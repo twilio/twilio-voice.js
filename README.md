@@ -1,14 +1,14 @@
-@twilio/voice-client-sdk
+@twilio/voice-sdk
 ====================
 
-[![Travis Build Status](https://travis-ci.org/twilio/twilio-client.js.svg?branch=master)](https://travis-ci.org/twilio/twilio-client.js) [![NPM](https://img.shields.io/npm/v/twilio-client.svg)](https://www.npmjs.com/package/twilio-client)
+[![Travis Build Status](https://travis-ci.org/twilio/twilio.js.svg?branch=master)](https://travis-ci.org/twilio/twilio-voice.js) [![NPM](https://img.shields.io/npm/v/twilio-voice.svg)](https://www.npmjs.com/package/twilio-voice)
 
-Twilio Voice Client SDK allows you to add real-time voice and PSTN calling to your web apps.
+Twilio's Voice SDK allows you to add real-time voice and PSTN calling to your web apps.
 
-* [API Docs](https://twilio.github.io/twilio-client.js/index.html)
+* [API Docs](https://twilio.github.io/twilio-voice.js/index.html)
 * [More Docs](https://www.twilio.com/docs/voice/client/javascript/overview)
 * [Quickstart](https://www.twilio.com/docs/voice/client/javascript/quickstart)
-* [Changelog](https://github.com/twilio/twilio-client.js/blob/master/CHANGELOG.md)
+* [Changelog](https://github.com/twilio/twilio-voice.js/blob/master/CHANGELOG.md)
 
 ### Technical Support
 If you need technical support, contact
@@ -19,27 +19,27 @@ Installation
 
 ### NPM
 
-We recommend using `npm` to add the Client SDK as a dependency.
+We recommend using `npm` to add the Voice SDK as a dependency.
 
 ```
-npm install @twilio/voice-client-sdk --save
+npm install @twilio/voice-sdk --save
 ```
 
-Using this method, you can `import` the Voice Client SDK using ES Module or TypeScript syntax:
+Using this method, you can `import` the Voice SDK using ES Module or TypeScript syntax:
 
 ```js
-import { Device } from '@twilio/voice-client-sdk';
+import { Device } from '@twilio/voice-sdk';
 
 ```
 
 Or using CommonJS:
 
 ```js
-const Device = require('@twilio/voice-client-sdk').Device;
+const Device = require('@twilio/voice-sdk').Device;
 ```
 
 ### CDN
-As of 2.0, the Twilio Voice Client SDK is no longer hosted via CDN.
+As of 2.0, the Twilio Voice SDK is no longer hosted via CDN.
 
 Testing
 -------
@@ -85,7 +85,7 @@ These tests will run via karma, one at a time, in your system's default Chrome a
 Content Security Policy (CSP)
 ----------------------------
 
-Use the following policy directives to enable [CSP](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP) that is compatible with twilio-client.js.
+Use the following policy directives to enable [CSP](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP) that is compatible with twilio-voice.js.
 
 ```
 script-src https://media.twiliocdn.com https://sdk.twilio.com
@@ -110,4 +110,4 @@ connect-src https://eventgw.twilio.com https://media.twiliocdn.com https://sdk.t
 License
 -------
 
-See [LICENSE.md](https://github.com/twilio/twilio-client.js/blob/master/LICENSE.md)
+See [LICENSE.md](https://github.com/twilio/twilio-voice.js/blob/master/LICENSE.md)

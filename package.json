@@ -1,19 +1,20 @@
 {
-  "name": "@twilio/voice-client-sdk",
+  "name": "@twilio/voice-sdk",
   "version": "2.0.0-dev",
-  "description": "Twilio Voice Client SDK",
+  "description": "Twilio's JavaScript Voice SDK",
   "main": "./es5/twilio.js",
   "types": "./es5/twilio.d.ts",
   "license": "Apache-2.0",
   "keywords": [
     "twilio",
     "client",
+    "sdk",
     "voice",
     "voip"
   ],
   "repository": {
     "type": "git",
-    "url": "git@github.com:twilio/twilio-client.js.git"
+    "url": "git@github.com:twilio/twilio-voice.js.git"
   },
   "scripts": {
     "build": "npm-run-all clean build:constants build:errors docs:ts build:es5 build:ts build:dist build:dist-min",
@@ -21,7 +22,7 @@
     "build:es5": "rimraf ./es5 && babel lib -d es5",
     "build:dev": "ENV=dev npm run build",
     "build:dist": "node ./scripts/build.js ./lib/browser.js ./LICENSE.md ./dist/twilio.js",
-    "build:dist-min": "uglifyjs ./dist/twilio.js -o ./dist/twilio.min.js --comments \"/^! twilio-client.js/\" -b beautify=false,ascii_only=true",
+    "build:dist-min": "uglifyjs ./dist/twilio.js -o ./dist/twilio.min.js --comments \"/^! twilio-voice.js/\" -b beautify=false,ascii_only=true",
     "build:release": "npm-run-all lint build test:webpack test:es5 status",
     "build:ts": "./node_modules/typescript/bin/tsc",
     "build:constants": "node ./scripts/constants.js",
