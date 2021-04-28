@@ -267,7 +267,7 @@ class Device extends EventEmitter {
   private static _isUnifiedPlanDefault: boolean | undefined;
 
   /**
-   * Initializes the AudioContext instance shared across the Client SDK,
+   * Initializes the AudioContext instance shared across the Voice SDK,
    * or returns the existing instance if one has already been initialized.
    */
   private static _getOrCreateAudioContext(): AudioContext | undefined {

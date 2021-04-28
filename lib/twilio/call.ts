@@ -857,7 +857,7 @@ class Call extends EventEmitter {
     // Basically, there's a sequencing problem with the way PeerConnection raises
     // the
     //
-    //   Cannot establish call. Client is disconnected
+    //   Cannot establish call. SDK is disconnected
     //
     // error in Call#accept. It calls PeerConnection#onerror, which emits
     // the error event on Call. An error handler on Call then calls
