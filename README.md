@@ -1,10 +1,17 @@
 ## This version is currently in the Pilot phase!
 This product, Twilio's JavaScript Voice SDK, is the next version of Twilio's Javascript Client SDK. It
 is currently in the Pilot phase while we gather customer feedback. In this phase, it is possible that some
-aspects of the API may change before GA. If you'd prefer, you can use the 
+aspects of the API may change before GA. If you'd prefer, you can use the
 [stable version of the SDK](https://github.com/twilio/twilio-client.js).
 
 If you're interested in testing out the 2.0 pilot, see our [migration guide](https://www.twilio.com/docs/voice/client/migrating-to-js-voice-sdk-20).
+
+Until the JavaScript Voice SDK goes GA, we recommend installing the SDK by using this Github repository.
+Once version 2.0 goes GA, we recommend installing the SDK as usual through the `npm` package `@twilio/voice-sdk`.
+
+```
+npm install git+https://github.com/twilio/twilio-voice.js.git#2.0.0
+```
 
 @twilio/voice-sdk
 ====================
