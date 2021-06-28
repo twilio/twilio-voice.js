@@ -56,6 +56,41 @@ const Device = require('@twilio/voice-sdk').Device;
 ### CDN
 As of 2.0, the Twilio Voice SDK is no longer hosted via CDN.
 
+### Github
+
+You can get the Twilio Voice SDK code from Github and include it in your project directly. To do so,
+navigate to ["Releases"](https://github.com/twilio/twilio-voice.js/releases) and find the most recent release, or
+the particular release version you'd like to use.
+
+> **Note:** releases tagged with "-rc" are "Release Candidate" versions
+> and are still being tested. Unless you specifically know that you want to use a release candidate
+> version, you should not use a release with "-rc" in the name.
+
+Download either the `zip` or the `tar.gz` and then extract the files. For example, if you downloaded the
+tarball for the `2.0.0` release, you could then extract the files with the `tar` command:
+
+```
+tar -xvzf twilio-voice.js-2.0.0.tar.gz
+cd twilio-voice.js-2.0.0
+```
+
+Once you've extracted the folder, the `twilio.js` and `twilio.min.js` files that
+you can include in your project will be in the `/dist` directory. `twilio.min.js` is the
+minified version of the code.
+
+You can copy either thet `twilio.js` or the `twilio.min.js` file into your project and
+then provide a link to it in your html. For example:
+
+```
+<script type="text/javascript" src="twilio.min.js"></script>
+```
+
+Using this method, you can access the SDK through the browser global:
+
+```
+const Device = Twilio.Device;
+```
+
 Testing
 -------
 
