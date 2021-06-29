@@ -78,7 +78,7 @@ Once you've extracted the folder, the `twilio.js` and `twilio.min.js` files that
 you can include in your project will be in the `/dist` directory. `twilio.min.js` is the
 minified version of the code.
 
-You can copy either thet `twilio.js` or the `twilio.min.js` file into your project and
+You can copy either the `twilio.js` or the `twilio.min.js` file into your project and
 then provide a link to it in your html. For example:
 
 ```
