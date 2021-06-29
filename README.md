@@ -6,7 +6,7 @@ aspects of the API may change before GA. If you'd prefer, you can use the
 
 If you're interested in testing out the 2.0 pilot, see our [migration guide](https://www.twilio.com/docs/voice/client/migrating-to-js-voice-sdk-20).
 
-Until the JavaScript Voice SDK goes GA, we recommend installing the SDK by using this Github repository.
+Until the JavaScript Voice SDK goes GA, we recommend installing the SDK by using this GitHub repository.
 Once version 2.0 goes GA, we recommend installing the SDK as usual through the `npm` package `@twilio/voice-sdk`.
 
 ```
@@ -56,9 +56,9 @@ const Device = require('@twilio/voice-sdk').Device;
 ### CDN
 As of 2.0, the Twilio Voice SDK is no longer hosted via CDN.
 
-### Github
+### GitHub
 
-You can get the Twilio Voice SDK code from Github and include it in your project directly. To do so,
+You can get the Twilio Voice SDK code from GitHub and include it in your project directly. To do so,
 navigate to ["Releases"](https://github.com/twilio/twilio-voice.js/releases) and find the most recent release, or
 the particular release version you'd like to use.
 
