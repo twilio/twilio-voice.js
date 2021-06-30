@@ -23,15 +23,10 @@ describe('SHAKEN/STIR', function() {
     device1 = new Device(token1);
     device2 = new Device(token2);
 
-    const deviceReadyPromise = Promise.all([
-      expectEvent(Device.EventName.Registered, device1),
-      expectEvent(Device.EventName.Registered, device2),
+    return Promise.all([
+      device1.register(),
+      device2.register(),
     ]);
-
-    device1.register();
-    device2.register();
-
-    return deviceReadyPromise;
   });
 
   after(() => {
@@ -49,9 +44,14 @@ describe('SHAKEN/STIR', function() {
   describe('device 1 calls device 2', () => {
 
     describe('with pstream sending additional params', () => {
+      let call1: Call;
+      let call2: Call;
 
-      before(done => {
-        device2.once(Device.EventName.Incoming, () => done());
+      before(() => new Promise(async resolve => {
+        device2.once(Device.EventName.Incoming, (call: Call) => {
+          resolve();
+          call2 = call;
+        });
         const devShim = device2 as any;
         devShim._stream.transport.__onSocketMessage = devShim._stream.transport._onSocketMessage;
         devShim._stream.transport._onSocketMessage = (message: any) => {
@@ -65,27 +65,18 @@ describe('SHAKEN/STIR', function() {
             message.data = JSON.stringify(data);
           }
           return devShim._stream.transport.__onSocketMessage(message);
-        }
+        };
 
-        (device1['connect'] as any)({
+        call1 = await (device1['connect'] as any)({
           params: { CallerId: (env as any).callerId },
         });
-      });
+      }));
 
       describe('and device 2 accepts', () => {
-        let call1: Call;
-        let call2: Call;
-
         beforeEach(() => {
-          const conn1: Call | undefined | null = device1.activeCall || device1.calls[0];
-          const conn2: Call | undefined | null = device2.activeCall || device2.calls[0];
-
-          if (!conn1 || !conn2) {
+          if (!call1 || !call2) {
             throw new Error(`Calls weren't both open at beforeEach`);
           }
-
-          call1 = conn1;
-          call2 = conn2;
         });
 
         it('should set callerInfo to null on origin call', () => {
@@ -104,9 +95,3 @@ describe('SHAKEN/STIR', function() {
     });
   });
 });
-
-function expectEvent(eventName: string, emitter: EventEmitter) {
-  return new Promise(resolve => {
-    emitter.once(eventName, () => resolve());
-  });
-}

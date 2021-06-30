@@ -159,18 +159,6 @@ describe('Device', function() {
         };
       });
 
-      describe('.activeCall', () => {
-        it('should return "null" if there is no active Call', () => {
-          assert.equal(device.activeCall, null);
-        });
-
-        it('should return the active Call if one exists', async () => {
-          const call = await device.connect();
-          assert.equal(device.activeCall, call);
-          assert.equal(device.activeCall, activeCall);
-        });
-      });
-
       describe('.connect(params?, audioConstraints?, iceServers?)', () => {
         it('should reject if there is already an active call', async () => {
           await device.connect();
@@ -204,8 +192,8 @@ describe('Device', function() {
           assert.equal(await device.connect(), activeCall);
         });
 
-        it('should set .activeCall', async () => {
-          assert.equal(await device.connect(), device.activeCall);
+        it('should set ._activeCall', async () => {
+          assert.equal(await device.connect(), device['_activeCall']);
         });
 
         it('should play outgoing sound after accepted if enabled', async () => {
@@ -586,7 +574,7 @@ describe('Device', function() {
             pstream.emit('invite', { callsid: 'foo', sdp: 'bar' });
             await clock.tickAsync(0);
             assert.equal(device.calls.length, 1);
-            assert.notEqual(device.calls[0], device.activeCall);
+            assert.notEqual(device.calls[0], device['_activeCall']);
           });
 
           it('should not play the incoming sound', async () => {
@@ -650,7 +638,7 @@ describe('Device', function() {
           it('should should set the active call', () => {
             const call = device.calls[0];
             call.emit('accept');
-            assert.equal(call, device.activeCall);
+            assert.equal(call, device['_activeCall']);
           });
 
           it('should should remove the call', () => {
@@ -692,10 +680,10 @@ describe('Device', function() {
             const call = device.calls[0];
             call.emit('accept');
             assert.equal(typeof call, 'object');
-            assert.equal(call, device.activeCall);
+            assert.equal(call, device['_activeCall']);
 
             call.emit('disconnect');
-            assert.equal(device.activeCall, null);
+            assert.equal(device['_activeCall'], null);
           });
         });
 
@@ -831,10 +819,10 @@ describe('Device', function() {
 
         it('should not set the active call until the stream resolves', async () => {
           const connectPromise = device.connect();
-          assert.equal(device.activeCall, null);
+          assert.equal(device['_activeCall'], null);
           pstream.emit('connected', { region: 'US_EAST_VIRGINIA' });
           await connectPromise;
-          assert(device.activeCall);
+          assert(device['_activeCall']);
         });
       });
 

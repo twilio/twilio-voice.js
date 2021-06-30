@@ -516,13 +516,6 @@ class Device extends EventEmitter {
   }
 
   /**
-   * Return the active {@link Call}.
-   */
-  get activeCall(): Call | null {
-    return this._activeCall;
-  }
-
-  /**
    * Return the {@link AudioHelper} used by this {@link Device}.
    */
   get audio(): AudioHelper | null {
@@ -614,7 +607,7 @@ class Device extends EventEmitter {
    * Whether the Device is currently on an active Call.
    */
   get isBusy(): boolean {
-    return !!this.activeCall;
+    return !!this._activeCall;
   }
 
   /**

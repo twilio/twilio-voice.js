@@ -1,10 +1,32 @@
+2.0.0 (In Progress) - Release
+===================
+
+Breaking API Changes
+--------------------
+
+### Active call no longer accessible through the Device object.
+
+To future-proof the SDK, `Device.activeCall` is no longer available. Instead,
+the application should keep track of active calls itself, i.e. when accepting an
+incoming call or when making an outgoing call.
+
+```ts
+const token = '...';
+const options = { ... };
+const device = new Device(token, options);
+
+await device.register();
+
+const activeCall = await device.connect();
+```
+
 2.0.0 (Apr 30, 2021) - Pilot
 ===================
 
 #### This version is currently in the Pilot phase!
 This product, Twilio's JavaScript Voice SDK, is the next version of Twilio's Javascript Client SDK. It
 is currently in the Pilot phase while we gather customer feedback. In this phase, it is possible that some
-aspects of the API may change before GA. If you'd prefer, you can use the 
+aspects of the API may change before GA. If you'd prefer, you can use the
 [stable version of the SDK](https://github.com/twilio/twilio-client.js).
 
 If you're interested in testing out the 2.0 pilot, see our [migration guide](https://www.twilio.com/docs/voice/client/migrating-to-js-voice-sdk-20).
@@ -336,4 +358,3 @@ Fixes
 The formula used to calculate the mean-opinion score (MOS) has been fixed for
 extreme network conditions. These fixes will not affect scores for nominal
 network conditions.
-

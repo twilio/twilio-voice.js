@@ -1,5 +1,4 @@
 import * as assert from 'assert';
-import { EventEmitter } from 'events';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../lib/token';
@@ -43,27 +42,24 @@ describe('Device', function() {
   });
 
   describe('device 1 calls device 2', () => {
-    before(done => {
-      device2.once(Device.EventName.Incoming, () => done());
-      (device1['connect'] as any)({
+    let call1: Call;
+    let call2: Call;
+
+    before(() => new Promise(async resolve => {
+      device2.once(Device.EventName.Incoming, (call: Call) => {
+        call2 = call;
+        resolve();
+      });
+      call1 = await (device1['connect'] as any)({
         params: { To: identity2, Custom1: 'foo + bar', Custom2: undefined, Custom3: '我不吃蛋' }
       });
-    });
+    }));
 
     describe('and device 2 accepts', () => {
-      let call1: Call;
-      let call2: Call;
-
       beforeEach(() => {
-        const conn1: Call | undefined | null = device1.activeCall || device1.calls[0];
-        const conn2: Call | undefined | null = device2.activeCall || device2.calls[0];
-
-        if (!conn1 || !conn2) {
+        if (!call1 || !call2) {
           throw new Error(`Calls weren't both open at beforeEach`);
         }
-
-        call1 = conn1;
-        call2 = conn2;
       });
 
       it('should connect the call', (done) => {
@@ -118,11 +114,10 @@ describe('Device', function() {
       });
 
       it('should update network priority to high if supported', () => {
-        const conn = device2 && device2.activeCall;
-        if (!conn || !conn['_mediaHandler'] || !conn['_mediaHandler']._sender) {
+        if (!call2 || !call2['_mediaHandler'] || !call2['_mediaHandler']._sender) {
           throw new Error('Expected sender to be present');
         }
-        const sender = conn['_mediaHandler']._sender;
+        const sender = call2['_mediaHandler']._sender;
         const params = sender.getParameters();
         const encoding = params.encodings && params.encodings[0];
 
@@ -163,9 +158,3 @@ describe('Device', function() {
     });
   });
 });
-
-function expectEvent(eventName: string, emitter: EventEmitter) {
-  return new Promise(resolve => {
-    emitter.once(eventName, () => resolve());
-  });
-}
