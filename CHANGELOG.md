@@ -6,9 +6,8 @@ Breaking API Changes
 
 ### Active call no longer accessible through the Device object.
 
-`Device.activeCall` is no longer available. Instead,
-the application should keep track of active calls itself, i.e. when accepting an
-incoming call or when making an outgoing call.
+`Device.activeCall` is no longer available. Instead, the application should keep
+a reference to any call that is made using connect or accepted.
 
 ```ts
 const token = '...';
@@ -17,7 +16,7 @@ const device = new Device(token, options);
 
 await device.register();
 
-const activeCall = await device.connect();
+const call = await device.connect();
 ```
 
 2.0.0 (Apr 30, 2021) - Pilot
