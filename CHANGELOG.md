@@ -6,7 +6,7 @@ Breaking API Changes
 
 ### Active call no longer accessible through the Device object.
 
-To future-proof the SDK, `Device.activeCall` is no longer available. Instead,
+`Device.activeCall` is no longer available. Instead,
 the application should keep track of active calls itself, i.e. when accepting an
 incoming call or when making an outgoing call.
 
