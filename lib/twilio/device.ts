@@ -751,12 +751,7 @@ class Device extends EventEmitter {
     this._setupPublisher();
 
     if (hasChunderURIsChanged && this._streamConnectedPromise) {
-      const shouldReRegister = this.state === Device.State.Registered;
-      this._setupStream().then(async () => {
-        if (shouldReRegister) {
-          await this.register();
-        }
-      });
+      this._setupStream();
     }
 
     // Setup close protection and make sure we clean up ongoing calls on unload.
@@ -1288,7 +1283,7 @@ class Device extends EventEmitter {
     this._stream.addListener('offline', this._onSignalingOffline);
     this._stream.addListener('ready', this._onSignalingReady);
 
-    return this._streamConnectedPromise = new Promise<this>(resolve =>
+    return this._streamConnectedPromise = new Promise<IPStream>(resolve =>
       this._stream.once('connected', () => {
         resolve(this._stream);
       }),
