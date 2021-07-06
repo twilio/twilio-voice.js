@@ -45,6 +45,33 @@ describe('mutable options', function() {
     });
   });
 
+  it('should not throw during re-registration', async function() {
+    this.timeout(10000);
+
+    const dev = device = new Device(token, { edge: 'sydney' });
+
+    await dev.register();
+
+    const regCalls: Array<Promise<any>> = [];
+
+    dev.register = () => {
+      const regCall = Device.prototype.register.call(dev);
+      regCalls.push(regCall);
+      return regCall;
+    };
+
+    const registeredPromise = new Promise(resolve => {
+      dev.once(Device.EventName.Registered, resolve);
+    });
+
+    dev.updateOptions({ edge: 'ashburn' });
+
+    await registeredPromise;
+
+    assert(regCalls.length);
+    await Promise.all(regCalls);
+  });
+
   context('ongoing calls', function() {
     this.timeout(30000);
 
