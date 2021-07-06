@@ -377,6 +377,30 @@ describe('Device', function() {
           sinon.assert.calledOnce(setupStreamSpy);
         });
 
+        it('should not throw during re-registration', async () => {
+          await registerDevice();
+
+          const regCalls: Array<Promise<any>> = [];
+
+          device.register = () => {
+            const regCall = Device.prototype.register.call(device);
+            regCalls.push(regCall);
+            return regCall;
+          };
+
+          device.updateOptions({ edge: 'sydney' });
+
+          pstream.emit('offline');
+          await clock.tickAsync(0);
+          pstream.emit('connected', { region: 'EU_IRELAND' });
+          await clock.tickAsync(0);
+          pstream.emit('ready');
+          await clock.tickAsync(0);
+
+          assert(regCalls.length);
+          await Promise.all(regCalls);
+        });
+
         describe('log', () => {
           let setDefaultLevelStub: any;
 
