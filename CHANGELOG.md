@@ -1,5 +1,13 @@
-2.0.0 (In Progress) - Release
+2.1.0 (In Progress) - Release
 ===================
+
+Fixes
+-----
+
+### Error updating `edge` parameter with `Device.updateOptions`
+
+An error surrounding re-registration was fixed that occurred when updating the
+`edge` option.
 
 Breaking API Changes
 --------------------
