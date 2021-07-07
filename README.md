@@ -5,7 +5,7 @@ For help on migrating from 1.x, see our [migration guide](https://www.twilio.com
 
 #### Pilot Versioning Note
 During the pilot phase, the GitHub release artifact was referred to as `2.0.0`. This has been retroactively corrected
-to the appropriate tag, `2.0.0-preview.1`. With GA, we move to 2.0.0 formally. This versioning fix was necessary
+to the appropriate tag, `2.0.0-preview.1`. With GA, we move to `2.0.0` formally. This versioning fix was necessary
 to properly follow semantic versioning rules.
 
 @twilio/voice-sdk
