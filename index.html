@@ -52,21 +52,22 @@
 	<div class="row">
 		<div class="col-8 col-content">
 			<div class="tsd-panel tsd-typography">
-				<a href="#this-version-is-currently-in-the-pilot-phase" id="this-version-is-currently-in-the-pilot-phase" style="color: inherit; text-decoration: none;">
-					<h2>This version is currently in the Pilot phase!</h2>
+				<a href="#migration-from-twilio-clientjs-1x" id="migration-from-twilio-clientjs-1x" style="color: inherit; text-decoration: none;">
+					<h2>Migration from twilio-client.js 1.x</h2>
 				</a>
-				<p>This product, Twilio&#39;s JavaScript Voice SDK, is the next version of Twilio&#39;s Javascript Client SDK. It
-					is currently in the Pilot phase while we gather customer feedback. In this phase, it is possible that some
-					aspects of the API may change before GA. If you&#39;d prefer, you can use the
-				<a href="https://github.com/twilio/twilio-client.js">stable version of the SDK</a>.</p>
-				<p>If you&#39;re interested in testing out the 2.0 pilot, see our <a href="https://www.twilio.com/docs/voice/client/migrating-to-js-voice-sdk-20">migration guide</a>.</p>
-				<p>Until the JavaScript Voice SDK goes GA, we recommend installing the SDK by using this Github repository.
-				Once version 2.0 goes GA, we recommend installing the SDK as usual through the <code>npm</code> package <code>@twilio/voice-sdk</code>.</p>
-				<pre><code>npm install git+https:<span class="hljs-regexp">//gi</span>thub.com<span class="hljs-regexp">/twilio/</span>twilio-voice.js.git<span class="hljs-comment">#2.0.0</span></code></pre>
+				<p>This product, Twilio&#39;s JavaScript Voice SDK, is the next version of Twilio&#39;s Javascript Client SDK. It is
+					now in GA and we recommend all customers migrate in order to continue receiving future feature additions.
+				For help on migrating from 1.x, see our <a href="https://www.twilio.com/docs/voice/client/migrating-to-js-voice-sdk-20">migration guide</a>.</p>
+				<a href="#pilot-versioning-note" id="pilot-versioning-note" style="color: inherit; text-decoration: none;">
+					<h4>Pilot Versioning Note</h4>
+				</a>
+				<p>During the pilot phase, the GitHub release artifact was referred to as <code>2.0.0</code>. This has been retroactively corrected
+					to the appropriate tag, <code>2.0.0-preview.1</code>. With GA, we move to <code>2.0.0</code> formally. This versioning fix was necessary
+				to properly follow semantic versioning rules.</p>
 				<a href="#twiliovoice-sdk" id="twiliovoice-sdk" style="color: inherit; text-decoration: none;">
 					<h1>@twilio/voice-sdk</h1>
 				</a>
-				<p><a href="https://travis-ci.org/twilio/twilio-voice.js"><img src="https://travis-ci.org/twilio/twilio.js.svg?branch=master" alt="Travis Build Status"></a> <a href="https://www.npmjs.com/package/twilio-voice"><img src="https://img.shields.io/npm/v/twilio-voice.svg" alt="NPM"></a></p>
+				<p><a href="https://travis-ci.com/twilio/twilio-voice.js"><img src="https://travis-ci.com/twilio/twilio.js.svg?branch=master" alt="Travis Build Status"></a> <a href="https://www.npmjs.com/package/twilio-voice"><img src="https://img.shields.io/npm/v/twilio-voice.svg" alt="NPM"></a></p>
 				<p>Twilio&#39;s Voice SDK allows you to add real-time voice and PSTN calling to your web apps.</p>
 				<ul>
 					<li><a href="https://twilio.github.io/twilio-voice.js/index.html">API Docs</a></li>
@@ -95,6 +96,28 @@
 					<h3>CDN</h3>
 				</a>
 				<p>As of 2.0, the Twilio Voice SDK is no longer hosted via CDN.</p>
+				<a href="#github" id="github" style="color: inherit; text-decoration: none;">
+					<h3>GitHub</h3>
+				</a>
+				<p>Although we recommend using <code>npm</code> to add the Voice SDK as a dependency, you can also get the Twilio Voice SDK code
+					from GitHub and include it in your project directly. To do so, navigate to
+					<a href="https://github.com/twilio/twilio-voice.js/releases">&quot;Releases&quot;</a> and find the most recent release, or
+				the particular release version you&#39;d like to use.</p>
+				<blockquote>
+					<p><strong>Note:</strong> releases tagged with &quot;-rc&quot; are &quot;Release Candidate&quot; versions
+						and are still being tested. Unless you specifically know that you want to use a release candidate
+					version, you should not use a release with &quot;-rc&quot; in the name.</p>
+				</blockquote>
+				<p>Download either the <code>zip</code> or the <code>tar.gz</code> and then extract the files. For example, if you downloaded the
+				tarball for the <code>2.0.0</code> release, you could then extract the files with the <code>tar</code> command:</p>
+				<pre><code><span class="hljs-selector-tag">tar</span> <span class="hljs-selector-tag">-xvzf</span> <span class="hljs-selector-tag">twilio-voice</span><span class="hljs-selector-class">.js-2</span><span class="hljs-selector-class">.0</span><span class="hljs-selector-class">.0</span><span class="hljs-selector-class">.tar</span><span class="hljs-selector-class">.gz</span>
+<span class="hljs-selector-tag">cd</span> <span class="hljs-selector-tag">twilio-voice</span><span class="hljs-selector-class">.js-2</span><span class="hljs-selector-class">.0</span><span class="hljs-selector-class">.0</span></code></pre><p>Once you&#39;ve extracted the folder, the <code>twilio.js</code> and <code>twilio.min.js</code> files that
+					you can include in your project will be in the <code>/dist</code> directory. <code>twilio.min.js</code> is the
+				minified version of the code.</p>
+				<p>You can copy either the <code>twilio.js</code> or the <code>twilio.min.js</code> file into your project and
+				then provide a link to it in your html. For example:</p>
+				<pre><code><span class="hljs-tag">&lt;<span class="hljs-name">script</span> <span class="hljs-attr">type</span>=<span class="hljs-string">"text/javascript"</span> <span class="hljs-attr">src</span>=<span class="hljs-string">"twilio.min.js"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-name">script</span>&gt;</span></code></pre><p>Using this method, you can access the SDK through the browser global:</p>
+				<pre><code>const Device = Twilio.Device<span class="hljs-comment">;</span></code></pre>
 				<a href="#testing" id="testing" style="color: inherit; text-decoration: none;">
 					<h2>Testing</h2>
 				</a>
