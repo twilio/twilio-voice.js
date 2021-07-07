@@ -1,17 +1,7 @@
-## This version is currently in the Pilot phase!
-This product, Twilio's JavaScript Voice SDK, is the next version of Twilio's Javascript Client SDK. It
-is currently in the Pilot phase while we gather customer feedback. In this phase, it is possible that some
-aspects of the API may change before GA. If you'd prefer, you can use the
-[stable version of the SDK](https://github.com/twilio/twilio-client.js).
-
-If you're interested in testing out the 2.0 pilot, see our [migration guide](https://www.twilio.com/docs/voice/client/migrating-to-js-voice-sdk-20).
-
-Until the JavaScript Voice SDK goes GA, we recommend installing the SDK by using this GitHub repository.
-Once version 2.0 goes GA, we recommend installing the SDK as usual through the `npm` package `@twilio/voice-sdk`.
-
-```
-npm install git+https://github.com/twilio/twilio-voice.js.git#2.0.0
-```
+## Migration from twilio-client.js 1.x
+This product, Twilio's JavaScript Voice SDK, is the next version of Twilio's Javascript Client SDK. It is
+now in GA and we recommend all customers migrate in order to continue receiving future feature additions.
+For help on migrating from 1.x, see our [migration guide](https://www.twilio.com/docs/voice/client/migrating-to-js-voice-sdk-20).
 
 #### Pilot Versioning Note
 During the pilot phase, the GitHub release artifact was referred to as `2.0.0`. This has been retroactively corrected
@@ -19,7 +9,7 @@ to the appropriate tag, `2.0.0-preview.1`. With GA, we move to 2.0.0 formally. T
 to properly follow semantic versioning rules.
 
 @twilio/voice-sdk
-====================
+=================
 
 [![Travis Build Status](https://travis-ci.org/twilio/twilio.js.svg?branch=master)](https://travis-ci.org/twilio/twilio-voice.js) [![NPM](https://img.shields.io/npm/v/twilio-voice.svg)](https://www.npmjs.com/package/twilio-voice)
 

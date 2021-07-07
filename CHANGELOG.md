@@ -1,5 +1,13 @@
-2.0.0 (In Progress) - Release
-===================
+2.0.0 (July 7, 2021) - Release
+==============================
+
+## Migration from twilio-client.js 1.x
+This product, Twilio's JavaScript Voice SDK, is the next version of Twilio's Javascript Client SDK. It is
+now in GA and we recommend all customers migrate in order to continue receiving future feature additions.
+For help on migrating from 1.x, see our [migration guide](https://www.twilio.com/docs/voice/client/migrating-to-js-voice-sdk-20).
+
+**Note:**: These changes are cumulative with the 2.0.0-preview.1 changes below. If you are looking to
+upgrade from twilio-client.js 1.x, see the 2.0.0-preview.1 section below for the full 2.0 changelog.
 
 Fixes
 -----
@@ -29,14 +37,6 @@ const call = await device.connect();
 
 2.0.0-preview.1 (Apr 30, 2021) - Pilot
 ======================================
-
-#### This version is currently in the Pilot phase!
-This product, Twilio's JavaScript Voice SDK, is the next version of Twilio's Javascript Client SDK. It
-is currently in the Pilot phase while we gather customer feedback. In this phase, it is possible that some
-aspects of the API may change before GA. If you'd prefer, you can use the
-[stable version of the SDK](https://github.com/twilio/twilio-client.js).
-
-If you're interested in testing out the 2.0 pilot, see our [migration guide](https://www.twilio.com/docs/voice/client/migrating-to-js-voice-sdk-20).
 
 Breaking API Changes
 --------------------
