@@ -1,4 +1,4 @@
-2.1.0 (In Progress) - Release
+2.0.0 (In Progress) - Release
 ===================
 
 Fixes
@@ -27,8 +27,8 @@ await device.register();
 const call = await device.connect();
 ```
 
-2.0.0 (Apr 30, 2021) - Pilot
-===================
+2.0.0-preview.1 (Apr 30, 2021) - Pilot
+======================================
 
 #### This version is currently in the Pilot phase!
 This product, Twilio's JavaScript Voice SDK, is the next version of Twilio's Javascript Client SDK. It

@@ -13,6 +13,11 @@ Once version 2.0 goes GA, we recommend installing the SDK as usual through the `
 npm install git+https://github.com/twilio/twilio-voice.js.git#2.0.0
 ```
 
+#### Pilot Versioning Note
+During the pilot phase, the GitHub release artifact was referred to as `2.0.0`. This has been retroactively corrected
+to the appropriate tag, `2.0.0-preview.1`. With GA, we move to 2.0.0 formally. This versioning fix was necessary
+to properly follow semantic versioning rules.
+
 @twilio/voice-sdk
 ====================
 
