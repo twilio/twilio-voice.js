@@ -11,7 +11,7 @@ to properly follow semantic versioning rules.
 @twilio/voice-sdk
 =================
 
-[![Travis Build Status](https://travis-ci.com/twilio/twilio.js.svg?branch=master)](https://travis-ci.com/twilio/twilio-voice.js) [![NPM](https://img.shields.io/npm/v/twilio-voice.svg)](https://www.npmjs.com/package/twilio-voice)
+[![Travis Build Status](https://travis-ci.com/twilio/twilio.js.svg?branch=master)](https://travis-ci.com/twilio/twilio-voice.js) [![NPM](https://img.shields.io/npm/v/%40twilio/voice-sdk.svg)](https://www.npmjs.com/package/%40twilio/voice-sdk)
 
 Twilio's Voice SDK allows you to add real-time voice and PSTN calling to your web apps.
 
