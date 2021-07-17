@@ -1,31 +1,26 @@
 ## Migration from twilio-client.js 1.x
+
 This product, Twilio's JavaScript Voice SDK, is the next version of Twilio's Javascript Client SDK. It is
 now in GA and we recommend all customers migrate in order to continue receiving future feature additions.
-For help on migrating from 1.x, see our [migration guide](https://www.twilio.com/docs/voice/client/migrating-to-js-voice-sdk-20).
+For help on migrating from 1.x, see our [migration guide](https://www.twilio.com/docs/voice/sdks/javascript/migrating-to-js-voice-sdk-20).
 
-#### Pilot Versioning Note
-During the pilot phase, the GitHub release artifact was referred to as `2.0.0`. This has been retroactively corrected
-to the appropriate tag, `2.0.0-preview.1`. With GA, we move to `2.0.0` formally. This versioning fix was necessary
-to properly follow semantic versioning rules.
-
-@twilio/voice-sdk
-=================
+# @twilio/voice-sdk
 
 [![Travis Build Status](https://travis-ci.com/twilio/twilio.js.svg?branch=master)](https://travis-ci.com/twilio/twilio-voice.js) [![NPM](https://img.shields.io/npm/v/%40twilio/voice-sdk.svg)](https://www.npmjs.com/package/%40twilio/voice-sdk)
 
 Twilio's Voice SDK allows you to add real-time voice and PSTN calling to your web apps.
 
-* [API Docs](https://twilio.github.io/twilio-voice.js/index.html)
-* [More Docs](https://www.twilio.com/docs/voice/client/javascript/overview)
-* [Quickstart](https://www.twilio.com/docs/voice/client/javascript/quickstart)
-* [Changelog](https://github.com/twilio/twilio-voice.js/blob/master/CHANGELOG.md)
+- [API Docs](https://twilio.github.io/twilio-voice.js/index.html)
+- [More Docs](https://www.twilio.com/docs/voice/sdks/javascript)
+- [Quickstart](https://www.twilio.com/docs/voice/sdks/javascript/get-started)
+- [Changelog](https://github.com/twilio/twilio-voice.js/blob/master/CHANGELOG.md)
 
 ### Technical Support
+
 If you need technical support, contact
 [help@twilio.com](mailto:help@twilio.com).
 
-Installation
-------------
+## Installation
 
 ### NPM
 
@@ -38,17 +33,17 @@ npm install @twilio/voice-sdk --save
 Using this method, you can `import` the Voice SDK using ES Module or TypeScript syntax:
 
 ```js
-import { Device } from '@twilio/voice-sdk';
-
+import { Device } from "@twilio/voice-sdk";
 ```
 
 Or using CommonJS:
 
 ```js
-const Device = require('@twilio/voice-sdk').Device;
+const Device = require("@twilio/voice-sdk").Device;
 ```
 
 ### CDN
+
 As of 2.0, the Twilio Voice SDK is no longer hosted via CDN.
 
 ### GitHub
@@ -87,8 +82,7 @@ Using this method, you can access the SDK through the browser global:
 const Device = Twilio.Device;
 ```
 
-Testing
--------
+## Testing
 
 Running unit tests requires no setup aside from installation (above). You can run unit tests via:
 
@@ -128,8 +122,7 @@ npm run test:integration
 
 These tests will run via karma, one at a time, in your system's default Chrome and then Firefox.
 
-Content Security Policy (CSP)
-----------------------------
+## Content Security Policy (CSP)
 
 Use the following policy directives to enable [CSP](https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP) that is compatible with twilio-voice.js.
 
@@ -153,7 +146,6 @@ connect-src https://eventgw.twilio.com https://media.twiliocdn.com https://sdk.t
 connect-src https://eventgw.twilio.com https://media.twiliocdn.com https://sdk.twilio.com wss://chunderw-vpc-gll-us1.twilio.com wss://chunderw-vpc-gll-au1.twilio.com wss://chunderw-vpc-gll.twilio.com
 ```
 
-License
--------
+## License
 
 See [LICENSE.md](https://github.com/twilio/twilio-voice.js/blob/master/LICENSE.md)

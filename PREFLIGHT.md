@@ -1,10 +1,9 @@
-Preflight Test
-==============
+# Preflight Test
 
-The SDK supports a preflight test API which can help determine Voice calling readiness. The API creates a test call and will provide information to help troubleshoot call related issues. This new API is a static member of the [Device](https://www.twilio.com/docs/voice/client/javascript/device#twilio-device) class and can be used by calling `Device.testPreflight(token, options)`. For example:
+The SDK supports a preflight test API which can help determine Voice calling readiness. The API creates a test call and will provide information to help troubleshoot call related issues. This new API is a static member of the [Device](https://www.twilio.com/docs/voice/sdks/javascript/overview-1x-deprecated/device#twilio-device) class and can be used by calling `Device.testPreflight(token, options)`. For example:
 
 ```ts
-import { Device, PreflightTest } from 'twilio-client';
+import { Device, PreflightTest } from "twilio-client";
 
 const preflightTest = Device.testPreflight(token, options);
 
@@ -20,26 +19,29 @@ preflightTest.on(PreflightTest.Events.Failed, (error) => {
 ## Parameters
 
 ### Token
-`Device.testPreflight(token, options)` requires a [Twilio Access Token](https://www.twilio.com/docs/iam/access-tokens) to initiate the test call. This access token will be passed directly to the [Device's constructor](https://www.twilio.com/docs/voice/client/javascript/device#setup) and will be used to connect to a TwiML app that you associated with your [Twilio Access Token](https://www.twilio.com/docs/iam/access-tokens). In order to get better results, the TwiML app should be able to record audio from a microphone and play it back to the browser. Please see [Preflight Test TwiML App](#twiml-app---record-and-play) for details.
+
+`Device.testPreflight(token, options)` requires a [Twilio Access Token](https://www.twilio.com/docs/iam/access-tokens) to initiate the test call. This access token will be passed directly to the [Device's constructor](https://www.twilio.com/docs/voice/sdks/javascript/overview-1x-deprecated/device#setup) and will be used to connect to a TwiML app that you associated with your [Twilio Access Token](https://www.twilio.com/docs/iam/access-tokens). In order to get better results, the TwiML app should be able to record audio from a microphone and play it back to the browser. Please see [Preflight Test TwiML App](#twiml-app---record-and-play) for details.
 
 ### Options
+
 The `PreflightTest.Options` parameter is a JavaScript object containing configuration settings. Available settings are listed below:
 
-| Property | Default | Description |
-|:---------|:--------|:------------|
-| `codecPreferences` | `['pcmu', 'opus']` | An ordered list of preferred codecs. |
-| `debug` | `false` | Can be `true` or `false`. Set this property to true to enable debug logging in your browser console. |
-| `edge` | `roaming` | Specifies which Twilio `edge` to use when initiating the test call. Please see documentation on [edges](https://www.twilio.com/docs/voice/client/edges). |
-| `fakeMicInput` | `false` | If set to `true`, the test call will ignore microphone input and will use a default audio file. If set to `false`, the test call will capture the audio from the microphone. |
-| `iceServers` | `null` | An array of custom ICE servers to use to connect media. If you provide both STUN and TURN server configurations, the test will detect whether a TURN server is required to establish a connection. See [Using Twilio NTS for Generating STUN/TURN Credentials](#using-twilio-nts-for-generating-stunturn-credentials) |
-| `signalingTimeoutMs` | `10000` | Ammount of time to wait for setting up signaling connection. |
+| Property             | Default            | Description                                                                                                                                                                                                                                                                                                           |
+| :------------------- | :----------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `codecPreferences`   | `['pcmu', 'opus']` | An ordered list of preferred codecs.                                                                                                                                                                                                                                                                                  |
+| `debug`              | `false`            | Can be `true` or `false`. Set this property to true to enable debug logging in your browser console.                                                                                                                                                                                                                  |
+| `edge`               | `roaming`          | Specifies which Twilio `edge` to use when initiating the test call. Please see documentation on [edges](https://www.twilio.com/docs/voice/sdks/javascript/edges).                                                                                                                                                     |
+| `fakeMicInput`       | `false`            | If set to `true`, the test call will ignore microphone input and will use a default audio file. If set to `false`, the test call will capture the audio from the microphone.                                                                                                                                          |
+| `iceServers`         | `null`             | An array of custom ICE servers to use to connect media. If you provide both STUN and TURN server configurations, the test will detect whether a TURN server is required to establish a connection. See [Using Twilio NTS for Generating STUN/TURN Credentials](#using-twilio-nts-for-generating-stunturn-credentials) |
+| `signalingTimeoutMs` | `10000`            | Ammount of time to wait for setting up signaling connection.                                                                                                                                                                                                                                                          |
 
 ### Using Twilio NTS for Generating STUN/TURN Credentials
+
 The following example demonstrates how to use [Twilio's Network Traversal Service](https://www.twilio.com/stun-turn) to generate STUN/TURN credentials and how to specify a specific [edge location](https://www.twilio.com/docs/global-infrastructure/edge-locations).
 
 ```ts
-import Client from 'twilio';
-import { Device } from 'twilio-client';
+import Client from "twilio";
+import { Device } from "@twilio/voice-sdk";
 
 // Generate the STUN and TURN server credentials with a ttl of 120 seconds
 const client = Client(twilioAccountSid, authToken);
@@ -49,10 +51,10 @@ let iceServers = token.iceServers;
 
 // By default, global will be used as the default edge location.
 // You can replace global with a specific edge name for each of the iceServer configuration.
-iceServers = iceServers.map(config => {
+iceServers = iceServers.map((config) => {
   let { url, urls, ...rest } = config;
-  url = url.replace('global', 'ashburn');
-  urls = urls.replace('global', 'ashburn');
+  url = url.replace("global", "ashburn");
+  urls = urls.replace("global", "ashburn");
 
   return { url, urls, ...rest };
 });
@@ -61,17 +63,17 @@ iceServers = iceServers.map(config => {
 const preflightTest = Device.testPreflight(token, { iceServers });
 
 // Read from the report object to determine whether TURN is required to connect to media
-preflightTest.on('completed', (report) => {
+preflightTest.on("completed", (report) => {
   console.log(report.isTurnRequired);
 });
 ```
 
-Events
-------
+## Events
 
 The `PreflightTest` object that is returned by `Device.testPreflight(token, options)` is an [EventEmitter](https://nodejs.org/api/events.html#events_class_eventemitter), and as such its events can be subscribed to via `preflightTest.on(eventName, handler)`. The following is a list of all supported events that might get emitted throughout the duration of the test.
 
 #### .on('completed', handler(report))
+
 Raised when `PreflightTest.status` has transitioned to `PreflightTest.Status.Completed`. During this time, the `report` is available and ready to be inspected. This will not trigger if a fatal error is encountered during the test. Example report:
 
 ```js
@@ -215,7 +217,7 @@ Raised when `PreflightTest.status` has transitioned to `PreflightTest.Status.Com
   /**
    * Array of samples collected during the test.
    * See sample object format here
-   * https://www.twilio.com/docs/voice/client/javascript/connection#sample
+   * https://www.twilio.com/docs/voice/sdks/javascript/overview-1x-deprecated/connection#sample
    */
   "samples": [...],
 
@@ -237,15 +239,19 @@ Raised when `PreflightTest.status` has transitioned to `PreflightTest.Status.Com
 ```
 
 #### .on('connected', handler())
+
 Raised when `PreflightTest.status` has transitioned to `PreflightTest.Status.Connected`. This means, the connection to Twilio has been established.
 
 #### .on('failed', handler(error))
-Raised when `PreflightTest.status` has transitioned to `PreflightTest.Status.Failed`. This happens when establishing a connection to Twilio has failed or when a test call has encountered a fatal error. This is also raised if `PreflightTest.stop` is called while the test is in progress. The error emitted from this event is coming from [Device.on('error)](https://www.twilio.com/docs/voice/client/javascript/device#error) and uses the same error format.
+
+Raised when `PreflightTest.status` has transitioned to `PreflightTest.Status.Failed`. This happens when establishing a connection to Twilio has failed or when a test call has encountered a fatal error. This is also raised if `PreflightTest.stop` is called while the test is in progress. The error emitted from this event is coming from [Device.on('error)](https://www.twilio.com/docs/voice/sdks/javascript/overview-1x-deprecated/device#error) and uses the same error format.
 
 #### .on('sample', handler(sample))
-This event is published every second and is raised when the [Connection](https://www.twilio.com/docs/voice/client/javascript/connection) gets a webrtc sample object. The `sample` object is coming from [Connection.on('sample')](https://www.twilio.com/docs/voice/client/javascript/connection#sample) and uses the same `sample` format.
+
+This event is published every second and is raised when the [Connection](https://www.twilio.com/docs/voice/sdks/javascript/overview-1x-deprecated/connection) gets a webrtc sample object. The `sample` object is coming from [Connection.on('sample')](https://www.twilio.com/docs/voice/sdks/javascript/overview-1x-deprecated/connection#sample) and uses the same `sample` format.
 
 #### .on('warning', handler(warning))
+
 Raised whenever the test encounters a warning. Example warning data:
 
 ```ts
@@ -269,42 +275,40 @@ Raised whenever the test encounters a warning. Example warning data:
 }
 ```
 
-Properties
-----------
+## Properties
+
 You can access the following properties on the `PreflightTest` object:
 
-* `callSid` - The callsid generated for the test call. This is set when the client has finished connecting to Twilio.
-* `endTime` - A timestamp in milliseconds of when the test ended. This is set when the test has completed and raised the `completed` event.
-* `latestSample` - The latest WebRTC sample collected. This is set whenever the connection emits a `sample`. Please see [Connection.on('sample')](https://www.twilio.com/docs/voice/client/javascript/connection#sample) API for more details.
-* `report` - The report for this test. This is set when the test has completed and raised the `completed` event.
-* `startTime` - A timestamp in milliseconds of when the test started. This is set right after calling `Device.testPreflight(token, options)`.
-* `status` - The status of the test. Below are the possible values for this property.
+- `callSid` - The callsid generated for the test call. This is set when the client has finished connecting to Twilio.
+- `endTime` - A timestamp in milliseconds of when the test ended. This is set when the test has completed and raised the `completed` event.
+- `latestSample` - The latest WebRTC sample collected. This is set whenever the connection emits a `sample`. Please see [Connection.on('sample')](https://www.twilio.com/docs/voice/sdks/javascript/overview-1x-deprecated/connection#sample) API for more details.
+- `report` - The report for this test. This is set when the test has completed and raised the `completed` event.
+- `startTime` - A timestamp in milliseconds of when the test started. This is set right after calling `Device.testPreflight(token, options)`.
+- `status` - The status of the test. Below are the possible values for this property.
 
-  | Value | Description |
-  |:------|:------------|
-  | Completed | The connection to Twilio has been disconnected and the test call has completed. |
-  | Connected | The connection to Twilio has been established. |
-  | Connecting | Connecting to Twilio has started. |
-  | Failed | The test has stopped and failed. |
+  | Value      | Description                                                                     |
+  | :--------- | :------------------------------------------------------------------------------ |
+  | Completed  | The connection to Twilio has been disconnected and the test call has completed. |
+  | Connected  | The connection to Twilio has been established.                                  |
+  | Connecting | Connecting to Twilio has started.                                               |
+  | Failed     | The test has stopped and failed.                                                |
 
-Methods
--------
+## Methods
 
 #### .stop()
 
 Calling this method from the `PreflightTest` object will stop the existing test and will raise a `failed` event with an error code `31008` indicating that the call has been cancelled.
 
-TwiML App - Record and Play
-===========================
+# TwiML App - Record and Play
 
 If `PreflightTest.Options.fakeMicInput` is set to `false`, `Device.testPreflight(token, options)` API requires a [token](https://www.twilio.com/docs/iam/access-tokens) with a TwiML app that can record an audio from a microphone and the ability to play the recorded audio back to the browser. In order to achieve this, we need two TwiML endpoints: one to capture and record the audio, and another one to play the recorded audio.
 
-TwiML Bins
-----------
+## TwiML Bins
 
 In this example, we will use TwiML Bins for our TwiML app. Start by going to the [TwiML Bin](https://www.twilio.com/console/twiml-bins) page in the Twilio Console.
 
 ### TwiML App - Playback
+
 Create a new TwiML Bin with the plus button on that screen and use `Playback` as the friendly name. Then use the following template under the TwiML section.
 
 ```xml
@@ -322,6 +326,7 @@ Create a new TwiML Bin with the plus button on that screen and use `Playback` as
 Go ahead and click the **Create** button and copy the TwiML Bin's url located at the top of the screen.
 
 ### TwiML App - Record
+
 Using the [TwiML Bin](https://www.twilio.com/console/twiml-bins) page, let's create another TwiML Bin by clicking the plus button on that screen and use `Record` as the friendly name. Then replace the action url in the following template with your **TwiML Bin's Playback** url that you created previously. Let's use this template under the TwiML section.
 
 ```xml
@@ -336,16 +341,13 @@ Using the [TwiML Bin](https://www.twilio.com/console/twiml-bins) page, let's cre
 
 Go ahead and click the **Create** button and copy the TwiML Bin's url located at the top of the screen.
 
-Creating the TwiML App
------------------------
+## Creating the TwiML App
 
 Now that we have created our TwiML Bins, let's create our TwiML app by going to the [TwiML Apps](https://www.twilio.com/console/voice/twiml/apps) page. Click the plus button on that screen and enter a friendly name that you prefer. Under Voice request url, enter the **TwiML Bin's Record** url that you created in the previous section, and then click the **Create** button.
 
 On that same page, open the TwiML app that you just created by clicking on it and make note of the `SID`. You can now use this TwiML app to generate your [token](https://www.twilio.com/docs/iam/access-tokens) when calling `Device.testPreflight(token, options)` API.
 
-
-TwiML App - Echo
-================
+# TwiML App - Echo
 
 If `PreflightTest.Options.fakeMicInput` is set to `true`, `Device.testPreflight(token, options)` API requires a [token](https://www.twilio.com/docs/iam/access-tokens) with a single TwiML app that can capture and play an audio. Following the [previous steps](#twiml-bins), create a TwiML Bin using the following template, and name it `Echo`.
 

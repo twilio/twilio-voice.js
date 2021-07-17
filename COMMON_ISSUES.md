@@ -1,14 +1,12 @@
-Common Issues
-=============
+# Common Issues
 
-Having an issue with twilio.js?  Review this list of common issues to determine whether
+Having an issue with twilio.js? Review this list of common issues to determine whether
 or not your issue is known or a workaround is available. Please also take a look at the
 [CHANGELOG.md](CHANGELOG.md) to see if your issue is known for a particular
 release. If your issue hasn't been reported, consider submitting
-[a new issue](https://github.com/twilio/twilio-client.js/issues/new).
+[a new issue](https://github.com/twilio/twilio-voice.js/issues/new).
 
-Working around the browsers' autoplay policy
---------------------------------------------
+## Working around the browsers' autoplay policy
 
 Chrome, Firefox and Safari enforce the autoplay policy, which blocks automatically
 playing audio if the user has not interacted with your application
@@ -29,36 +27,32 @@ will qualify. If the user is already logged in, we recommend adding a button to 
 they are ready to receive calls. For example:
 
 ```js
-  document.getElementById('ready_button').addEventListener('click', () => {
-    device = new Twilio.Device(token);
-  });
+document.getElementById("ready_button").addEventListener("click", () => {
+  device = new Twilio.Device(token);
+});
 ```
 
-Missing Input or Output Device Labels
--------------------------------------
+## Missing Input or Output Device Labels
 
 In standard browsers, after making a `getUserMedia` request, the window will populate the
 labels for all available input and output devices. Some browsers are slowly catching up
 but not yet fully implemented, and won't supply labels for input or output devices.
 
-Audio Stream Not Closing After Hanging Up Call
-----------------------------------------------
+## Audio Stream Not Closing After Hanging Up Call
 
 When calling `Device.audio.setInputDevice()`, the input device will not be unset until
 `Device.audio.unsetInputDevice()` is called. This means that if `.setInputDevice()` is called
 during a call, and the call is hung up, the microphone will continue capturing until
 `.unsetInputDevice()` is called.
 
-Aggressive Browser Extensions and Plugins
------------------------------------------
+## Aggressive Browser Extensions and Plugins
 
 Some browser extensions and plugins will disable WebRTC APIs, causing
-twilio-client.js to fail. Examples of such plugins include
+twilio-voice.js to fail. Examples of such plugins include
 
-* uBlockOrigin-Extra
-* WebRTC Leak Prevent
-* Easy WebRTC Block
+- uBlockOrigin-Extra
+- WebRTC Leak Prevent
+- Easy WebRTC Block
 
-These are unsupported and likely to break twilio-client.js. If you are having
-trouble with twilio-client.js, ensure these are not running.
-
+These are unsupported and likely to break twilio-voice.js. If you are having
+trouble with twilio-voice.js, ensure these are not running.

@@ -1,31 +1,27 @@
-2.0.1 (July 9, 2021)
-====================
+# 2.0.1 (July 9, 2021)
 
 This patch increment was necessary because the 2.0.0 pilot artifact was erroneously published to npm. It is
 now removed from npm so that it is not mistakenly used. The first npm artifact will be 2.0.1.
 
-
-2.0.0 (July 7, 2021) - Release
-==============================
+# 2.0.0 (July 7, 2021) - Release
 
 ## Migration from twilio-client.js 1.x
+
 This product, Twilio's JavaScript Voice SDK, is the next version of Twilio's Javascript Client SDK. It is
 now in GA and we recommend all customers migrate in order to continue receiving future feature additions.
-For help on migrating from 1.x, see our [migration guide](https://www.twilio.com/docs/voice/client/migrating-to-js-voice-sdk-20).
+For help on migrating from 1.x, see our [migration guide](https://www.twilio.com/docs/voice/sdks/javascript/migrating-to-js-voice-sdk-20).
 
 **Note:**: These changes are cumulative with the 2.0.0-preview.1 changes below. If you are looking to
 upgrade from twilio-client.js 1.x, see the 2.0.0-preview.1 section below for the full 2.0 changelog.
 
-Fixes
------
+## Fixes
 
 ### Error updating `edge` parameter with `Device.updateOptions`
 
 An error surrounding re-registration was fixed that occurred when updating the
 `edge` option.
 
-Breaking API Changes
---------------------
+## Breaking API Changes
 
 ### Active call no longer accessible through the Device object.
 
@@ -42,31 +38,33 @@ await device.register();
 const call = await device.connect();
 ```
 
-2.0.0-preview.1 (Apr 30, 2021) - Pilot
-======================================
+# 2.0.0-preview.1 (Apr 30, 2021) - Pilot
 
-Breaking API Changes
---------------------
+## Breaking API Changes
 
 ### Device singleton behavior removed
+
 Device must now be instantiated before it can be used. Calling `Device.setup()` will no longer
 work; instead, a new `Device` must be instantiated via `new Device(token, options?)`.
 
 ### Connection renamed to Call
+
 As Connection is an overloaded and ambiguous term, the class has been renamed Call to better
 indicate what the object represents and be more consistent with Mobile SDKs and our REST APIs.
 
 ### Signaling connection now lazy loaded
+
 `Device.setup()` has been removed, and `new Device(...)` will not automatically begin
 connecting to signaling. There is no need to listen for `Device.on('ready')`. Instead,
 the signaling connection will automatically be acquired in one of two scenarios:
 
 1. The application calls `Device.connect()`, creating an outbound Call. In this case,
-the state of the signaling connection will be represented in the Call.
+   the state of the signaling connection will be represented in the Call.
 2. The application calls `Device.register()`, which will register the SDK to listen
-for incoming calls at the identity specified in the AccessToken.
+   for incoming calls at the identity specified in the AccessToken.
 
 #### Note on token expiration
+
 As long as outgoing calls are expected to be made, or incoming calls are expected to be received,
 the token supplied to `Device` should be fresh and not expired. This can be done by setting a
 timer in the application to call `updateToken` with the new token shortly before the prior
@@ -74,6 +72,7 @@ token expires. This is important, because signaling connection is lazy loaded an
 the token is not valid at the time of creation.
 
 Example:
+
 ```ts
 const TTL = 600000; // Assuming our endpoint issues tokens for 600 seconds (10 minutes)
 const REFRESH_TIMER = TTL - 30000; // We update our token 30 seconds before expiration;
@@ -88,21 +87,22 @@ const interval = setInterval(async () => {
 The Device states have changed. The states were: `[Ready, Busy, Offline]`. These
 have been changed to more accurately and clearly represent the states of the
 Device. There are two changes to Device state:
+
 1. The states themselves have changed to `[Registered, Registering, Unregistered, Destroyed]`. This
-removes the idea of "Busy" from the state, as technically the Device can have an active
-Call whether it is registered or not, depending on the use case. The Device will always
-starty as `Unregistered`. In this state, it can still make outbound Calls. Once `Device.register()`
-has been called, this state will change to `Registering` and finally `Registered`. If
-`Device.unregister()` is called the state will revert to `Unregistered`. If the signaling
-connection is lost, the state will transition to `Registering` or `Unregistered' depending
-on whether or not the connection can be re-established.
+   removes the idea of "Busy" from the state, as technically the Device can have an active
+   Call whether it is registered or not, depending on the use case. The Device will always
+   starty as `Unregistered`. In this state, it can still make outbound Calls. Once `Device.register()`
+   has been called, this state will change to `Registering` and finally `Registered`. If
+   `Device.unregister()` is called the state will revert to `Unregistered`. If the signaling
+   connection is lost, the state will transition to `Registering` or `Unregistered' depending
+   on whether or not the connection can be re-established.
 
 The `destroyed` state represents a `Device` that has been "destroyed" by calling
 `Device.destroy`. The device should be considered unusable at this point and a
 new one should be constructed for further use.
 
 2. The busy state has been moved to a boolean, `Device.isBusy`. This is a very basic
-shortcut for the logic `return !!device.activeConnection`.
+   shortcut for the logic `return !!device.activeConnection`.
 
 ### Device events changed
 
@@ -111,12 +111,12 @@ enum and represent the new Device states:
 
 ```ts
 export enum EventName {
-  Destroyed = 'destroyed',
-  Error = 'error',
-  Incoming = 'incoming',
-  Unregistered = 'unregistered',
-  Registering = 'registering',
-  Registered = 'registered',
+  Destroyed = "destroyed",
+  Error = "error",
+  Incoming = "incoming",
+  Unregistered = "unregistered",
+  Registering = "registering",
+  Registered = "registered",
 }
 ```
 
@@ -158,20 +158,25 @@ async Device.connect(options?: Device.ConnectOptions): Promise<Call>;
 ```
 
 #### Listening for incoming calls:
-```ts
-const device = new Device(token, { edge: 'ashburn' });
 
-device.on(Device.EventName.Incoming, call => { /* use `call` here */ });
+```ts
+const device = new Device(token, { edge: "ashburn" });
+
+device.on(Device.EventName.Incoming, (call) => {
+  /* use `call` here */
+});
 await device.register();
 ```
 
 #### Making an outgoing call:
+
 ```ts
-const device = new Device(token, { edge: 'ashburn' });
-const call = await device.connect({ To: 'alice' });
+const device = new Device(token, { edge: "ashburn" });
+const call = await device.connect({ To: "alice" });
 ```
 
 ### Device#CallOptions and Call#AcceptOptions standardized
+
 The arguments for `Device.connect()` and `Call.accept()` have been standardized
 to the following options objects:
 
@@ -199,20 +204,24 @@ interface Device.ConnectOptions extends Call.AcceptOptions {
 ```
 
 Note that these now take a [MediaStreamConstraints](https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamConstraints) rather than just the audio constraints. For example:
+
 ```ts
-device.connect({ To: 'client:alice' }, { deviceId: 'default' });
+device.connect({ To: "client:alice" }, { deviceId: "default" });
 ```
 
 might be re-written as:
+
 ```ts
 device.connect({
-  params: { To: 'client:alice' },
-  rtcConstraints: { audio: { deviceId: 'default' } },
+  params: { To: "client:alice" },
+  rtcConstraints: { audio: { deviceId: "default" } },
 });
 ```
 
 ### Moved to new Error format
+
 For backward compatibility, the new error format was attached to the old format under `error.twilioError`:
+
 ```ts
 class oldError extends Error {
   //...
@@ -223,6 +232,7 @@ class oldError extends Error {
 ```
 
 The new Error format is:
+
 ```ts
 class TwilioError extends Error {
   /**
@@ -268,14 +278,15 @@ class TwilioError extends Error {
 ```
 
 #### Affected Error Codes
+
 With the transition, the following error codes have changed:
+
 - 31003 -> 53405 | When ICE connection fails
 - 31201 -> 31402 | When getting user media fails
 - 31208 -> 31401 | When user denies access to user media
 - 31901 -> 53000 | When websocket times out in preflight
 
-New Features
-------------
+## New Features
 
 ### Device Options
 
@@ -287,7 +298,7 @@ during an active Call.
 Example usage:
 
 ```ts
-const options = { edge: 'ashburn' };
+const options = { edge: "ashburn" };
 const device = new Device(token, options);
 
 // Later...
@@ -296,6 +307,7 @@ device.updateOptions({ allowIncomingWhileBusy: true });
 ```
 
 The resulting (non-default) options would now be:
+
 ```ts
 {
   allowIncomingWhileBusy: true,
@@ -322,27 +334,25 @@ Logger.setLogLevel('DEBUG');
 Please see the original [`loglevel`](https://github.com/pimterry/loglevel) project for more
 documentation on usage.
 
-
-Deprecations
-------------
+## Deprecations
 
 ### Connection Deprecations
 
 - Removed `Connection.mediaStream`. To access the MediaStreams, use `Connection.getRemoteStream()` and `Connection.getLocalStream()`
 - Removed `Connection.message` in favor of the newer `Connection.customParameters`. Where `.message` was an Object, `.customParameters` is a `Map`.
 - Removed the following private members from the public interface:
-   - `Connection.options`
-   - `Connection.pstream`
-   - `Connection.sendHangup`
+  - `Connection.options`
+  - `Connection.pstream`
+  - `Connection.sendHangup`
 - Fixed `Connection.on('cancel')` logic so that we no longer emit `cancel` in response to `Connection.ignore()`.
 
 ### Device Option Deprecations
 
 Some deprecated `Device` options have been removed. This includes:
 
-* `enableIceRestart`
-* `enableRingingState`
-* `fakeLocalDtmf`
+- `enableIceRestart`
+- `enableRingingState`
+- `fakeLocalDtmf`
 
 The above three removed options are now assumed `true`. The new `Device.Options` interface is now:
 
@@ -364,8 +374,7 @@ export interface Options {
 }
 ```
 
-Fixes
------
+## Fixes
 
 ### MOS Calculation Formula
 
