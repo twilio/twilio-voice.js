@@ -12,6 +12,9 @@
     "voice",
     "voip"
   ],
+  "engines": {
+    "node": "0.12"
+  },
   "repository": {
     "type": "git",
     "url": "git@github.com:twilio/twilio-voice.js.git"
@@ -41,7 +44,7 @@
     "start": "node server.js",
     "status": "git status",
     "test": "npm-run-all lint build test:unit test:webpack test:es5 test:docker",
-    "test:docker": "cd tests/docker && ./scripts/run.sh",
+    "test:docker": "chmod +x ./scripts/circleci-run-tests.sh && ./scripts/circleci-run-tests.sh",
     "test:es5": "es-check es5 \"./es5/**/*.js\" ./dist/*.js",
     "test:framework:no-framework": "mocha tests/framework/no-framework.js",
     "test:framework:react:install": "cd ./tests/framework/react && rimraf ./node_modules package-lock.json && npm install",
@@ -49,7 +52,8 @@
     "test:framework:react:run": "mocha ./tests/framework/react.js",
     "test:framework:react": "npm-run-all test:framework:react:*",
     "test:frameworks": "npm-run-all test:framework:no-framework test:framework:react",
-    "test:integration": "node ./scripts/karma.js $PWD/karma.conf.ts",
+    "test:integration": "karma start $PWD/karma.conf.ts",
+    "test:network": "node ./scripts/karma.js $PWD/karma.conf.ts",
     "test:selenium": "mocha tests/browser/index.js",
     "test:unit": "nyc mocha -r ts-node/register ./tests/index.ts",
     "test:webpack": "cd ./tests/webpack && npm install && npm test"

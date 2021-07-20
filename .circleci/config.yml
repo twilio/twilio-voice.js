@@ -1,6 +1,121 @@
 version: 2.1
+parameters:
+  browser:
+    type: enum
+    enum: ["chrome", "firefox"]
+    default: "chrome"
+  bver:
+    type: enum
+    enum: ["stable", "beta", "unstable"]
+    default: "stable"
+  pr_workflow:
+    type: boolean
+    default: true # by default pr workflow will get executed.
+  tag:
+    type: string
+    default: "" # use something like: "2.0.0-beta15" when invoking with parameters.
+executors: 
+  machine-executor:
+    machine: true
+  generic-executor:
+    docker:
+      - image: alpine:3.7
+  docker-with-browser:
+    parameters:
+      browser:
+        type: enum
+        enum: ["chrome", "firefox"]
+        default: "chrome"
+      bver:
+        type: enum
+        enum: ["stable", "beta", "unstable"]
+        default: "stable"
+    docker:
+      - image: twilio/twilio-video-browsers:<<parameters.browser>>-<<parameters.bver>>
+commands:
+  get-code:
+    steps:
+      - checkout
+      - when:
+          condition: << pipeline.parameters.tag >>
+          steps:
+            - run: git checkout << pipeline.parameters.tag >>
+  set-node-version:
+    steps:
+      - run:
+          name: Set node to version 12
+          command: |
+            sudo npm install -g n
+            sudo n 12
+  get-code-and-dependencies:
+    steps:
+      - get-code
+      - restore_cache:
+          key: dependency-cache-{{ checksum "package.json" }}
+      - run:
+          name: Installing dependencies
+          command: node -v && npm install --legacy-peer-deps
+      - save_cache:
+          key: dependency-cache-{{ checksum "package.json" }}
+          paths:
+            - ./node_modules
+  unit-tests:
+    steps:
+      - set-node-version
+      - get-code-and-dependencies
+      - run:
+          name: Running unit tests
+          command: node -v && npm run build && npm run test:unit
+  network-tests:
+    steps:
+      - get-code-and-dependencies
+      - run:
+          name: Running integration tests
+          command: npm run test:docker
+  integration-tests:
+    steps:
+      - get-code-and-dependencies
+      - run:
+          name: Running integration tests
+          command: npm run build && npm run test:integration
 
 jobs:
+  UnitTests:
+    executor: docker-with-browser
+    steps:
+      - unit-tests
+  run-network-tests:
+    parallelism: << parameters.parallelism >>
+    parameters:
+      parallelism:
+        type: integer
+        default: 2
+      bver:
+        type: string
+      browser:
+        type: string
+    executor:
+      name: machine-executor
+    environment:
+      BROWSER: << parameters.browser >>
+      BVER: << parameters.bver >>
+    steps: [network-tests]
+  run-integration-tests:
+    parallelism: << parameters.parallelism >>
+    parameters:
+      parallelism:
+        type: integer
+        default: 4
+      bver:
+        type: string
+      browser:
+        type: string
+    executor:
+      name: docker-with-browser
+    environment:
+      BROWSER: << parameters.browser >>
+      BVER: << parameters.bver >>
+    steps: [integration-tests]
   trigger-qe-tests:
     docker:
       - image: circleci/node:latest
@@ -13,15 +128,34 @@ jobs:
           -d '{"branch":"'v${CIRCLE_TAG:0:1}'","parameters":{"sdk_version":"'$CIRCLE_TAG'","is_rc":true}}' \
           $SDKS_QE_CIRCLECI_VOICE_JS_SLAVE_PIPELINE_ENDPOINT
 workflows:
+  Pull_Request_Workflow:
+    when: << pipeline.parameters.pr_workflow >>
+    jobs:
+      #- UnitTests:
+      #context: dockerhub-pulls
+      - run-integration-tests:
+          context: dockerhub-pulls
+          name: <<matrix.browser>> <<matrix.bver>> integration tests
+          matrix:
+            parameters:
+              browser: ["chrome", "firefox"]
+              bver: ["beta", "unstable"]
+      - run-network-tests:
+          context: dockerhub-pulls
+          name: <<matrix.browser>> <<matrix.bver>> integration and network tests
+          matrix:
+            parameters:
+              browser: ["chrome", "firefox"]
+              bver: ["stable"]
   release-candidate:
       jobs:
-      - trigger-qe-tests:
-          context: sdks-qe
-          filters:
-            tags:
-              only:
-              - /^\d+\.\d+\.\d+-rc\d+$/
-              - /^\d+\.\d+\.\d+-preview\d+-rc\d+$/
-              - /^\d+\.\d+\.\d+-beta\d+-rc\d+$/
-            branches:
-              ignore: /.*/
+        - trigger-qe-tests:
+            context: sdks-qe
+            filters:
+              tags:
+                only:
+                - /^\d+\.\d+\.\d+-rc\d+$/
+                - /^\d+\.\d+\.\d+-preview\d+-rc\d+$/
+                - /^\d+\.\d+\.\d+-beta\d+-rc\d+$/
+              branches:
+                ignore: /.*/
