@@ -128,6 +128,12 @@ npm run test:integration
 
 These tests will run via karma, one at a time, in your system's default Chrome and then Firefox.
 
+Network tests have been split out into their own docker processes, and can be run via
+
+```
+npm run test:docker
+```
+
 Content Security Policy (CSP)
 ----------------------------
 

@@ -28,11 +28,6 @@ services:
       - "../../:/opt/app"
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/app/node_modules
-  browserContainer:
-    <<: *defaults
-    build:
-      context: .
-      dockerfile: ./${BROWSER}/${BVER}/Dockerfile
   integrationTests: # runs integration tets. Expects that sources are mounted.
     <<: *runtimeDefaults
     command: bash -c "npm install -g n && n 12 && npm install --no-optional --no-legacy-peer-deps && npm run build && ls -la /root && ls -la /root/.npm && npm run test:network"
