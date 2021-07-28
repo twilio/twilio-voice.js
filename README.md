@@ -3,11 +3,6 @@ This product, Twilio's JavaScript Voice SDK, is the next version of Twilio's Jav
 now in GA and we recommend all customers migrate in order to continue receiving future feature additions.
 For help on migrating from 1.x, see our [migration guide](https://www.twilio.com/docs/voice/client/migrating-to-js-voice-sdk-20).
 
-#### Pilot Versioning Note
-During the pilot phase, the GitHub release artifact was referred to as `2.0.0`. This has been retroactively corrected
-to the appropriate tag, `2.0.0-preview.1`. With GA, we move to `2.0.0` formally. This versioning fix was necessary
-to properly follow semantic versioning rules.
-
 @twilio/voice-sdk
 =================
 
@@ -16,7 +11,7 @@ to properly follow semantic versioning rules.
 Twilio's Voice SDK allows you to add real-time voice and PSTN calling to your web apps.
 
 * [API Docs](https://twilio.github.io/twilio-voice.js/index.html)
-* [More Docs](https://www.twilio.com/docs/voice/client/javascript/overview)
+* [More Docs](https://www.twilio.com/docs/voice/sdks/javascript)
 * [Quickstart](https://www.twilio.com/docs/voice/client/javascript/quickstart)
 * [Changelog](https://github.com/twilio/twilio-voice.js/blob/master/CHANGELOG.md)
 
