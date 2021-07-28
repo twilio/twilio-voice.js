@@ -53,7 +53,7 @@
     "test:framework:react": "npm-run-all test:framework:react:*",
     "test:frameworks": "npm-run-all test:framework:no-framework test:framework:react",
     "test:integration": "karma start $PWD/karma.conf.ts",
-    "test:network": "node ./scripts/karma.js $PWD/karma.conf.ts",
+    "test:network": "node ./scripts/karma.js $PWD/karma.network.conf.ts",
     "test:selenium": "mocha tests/browser/index.js",
     "test:unit": "nyc mocha -r ts-node/register ./tests/index.ts",
     "test:webpack": "cd ./tests/webpack && npm install && npm test"

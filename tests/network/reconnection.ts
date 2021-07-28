@@ -1,7 +1,7 @@
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../lib/token';
-import { expectEvent, isDocker, isFirefox, runDockerCommand, waitFor } from '../lib/util';
+import { expectEvent, isFirefox, runDockerCommand, waitFor } from '../lib/util';
 import * as assert from 'assert';
 import { EventEmitter } from 'events';
 
@@ -85,18 +85,6 @@ describe('Reconnection', function() {
     }
   };
 
-  let isRunningInsideDocker = false;
-  before(async function() {
-    isRunningInsideDocker = await isDocker().catch(() => false);
-  });
-
-   beforeEach(function() {
-    if (!isRunningInsideDocker) {
-      console.info('skipping');
-      this.skip();
-    }
-  });
-
   describe('ICE Restart', function() {
     this.timeout(SUITE_TIMEOUT);
 
@@ -104,16 +92,12 @@ describe('Reconnection', function() {
       this.timeout(USE_CASE_TIMEOUT);
 
       before(async () => {
-        if (isRunningInsideDocker) {
-          await runDockerCommand('unblockMediaPorts');
-          await setupDevices();
-        }
+        await runDockerCommand('unblockMediaPorts');
+        await setupDevices();
       });
       after(() => {
-        if (isRunningInsideDocker) {
-          destroyDevices();
-          return runDockerCommand('unblockMediaPorts');
-        }
+        destroyDevices();
+        return runDockerCommand('unblockMediaPorts');
       });
 
       it('should trigger reconnecting', async () => {
@@ -154,10 +138,8 @@ describe('Reconnection', function() {
 
     before(() => setupDevices());
     after(() => {
-      if (isRunningInsideDocker) {
-        destroyDevices();
-        return runDockerCommand('resetNetwork');
-      }
+      destroyDevices();
+      return runDockerCommand('resetNetwork');
     });
 
     it('should trigger device.unregistered', async () => {

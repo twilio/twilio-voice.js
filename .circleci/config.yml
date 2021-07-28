@@ -105,7 +105,7 @@ jobs:
     parameters:
       parallelism:
         type: integer
-        default: 4
+        default: 6
       bver:
         type: string
       browser:
@@ -131,18 +131,18 @@ workflows:
   Pull_Request_Workflow:
     when: << pipeline.parameters.pr_workflow >>
     jobs:
-      #- UnitTests:
-      #context: dockerhub-pulls
+      - UnitTests:
+          context: dockerhub-pulls
       - run-integration-tests:
           context: dockerhub-pulls
           name: <<matrix.browser>> <<matrix.bver>> integration tests
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
-              bver: ["beta", "unstable"]
+              bver: ["beta", "unstable", "stable"]
       - run-network-tests:
           context: dockerhub-pulls
-          name: <<matrix.browser>> <<matrix.bver>> integration and network tests
+          name: <<matrix.browser>> <<matrix.bver>> network tests
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
