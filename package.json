@@ -121,7 +121,7 @@
     "backoff": "2.5.0",
     "loglevel": "1.6.7",
     "rtcpeerconnection-shim": "1.2.8",
-    "ws": "6.2.2",
+    "ws": "7.4.6",
     "xmlhttprequest": "1.8.0"
   },
   "browser": {
