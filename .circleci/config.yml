@@ -85,11 +85,7 @@ jobs:
     steps:
       - unit-tests
   run-network-tests:
-    parallelism: << parameters.parallelism >>
     parameters:
-      parallelism:
-        type: integer
-        default: 2
       bver:
         type: string
       browser:
@@ -101,11 +97,7 @@ jobs:
       BVER: << parameters.bver >>
     steps: [network-tests]
   run-integration-tests:
-    parallelism: << parameters.parallelism >>
     parameters:
-      parallelism:
-        type: integer
-        default: 6
       bver:
         type: string
       browser:
@@ -133,16 +125,17 @@ workflows:
     jobs:
       - UnitTests:
           context: dockerhub-pulls
+          name: Unit Tests
       - run-integration-tests:
           context: dockerhub-pulls
-          name: <<matrix.browser>> <<matrix.bver>> integration tests
+          name: Integration Tests <<matrix.browser>> <<matrix.bver>>
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
               bver: ["beta", "unstable", "stable"]
       - run-network-tests:
           context: dockerhub-pulls
-          name: <<matrix.browser>> <<matrix.bver>> network tests
+          name: Network Tests <<matrix.browser>> <<matrix.bver>>
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
