@@ -667,8 +667,8 @@ class Call extends EventEmitter {
   }
 
   /**
-   * Mute incoming audio.
-   * @param shouldMute - Whether the incoming audio should be muted. Defaults to true.
+   * Mute input (local microphone) audio.
+   * @param shouldMute - Whether the local input track (outgoing audio) should be muted. Defaults to true.
    */
   mute(shouldMute: boolean = true): void {
     const wasMuted = this._mediaHandler.isMuted;
