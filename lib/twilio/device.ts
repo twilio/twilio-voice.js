@@ -581,6 +581,7 @@ class Device extends EventEmitter {
     }
 
     this._setState(Device.State.Destroyed);
+    EventEmitter.prototype.removeAllListeners.call(this);
   }
 
   /**
