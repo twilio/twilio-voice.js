@@ -1296,6 +1296,22 @@ namespace Call {
   declare function muteEvent(isMuted: boolean, call: Call): void;
 
   /**
+   * Emitted when the {@link Call} has regained media connectivity.
+   * @param call - The {@link Call}.
+   * @example `call.on('reconnected', () => { })`
+   * @event
+   */
+  declare function reconnected(): void;
+
+  /**
+   * Emitted when the {@link Call} has lost media connectivity and is reconnecting.
+   * @param call - The {@link Call}.
+   * @example `call.on('reconnecting', error => { })`
+   * @event
+   */
+  declare function reconnectingEvent(error: TwilioError): void;
+
+  /**
    * Emitted when the {@link Call} is rejected.
    * @param call - The {@link Call}.
    * @example `call.on('reject', call => { })`
