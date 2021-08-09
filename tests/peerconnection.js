@@ -964,18 +964,21 @@ describe('PeerConnection', () => {
 
   context('PeerConnection.prototype._maybeSetIceAggressiveNomination', () => {
     const METHOD = PeerConnection.prototype._maybeSetIceAggressiveNomination;
-    const USER_AGENT = root.window.navigator.userAgent;
+    const navigator = typeof window === 'undefined'
+      ? root.window.navigator
+      : window.navigator;
+    const USER_AGENT = navigator.userAgent;
     const SDP = 'bar\na=ice-lite\nfoo';
     let context;
 
     beforeEach(() => {
-      root.window.navigator.userAgent = 'CriOS';
+      navigator.userAgent = 'CriOS';
       context = { options: {} };
       toTest = METHOD.bind(context);
     });
 
     afterEach(() => {
-      root.window.navigator.userAgent = USER_AGENT;
+      navigator.userAgent = USER_AGENT;
     });
 
     it('Should call setIceAggressiveNomination if forceAggressiveIceNomination is true', () => {

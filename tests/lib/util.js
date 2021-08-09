@@ -209,11 +209,13 @@ function product(xs, ys, combine) {
  * @returns {Promise<*>}
  */
 function runDockerCommand(cmd) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const xmlhttp = new XMLHttpRequest();
     xmlhttp.onreadystatechange = function() {
       if (this.readyState == 4 && this.status == 200) {
         resolve(this.responseText);
+      } else if (this.readyState == 4 && this.status != 200) {
+        reject(this.responseText);
       }
     };
     xmlhttp.open('GET', `${DOCKER_PROXY_SERVER_URL}/${cmd}`, true);
@@ -237,9 +239,22 @@ function waitFor(promiseOrArray, timeoutMS) {
   return Promise.race([promise, timeoutPromise]).then(() => clearTimeout(timer));
 };
 
+/**
+ * @returns {Promise<boolean>} - Resolves to true if caller is running inside docker instance.
+ *   resolves to false if not running inside docker, or if it failed to connect to DockerProxyServer
+ */
+function isDocker() {
+  return Promise.resolve()
+    .then(() => runDockerCommand('isDocker'))
+    .then(res => res ? JSON.parse(res) : { })
+    .then(res => res.isDocker)
+    .catch(err => console.error('isDocker failed, is server running? ', err));
+}
+
 exports.combinationContext = combinationContext;
 exports.combinations = combinations;
 exports.expectEvent = expectEvent;
+exports.isDocker = isDocker;
 exports.isFirefox = isFirefox;
 exports.pairs = pairs;
 exports.runDockerCommand = runDockerCommand;

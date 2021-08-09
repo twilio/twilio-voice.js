@@ -473,7 +473,6 @@ class Call extends EventEmitter {
 
       if (!this._isCancelled) {
         // tslint:disable no-console
-        console.info('DISCONNECT!!');
         this.emit('disconnect', this);
       }
     };

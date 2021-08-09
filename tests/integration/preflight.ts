@@ -6,7 +6,7 @@ import { PreflightTest } from '../../lib/twilio/preflight/preflight';
 import Call from '../../lib/twilio/call';
 import { TwilioError } from '../../lib/twilio/errors';
 
-const DURATION_PADDING = 1000;
+const DURATION_PADDING = 3000;
 const EVENT_TIMEOUT = 30000;
 const MAX_TIMEOUT = 300000;
 

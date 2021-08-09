@@ -15,14 +15,17 @@ const { combinationContext } = require('./lib/util');
 describe('setIceAggressiveNomination', () => {
   const SDP_ICE_LITE = 'bar\na=ice-lite\nfoo';
   const SDP_FULL_ICE = 'a=group\nfoo\na=ice-options:trickle-ice\n';
-  const USER_AGENT = root.window.navigator.userAgent;
+  const navigator = typeof window === 'undefined'
+    ? root.window.navigator
+    : window.navigator;
+  const USER_AGENT = navigator.userAgent;
 
   beforeEach(() => {
-    root.window.navigator.userAgent = 'CriOS';
+    navigator.userAgent = 'CriOS';
   });
 
   afterEach(() => {
-    root.window.navigator.userAgent = USER_AGENT;
+    navigator.userAgent = USER_AGENT;
   });
 
   it('should remove ice-lite on chrome', () => {
@@ -30,7 +33,7 @@ describe('setIceAggressiveNomination', () => {
   });
 
   it('should not run on other browsers', () => {
-    root.window.navigator.userAgent = '';
+    navigator.userAgent = '';
     assert.equal(setIceAggressiveNomination(SDP_ICE_LITE), SDP_ICE_LITE);
   });
 
