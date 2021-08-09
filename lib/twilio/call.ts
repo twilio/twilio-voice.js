@@ -1297,15 +1297,14 @@ namespace Call {
 
   /**
    * Emitted when the {@link Call} has regained media connectivity.
-   * @param call - The {@link Call}.
    * @example `call.on('reconnected', () => { })`
    * @event
    */
-  declare function reconnected(): void;
+  declare function reconnectedEvent(): void;
 
   /**
    * Emitted when the {@link Call} has lost media connectivity and is reconnecting.
-   * @param call - The {@link Call}.
+   * @param error - The {@link TwilioError} that caused the media connectivity loss
    * @example `call.on('reconnecting', error => { })`
    * @event
    */
