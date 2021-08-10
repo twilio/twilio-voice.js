@@ -1,3 +1,13 @@
+2.0.2 (In progress)
+==================
+
+Fixes
+-----
+
+- Updated `ws` version to fix a potential security vulnerability.
+- We now properly clean up all event listers after `Device.destroy()`
+
+
 2.0.1 (July 9, 2021)
 ====================
 
