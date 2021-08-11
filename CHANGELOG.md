@@ -6,6 +6,8 @@ Fixes
 
 - Updated `ws` version to fix a potential security vulnerability.
 - We now properly clean up all event listers after `Device.destroy()`
+- We now log a warning rather than an throwing an uncaught promise rejection when Insights
+  fails to post an event.
 
 
 2.0.1 (July 9, 2021)
