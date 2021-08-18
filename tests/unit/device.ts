@@ -62,6 +62,8 @@ describe('Device', function() {
   });
 
   beforeEach(() => {
+    pstream = null;
+    publisher = null;
     clock = sinon.useFakeTimers(Date.now());
     token = createToken('alice');
     device = new Device(token, setupOptions);
@@ -157,6 +159,26 @@ describe('Device', function() {
           pstream.emit('offline');
           await regPromise;
         };
+      });
+
+      describe('insights gateway', () => {
+        beforeEach(() => {
+          publisher.setHost = sinon.stub();
+        });
+
+        it('should set default host address if home is not available', () => {
+          pstream.emit('connected', {});
+          sinon.assert.calledOnce(publisher.setHost);
+          sinon.assert.calledWithExactly(publisher.setHost, 'eventgw.twilio.com');
+        });
+
+        Object.values(Region).forEach(region => {
+          it(`should set host to eventgw.${region}.twilio.com when home is set to ${region}`, () => {
+            pstream.emit('connected', { home: region});
+            sinon.assert.calledOnce(publisher.setHost);
+            sinon.assert.calledWithExactly(publisher.setHost, `eventgw.${region}.twilio.com`);
+          });
+        });
       });
 
       describe('.connect(params?, audioConstraints?, iceServers?)', () => {
@@ -832,6 +854,16 @@ describe('Device', function() {
     describe('before the Device has been connected to signaling', () => {
       it('should lazy create a signaling call', () => {
         assert.equal(device['_stream'], null);
+      });
+
+      describe('insights gateway', () => {
+        beforeEach(() => {
+          publisher.setHost = sinon.stub();
+        });
+
+        it('should not set host address before signaling is connected', () => {
+          sinon.assert.notCalled(publisher.setHost);
+        });
       });
 
       describe('.connect(params?, audioConstraints?, iceServers?)', () => {

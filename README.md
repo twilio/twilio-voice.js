@@ -154,6 +154,12 @@ connect-src https://eventgw.twilio.com https://media.twiliocdn.com https://sdk.t
 connect-src https://eventgw.twilio.com https://media.twiliocdn.com https://sdk.twilio.com wss://chunderw-vpc-gll-us1.twilio.com wss://chunderw-vpc-gll-au1.twilio.com wss://chunderw-vpc-gll.twilio.com
 ```
 
+If you are providing a home region grant into your [Twilio access token](https://www.twilio.com/docs/iam/access-tokens), you need to add the insights endpoint in your `connect-src` directive using `eventgw.{homeRegion}.twilio.com` format. Below is an example if your home region grant is `sg1`.
+
+```
+connect-src https://eventgw.sg1.twilio.com wss://chunderw-vpc-gll.twilio.com https://media.twiliocdn.com https://sdk.twilio.com
+```
+
 License
 -------
 

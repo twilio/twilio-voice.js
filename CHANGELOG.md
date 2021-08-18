@@ -1,3 +1,29 @@
+Feature Branch
+==============
+
+New Features
+------------
+
+- ### Twilio Regional Support
+
+The Twilio Voice JS SDK now supports Twilio Regional. To use a home region, please specify the desired home region in the access token before passing the token to the Twilio `Device`. For example, if you are using the `twilio-node` helper library to mint access tokens within your backend, you can specify the `au1` home region like so:
+
+```ts
+const accessToken = new twilio.jwt.AccessToken(
+  credentials.accountSid,
+  credentials.apiKeySid,
+  credentials.apiKeySecret, {
+    identity,
+    ttl,
+    region: 'au1',
+  },
+);
+```
+
+For more information about Twilio Regional, please follow this link.
+
+[Twilio Regional]()
+
 2.0.2 (In progress)
 ==================
 
