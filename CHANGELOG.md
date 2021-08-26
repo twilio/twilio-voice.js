@@ -1,5 +1,30 @@
-2.0.2 (In progress)
-==================
+2.1.0 (In progress)
+===================
+
+New Features
+------------
+
+- ### Twilio Regional Support
+
+The Twilio Voice JS SDK now supports Twilio Regional. To use a home region, please specify the desired home region in the access token before passing the token to the Twilio `Device`. This home region parameter should be matched with the appropriate `edge` parameter when instantiating a Twilio `Device`. The home region determines the location of your Insights data, as opposed to the `edge` that your call connects to Twilio through.
+
+If you are using the `twilio-node` helper library to mint access tokens within your backend, you can specify the `au1` home region like so:
+
+```ts
+const accessToken = const accessToken = new twilio.jwt.AccessToken(
+  credentials.accountSid,
+  credentials.apiKeySid,
+  credentials.apiKeySecret, {
+    identity,
+    ttl,
+    region: 'au1',
+  },
+);
+
+const device = new Device(accessToken, {
+  edge: 'sydney',
+});
+```
 
 Fixes
 -----

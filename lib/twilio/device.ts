@@ -23,6 +23,7 @@ import {
 import Log from './log';
 import { PreflightTest } from './preflight/preflight';
 import {
+  createEventGatewayURI,
   getChunderURIs,
   getRegionShortcode,
   Region,
@@ -331,7 +332,6 @@ class Device extends EventEmitter {
     closeProtection: false,
     codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
     dscp: true,
-    eventgw: 'eventgw.twilio.com',
     forceAggressiveIceNomination: false,
     logLevel: LogLevels.ERROR,
     preflight: false,
@@ -1020,6 +1020,7 @@ class Device extends EventEmitter {
     const region = getRegionShortcode(payload.region);
     this._edge = regionToEdge[region as Region] || payload.region;
     this._region = region || payload.region;
+    this._publisher?.setHost(createEventGatewayURI(payload.home));
 
     // The signaling stream emits a `connected` event after reconnection, if the
     // device was registered before this, then register again.
@@ -1234,18 +1235,19 @@ class Device extends EventEmitter {
       this._destroyPublisher();
     }
 
-    this._publisher = (this._options.Publisher || Publisher)(
-      PUBLISHER_PRODUCT_NAME,
-      this.token,
-      {
-        defaultPayload: this._createDefaultPayload,
-        host: this._options.eventgw,
-        metadata: {
-          app_name: this._options.appName,
-          app_version: this._options.appVersion,
-        },
+    const publisherOptions = {
+      defaultPayload: this._createDefaultPayload,
+      metadata: {
+        app_name: this._options.appName,
+        app_version: this._options.appVersion,
       },
-    );
+    } as any;
+
+    if (this._options.eventgw) {
+      publisherOptions.host = this._options.eventgw;
+    }
+
+    this._publisher = (this._options.Publisher || Publisher)(PUBLISHER_PRODUCT_NAME, this.token, publisherOptions);
 
     if (this._options.publishEvents === false) {
       this._publisher.disable();
