@@ -11,6 +11,7 @@ import {
   GeneralErrors,
   InvalidArgumentError,
   MediaErrors,
+  SignalingErrors,
   TwilioError,
   UserMediaErrors,
 } from './errors';
@@ -248,6 +249,11 @@ class Call extends EventEmitter {
   private _shouldSendHangup: boolean = true;
 
   /**
+   * The signaling reconnection token used to re-establish a lost signaling connection.
+   */
+  private _signalingReconnectToken: string | undefined;
+
+  /**
    * A Map of Sounds to play.
    */
   private readonly _soundcache: Map<Device.SoundName, ISound> = new Map();
@@ -277,6 +283,10 @@ class Call extends EventEmitter {
 
     if (this._options.callParameters) {
       this.parameters = this._options.callParameters;
+    }
+
+    if (this._options.signalingReconnectToken) {
+      this._signalingReconnectToken = this._options.signalingReconnectToken;
     }
 
     this._direction = this.parameters.CallSid ? Call.CallDirection.Incoming : Call.CallDirection.Outgoing;
@@ -481,6 +491,7 @@ class Call extends EventEmitter {
     this._pstream.on('cancel', this._onCancel);
     this._pstream.on('ringing', this._onRinging);
     this._pstream.on('transportClose', this._onTransportClose);
+    this._pstream.on('connected', this._onConnected);
 
     this.on('error', error => {
       this._publisher.error('connection', 'error', {
@@ -539,12 +550,16 @@ class Call extends EventEmitter {
         return;
       }
 
-      const onAnswer = (pc: RTCPeerConnection) => {
+      const onAnswer = (pc: RTCPeerConnection, reconnectToken?: string) => {
         // Report that the call was answered, and directionality
         const eventName = this._direction === Call.CallDirection.Incoming
           ? 'accepted-by-local'
           : 'accepted-by-remote';
         this._publisher.info('connection', eventName, null, this);
+
+        if (typeof reconnectToken ===  'string') {
+          this._signalingReconnectToken = reconnectToken;
+        }
 
         // Report the preferred codec and params as they appear in the SDP
         const { codecName, codecParams } = getPreferredCodecInfo(this._mediaHandler.version.getSDP());
@@ -850,6 +865,7 @@ class Call extends EventEmitter {
       this._pstream.removeListener('hangup', this._onHangup);
       this._pstream.removeListener('ringing', this._onRinging);
       this._pstream.removeListener('transportClose', this._onTransportClose);
+      this._pstream.removeListener('connected', this._onConnected);
     };
 
     // This is kind of a hack, but it lets us avoid rewriting more code.
@@ -980,11 +996,15 @@ class Call extends EventEmitter {
    * @param payload
    */
   private _onAnswer = (payload: Record<string, any>): void => {
+    if (typeof payload.reconnect === 'string') {
+      this._signalingReconnectToken = payload.reconnect;
+    }
+
     // answerOnBridge=false will send a 183 which we need to catch in _onRinging when
     // the enableRingingState flag is disabled. In that case, we will receive a 200 after
     // the callee accepts the call firing a second `accept` event if we don't
     // short circuit here.
-    if (this._isAnswered) {
+    if (this._isAnswered && this._status !== Call.State.Reconnecting) {
       return;
     }
 
@@ -1009,6 +1029,21 @@ class Call extends EventEmitter {
       this._status = Call.State.Closed;
       this.emit('cancel');
       this._pstream.removeListener('cancel', this._onCancel);
+    }
+  }
+
+  /**
+   * Called when we receive a connected event from pstream.
+   * Re-emits the event.
+   */
+  private _onConnected = (): void => {
+    this._log.info('Received connected from pstream');
+    if (this._signalingReconnectToken) {
+      this._pstream.reconnect(
+        this._mediaHandler.version.getSDP(),
+        this.parameters.CallSid,
+        this._signalingReconnectToken,
+      );
     }
   }
 
@@ -1179,6 +1214,10 @@ class Call extends EventEmitter {
   private _onTransportClose = (): void => {
     this._log.error('Received transportClose from pstream');
     this.emit('transportClose');
+    if (this._signalingReconnectToken) {
+      this._status = Call.State.Reconnecting;
+      this.emit('reconnecting', new SignalingErrors.ConnectionDisconnected());
+    }
   }
 
   /**
@@ -1573,6 +1612,11 @@ namespace Call {
      * Whether the disconnect sound should be played.
      */
     shouldPlayDisconnect?: () => boolean;
+
+    /**
+     * A reconnect token, passed in for an incoming call.
+     */
+    signalingReconnectToken?: string;
 
     /**
      * An override for the StatsMonitor dependency.

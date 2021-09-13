@@ -5,6 +5,8 @@ const PStream = require('../lib/twilio/pstream');
 const { RELEASE_VERSION } = require('../lib/twilio/constants');
 const TransportFactory = require('./mock/WSTransport');
 
+const EXPECTED_PSTREAM_VERSION = '1.6';
+
 describe('PStream', () => {
   let pstream;
   beforeEach(() => {
@@ -47,7 +49,7 @@ describe('PStream', () => {
           token: 'foo',
         },
         type: 'listen',
-        version: '1.5'
+        version: EXPECTED_PSTREAM_VERSION
       });
     });
 
@@ -186,7 +188,7 @@ describe('PStream', () => {
           token: 'foobar',
         },
         type: 'listen',
-        version: '1.5'
+        version: EXPECTED_PSTREAM_VERSION
       });
     });
   });
@@ -334,7 +336,7 @@ describe('PStream', () => {
             assert.deepEqual(JSON.parse(pstream.transport.send.args[0][0]), {
               payload,
               type: method,
-              version: '1.5'
+              version: EXPECTED_PSTREAM_VERSION
             });
           });
         });

@@ -336,6 +336,7 @@ class Device extends EventEmitter {
     logLevel: LogLevels.ERROR,
     preflight: false,
     sounds: { },
+    tokenRefreshMs: 10000,
   };
 
   /**
@@ -351,6 +352,16 @@ class Device extends EventEmitter {
     [Device.SoundName.Incoming]: true,
     [Device.SoundName.Outgoing]: true,
   };
+
+  /**
+   * The name of the home region the {@link Device} is connected to.
+   */
+  private _home: string | null = null;
+
+  /**
+   * The identity associated with this Device.
+   */
+  private _identity: string | null = null;
 
   /**
    * Whether SDK is run as a browser extension
@@ -430,6 +441,11 @@ class Device extends EventEmitter {
    * The JWT string currently being used to authenticate this {@link Device}.
    */
   private _token: string;
+
+  /**
+   * A timeout to track when the current AccessToken will expire.
+   */
+  private _tokenWillExpireTimeout: NodeJS.Timer | null = null;
 
   /**
    * Construct a {@link Device} instance. The {@link Device} can be registered
@@ -602,6 +618,22 @@ class Device extends EventEmitter {
    */
   get edge(): string | null {
     return this._edge;
+  }
+
+  /**
+   * Returns the home value the {@link Device} is currently connected
+   * to. The value will be `null` when the {@link Device} is offline.
+   */
+  get home(): string | null {
+    return this._home;
+  }
+
+  /**
+   * Returns the identity associated with the {@link Device} for incoming calls. Only
+   * populated when registered.
+   */
+  get identity(): string | null {
+    return this._home;
   }
 
   /**
@@ -1021,6 +1053,12 @@ class Device extends EventEmitter {
     this._edge = regionToEdge[region as Region] || payload.region;
     this._region = region || payload.region;
     this._publisher?.setHost(createEventGatewayURI(payload.home));
+    this._home = payload.home;
+    this._identity = payload.identity;
+    this._tokenWillExpireTimeout = setTimeout(() => {
+      this.emit('tokenWillExpire');
+      this._tokenWillExpireTimeout = null;
+    }, payload.ttl - this._options.tokenRefreshMs!);
 
     // The signaling stream emits a `connected` event after reconnection, if the
     // device was registered before this, then register again.
@@ -1237,6 +1275,7 @@ class Device extends EventEmitter {
 
     const publisherOptions = {
       defaultPayload: this._createDefaultPayload,
+      log: this._log,
       metadata: {
         app_name: this._options.appName,
         app_version: this._options.appVersion,
@@ -1454,6 +1493,17 @@ namespace Device {
   declare function registeredEvent(device: Device): void;
 
   /**
+   * Emitted when the {@link Device}'s token is about to expire. Use DeviceOptions.refreshTokenMs
+   * to set a custom warning time. Default is 10000 (10 seconds) prior to the token expiring.
+   * @example `device.on('tokenWillExpire', () => {
+   *   const token = getNewTokenViaAjax();
+   *   device.updateToken(token);
+   * })`
+   * @event
+   */
+  declare function registeredEvent(device: Device): void;
+
+  /**
    * All valid {@link Device} event names.
    */
   export enum EventName {
@@ -1463,6 +1513,7 @@ namespace Device {
     Unregistered = 'unregistered',
     Registering = 'registering',
     Registered = 'registered',
+    TokenWillExpire = 'tokenWillExpire',
   }
 
   /**
@@ -1592,6 +1643,12 @@ namespace Device {
      * A mapping of custom sound URLs by sound name.
      */
     sounds?: Partial<Record<Device.SoundName, string>>;
+
+    /**
+     * Number of milliseconds fewer than the token's TTL to emit the tokenWillExpire event.
+     * Default is 10000 (10 seconds).
+     */
+    tokenRefreshMs?: number;
   }
 }
 
