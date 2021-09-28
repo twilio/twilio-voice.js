@@ -633,7 +633,7 @@ class Device extends EventEmitter {
    * populated when registered.
    */
   get identity(): string | null {
-    return this._home;
+    return this._identity;
   }
 
   /**
