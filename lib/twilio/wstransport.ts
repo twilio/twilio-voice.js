@@ -134,7 +134,7 @@ export default class WSTransport extends EventEmitter {
   /**
    * List of URI of the endpoints to connect to.
    */
-  private readonly _uris: string[];
+  private _uris: string[];
 
   /**
    * The constructor to use for WebSocket
@@ -232,6 +232,18 @@ export default class WSTransport extends EventEmitter {
     }
 
     return true;
+  }
+
+  /**
+   * Update acceptable URIs to reconnect to. Useful for Call signaling reconnection, which requires
+   * connecting on the same edge.
+   */
+  updateURIs(uris: string[] | string) {
+    if (typeof uris === 'string') {
+      uris = [uris];
+    }
+
+    this._uris = uris;
   }
 
   /**

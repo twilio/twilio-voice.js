@@ -898,6 +898,13 @@ class Device extends EventEmitter {
    */
   private _destroyStream() {
     if (this._stream) {
+      this._stream.removeListener('close', this._onSignalingClose);
+      this._stream.removeListener('connected', this._onSignalingConnected);
+      this._stream.removeListener('error', this._onSignalingError);
+      this._stream.removeListener('invite', this._onSignalingInvite);
+      this._stream.removeListener('offline', this._onSignalingOffline);
+      this._stream.removeListener('ready', this._onSignalingReady);
+
       this._stream.destroy();
       this._stream = null;
     }
@@ -1059,6 +1066,12 @@ class Device extends EventEmitter {
       this.emit('tokenWillExpire');
       this._tokenWillExpireTimeout = null;
     }, payload.ttl - this._options.tokenRefreshMs!);
+
+    this._stream.updateURIs(getChunderURIs(
+      this._edge,
+      undefined,
+      this._log.warn.bind(this._log),
+    ));
 
     // The signaling stream emits a `connected` event after reconnection, if the
     // device was registered before this, then register again.
