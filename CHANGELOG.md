@@ -9,8 +9,8 @@ New Features
 The SDK now fully supports Call reconnection. Previously, the SDK only truly supported media reconnection -- if the
 media connection was lost but the signaling websocket recovered (generally within 10-15 seconds), reconnecting
 the Call was possible. However, if the websocket was lost, the Call was lost. Now, the SDK is able to reconnect
-a Call even if the websocket is lost. This means that a Call can potentially be recovered up to 60 seconds (before
-the RTP timeout) or in a network handover event, in which a user switches networks during a call.
+a Call even if the websocket is lost. This means that a Call can potentially be recovered up to 30 seconds or
+in a network handover event, in which a user switches networks during a call.
 
 In order to ensure automatic reconnection is possible at any time, we've also added `Device.Event.TokenWillExpire`,
 which should prompt the application to obtain a new token and call `Device.updateToken()`.

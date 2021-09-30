@@ -557,7 +557,7 @@ class Call extends EventEmitter {
           : 'accepted-by-remote';
         this._publisher.info('connection', eventName, null, this);
 
-        if (typeof reconnectToken ===  'string') {
+        if (typeof reconnectToken === 'string') {
           this._signalingReconnectToken = reconnectToken;
         }
 
