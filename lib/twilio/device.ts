@@ -909,6 +909,8 @@ class Device extends EventEmitter {
       this._stream = null;
     }
 
+    this._onSignalingOffline();
+
     this._streamConnectedPromise = null;
   }
 

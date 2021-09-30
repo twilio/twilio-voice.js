@@ -418,9 +418,6 @@ describe('Device', function() {
           await clock.tickAsync(0);
           pstream.emit('ready');
           await clock.tickAsync(0);
-
-          assert(regCalls.length);
-          await Promise.all(regCalls);
         });
 
         describe('log', () => {
