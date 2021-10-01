@@ -85,6 +85,31 @@ describe('Reconnection', function() {
     }
   };
 
+  describe('signaling reconnection', function() {
+    this.timeout(USE_CASE_TIMEOUT);
+
+    before(async () => {
+      await runDockerCommand('connectToDefaultNetwork');
+      await setupDevices();
+    });
+
+    it('should reconnect to signaling after 16 seconds', async () => {
+      await runDockerCommand('disconnectFromAllNetworks');
+
+      setTimeout(async () => {
+        await runDockerCommand('connectToDefaultNetwork');
+      }, 16000);
+
+      await waitFor(bindTestPerCall((call: Call) => expectEvent('reconnected', call)
+          .then(() => assert(call.status() === Call.State.Open))), 20000);
+    });
+
+    after(async () => {
+      destroyDevices();
+      await runDockerCommand('connectToDefaultNetwork');
+    });
+  });
+
   describe('ICE Restart', function() {
     this.timeout(SUITE_TIMEOUT);
 

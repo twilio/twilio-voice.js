@@ -209,6 +209,11 @@ class Call extends EventEmitter {
   private _mediaReconnectStartTime: number;
 
   /**
+   * State of the {@link Call}'s media.
+   */
+  private _mediaStatus: Call.State = Call.State.Pending;
+
+  /**
    * A batch of metrics samples to send to Insights. Gets cleared after
    * each send and appended to on each new sample.
    */
@@ -254,6 +259,11 @@ class Call extends EventEmitter {
   private _signalingReconnectToken: string | undefined;
 
   /**
+   * State of the {@link Call}'s signaling.
+   */
+  private _signalingStatus: Call.State = Call.State.Pending;
+
+  /**
    * A Map of Sounds to play.
    */
   private readonly _soundcache: Map<Device.SoundName, ISound> = new Map();
@@ -262,6 +272,11 @@ class Call extends EventEmitter {
    * State of the {@link Call}.
    */
   private _status: Call.State = Call.State.Pending;
+
+  /**
+   * Whether the {@link Call} has been connected. Used to determine if we are reconnected.
+   */
+  private _wasConnected: boolean = false;
 
   /**
    * @constructor
@@ -285,8 +300,8 @@ class Call extends EventEmitter {
       this.parameters = this._options.callParameters;
     }
 
-    if (this._options.signalingReconnectToken) {
-      this._signalingReconnectToken = this._options.signalingReconnectToken;
+    if (this._options.reconnectToken) {
+      this._signalingReconnectToken = this._options.reconnectToken;
     }
 
     this._direction = this.parameters.CallSid ? Call.CallDirection.Incoming : Call.CallDirection.Outgoing;
@@ -461,6 +476,7 @@ class Call extends EventEmitter {
         return;
       } else if (this._status === Call.State.Ringing || this._status === Call.State.Connecting) {
         this.mute(false);
+        this._mediaStatus = Call.State.Open;
         this._maybeTransitionToOpen();
       } else {
         // call was probably canceled sometime before this
@@ -985,9 +1001,17 @@ class Call extends EventEmitter {
    * Transition to {@link CallStatus.Open} if criteria is met.
    */
   private _maybeTransitionToOpen(): void {
-    if (this._mediaHandler && this._mediaHandler.status === 'open' && this._isAnswered) {
-      this._status = Call.State.Open;
-      this.emit('accept', this);
+    const wasConnected = this._wasConnected;
+    if (this._isAnswered) {
+      this._onSignalingReconnected();
+      this._signalingStatus = Call.State.Open;
+      if (this._mediaHandler && this._mediaHandler.status === 'open') {
+        this._status = Call.State.Open;
+        if (!this._wasConnected) {
+          this._wasConnected = true;
+          this.emit('accept', this);
+        }
+      }
     }
   }
 
@@ -1144,6 +1168,7 @@ class Call extends EventEmitter {
 
       this._mediaReconnectStartTime = Date.now();
       this._status = Call.State.Reconnecting;
+      this._mediaStatus = Call.State.Reconnecting;
       this._mediaReconnectBackoff.reset();
       this._mediaReconnectBackoff.backoff();
 
@@ -1157,14 +1182,17 @@ class Call extends EventEmitter {
   private _onMediaReconnected = (): void => {
     // Only trigger once.
     // This can trigger on pc.onIceConnectionChange and pc.onConnectionChange.
-    if (this._status !== Call.State.Reconnecting) {
+    if (this._mediaStatus !== Call.State.Reconnecting) {
       return;
     }
     this._log.info('ICE Connection reestablished.');
-    this._publisher.info('connection', 'reconnected', null, this);
+    this._mediaStatus = Call.State.Open;
 
-    this._status = Call.State.Open;
-    this.emit('reconnected');
+    if (this._signalingStatus === Call.State.Open) {
+      this._publisher.info('connection', 'reconnected', null, this);
+      this.emit('reconnected');
+      this._status = Call.State.Open;
+    }
   }
 
   /**
@@ -1208,6 +1236,24 @@ class Call extends EventEmitter {
   }
 
   /**
+   * Called when signaling is restored
+   */
+  private _onSignalingReconnected = (): void => {
+    if (this._signalingStatus !== Call.State.Reconnecting) {
+      return;
+    }
+    this._log.info('Signaling Connection reestablished.');
+
+    this._signalingStatus = Call.State.Open;
+
+    if (this._mediaStatus === Call.State.Open) {
+      this._publisher.info('connection', 'reconnected', null, this);
+      this.emit('reconnected');
+      this._status = Call.State.Open;
+    }
+  }
+
+  /**
    * Called when we receive a transportClose event from pstream.
    * Re-emits the event.
    */
@@ -1216,7 +1262,11 @@ class Call extends EventEmitter {
     this.emit('transportClose');
     if (this._signalingReconnectToken) {
       this._status = Call.State.Reconnecting;
+      this._signalingStatus = Call.State.Reconnecting;
       this.emit('reconnecting', new SignalingErrors.ConnectionDisconnected());
+    } else {
+      this._status = Call.State.Closed;
+      this._signalingStatus = Call.State.Closed;
     }
   }
 
@@ -1588,6 +1638,11 @@ namespace Call {
     preflight?: boolean;
 
     /**
+     * A reconnect token for the {@link Call}. Passed in for incoming {@link Calls}.
+     */
+    reconnectToken?: string;
+
+    /**
      * The Region currently connected to.
      */
     region?: string;
@@ -1612,11 +1667,6 @@ namespace Call {
      * Whether the disconnect sound should be played.
      */
     shouldPlayDisconnect?: () => boolean;
-
-    /**
-     * A reconnect token, passed in for an incoming call.
-     */
-    signalingReconnectToken?: string;
 
     /**
      * An override for the StatsMonitor dependency.

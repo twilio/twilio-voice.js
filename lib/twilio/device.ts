@@ -1023,7 +1023,7 @@ class Device extends EventEmitter {
       this._maybeStopIncomingSound();
     });
 
-    call.once('transportClose', () => {
+    call.on('transportClose', () => {
       if (call.status() !== Call.State.Pending) {
         return;
       }
@@ -1062,12 +1062,14 @@ class Device extends EventEmitter {
     this._edge = regionToEdge[region as Region] || payload.region;
     this._region = region || payload.region;
     this._publisher?.setHost(createEventGatewayURI(payload.home));
+    if (payload.token) {
+      this._identity = payload.token.identity;
+      this._tokenWillExpireTimeout = setTimeout(() => {
+        this.emit('tokenWillExpire');
+        this._tokenWillExpireTimeout = null;
+      }, payload.token.ttl - this._options.tokenRefreshMs!);
+    }
     this._home = payload.home;
-    this._identity = payload.identity;
-    this._tokenWillExpireTimeout = setTimeout(() => {
-      this.emit('tokenWillExpire');
-      this._tokenWillExpireTimeout = null;
-    }, payload.ttl - this._options.tokenRefreshMs!);
 
     this._stream.updateURIs(getChunderURIs(
       this._edge,
@@ -1140,9 +1142,11 @@ class Device extends EventEmitter {
     callParameters.CallSid = callParameters.CallSid || payload.callsid;
 
     const customParameters = Object.assign({ }, queryToJson(callParameters.Params));
+
     const call = await this._makeCall(customParameters, {
       callParameters,
       offerSdp: payload.sdp,
+      reconnectToken: payload.reconnect,
     });
 
     this._calls.push(call);
