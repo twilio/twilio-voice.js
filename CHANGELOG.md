@@ -4,6 +4,23 @@
 New Features
 ------------
 
+- ### Call Event Enum
+
+The Twilio `Call` entity now includes an EventName enum. You can access each event type off of the enum. These are used when specifying events off of the `Call` entity. For more information, see [this page](https://www.twilio.com/docs/voice/sdks/javascript/twiliocall#events).
+
+```
+export enum EventName {
+  Accept = 'accept',
+  Cancel = 'cancel',
+  Disconnect = 'disconnect',
+  Error = 'error',
+  Mute = 'mute',
+  Reject = 'reject',
+  Sample = 'sample',
+  Volume = 'volume',
+} 
+```
+
 - ### Twilio Regional Support
 
 The Twilio Voice JS SDK now supports Twilio Regional. To use a home region, please specify the desired home region in the access token before passing the token to the Twilio `Device`. This home region parameter should be matched with the appropriate `edge` parameter when instantiating a Twilio `Device`. The home region determines the location of your Insights data, as opposed to the `edge` that your call connects to Twilio through.
