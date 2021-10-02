@@ -1337,6 +1337,20 @@ namespace Call {
    */
   declare function sampleEvent(sample: RTCSample): void;
 
+   /**
+   * Possible states of the {@link Call}.
+   */
+    export enum EventName {
+      Accept = 'accept',
+      Cancel = 'cancel',
+      Disconnect = 'disconnect',
+      Error = 'error',
+      Mute = 'mute',
+      Reject = 'reject',
+      Sample = 'sample',
+      Volume = 'volume',
+    } 
+
   /**
    * Possible states of the {@link Call}.
    */
