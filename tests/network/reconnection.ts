@@ -91,6 +91,11 @@ describe('Reconnection', function() {
     before(async () => {
       await runDockerCommand('connectToDefaultNetwork');
       await setupDevices();
+      /**
+       * NOTE(mhuynh): This is a delay to ensure that the call has "settled" and
+       * is no longer in some "ringing" state.
+       */
+      await new Promise(resolve => setTimeout(resolve, 4000));
     });
 
     it('should reconnect to signaling after 16 seconds', async () => {
