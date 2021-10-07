@@ -85,11 +85,15 @@ describe('Reconnection', function() {
     }
   };
 
-  describe('signaling reconnection', function() {
+  /**
+   * NOTE(mhuynh): Firefox websockets have indeterminate signaling loss
+   * behavior.
+   */
+  (isFirefox() ? describe.skip : describe)('signaling reconnection', function() {
     this.timeout(USE_CASE_TIMEOUT);
 
     before(async () => {
-      await runDockerCommand('connectToDefaultNetwork');
+      await runDockerCommand('resetNetwork');
       await setupDevices();
       /**
        * NOTE(mhuynh): This is a delay to ensure that the call has "settled" and
@@ -98,20 +102,23 @@ describe('Reconnection', function() {
       await new Promise(resolve => setTimeout(resolve, 4000));
     });
 
-    it('should reconnect to signaling after 16 seconds', async () => {
+    it('should reconnect to signaling after 8 seconds', async () => {
       await runDockerCommand('disconnectFromAllNetworks');
 
-      setTimeout(async () => {
-        await runDockerCommand('connectToDefaultNetwork');
-      }, 16000);
+      const reconnectPromises = Promise.all([call1, call2].map(
+        call => new Promise(res => call.on('reconnected', res)),
+      ));
 
-      await waitFor(bindTestPerCall((call: Call) => expectEvent('reconnected', call)
-          .then(() => assert(call.status() === Call.State.Open))), 20000);
+      setTimeout(() => runDockerCommand('resetNetwork'), 8000);
+
+      await waitFor(reconnectPromises, 20000);
+
+      assert([call1, call2].every(call => call.status() === Call.State.Open));
     });
 
     after(async () => {
       destroyDevices();
-      await runDockerCommand('connectToDefaultNetwork');
+      await runDockerCommand('resetNetwork');
     });
   });
 
