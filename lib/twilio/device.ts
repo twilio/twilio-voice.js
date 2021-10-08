@@ -744,13 +744,11 @@ class Device extends EventEmitter {
         maxDuration: soundDef.maxDuration,
         shouldLoop: soundDef.shouldLoop,
       });
-      
-      const currentSound = this._soundcache.get(name as Device.SoundName);
-      if (currentSound?.isPlaying) {
-        currentSound.stop();
-        sound.play();
-      }
 
+      const currentSound = this._soundcache.get(name as Device.SoundName)
+      if (currentSound) {
+        currentSound.stop()
+      }
       this._soundcache.set(name as Device.SoundName, sound);
     }
 
