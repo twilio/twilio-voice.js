@@ -1,4 +1,8 @@
 version: 2.1
+
+###
+# Parameters
+###
 parameters:
   browser:
     type: enum
@@ -14,7 +18,17 @@ parameters:
   tag:
     type: string
     default: "" # use something like: "2.0.0-beta15" when invoking with parameters.
-executors: 
+  release_workflow:
+    type: boolean
+    default: false
+  release_command:
+    type: string
+    default: "echo \"no release-command specified\""
+
+###
+# Executors
+###
+executors:
   machine-executor:
     machine: true
   generic-executor:
@@ -32,6 +46,10 @@ executors:
         default: "stable"
     docker:
       - image: twilio/twilio-video-browsers:<<parameters.browser>>-<<parameters.bver>>
+
+###
+# Commands
+###
 commands:
   get-code:
     steps:
@@ -59,31 +77,43 @@ commands:
           key: dependency-cache-{{ checksum "package.json" }}
           paths:
             - ./node_modules
-  unit-tests:
+  build:
     steps:
       - set-node-version
       - get-code-and-dependencies
       - run:
-          name: Running unit tests
-          command: node -v && npm run build && npm run test:unit
-  network-tests:
+          name: Building project
+          command: npm run build
+      - store_artifacts:
+          path: ./dist
+          prefix: ./dist
+  unit-tests:
     steps:
-      - get-code-and-dependencies
+      - build
       - run:
-          name: Running integration tests
-          command: npm run test:docker
+          name: Running unit tests
+          command: npm run test:unit
   integration-tests:
     steps:
-      - get-code-and-dependencies
+      - build
       - run:
           name: Running integration tests
-          command: npm run build && npm run test:integration
-
-jobs:
-  UnitTests:
-    executor: docker-with-browser
+          command: npm run test:integration
+  network-tests:
     steps:
-      - unit-tests
+      - get-code
+      - run:
+          name: Running network tests
+          command: npm run test:docker
+
+
+###
+# Jobs
+###
+jobs:
+  run-unit-tests:
+    executor: docker-with-browser
+    steps: [unit-tests]
   run-network-tests:
     parameters:
       bver:
@@ -108,38 +138,101 @@ jobs:
       BROWSER: << parameters.browser >>
       BVER: << parameters.bver >>
     steps: [integration-tests]
+  run-release:
+    executor:
+      name: docker-with-browser
+    steps:
+      - run:
+          name: Create Release
+          command: << pipeline.parameters.release_command >>
   trigger-qe-tests:
     docker:
       - image: circleci/node:latest
     steps:
-    - run:
-        name: Trigger QE tests
-        command: |
-          curl --fail --write-out "\nHTTP Response Code: %{http_code}\n" \
-          -u "$CIRCLECI_PERSONAL_API_TOKEN": -X POST --header "Content-Type: application/json" \
-          -d '{"branch":"'v${CIRCLE_TAG:0:1}'","parameters":{"sdk_version":"'$CIRCLE_TAG'","is_rc":true}}' \
-          $SDKS_QE_CIRCLECI_VOICE_JS_SLAVE_PIPELINE_ENDPOINT
+      - run:
+          name: Trigger QE tests
+          command: |
+            curl --fail --write-out "\nHTTP Response Code: %{http_code}\n" \
+            -u "$CIRCLECI_PERSONAL_API_TOKEN": -X POST --header "Content-Type: application/json" \
+            -d '{"branch":"'v${CIRCLE_TAG:0:1}'","parameters":{"sdk_version":"'$CIRCLE_TAG'","is_rc":true}}' \
+            $SDKS_QE_CIRCLECI_VOICE_JS_SLAVE_PIPELINE_ENDPOINT
+
+###
+# Workflows
+###
 workflows:
-  Pull_Request_Workflow:
-    when: << pipeline.parameters.pr_workflow >>
+  pull-request-workflow:
+    when:
+        and:
+          - equal: [true, << pipeline.parameters.pr_workflow >>]
+          - equal: [false, << pipeline.parameters.release_workflow >>]
     jobs:
-      - UnitTests:
-          context: dockerhub-pulls
+      - run-unit-tests:
+          context:
+            - vblocks-js
           name: Unit Tests
       - run-integration-tests:
-          context: dockerhub-pulls
+          name: Integration Tests << matrix.browser >> << matrix.bver >>
+          context:
+            - dockerhub-pulls
+            - vblocks-js
+          matrix:
+            parameters:
+              browser: ["chrome", "firefox"]
+              bver: ["beta", "unstable", "stable"]
+      - run-network-tests:
+          name: Network Tests << matrix.browser >> << matrix.bver >>
+          context:
+            - dockerhub-pulls
+            - vblocks-js
+          matrix:
+            parameters:
+              browser: ["chrome", "firefox"]
+              bver: ["stable"]
+  release-workflow:
+    when: << pipeline.parameters.release_workflow >>
+    jobs:
+      - run-unit-tests:
+          context:
+            - vblocks-js
+          name: Unit Tests
+      - run-integration-tests:
+          context:
+            - dockerhub-pulls
+            - vblocks-js
           name: Integration Tests <<matrix.browser>> <<matrix.bver>>
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
               bver: ["beta", "unstable", "stable"]
       - run-network-tests:
-          context: dockerhub-pulls
+          context:
+            - dockerhub-pulls
+            - vblocks-js
           name: Network Tests <<matrix.browser>> <<matrix.bver>>
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
               bver: ["stable"]
+      - run-release:
+          context:
+            - dockerhub-pulls
+            - vblocks-js
+          name: Create Release
+          requires:
+            - Unit Tests
+            # Chrome integration tests
+            - Integration Tests chrome beta
+            - Integration Tests chrome unstable
+            - Integration Tests chrome stable
+            # Firefox integration tests
+            - Integration Tests firefox beta
+            - Integration Tests firefox unstable
+            - Integration Tests firefox stable
+            # Chrome network tests
+            - Network Tests chrome stable
+            # Firefox network tests
+            - Network Tests firefox stable
   release-candidate:
       jobs:
         - trigger-qe-tests:
