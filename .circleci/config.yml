@@ -139,12 +139,22 @@ jobs:
       BVER: << parameters.bver >>
     steps: [integration-tests]
   run-release:
+    parameters:
+      dryRun:
+        type: boolean
+        default: true
     executor:
       name: docker-with-browser
     steps:
-      - run:
-          name: Create Release
-          command: << pipeline.parameters.release_command >>
+      - when:
+          condition: << parameters.dryRun >>
+          steps:
+            - run: echo "Will run \"<< pipeline.parameters.release_command >>\""
+      - unless:
+          condition: << parameters.dryRun >>
+          steps:
+            - run: << pipeline.parameters.release_command >>
+
   trigger-qe-tests:
     docker:
       - image: circleci/node:latest
@@ -218,7 +228,8 @@ workflows:
           context:
             - dockerhub-pulls
             - vblocks-js
-          name: Create Release
+          name: Create Release Dry Run
+          dryRun: true
           requires:
             - Unit Tests
             # Chrome integration tests
@@ -233,6 +244,18 @@ workflows:
             - Network Tests chrome stable
             # Firefox network tests
             - Network Tests firefox stable
+      - hold:
+          type: approval
+          requires:
+            - Create Release Dry Run
+      - run-release:
+          context:
+            - dockerhub-pulls
+            - vblocks-js
+          name: Create Release
+          dryRun: false
+          requires:
+            - hold
   release-candidate:
       jobs:
         - trigger-qe-tests:
