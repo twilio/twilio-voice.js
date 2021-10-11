@@ -12,6 +12,14 @@ the Call was possible. However, if the websocket was lost, the Call was lost. No
 a Call even if the websocket is lost. This means that a Call can potentially be recovered up to 30 seconds or
 in a network handover event, in which a user switches networks during a call.
 
+When a call has encountered a network error and signaling reconnection has succeeded, the `Call` object will emit the
+`reconnected` event.
+
+```ts
+const call = await device.connect(...);
+call.on('reconnected', () => { ... });
+```
+
 In order to ensure automatic reconnection is possible at any time, we've also added `Device.Event.TokenWillExpire`,
 which should prompt the application to obtain a new token and call `Device.updateToken()`.
 
