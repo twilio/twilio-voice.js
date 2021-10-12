@@ -121,6 +121,7 @@
 								<li class="tsd-kind-method tsd-parent-kind-class tsd-is-overwrite tsd-is-inherited tsd-is-external"><a href="tools.wstransport.html#removelistener" class="tsd-kind-icon">remove<wbr>Listener</a></li>
 								<li class="tsd-kind-method tsd-parent-kind-class tsd-is-external"><a href="tools.wstransport.html#send" class="tsd-kind-icon">send</a></li>
 								<li class="tsd-kind-method tsd-parent-kind-class tsd-is-overwrite tsd-is-inherited tsd-is-external"><a href="tools.wstransport.html#setmaxlisteners" class="tsd-kind-icon">set<wbr>Max<wbr>Listeners</a></li>
+								<li class="tsd-kind-method tsd-parent-kind-class tsd-is-external"><a href="tools.wstransport.html#updateuris" class="tsd-kind-icon">updateURIs</a></li>
 								<li class="tsd-kind-method tsd-parent-kind-class tsd-is-inherited tsd-is-static tsd-is-external"><a href="tools.wstransport.html#listenercount-1" class="tsd-kind-icon">listener<wbr>Count</a></li>
 							</ul>
 						</section>
@@ -139,7 +140,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/1e7bb24/lib/twilio/wstransport.ts#L142">lib/twilio/wstransport.ts:142</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/043870f/lib/twilio/wstransport.ts#L142">lib/twilio/wstransport.ts:142</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -171,7 +172,7 @@
 					<div class="tsd-signature tsd-kind-icon">state<span class="tsd-signature-symbol">:</span> <a href="../enums/tools.wstransportstate.html" class="tsd-signature-type">WSTransportState</a><span class="tsd-signature-symbol"> = WSTransportState.Closed</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/1e7bb24/lib/twilio/wstransport.ts#L73">lib/twilio/wstransport.ts:73</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/043870f/lib/twilio/wstransport.ts#L73">lib/twilio/wstransport.ts:73</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -203,7 +204,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/1e7bb24/lib/twilio/wstransport.ts#L442">lib/twilio/wstransport.ts:442</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/043870f/lib/twilio/wstransport.ts#L454">lib/twilio/wstransport.ts:454</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -273,7 +274,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/1e7bb24/lib/twilio/wstransport.ts#L193">lib/twilio/wstransport.ts:193</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/043870f/lib/twilio/wstransport.ts#L193">lib/twilio/wstransport.ts:193</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -541,7 +542,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/1e7bb24/lib/twilio/wstransport.ts#L201">lib/twilio/wstransport.ts:201</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/043870f/lib/twilio/wstransport.ts#L201">lib/twilio/wstransport.ts:201</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -746,7 +747,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/1e7bb24/lib/twilio/wstransport.ts#L219">lib/twilio/wstransport.ts:219</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/043870f/lib/twilio/wstransport.ts#L219">lib/twilio/wstransport.ts:219</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -789,6 +790,35 @@
 								</li>
 							</ul>
 							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">this</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-external">
+					<a name="updateuris" class="tsd-anchor"></a>
+					<h3>updateURIs</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-external">
+						<li class="tsd-signature tsd-kind-icon">updateURIs<span class="tsd-signature-symbol">(</span>uris<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/043870f/lib/twilio/wstransport.ts#L241">lib/twilio/wstransport.ts:241</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Update acceptable URIs to reconnect to. Useful for Call signaling reconnection, which requires
+									connecting on the same edge.</p>
+								</div>
+							</div>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>uris: <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">string</span></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
 						</li>
 					</ul>
 				</section>
@@ -952,6 +982,9 @@
 							</li>
 							<li class=" tsd-kind-method tsd-parent-kind-class tsd-is-overwrite tsd-is-inherited tsd-is-external">
 								<a href="tools.wstransport.html#setmaxlisteners" class="tsd-kind-icon">set<wbr>Max<wbr>Listeners</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class tsd-is-external">
+								<a href="tools.wstransport.html#updateuris" class="tsd-kind-icon">updateURIs</a>
 							</li>
 							<li class=" tsd-kind-method tsd-parent-kind-class tsd-is-inherited tsd-is-static tsd-is-external">
 								<a href="tools.wstransport.html#listenercount-1" class="tsd-kind-icon">listener<wbr>Count</a>

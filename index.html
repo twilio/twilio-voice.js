@@ -58,20 +58,14 @@
 				<p>This product, Twilio&#39;s JavaScript Voice SDK, is the next version of Twilio&#39;s Javascript Client SDK. It is
 					now in GA and we recommend all customers migrate in order to continue receiving future feature additions.
 				For help on migrating from 1.x, see our <a href="https://www.twilio.com/docs/voice/client/migrating-to-js-voice-sdk-20">migration guide</a>.</p>
-				<a href="#pilot-versioning-note" id="pilot-versioning-note" style="color: inherit; text-decoration: none;">
-					<h4>Pilot Versioning Note</h4>
-				</a>
-				<p>During the pilot phase, the GitHub release artifact was referred to as <code>2.0.0</code>. This has been retroactively corrected
-					to the appropriate tag, <code>2.0.0-preview.1</code>. With GA, we move to <code>2.0.0</code> formally. This versioning fix was necessary
-				to properly follow semantic versioning rules.</p>
 				<a href="#twiliovoice-sdk" id="twiliovoice-sdk" style="color: inherit; text-decoration: none;">
 					<h1>@twilio/voice-sdk</h1>
 				</a>
-				<p><a href="https://travis-ci.com/twilio/twilio-voice.js"><img src="https://travis-ci.com/twilio/twilio.js.svg?branch=master" alt="Travis Build Status"></a> <a href="https://www.npmjs.com/package/twilio-voice"><img src="https://img.shields.io/npm/v/twilio-voice.svg" alt="NPM"></a></p>
+				<p><a href="https://travis-ci.com/twilio/twilio-voice.js"><img src="https://travis-ci.com/twilio/twilio.js.svg?branch=master" alt="Travis Build Status"></a> <a href="https://www.npmjs.com/package/%40twilio/voice-sdk"><img src="https://img.shields.io/npm/v/%40twilio/voice-sdk.svg" alt="NPM"></a></p>
 				<p>Twilio&#39;s Voice SDK allows you to add real-time voice and PSTN calling to your web apps.</p>
 				<ul>
 					<li><a href="https://twilio.github.io/twilio-voice.js/index.html">API Docs</a></li>
-					<li><a href="https://www.twilio.com/docs/voice/client/javascript/overview">More Docs</a></li>
+					<li><a href="https://www.twilio.com/docs/voice/sdks/javascript">More Docs</a></li>
 					<li><a href="https://www.twilio.com/docs/voice/client/javascript/quickstart">Quickstart</a></li>
 					<li><a href="https://github.com/twilio/twilio-voice.js/blob/master/CHANGELOG.md">Changelog</a></li>
 				</ul>
@@ -145,6 +139,8 @@
 <span class="hljs-tag">&lt;/<span class="hljs-name">Response</span>&gt;</span></code></pre>
 				<p>Integration tests can be run via:</p>
 				<pre><code>npm <span class="hljs-keyword">run</span><span class="bash"> <span class="hljs-built_in">test</span>:integration</span></code></pre><p>These tests will run via karma, one at a time, in your system&#39;s default Chrome and then Firefox.</p>
+				<p>Network tests have been split out into their own docker processes, and can be run via</p>
+				<pre><code>npm <span class="hljs-keyword">run</span><span class="bash"> <span class="hljs-built_in">test</span>:docker</span></code></pre>
 				<a href="#content-security-policy-csp" id="content-security-policy-csp" style="color: inherit; text-decoration: none;">
 					<h2>Content Security Policy (CSP)</h2>
 				</a>
@@ -154,7 +150,8 @@ media-src mediastream http<span class="hljs-variable">s:</span>//media.twiliocdn
 connect-src http<span class="hljs-variable">s:</span>//eventgw.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//chunderw-vpc-gll.twilio.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span></code></pre><p>If you are providing a non-default value for <code>Device.ConnectOptions.edge</code> parameter, you need to add the Signaling URI <code>wss://chunderw-vpc-gll-{regionId}.twilio.com</code> in your <code>connect-src</code> directive where <code>regionId</code> is the <code>Region ID</code> as defined in this <a href="https://www.twilio.com/docs/global-infrastructure/edge-locations/legacy-regions">page</a>. See examples below.</p>
 				<p><strong>If <code>Device.ConnectOptions.edge</code> is <code>ashburn</code></strong></p>
 				<pre><code>connect-src http<span class="hljs-variable">s:</span>//eventgw.twilio.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//chunderw-vpc-gll-us1.twilio.<span class="hljs-keyword">com</span></code></pre><p><strong>If <code>Device.ConnectOptions.edge</code> is <code>[&#39;ashburn&#39;, &#39;sydney&#39;, &#39;roaming&#39;]</code></strong></p>
-				<pre><code>connect-src http<span class="hljs-variable">s:</span>//eventgw.twilio.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//chunderw-vpc-gll-us1.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//chunderw-vpc-gll-au1.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//chunderw-vpc-gll.twilio.<span class="hljs-keyword">com</span></code></pre>
+				<pre><code>connect-src http<span class="hljs-variable">s:</span>//eventgw.twilio.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//chunderw-vpc-gll-us1.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//chunderw-vpc-gll-au1.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//chunderw-vpc-gll.twilio.<span class="hljs-keyword">com</span></code></pre><p>If you are providing a home region grant into your <a href="https://www.twilio.com/docs/iam/access-tokens">Twilio access token</a>, you need to add the insights endpoint in your <code>connect-src</code> directive using <code>eventgw.{homeRegion}.twilio.com</code> format. Below is an example if your home region grant is <code>sg1</code>.</p>
+				<pre><code>connect-src http<span class="hljs-variable">s:</span>//eventgw.sg1.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//chunderw-vpc-gll.twilio.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span></code></pre>
 				<a href="#license" id="license" style="color: inherit; text-decoration: none;">
 					<h2>License</h2>
 				</a>
