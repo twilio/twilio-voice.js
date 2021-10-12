@@ -9,6 +9,9 @@ describe('EventPublisher', () => {
     const options = {
       defaultPayload: createDefaultFakePayload,
       host: 'foo',
+      log: {
+        warn: function() { }
+      },
       request: fakeRequest,
       metadata: {
         app_name: 'foo',

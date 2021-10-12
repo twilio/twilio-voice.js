@@ -4,7 +4,42 @@
 New Features
 ------------
 
-- ### Twilio Regional Support
+### Signaling Reconnection Support
+
+The SDK now fully supports Call reconnection. Previously, the SDK only truly supported media reconnection -- if the
+media connection was lost but the signaling websocket recovered (generally within 10-15 seconds), reconnecting
+the Call was possible. However, if the websocket was lost, the Call was lost. Now, the SDK is able to reconnect
+a Call even if the websocket is lost. This means that a Call can potentially be recovered up to 30 seconds or
+in a network handover event, in which a user switches networks during a call.
+
+When a call has encountered a network error and signaling reconnection has succeeded, the `Call` object will emit the
+`reconnected` event.
+
+```ts
+const call = await device.connect(...);
+call.on('reconnected', () => { ... });
+```
+
+In order to ensure automatic reconnection is possible at any time, we've also added `Device.Event.TokenWillExpire`,
+which should prompt the application to obtain a new token and call `Device.updateToken()`.
+
+### Device.Event.TokenWillExpire
+
+By default, this new event will fire 10 seconds prior to the AccessToken's expiration, prompting the application
+to provide a new token. This can be changed by setting `Device.Options.tokenRefreshMs` to something other than the
+default of `10000` ms.
+
+```ts
+const device = new Device(token, {
+  tokenRefreshMs: 30000,
+});
+
+device.on('tokenWillExpire', () => {
+  return getTokenViaAjax().then(token => device.updateToken(token));
+});
+```
+
+### Twilio Regional Support
 
 The Twilio Voice JS SDK now supports Twilio Regional. To use a home region, please specify the desired home region in the access token before passing the token to the Twilio `Device`. This home region parameter should be matched with the appropriate `edge` parameter when instantiating a Twilio `Device`. The home region determines the location of your Insights data, as opposed to the `edge` that your call connects to Twilio through.
 
@@ -25,6 +60,14 @@ const device = new Device(accessToken, {
   edge: 'sydney',
 });
 ```
+
+The current home region can be retrieved from the read-only string `Device.home`, which contains the currently
+connected home region after a successful registration.
+
+### Device.identity
+
+After successfully registering, the Device will now have a read-only string, `Device.identity`, which exposes
+the identity passed via token.
 
 Fixes
 -----

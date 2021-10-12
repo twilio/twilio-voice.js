@@ -11,6 +11,7 @@ import {
   GeneralErrors,
   InvalidArgumentError,
   MediaErrors,
+  SignalingErrors,
   TwilioError,
   UserMediaErrors,
 } from './errors';
@@ -208,6 +209,11 @@ class Call extends EventEmitter {
   private _mediaReconnectStartTime: number;
 
   /**
+   * State of the {@link Call}'s media.
+   */
+  private _mediaStatus: Call.State = Call.State.Pending;
+
+  /**
    * A batch of metrics samples to send to Insights. Gets cleared after
    * each send and appended to on each new sample.
    */
@@ -248,6 +254,16 @@ class Call extends EventEmitter {
   private _shouldSendHangup: boolean = true;
 
   /**
+   * The signaling reconnection token used to re-establish a lost signaling connection.
+   */
+  private _signalingReconnectToken: string | undefined;
+
+  /**
+   * State of the {@link Call}'s signaling.
+   */
+  private _signalingStatus: Call.State = Call.State.Pending;
+
+  /**
    * A Map of Sounds to play.
    */
   private readonly _soundcache: Map<Device.SoundName, ISound> = new Map();
@@ -256,6 +272,11 @@ class Call extends EventEmitter {
    * State of the {@link Call}.
    */
   private _status: Call.State = Call.State.Pending;
+
+  /**
+   * Whether the {@link Call} has been connected. Used to determine if we are reconnected.
+   */
+  private _wasConnected: boolean = false;
 
   /**
    * @constructor
@@ -277,6 +298,10 @@ class Call extends EventEmitter {
 
     if (this._options.callParameters) {
       this.parameters = this._options.callParameters;
+    }
+
+    if (this._options.reconnectToken) {
+      this._signalingReconnectToken = this._options.reconnectToken;
     }
 
     this._direction = this.parameters.CallSid ? Call.CallDirection.Incoming : Call.CallDirection.Outgoing;
@@ -451,6 +476,7 @@ class Call extends EventEmitter {
         return;
       } else if (this._status === Call.State.Ringing || this._status === Call.State.Connecting) {
         this.mute(false);
+        this._mediaStatus = Call.State.Open;
         this._maybeTransitionToOpen();
       } else {
         // call was probably canceled sometime before this
@@ -481,6 +507,7 @@ class Call extends EventEmitter {
     this._pstream.on('cancel', this._onCancel);
     this._pstream.on('ringing', this._onRinging);
     this._pstream.on('transportClose', this._onTransportClose);
+    this._pstream.on('connected', this._onConnected);
 
     this.on('error', error => {
       this._publisher.error('connection', 'error', {
@@ -539,12 +566,16 @@ class Call extends EventEmitter {
         return;
       }
 
-      const onAnswer = (pc: RTCPeerConnection) => {
+      const onAnswer = (pc: RTCPeerConnection, reconnectToken?: string) => {
         // Report that the call was answered, and directionality
         const eventName = this._direction === Call.CallDirection.Incoming
           ? 'accepted-by-local'
           : 'accepted-by-remote';
         this._publisher.info('connection', eventName, null, this);
+
+        if (typeof reconnectToken === 'string') {
+          this._signalingReconnectToken = reconnectToken;
+        }
 
         // Report the preferred codec and params as they appear in the SDP
         const { codecName, codecParams } = getPreferredCodecInfo(this._mediaHandler.version.getSDP());
@@ -850,6 +881,7 @@ class Call extends EventEmitter {
       this._pstream.removeListener('hangup', this._onHangup);
       this._pstream.removeListener('ringing', this._onRinging);
       this._pstream.removeListener('transportClose', this._onTransportClose);
+      this._pstream.removeListener('connected', this._onConnected);
     };
 
     // This is kind of a hack, but it lets us avoid rewriting more code.
@@ -969,9 +1001,17 @@ class Call extends EventEmitter {
    * Transition to {@link CallStatus.Open} if criteria is met.
    */
   private _maybeTransitionToOpen(): void {
-    if (this._mediaHandler && this._mediaHandler.status === 'open' && this._isAnswered) {
-      this._status = Call.State.Open;
-      this.emit('accept', this);
+    const wasConnected = this._wasConnected;
+    if (this._isAnswered) {
+      this._onSignalingReconnected();
+      this._signalingStatus = Call.State.Open;
+      if (this._mediaHandler && this._mediaHandler.status === 'open') {
+        this._status = Call.State.Open;
+        if (!this._wasConnected) {
+          this._wasConnected = true;
+          this.emit('accept', this);
+        }
+      }
     }
   }
 
@@ -980,11 +1020,15 @@ class Call extends EventEmitter {
    * @param payload
    */
   private _onAnswer = (payload: Record<string, any>): void => {
+    if (typeof payload.reconnect === 'string') {
+      this._signalingReconnectToken = payload.reconnect;
+    }
+
     // answerOnBridge=false will send a 183 which we need to catch in _onRinging when
     // the enableRingingState flag is disabled. In that case, we will receive a 200 after
     // the callee accepts the call firing a second `accept` event if we don't
     // short circuit here.
-    if (this._isAnswered) {
+    if (this._isAnswered && this._status !== Call.State.Reconnecting) {
       return;
     }
 
@@ -1009,6 +1053,21 @@ class Call extends EventEmitter {
       this._status = Call.State.Closed;
       this.emit('cancel');
       this._pstream.removeListener('cancel', this._onCancel);
+    }
+  }
+
+  /**
+   * Called when we receive a connected event from pstream.
+   * Re-emits the event.
+   */
+  private _onConnected = (): void => {
+    this._log.info('Received connected from pstream');
+    if (this._signalingReconnectToken) {
+      this._pstream.reconnect(
+        this._mediaHandler.version.getSDP(),
+        this.parameters.CallSid,
+        this._signalingReconnectToken,
+      );
     }
   }
 
@@ -1109,6 +1168,7 @@ class Call extends EventEmitter {
 
       this._mediaReconnectStartTime = Date.now();
       this._status = Call.State.Reconnecting;
+      this._mediaStatus = Call.State.Reconnecting;
       this._mediaReconnectBackoff.reset();
       this._mediaReconnectBackoff.backoff();
 
@@ -1122,14 +1182,17 @@ class Call extends EventEmitter {
   private _onMediaReconnected = (): void => {
     // Only trigger once.
     // This can trigger on pc.onIceConnectionChange and pc.onConnectionChange.
-    if (this._status !== Call.State.Reconnecting) {
+    if (this._mediaStatus !== Call.State.Reconnecting) {
       return;
     }
     this._log.info('ICE Connection reestablished.');
-    this._publisher.info('connection', 'reconnected', null, this);
+    this._mediaStatus = Call.State.Open;
 
-    this._status = Call.State.Open;
-    this.emit('reconnected');
+    if (this._signalingStatus === Call.State.Open) {
+      this._publisher.info('connection', 'reconnected', null, this);
+      this.emit('reconnected');
+      this._status = Call.State.Open;
+    }
   }
 
   /**
@@ -1173,12 +1236,38 @@ class Call extends EventEmitter {
   }
 
   /**
+   * Called when signaling is restored
+   */
+  private _onSignalingReconnected = (): void => {
+    if (this._signalingStatus !== Call.State.Reconnecting) {
+      return;
+    }
+    this._log.info('Signaling Connection reestablished.');
+
+    this._signalingStatus = Call.State.Open;
+
+    if (this._mediaStatus === Call.State.Open) {
+      this._publisher.info('connection', 'reconnected', null, this);
+      this.emit('reconnected');
+      this._status = Call.State.Open;
+    }
+  }
+
+  /**
    * Called when we receive a transportClose event from pstream.
    * Re-emits the event.
    */
   private _onTransportClose = (): void => {
     this._log.error('Received transportClose from pstream');
     this.emit('transportClose');
+    if (this._signalingReconnectToken) {
+      this._status = Call.State.Reconnecting;
+      this._signalingStatus = Call.State.Reconnecting;
+      this.emit('reconnecting', new SignalingErrors.ConnectionDisconnected());
+    } else {
+      this._status = Call.State.Closed;
+      this._signalingStatus = Call.State.Closed;
+    }
   }
 
   /**
@@ -1547,6 +1636,11 @@ namespace Call {
      * Whether this is a preflight call or not
      */
     preflight?: boolean;
+
+    /**
+     * A reconnect token for the {@link Call}. Passed in for incoming {@link Calls}.
+     */
+    reconnectToken?: string;
 
     /**
      * The Region currently connected to.

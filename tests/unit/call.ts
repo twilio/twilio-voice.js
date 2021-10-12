@@ -1910,6 +1910,7 @@ describe('Call', function() {
       const callback = sinon.stub();
       mediaHandler.onfailed();
       conn.on('reconnected', callback);
+      conn['_signalingStatus'] = Call.State.Open;
       mediaHandler.onreconnected();
 
       sinon.assert.callCount(callback, 1);
@@ -1919,6 +1920,7 @@ describe('Call', function() {
       const callback = sinon.stub();
       mediaHandler.onicegatheringfailure();
       conn.on('reconnected', callback);
+      conn['_signalingStatus'] = Call.State.Open;
       mediaHandler.onconnected();
 
       sinon.assert.callCount(callback, 1);
