@@ -153,6 +153,7 @@ jobs:
       - unless:
           condition: << parameters.dryRun >>
           steps:
+            - build
             - run: << pipeline.parameters.release_command >>
 
   trigger-qe-tests:
