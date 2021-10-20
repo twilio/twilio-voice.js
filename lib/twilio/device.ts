@@ -24,6 +24,7 @@ import Log from './log';
 import { PreflightTest } from './preflight/preflight';
 import {
   createEventGatewayURI,
+  Edge,
   getChunderURIs,
   getRegionShortcode,
   Region,
@@ -1059,7 +1060,7 @@ class Device extends EventEmitter {
    */
   private _onSignalingConnected = (payload: Record<string, any>) => {
     const region = getRegionShortcode(payload.region);
-    this._edge = regionToEdge[region as Region] || payload.region;
+    this._edge = payload.edge || regionToEdge[region as Region] || payload.region;
     this._region = region || payload.region;
     this._publisher?.setHost(createEventGatewayURI(payload.home));
     if (payload.token) {
@@ -1072,7 +1073,7 @@ class Device extends EventEmitter {
     this._home = payload.home;
 
     this._stream.updateURIs(getChunderURIs(
-      this._edge,
+      this._edge as Edge,
       undefined,
       this._log.warn.bind(this._log),
     ));

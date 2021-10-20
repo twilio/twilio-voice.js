@@ -3,6 +3,7 @@ import CallType from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { GeneralErrors } from '../../lib/twilio/errors';
 import {
+  Edge,
   Region,
   regionShortcodes,
   regionToEdge,
@@ -484,6 +485,12 @@ describe('Device', function() {
           await clock.tickAsync(0);
 
           sinon.assert.calledOnce(spy);
+        });
+
+        it('should update the pstream edge', () => {
+          const spy = pstream.updateURIs = sinon.spy(pstream.updateURIs);
+          pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
+          sinon.assert.calledOnceWithExactly(spy, ['chunderw-vpc-gll-ie1.twilio.com']);
         });
       });
 
