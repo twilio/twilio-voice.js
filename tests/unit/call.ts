@@ -1548,6 +1548,52 @@ describe('Call', function() {
         });
       });
     });
+
+    describe('pstream.answer event', () => {
+      let pStreamAnswerPayload: any;
+
+      beforeEach(async () => {
+        pStreamAnswerPayload = {
+          edge: 'foobar-edge',
+          reconnect: 'foobar-reconnect-token',
+        };
+        conn = new Call(config, options);
+        conn.accept();
+        await clock.tickAsync(0);
+      });
+
+      it('should set the call to "answered"', () => {
+        pstream.emit('answer', pStreamAnswerPayload);
+        assert(conn['_isAnswered']);
+      });
+
+      it('should save the reconnect token', () => {
+        pstream.emit('answer', pStreamAnswerPayload);
+        assert.equal(conn['_signalingReconnectToken'], pStreamAnswerPayload.reconnect);
+      });
+
+      describe('if raised multiple times', () => {
+        it('should save the reconnect token multiple times', () => {
+          pstream.emit('answer', pStreamAnswerPayload);
+          assert.equal(conn['_signalingReconnectToken'], pStreamAnswerPayload.reconnect);
+
+          pStreamAnswerPayload.reconnect = 'biffbazz-reconnect-token';
+
+          pstream.emit('answer', pStreamAnswerPayload);
+          assert.equal(conn['_signalingReconnectToken'], pStreamAnswerPayload.reconnect);
+        });
+
+        it('should not invoke "call._maybeTransitionToOpen" more than once', () => {
+          const spy = conn['_maybeTransitionToOpen'] = sinon.spy(conn['_maybeTransitionToOpen']);
+
+          pstream.emit('answer', pStreamAnswerPayload);
+          sinon.assert.calledOnce(spy);
+
+          pstream.emit('answer', pStreamAnswerPayload);
+          sinon.assert.calledOnce(spy);
+        });
+      });
+    });
   });
 
   describe('on monitor.sample', () => {
