@@ -236,7 +236,7 @@ export default class WSTransport extends EventEmitter {
 
   /**
    * Update acceptable URIs to reconnect to. Useful for Call signaling reconnection, which requires
-   * connecting on the same edge.
+   * connecting on the same edge. Resets the URI index to 0.
    */
   updateURIs(uris: string[] | string) {
     if (typeof uris === 'string') {
@@ -244,6 +244,7 @@ export default class WSTransport extends EventEmitter {
     }
 
     this._uris = uris;
+    this._uriIndex = 0;
   }
 
   /**

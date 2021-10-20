@@ -9,6 +9,7 @@ const EXPECTED_PSTREAM_VERSION = '1.6';
 
 describe('PStream', () => {
   let pstream;
+
   beforeEach(() => {
     pstream = new PStream('foo', ['wss://foo.bar/signal'], {
       TransportFactory
@@ -158,6 +159,18 @@ describe('PStream', () => {
       pstream.transport.emit('message', { data: JSON.stringify({ type: 'close' })});
       pstream.transport.emit('message', { data: JSON.stringify({ type: 'close' })});
       assert.equal(count, 1);
+    });
+  });
+
+  describe('updateURIs', () => {
+    it('should update the uris', () => {
+      pstream.updateURIs(['foo', 'bar']);
+      assert.deepEqual(pstream._uris, ['foo', 'bar']);
+    });
+
+    it('should update the wstransport uris', () => {
+      pstream.updateURIs(['foo', 'bar']);
+      sinon.assert.calledOnce(pstream.transport.updateURIs);
     });
   });
 

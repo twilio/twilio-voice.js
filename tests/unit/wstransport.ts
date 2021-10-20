@@ -241,6 +241,18 @@ describe('WSTransport', () => {
     });
   });
 
+  describe('#updateURIs', () => {
+    it('should update the URIs', () => {
+      transport.updateURIs(['foo', 'bar']);
+      assert.deepEqual(transport['_uris'], ['foo', 'bar']);
+    });
+
+    it('should reset the URI index', () => {
+      transport.updateURIs(['foo', 'bar']);
+      assert.equal(transport['_uriIndex'], 0);
+    });
+  });
+
   describe('onSocketMessage', () => {
     beforeEach(() => {
       transport.open();
