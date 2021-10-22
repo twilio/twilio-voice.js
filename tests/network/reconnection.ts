@@ -89,7 +89,7 @@ describe('Reconnection', function() {
    * NOTE(mhuynh): Firefox websockets have indeterminate signaling loss
    * behavior.
    */
-  (isFirefox() ? describe : describe)('signaling reconnection', function() {
+  (isFirefox() ? describe.skip : describe)('signaling reconnection', function() {
     this.timeout(USE_CASE_TIMEOUT);
 
     before(async () => {
@@ -113,24 +113,6 @@ describe('Reconnection', function() {
 
       await waitFor(reconnectPromises, 20000);
 
-      assert([call1, call2].every(call => call.status() === Call.State.Open));
-    });
-
-    it('should reconnect to signaling multiple times', async () => {
-      await runDockerCommand('disconnectFromAllNetworks');
-      let reconnectPromises = Promise.all([call1, call2].map(
-        call => new Promise(res => call.on('reconnected', res)),
-      ));
-      setTimeout(() => runDockerCommand('resetNetwork'), 8000);
-      await waitFor(reconnectPromises, 20000);
-      assert([call1, call2].every(call => call.status() === Call.State.Open));
-
-      await runDockerCommand('disconnectFromAllNetworks');
-      reconnectPromises = Promise.all([call1, call2].map(
-        call => new Promise(res => call.on('reconnected', res)),
-      ));
-      setTimeout(() => runDockerCommand('resetNetwork'), 8000);
-      await waitFor(reconnectPromises, 20000);
       assert([call1, call2].every(call => call.status() === Call.State.Open));
     });
 
