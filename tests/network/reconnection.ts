@@ -89,7 +89,7 @@ describe('Reconnection', function() {
    * NOTE(mhuynh): Firefox websockets have indeterminate signaling loss
    * behavior.
    */
-  (isFirefox() ? describe : describe)('signaling reconnection', function() {
+  (isFirefox() ? describe.skip : describe)('signaling reconnection', function() {
     this.timeout(USE_CASE_TIMEOUT);
 
     before(async () => {
