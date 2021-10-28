@@ -12,7 +12,7 @@ const RTP_TIMEOUT = 60000;
 const SUITE_TIMEOUT = 300000;
 const USE_CASE_TIMEOUT = 180000;
 
-(isFirefox() ? describe.skip : describe)('Reconnection', function() {
+describe('Reconnection', function() {
   this.timeout(SUITE_TIMEOUT);
 
   let call1: Call;
@@ -140,7 +140,7 @@ const USE_CASE_TIMEOUT = 180000;
     });
   });
 
-  describe('ICE Restart', function() {
+  (isFirefox() ? describe.skip : describe)('ICE Restart', function() {
     this.timeout(SUITE_TIMEOUT);
 
     describe('and ICE connection fails', function() {
@@ -213,5 +213,9 @@ const USE_CASE_TIMEOUT = 180000;
       await runDockerCommand('resetNetwork');
       await waitFor(bindTestPerDevice((device: Device) => expectEvent(Device.EventName.Registered, device)), EVENT_TIMEOUT);
     });
+  });
+
+  (isFirefox() ? it : it.skip)('Dummy test for Firefox', () => {
+    // no-op
   });
 });
