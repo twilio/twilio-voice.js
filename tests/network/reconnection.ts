@@ -12,7 +12,7 @@ const RTP_TIMEOUT = 60000;
 const SUITE_TIMEOUT = 300000;
 const USE_CASE_TIMEOUT = 180000;
 
-describe('Reconnection', function() {
+(isFirefox() ? describe.skip : describe)('Reconnection', function() {
   this.timeout(SUITE_TIMEOUT);
 
   let call1: Call;
