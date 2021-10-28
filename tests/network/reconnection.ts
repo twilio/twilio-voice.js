@@ -116,6 +116,24 @@ describe('Reconnection', function() {
       assert([call1, call2].every(call => call.status() === Call.State.Open));
     });
 
+    it('should reconnect to signaling multiple times', async () => {
+      await runDockerCommand('disconnectFromAllNetworks');
+      let reconnectPromises = Promise.all([call1, call2].map(
+        call => new Promise(res => call.on('reconnected', res)),
+      ));
+      setTimeout(() => runDockerCommand('resetNetwork'), 8000);
+      await waitFor(reconnectPromises, 20000);
+      assert([call1, call2].every(call => call.status() === Call.State.Open));
+
+      await runDockerCommand('disconnectFromAllNetworks');
+      reconnectPromises = Promise.all([call1, call2].map(
+        call => new Promise(res => call.on('reconnected', res)),
+      ));
+      setTimeout(() => runDockerCommand('resetNetwork'), 8000);
+      await waitFor(reconnectPromises, 20000);
+      assert([call1, call2].every(call => call.status() === Call.State.Open));
+    });
+
     after(async () => {
       destroyDevices();
       await runDockerCommand('resetNetwork');

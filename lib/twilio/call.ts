@@ -601,12 +601,13 @@ class Call extends EventEmitter {
 
       if (this._direction === Call.CallDirection.Incoming) {
         this._isAnswered = true;
+        this._pstream.on('answer', this._onAnswer.bind(this));
         this._mediaHandler.answerIncomingCall(this.parameters.CallSid, this._options.offerSdp,
           rtcConstraints, rtcConfiguration, onAnswer);
       } else {
         const params = Array.from(this.customParameters.entries()).map(pair =>
          `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
-        this._pstream.once('answer', this._onAnswer.bind(this));
+        this._pstream.on('answer', this._onAnswer.bind(this));
         this._mediaHandler.makeOutgoingCall(this._pstream.token, params, this.outboundConnectionId,
           rtcConstraints, rtcConfiguration, onAnswer);
       }
@@ -1124,7 +1125,7 @@ class Call extends EventEmitter {
     }
 
     // Ignore subsequent requests if ice restart is in progress
-    if (this._status === Call.State.Reconnecting) {
+    if (this._mediaStatus === Call.State.Reconnecting) {
 
       // This is a retry. Previous ICE Restart failed
       if (isEndOfIceCycle) {
