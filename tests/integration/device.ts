@@ -157,4 +157,50 @@ describe('Device', function() {
       });
     });
   });
+
+  describe('tokenWillExpire event', () => {
+    const setupDevice = (tokenTtl: number, tokenRefreshMs: number) => {
+      const accessToken = generateAccessToken(`device-tokenWillExpire-${Date.now()}`, tokenTtl);
+      const device = new Device(accessToken, { tokenRefreshMs });
+      return device;
+    };
+
+    it('should emit a "tokenWillExpire" event', async () => {
+      const device = setupDevice(10, 1000);
+      await new Promise((resolve, reject) => {
+        const failureTimeout = setTimeout(reject, 9500);
+        device.on('tokenWillExpire', () => {
+          clearTimeout(failureTimeout);
+          resolve();
+        });
+      });
+      await device.register();
+    });
+
+    it('should not emit a "tokenWillExpire" event early', async () => {
+      const device = setupDevice(10, 1000);
+      await new Promise((resolve, reject) => {
+        const successTimeout = setTimeout(resolve, 8500);
+        device.on('tokenWillExpire', () => {
+          clearTimeout(successTimeout);
+          reject();
+        });
+      });
+      await device.register();
+    });
+
+    it('should emit a "tokenWillExpire" event as soon as possible if the option is smaller than the ttl', async () => {
+      const device = setupDevice(5, 10000);
+      const eventTimePromise = new Promise<number>(resolve => {
+        device.on('tokenWillExpire', () => {
+          resolve(Date.now());
+        });
+      });
+      await device.register();
+      const registerTime = Date.now();
+      const eventTime = await eventTimePromise;
+      assert(eventTime > registerTime);
+      assert((registerTime - eventTime) < 500);
+    });
+  });
 });
