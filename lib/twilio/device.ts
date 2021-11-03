@@ -1071,8 +1071,11 @@ class Device extends EventEmitter {
         const ttlMs: number = payload.token.ttl * 1000;
         const timeoutMs: number = Math.max(0, ttlMs - this._options.tokenRefreshMs);
         this._tokenWillExpireTimeout = setTimeout(() => {
-          this.emit('tokenWillExpire');
-          this._tokenWillExpireTimeout = null;
+          this.emit('tokenWillExpire', this);
+          if (this._tokenWillExpireTimeout) {
+            clearTimeout(this._tokenWillExpireTimeout);
+            this._tokenWillExpireTimeout = null;
+          }
         }, timeoutMs);
       }
     }
@@ -1527,7 +1530,7 @@ namespace Device {
    * })`
    * @event
    */
-  declare function registeredEvent(device: Device): void;
+  declare function tokenWillExpireEvent(device: Device): void;
 
   /**
    * All valid {@link Device} event names.
