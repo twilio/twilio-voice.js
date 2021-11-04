@@ -497,32 +497,48 @@ describe('Device', function() {
           assert.notEqual(device['_tokenWillExpireTimeout'], null);
         });
 
-        it('should emit a token expiry', () => {
-          const ttlSeconds = 20;
-          const ttlMilliseconds = ttlSeconds * 1000;
-          let expiredEventFired = false;
+        describe('`tokenWillExpire` event', () => {
+          it('should emit a token expiry', () => {
+            const ttlSeconds = 20;
+            const ttlMilliseconds = ttlSeconds * 1000;
+            let expiredEventFired = false;
 
-          pstream.emit('connected', { token: { ttl: ttlSeconds } });
-          device.on('tokenWillExpire', () => {
-            expiredEventFired = true;
+            pstream.emit('connected', { token: { ttl: ttlSeconds } });
+            device.on('tokenWillExpire', () => {
+              expiredEventFired = true;
+            });
+
+            clock.tick(ttlMilliseconds);
+            assert(expiredEventFired);
           });
 
-          clock.tick(ttlMilliseconds);
-          assert(expiredEventFired);
-        });
+          it('should not emit a token expiry early', () => {
+            const ttlSeconds = 20;
+            const ttlMilliseconds = ttlSeconds * 1000;
+            let expiredEventFired = false;
 
-        it('should not emit a token expiry early', () => {
-          const ttlSeconds = 20;
-          const ttlMilliseconds = ttlSeconds * 1000;
-          let expiredEventFired = false;
+            pstream.emit('connected', { token: { ttl: ttlSeconds } });
+            device.on('tokenWillExpire', () => {
+              expiredEventFired = true;
+            });
 
-          pstream.emit('connected', { token: { ttl: ttlSeconds } });
-          device.on('tokenWillExpire', () => {
-            expiredEventFired = true;
+            clock.tick(ttlMilliseconds - 15000);
+            assert.notEqual(expiredEventFired, true);
           });
 
-          clock.tick(ttlMilliseconds - 15000);
-          assert.notEqual(expiredEventFired, true);
+          it('should emit the device with the `tokenWillExpire` event', () => {
+            const ttlSeconds = 20;
+            const ttlMilliseconds = ttlSeconds * 1000;
+            let expiredEventDevice = false;
+
+            pstream.emit('connected', { token: { ttl: ttlSeconds } });
+            device.on('tokenWillExpire', (dev: Device) => {
+              expiredEventDevice = (device === dev);
+            });
+
+            clock.tick(ttlMilliseconds);
+            assert(expiredEventDevice);
+          });
         });
       });
 

@@ -162,45 +162,55 @@ describe('Device', function() {
     const setupDevice = (tokenTtl: number, tokenRefreshMs: number) => {
       const accessToken = generateAccessToken(`device-tokenWillExpire-${Date.now()}`, tokenTtl);
       const device = new Device(accessToken, { tokenRefreshMs });
+      device.on(Device.EventName.Error, () => { /* no-op */ });
       return device;
     };
 
     it('should emit a "tokenWillExpire" event', async () => {
       const device = setupDevice(10, 1000);
-      await new Promise((resolve, reject) => {
-        const failureTimeout = setTimeout(reject, 9500);
-        device.on('tokenWillExpire', () => {
-          clearTimeout(failureTimeout);
+      await new Promise(async (resolve, reject) => {
+        let failureTimeout: any = null;
+        device.on(Device.EventName.TokenWillExpire, () => {
+          if (failureTimeout) {
+            clearTimeout(failureTimeout);
+          }
           resolve();
         });
+        await device.register();
+        failureTimeout = setTimeout(reject, 9500);
       });
-      await device.register();
     });
 
     it('should not emit a "tokenWillExpire" event early', async () => {
       const device = setupDevice(10, 1000);
-      await new Promise((resolve, reject) => {
-        const successTimeout = setTimeout(resolve, 8500);
-        device.on('tokenWillExpire', () => {
-          clearTimeout(successTimeout);
+      await new Promise(async (resolve, reject) => {
+        let successTimeout: any = null;
+        device.on(Device.EventName.TokenWillExpire, () => {
+          if (successTimeout) {
+            clearTimeout(successTimeout);
+          }
           reject();
         });
+        await device.register();
+        successTimeout = setTimeout(resolve, 8500);
       });
-      await device.register();
     });
 
     it('should emit a "tokenWillExpire" event as soon as possible if the option is smaller than the ttl', async () => {
       const device = setupDevice(5, 10000);
-      const eventTimePromise = new Promise<number>(resolve => {
-        device.on('tokenWillExpire', () => {
-          resolve(Date.now());
-        });
-      });
-      await device.register();
-      const registerTime = Date.now();
-      const eventTime = await eventTimePromise;
-      assert(eventTime > registerTime);
-      assert((registerTime - eventTime) < 500);
+
+      const eventPromises = Promise.all([
+        Device.EventName.TokenWillExpire,
+        Device.EventName.Registering,
+      ].map((eventName: string) => new Promise<number>(res => {
+        device.on(eventName, () => res(Date.now()));
+      })));
+
+      device.register();
+
+      const [expireTime, registeringTime] = await eventPromises;
+      const diff = Math.abs(expireTime - registeringTime);
+      assert(diff < 500, `event time occurred too late; diff: ${diff}`);
     });
   });
 });
