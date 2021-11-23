@@ -487,10 +487,9 @@ describe('Device', function() {
           sinon.assert.calledOnce(spy);
         });
 
-        it('should update the pstream edge', () => {
-          const spy = pstream.updateURIs = sinon.spy(pstream.updateURIs);
+        it('should update the preferred uri', () => {
           pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
-          sinon.assert.calledOnceWithExactly(spy, ['chunderw-vpc-gll-ie1.twilio.com']);
+          assert.equal(device['_preferredURI'], ['chunderw-vpc-gll-ie1.twilio.com']);
         });
       });
 
@@ -685,13 +684,13 @@ describe('Device', function() {
         });
 
         describe('on call.accept', () => {
-          it('should should set the active call', () => {
+          it('should set the active call', () => {
             const call = device.calls[0];
             call.emit('accept');
             assert.equal(call, device['_activeCall']);
           });
 
-          it('should should remove the call', () => {
+          it('should remove the call', () => {
             device.calls[0].emit('accept');
             assert.equal(device.calls.length, 0);
           });
@@ -702,13 +701,30 @@ describe('Device', function() {
             device.calls[0].emit('accept');
             sinon.assert.notCalled(spy.play);
           });
+
+          it('should update the preferred uri', () => {
+            pstream.emit('connected', { edge: 'sydney' });
+            const spy: any = device['_stream'].updatePreferredURI =
+              sinon.spy(device['_stream'].updatePreferredURI);
+            const call = device.calls[0];
+            call.emit('accept');
+            sinon.assert.calledOnce(spy);
+          });
         });
 
         describe('on call.error', () => {
-          it('should should remove the call if closed', () => {
+          it('should remove the call if closed', () => {
             device.calls[0].status = () => CallType.State.Closed;
             device.calls[0].emit('error');
             assert.equal(device.calls.length, 0);
+          });
+
+          it('should unset the preferred uri if the call was closed', () => {
+            const spy: any = device['_stream'].updatePreferredURI =
+              sinon.spy(device['_stream'].updatePreferredURI);
+            device.calls[0].status = () => CallType.State.Closed;
+            device.calls[0].emit('error');
+            sinon.assert.calledOnceWithExactly(spy, null);
           });
         });
 
@@ -735,12 +751,92 @@ describe('Device', function() {
             call.emit('disconnect');
             assert.equal(device['_activeCall'], null);
           });
+
+          it('should unset the preferred uri', () => {
+            const spy: any = device['_stream'].updatePreferredURI =
+              sinon.spy(device['_stream'].updatePreferredURI);
+            device.calls[0].emit('disconnect');
+            sinon.assert.calledOnceWithExactly(spy, null);
+          });
         });
 
         describe('on call.reject', () => {
-          it('should should remove the call', () => {
+          it('should remove the call', () => {
             device.calls[0].emit('reject');
             assert.equal(device.calls.length, 0);
+          });
+
+          it('should unset the preferred uri', () => {
+            const spy: any = device['_stream'].updatePreferredURI =
+              sinon.spy(device['_stream'].updatePreferredURI);
+            device.calls[0].emit('reject');
+            sinon.assert.calledOnceWithExactly(spy, null);
+          });
+        });
+      });
+
+      describe('with multiple calls', () => {
+        let call1: any;
+        let call2: any;
+
+        beforeEach(async () => {
+          device = new Device(token, {
+            ...setupOptions,
+            allowIncomingWhileBusy: true,
+          });
+          await setupStream();
+
+          const nextCallPromise = () => new Promise<any>(resolve => {
+            device.once(Device.EventName.Incoming, c => {
+              resolve(c);
+            });
+          });
+
+          const call1Promise = nextCallPromise();
+          pstream.emit('invite', {
+            callsid: 'CA1234',
+            sdp: 'foobar',
+          });
+          call1 = await call1Promise;
+          call1.emit('accept');
+          await clock.tickAsync(0);
+
+          const call2Promise = nextCallPromise();
+          pstream.emit('invite', {
+            callsid: 'CA5678',
+            sdp: 'biffbazz',
+          });
+          call2 = await call2Promise;
+
+          assert(device.calls.length === 1);
+        });
+
+        describe('on call.error', () => {
+          it('should not unset the preferred uri even if the call was closed', () => {
+            const spy: any = device['_stream'].updatePreferredURI =
+              sinon.spy(device['_stream'].updatePreferredURI);
+            call1.status = () => CallType.State.Closed;
+            call1.emit('error');
+            sinon.assert.notCalled(spy);
+          });
+        });
+
+        describe('on call.disconnect', () => {
+          it('should not unset the preferred uri', () => {
+            const spy: any = device['_stream'].updatePreferredURI =
+              sinon.spy(device['_stream'].updatePreferredURI);
+            call1.emit('disconnect');
+            sinon.assert.notCalled(spy);
+          });
+        });
+
+        describe('on call.reject', () => {
+          it('should not unset the preferred uri', () => {
+            const spy: any = device['_stream'].updatePreferredURI =
+              sinon.spy(device['_stream'].updatePreferredURI);
+            call1.parameters = { CallSid: 'foobar' };
+            call1.emit('reject');
+            sinon.assert.notCalled(spy);
           });
         });
       });

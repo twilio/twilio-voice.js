@@ -14,6 +14,7 @@ function MockWSTransport() {
 
   stub._uris = ['foo'];
   stub._uriIndex = 0;
+  stub._connectedUri = stub._uris[0];
   return stub;
 }
 

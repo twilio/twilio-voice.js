@@ -162,6 +162,18 @@ describe('PStream', () => {
     });
   });
 
+  describe('updatePreferredURI', () => {
+    it('should update the preferred uri', () => {
+      pstream.updatePreferredURI('foo');
+      assert.equal(pstream._preferredUri, 'foo');
+    });
+
+    it('should update the wstransport preferred uri', () => {
+      pstream.updatePreferredURI('foo');
+      sinon.assert.calledOnce(pstream.transport.updatePreferredURI);
+    });
+  });
+
   describe('updateURIs', () => {
     it('should update the uris', () => {
       pstream.updateURIs(['foo', 'bar']);

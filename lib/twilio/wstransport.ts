@@ -15,6 +15,7 @@ const Backoff = require('backoff');
 const CONNECT_SUCCESS_TIMEOUT = 10000;
 const CONNECT_TIMEOUT = 5000;
 const HEARTBEAT_TIMEOUT = 15000;
+const MAX_PREFERRED_URI_CONNECT_ATTEMPTS = 5;
 
 export interface IMessageEvent {
   data: string;
@@ -58,6 +59,11 @@ export interface IWSTransportConstructorOptions {
   connectTimeoutMs?: number;
 
   /**
+   * Max attempts on a preferred URI.
+   */
+  maxPreferredURIConnectAttempts?: number;
+
+  /**
    * A WebSocket factory to use instead of WebSocket.
    */
   WebSocket?: any;
@@ -76,6 +82,11 @@ export default class WSTransport extends EventEmitter {
    * The backoff instance used to schedule reconnection attempts.
    */
   private readonly _backoff: any;
+
+  /**
+   * The currently connected uri
+   */
+  private _connectedUri: string;
 
   /**
    * The current connection timeout. If it times out, we've failed to connect
@@ -104,6 +115,16 @@ export default class WSTransport extends EventEmitter {
    * An instance of Logger to use.
    */
   private _log: Log = Log.getInstance();
+
+  /**
+   * Max attempts on a preferred URI.
+   */
+  private _maxPreferredURIConnectAttempts: number;
+
+  /**
+   * Preferred URI endpoint to connect to.
+   */
+  private _preferredUri: string | null;
 
   /**
    * Previous state of the connection
@@ -150,6 +171,8 @@ export default class WSTransport extends EventEmitter {
     super();
 
     this._connectTimeoutMs = options.connectTimeoutMs || CONNECT_TIMEOUT;
+    this._maxPreferredURIConnectAttempts =
+      options.maxPreferredURIConnectAttempts || MAX_PREFERRED_URI_CONNECT_ATTEMPTS;
 
     let initialDelay = 100;
     if (uris && uris.length > 1) {
@@ -171,6 +194,7 @@ export default class WSTransport extends EventEmitter {
     this._backoff = Backoff.exponential(backoffConfig);
 
     this._uris = uris;
+    this._connectedUri = uris[0];
     this._WebSocket = options.WebSocket || WebSocket;
 
     // Called when a backoff timer is started.
@@ -235,8 +259,18 @@ export default class WSTransport extends EventEmitter {
   }
 
   /**
-   * Update acceptable URIs to reconnect to. Useful for Call signaling reconnection, which requires
-   * connecting on the same edge. Resets the URI index to 0.
+   * Update the preferred URI to connect to. Useful for Call signaling
+   * reconnection, which requires connecting on the same edge. If `null` is
+   * passed, the preferred URI is unset and the original `uris` array and
+   * `uriIndex` is used to determine the signaling URI to connect to.
+   * @param uri
+   */
+  updatePreferredURI(uri: string | null) {
+    this._preferredUri = uri;
+  }
+
+  /**
+   * Update acceptable URIs to reconnect to. Resets the URI index to 0.
    */
   updateURIs(uris: string[] | string) {
     if (typeof uris === 'string') {
@@ -298,6 +332,10 @@ export default class WSTransport extends EventEmitter {
   private _connect(retryCount?: number): void {
     if (retryCount) {
       this._log.info(`Attempting to reconnect (retry #${retryCount})...`);
+      if (this._preferredUri && retryCount > this._maxPreferredURIConnectAttempts) {
+        this._log.info(`Too many attempts on preferred URI, reverting to URI array...`);
+        this.updatePreferredURI(null);
+      }
     } else {
       this._log.info('Attempting to connect...');
     }
@@ -306,14 +344,15 @@ export default class WSTransport extends EventEmitter {
 
     this._setState(WSTransportState.Connecting);
     let socket = null;
+    this._connectedUri = this._preferredUri || this._uris[this._uriIndex];
     try {
-      socket = new this._WebSocket(this._uris[this._uriIndex]);
+      socket = new this._WebSocket(this._connectedUri);
     } catch (e) {
       this._log.info('Could not connect to endpoint:', e.message);
       this._close();
       this.emit('error', {
         code: 31000,
-        message: e.message || `Could not connect to ${this._uris[this._uriIndex]}`,
+        message: e.message || `Could not connect to ${this._connectedUri}`,
         twilioError: new SignalingErrors.ConnectionDisconnected(),
       });
       return;
@@ -453,6 +492,6 @@ export default class WSTransport extends EventEmitter {
    * The uri the transport is currently connected to
    */
   get uri(): string {
-    return this._uris[this._uriIndex];
+    return this._connectedUri;
   }
 }

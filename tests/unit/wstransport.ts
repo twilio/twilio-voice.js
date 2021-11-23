@@ -2,6 +2,7 @@ const assert = require('assert');
 const sinon = require('sinon');
 
 const WebSocketManager = require('../mock/WebSocketManager');
+import { SinonFakeTimers } from 'sinon';
 import WSTransport, { WSTransportState } from '../../lib/twilio/wstransport';
 
 describe('WSTransport', () => {
@@ -241,6 +242,18 @@ describe('WSTransport', () => {
     });
   });
 
+  describe('#updatePreferredURI', () => {
+    it('should update the preferred URI', () => {
+      transport.updatePreferredURI('foobar');
+      assert.equal('foobar', transport['_preferredUri']);
+    });
+
+    it('should unset the preferred URI', () => {
+      transport.updatePreferredURI(null);
+      assert.equal(null, transport['_preferredUri']);
+    });
+  });
+
   describe('#updateURIs', () => {
     it('should update the URIs', () => {
       transport.updateURIs(['foo', 'bar']);
@@ -417,39 +430,39 @@ describe('WSTransport', () => {
 
     it('should not move uri index if error is not fallback-able', async () => {
       transport.emit = sinon.spy();
-      assert.equal(transport.uri, URIS[0]);
+      assert.equal(transport['_uriIndex'], 0);
       socket.dispatchEvent({ type: 'close', code: 123 });
-      assert.equal(transport.uri, URIS[0]);
+      assert.equal(transport['_uriIndex'], 0);
     });
 
     it('should move uri to next index if error is 1006', async () => {
       transport.emit = sinon.spy();
-      assert.equal(transport.uri, URIS[0]);
+      assert.equal(transport['_uriIndex'], 0);
       socket.dispatchEvent({ type: 'close', code: 1006 });
-      assert.equal(transport.uri, URIS[1]);
+      assert.equal(transport['_uriIndex'], 1);
     });
 
     it('should move uri to next index if error is 1015', async () => {
       transport.emit = sinon.spy();
-      assert.equal(transport.uri, URIS[0]);
+      assert.equal(transport['_uriIndex'], 0);
       socket.dispatchEvent({ type: 'close', code: 1015 });
-      assert.equal(transport.uri, URIS[1]);
+      assert.equal(transport['_uriIndex'], 1);
     });
 
     it('should loop through all uris', async () => {
       transport.emit = sinon.spy();
-      assert.equal(transport.uri, URIS[0]);
+      assert.equal(transport['_uriIndex'], 0);
       transport['_uriIndex'] = 1;
       socket.dispatchEvent({ type: 'close', code: 1015 });
-      assert.equal(transport.uri, URIS[2]);
+      assert.equal(transport['_uriIndex'], 2);
     });
 
     it('should loop back to the first element', async () => {
       transport.emit = sinon.spy();
-      assert.equal(transport.uri, URIS[0]);
+      assert.equal(transport['_uriIndex'], 0);
       transport['_uriIndex'] = 2;
       socket.dispatchEvent({ type: 'close', code: 1015 });
-      assert.equal(transport.uri, URIS[0]);
+      assert.equal(transport['_uriIndex'], 0);
     });
 
     describe('when transitioning to the next state with fallback counter', () => {
@@ -464,11 +477,11 @@ describe('WSTransport', () => {
         it(`should not move uri to next index if error is fallback-able, state is open, and previous state is ${prevState}`, async () => {
           transport.state = WSTransportState.Open;
           transport['_previousState'] = prevState;
-          assert.equal(transport.uri, URIS[0]);
+          assert.equal(transport['_uriIndex'], 0);
           socket.dispatchEvent(closeEvent);
-          assert.equal(transport.uri, URIS[0]);
+          assert.equal(transport['_uriIndex'], 0);
           socket.dispatchEvent(closeEvent);
-          assert.equal(transport.uri, URIS[1]);
+          assert.equal(transport['_uriIndex'], 1);
         });
       });
 
@@ -476,11 +489,11 @@ describe('WSTransport', () => {
         it(`should not move uri to next index if error is fallback-able, previous state is open, and current state is ${currentState}`, async () => {
           transport.state = currentState;
           transport['_previousState'] = WSTransportState.Open;
-          assert.equal(transport.uri, URIS[0]);
+          assert.equal(transport['_uriIndex'], 0);
           socket.dispatchEvent(closeEvent);
-          assert.equal(transport.uri, URIS[0]);
+          assert.equal(transport['_uriIndex'], 0);
           socket.dispatchEvent(closeEvent);
-          assert.equal(transport.uri, URIS[1]);
+          assert.equal(transport['_uriIndex'], 1);
         });
       });
 
@@ -494,11 +507,11 @@ describe('WSTransport', () => {
           it(`should move uri to next index if error is fallback-able, previous state is ${prevState}, and current state is ${currentState}`, async () => {
             transport.state = currentState;
             transport['_previousState'] = prevState;
-            assert.equal(transport.uri, URIS[0]);
+            assert.equal(transport['_uriIndex'], 0);
             socket.dispatchEvent(closeEvent);
-            assert.equal(transport.uri, URIS[1]);
+            assert.equal(transport['_uriIndex'], 1);
             socket.dispatchEvent(closeEvent);
-            assert.equal(transport.uri, URIS[2]);
+            assert.equal(transport['_uriIndex'], 2);
           });
         })
       });
@@ -527,6 +540,58 @@ describe('WSTransport', () => {
       (transport as any)._backoff.emit('ready');
       assert.equal((transport as any)._connect.callCount, 1);
     });
+
+    describe('connecting to a preferred URI', () => {
+      let clock: SinonFakeTimers;
+
+      beforeEach(() => {
+        clock = sinon.useFakeTimers(Date.now());
+        wsManager.reset();
+      });
+
+      afterEach(() => {
+        clock.restore();
+      });
+
+      it('should attempt after a timeout', () => {
+        const uris = ['foo', 'bar'];
+        const preferredUri = 'biff';
+
+        transport = new WSTransport(uris, {
+          WebSocket: wsManager.MockWebSocket,
+        });
+        transport.open();
+
+        transport.updatePreferredURI(preferredUri);
+        assert.equal(transport['_preferredUri'], preferredUri);
+
+        for (let i = 0; i < 2; i++) {
+          clock.runToLast();
+        }
+
+        assert.equal(transport.uri, preferredUri);
+      });
+
+      it('should attempt only a max number of times', () => {
+        const uris = ['foo', 'bar'];
+        const preferredUri = 'biff';
+
+        transport = new WSTransport(uris, {
+          WebSocket: wsManager.MockWebSocket,
+        });
+        transport.open();
+
+        transport.updatePreferredURI(preferredUri);
+        assert.equal(transport['_preferredUri'], preferredUri);
+
+        for (let i = 0; i < 2 * 6; i++) {
+          clock.runToLast();
+        }
+
+        assert.equal(transport['_preferredUri'], null);
+        assert.notEqual(transport.uri, preferredUri);
+      });
+    });
   });
 
   describe('on timed out', () => {
@@ -545,13 +610,13 @@ describe('WSTransport', () => {
     it('should not move uri index before timing out', () => {
       transport.open();
       clock.tick(3000);
-      assert.equal(transport.uri, URIS[0]);
+      assert.equal(transport['_uriIndex'], 0);
     });
 
     it('should move uri index after timing out', () => {
       transport.open();
       clock.tick(5000);
-      assert.equal(transport.uri, URIS[1]);
+      assert.equal(transport['_uriIndex'], 1);
     });
 
     it('should use connectTimeoutMs parameter', () => {
@@ -559,11 +624,11 @@ describe('WSTransport', () => {
       transport = new WSTransport(URIS, { WebSocket, connectTimeoutMs: 20000 });
       transport.open();
       clock.tick(3000);
-      assert.equal(transport.uri, URIS[0]);
+      assert.equal(transport['_uriIndex'], 0);
       clock.tick(2000);
-      assert.equal(transport.uri, URIS[0]);
+      assert.equal(transport['_uriIndex'], 0);
       clock.tick(15000);
-      assert.equal(transport.uri, URIS[1]);
+      assert.equal(transport['_uriIndex'], 1);
     });
   });
 });

@@ -386,6 +386,11 @@ class Device extends EventEmitter {
   private _options: IExtendedDeviceOptions = { };
 
   /**
+   * The preferred URI to (re)-connect signaling to.
+   */
+  private _preferredURI: string | null = null;
+
+  /**
    * An Insights Event Publisher.
    */
   private _publisher: IPublisher | null = null;
@@ -966,9 +971,16 @@ class Device extends EventEmitter {
       twimlParams,
     }, options);
 
+    const maybeUnsetPreferredUri = () => {
+      if (this._activeCall === null && this._calls.length === 0) {
+        this._stream.updatePreferredURI(null);
+      }
+    };
+
     const call = new (this._options.Call || Call)(config, options);
 
     call.once('accept', () => {
+      this._stream.updatePreferredURI(this._preferredURI);
       this._removeCall(call);
       this._activeCall = call;
       if (this._audio) {
@@ -992,6 +1004,7 @@ class Device extends EventEmitter {
     call.addListener('error', (error: TwilioError) => {
       if (call.status() === 'closed') {
         this._removeCall(call);
+        maybeUnsetPreferredUri();
       }
       if (this._audio) {
         this._audio._maybeStopPollingVolume();
@@ -1002,6 +1015,7 @@ class Device extends EventEmitter {
     call.once('cancel', () => {
       this._log.info(`Canceled: ${call.parameters.CallSid}`);
       this._removeCall(call);
+      maybeUnsetPreferredUri();
       if (this._audio) {
         this._audio._maybeStopPollingVolume();
       }
@@ -1013,6 +1027,7 @@ class Device extends EventEmitter {
         this._audio._maybeStopPollingVolume();
       }
       this._removeCall(call);
+      maybeUnsetPreferredUri();
     });
 
     call.once('reject', () => {
@@ -1021,6 +1036,7 @@ class Device extends EventEmitter {
         this._audio._maybeStopPollingVolume();
       }
       this._removeCall(call);
+      maybeUnsetPreferredUri();
       this._maybeStopIncomingSound();
     });
 
@@ -1032,6 +1048,10 @@ class Device extends EventEmitter {
         this._audio._maybeStopPollingVolume();
       }
       this._removeCall(call);
+      /**
+       * NOTE(mhuynh): We don't want to call `maybeUnsetPreferredUri` because
+       * a `transportClose` will happen during signaling reconnection.
+       */
       this._maybeStopIncomingSound();
     });
 
@@ -1050,7 +1070,7 @@ class Device extends EventEmitter {
   /**
    * Called when a 'close' event is received from the signaling stream.
    */
-  private _onSignalingClose = () => {
+   private _onSignalingClose = () => {
     this._stream = null;
     this._streamConnectedPromise = null;
   }
@@ -1072,11 +1092,11 @@ class Device extends EventEmitter {
     }
     this._home = payload.home;
 
-    this._stream.updateURIs(getChunderURIs(
+    this._preferredURI = getChunderURIs(
       this._edge as Edge,
       undefined,
       this._log.warn.bind(this._log),
-    ));
+    )[0] || null;
 
     // The signaling stream emits a `connected` event after reconnection, if the
     // device was registered before this, then register again.
