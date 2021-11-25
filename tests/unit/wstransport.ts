@@ -1,5 +1,5 @@
 const assert = require('assert');
-const sinon = require('sinon');
+import * as sinon from 'sinon';
 
 const WebSocketManager = require('../mock/WebSocketManager');
 import { SinonFakeTimers } from 'sinon';
@@ -12,7 +12,7 @@ describe('WSTransport', () => {
   const URIS = [
     'wss://foo.com/signal',
     'wss://bar.com/signal',
-    'wss://baz.com/signal'
+    'wss://baz.com/signal',
   ];
 
   let socket: any;
@@ -112,14 +112,14 @@ describe('WSTransport', () => {
         const BadWebSocket = () => { throw new Error('Die'); }
 
         it('should close the WSTransport', () => {
-          transport = new WSTransport(['wss://foo.bar/signal'], { WebSocket: BadWebSocket });
+          transport = new WSTransport(['wss://foo.bar/signal'], { WebSocket: BadWebSocket as any });
           transport.on('error', () => { });
           transport.open();
           assert.equal(transport.state, WSTransportState.Closed);
         });
 
         it('should call onerror', (done) => {
-          transport = new WSTransport(['wss://foo.bar/signal'], { WebSocket: BadWebSocket });
+          transport = new WSTransport(['wss://foo.bar/signal'], { WebSocket: BadWebSocket as any });
           transport.on('error', () => done());
           transport.open();
         });
@@ -153,7 +153,6 @@ describe('WSTransport', () => {
       });
 
       afterEach(() => {
-        (transport as any)._backoff.reset();
         transport.close();
       });
 
@@ -374,23 +373,23 @@ describe('WSTransport', () => {
     });
 
     it('should attempt to reconnect by setting a backoff', () => {
-      (transport as any)._backoff.backoff = sinon.spy();
+      const spy = transport['_performBackoff'] = sinon.spy(transport['_performBackoff']);
       socket.dispatchEvent({ type: 'close' });
-      assert.equal((transport as any)._backoff.backoff.callCount, 1);
+      sinon.assert.calledOnce(spy);
     });
 
     it('should reset the backoff timer if the websocket was open longer than 10 seconds', () => {
-      (transport as any)._timeOpened = Date.now() - 11000;
-      (transport as any)._backoff.reset = sinon.spy();
+      transport['_timeOpened'] = Date.now() - 11000;
+      const spy = transport['_resetBackoffs'] = sinon.spy(transport['_resetBackoffs']);
       socket.dispatchEvent({ type: 'close' });
-      assert.equal((transport as any)._backoff.reset.callCount, 1);
+      sinon.assert.calledOnce(spy);
     });
 
-    it('should reset the backoff timer if the websocket was open less than 10 seconds', () => {
-      (transport as any)._timeOpened = Date.now() - 9000;
-      (transport as any)._backoff.reset = sinon.spy();
+    it('should not reset the backoff timer if the websocket was open less than 10 seconds', () => {
+      transport['_timeOpened'] = Date.now() - 9000;
+      const spy = transport['_resetBackoffs'] = sinon.spy(transport['_resetBackoffs']);
       socket.dispatchEvent({ type: 'close' });
-      assert.equal((transport as any)._backoff.reset.callCount, 0);
+      sinon.assert.notCalled(spy);
     });
 
     it('should emit close', () => {
@@ -519,33 +518,40 @@ describe('WSTransport', () => {
   });
 
   describe('after backoff', () => {
+    let backoff: any;
+    let spy: any;
+
     beforeEach(() => {
-      (transport as any)._connect = sinon.spy();
+      spy = transport['_connect'] = sinon.spy(transport['_connect']);
+      backoff = transport['_backoff'].primary;
     });
 
     it('should not attempt to reconnect if the state is closed', () => {
       transport.state = WSTransportState.Closed;
-      (transport as any)._backoff.emit('ready');
-      assert.equal((transport as any)._connect.callCount, 0);
+      backoff.emit('backoff', 0, 100);
+      backoff.emit('ready', 0, 100);
+      sinon.assert.notCalled(spy);
     });
 
     it('should attempt to reconnect if the state is open', () => {
       transport.state = WSTransportState.Open;
-      (transport as any)._backoff.emit('ready');
-      assert.equal((transport as any)._connect.callCount, 1);
+      backoff.emit('backoff', 0, 100);
+      backoff.emit('ready', 0, 100);
+      sinon.assert.calledOnce(spy);
     });
 
     it('should attempt to reconnect if the state is connecting', () => {
       transport.state = WSTransportState.Connecting;
-      (transport as any)._backoff.emit('ready');
-      assert.equal((transport as any)._connect.callCount, 1);
+      backoff.emit('backoff', 0, 100);
+      backoff.emit('ready', 0, 100);
+      sinon.assert.calledOnce(spy);
     });
 
     describe('connecting to a preferred URI', () => {
-      let clock: SinonFakeTimers;
+      let clock: SinonFakeTimers & { timers: any };
 
       beforeEach(() => {
-        clock = sinon.useFakeTimers(Date.now());
+        clock = sinon.useFakeTimers(1) as any;
         wsManager.reset();
       });
 
@@ -553,43 +559,74 @@ describe('WSTransport', () => {
         clock.restore();
       });
 
-      it('should attempt after a timeout', () => {
+      it('should attempt after a timeout', async () => {
         const uris = ['foo', 'bar'];
         const preferredUri = 'biff';
+        const maxPreferredDurationMs = 15000;
 
         transport = new WSTransport(uris, {
           WebSocket: wsManager.MockWebSocket,
+          maxPreferredDurationMs,
         });
         transport.open();
 
         transport.updatePreferredURI(preferredUri);
         assert.equal(transport['_preferredUri'], preferredUri);
 
-        for (let i = 0; i < 2; i++) {
-          clock.runToLast();
-        }
+        clock.tick(6000);
 
         assert.equal(transport.uri, preferredUri);
       });
 
-      it('should attempt only a max number of times', () => {
+      it('should attempt only for a max duration', () => {
         const uris = ['foo', 'bar'];
         const preferredUri = 'biff';
+        const maxPreferredDurationMs = 15000;
 
         transport = new WSTransport(uris, {
           WebSocket: wsManager.MockWebSocket,
+          maxPreferredDurationMs,
         });
         transport.open();
 
         transport.updatePreferredURI(preferredUri);
         assert.equal(transport['_preferredUri'], preferredUri);
 
-        for (let i = 0; i < 2 * 6; i++) {
-          clock.runToLast();
-        }
+        clock.tick(maxPreferredDurationMs + 15000);
 
         assert.equal(transport['_preferredUri'], null);
         assert.notEqual(transport.uri, preferredUri);
+      });
+
+      it('should effectively disable uri preference if a max duration of 0 is passed', () => {
+        const uris = ['foo', 'bar'];
+        const preferredUri = 'biff';
+        const maxPreferredDurationMs = 0;
+
+        transport = new WSTransport(uris, {
+          WebSocket: wsManager.MockWebSocket,
+          maxPreferredDurationMs,
+        });
+        const connectSpy = transport['_connect'] = sinon.spy(transport['_connect']);
+
+        transport.open();
+        transport.updatePreferredURI(preferredUri);
+
+        // Let the first connection timeout
+        clock.runToLast();
+        sinon.assert.callCount(connectSpy, 1);
+        sinon.assert.calledWith(connectSpy.getCall(0), 'foo');
+
+        // Backoff should have started, if the time option was valid, a
+        // connection shoud be made now
+        clock.runToLast();
+        sinon.assert.callCount(connectSpy, 1);
+
+        // No connection attempt should have been made, the preferred backoff
+        // should be skipped and the primary used
+        clock.runToLast();
+        sinon.assert.callCount(connectSpy, 2);
+        sinon.assert.calledWith(connectSpy.getCall(1), 'bar', 1);
       });
     });
   });

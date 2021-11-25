@@ -8,11 +8,42 @@ const TransportFactory = require('./mock/WSTransport');
 const EXPECTED_PSTREAM_VERSION = '1.6';
 
 describe('PStream', () => {
+  let WSTransportFactorySpy;
+  let token;
+  let uris;
+  let options;
   let pstream;
 
   beforeEach(() => {
-    pstream = new PStream('foo', ['wss://foo.bar/signal'], {
-      TransportFactory
+    WSTransportFactorySpy = sinon.spy(TransportFactory);
+    options = {
+      TransportFactory: WSTransportFactorySpy,
+    };
+    token = 'foo';
+    uris = ['wss://foo.bar/signal'];
+    pstream = new PStream(token, uris, options);
+  });
+
+  describe('options', () => {
+    function setupPStream(overrideOptions) {
+      WSTransportFactorySpy.resetHistory();
+      pstream = new PStream(token, uris, {
+        ...options,
+        ...overrideOptions,
+      });
+      return pstream;
+    }
+
+    Object.entries({
+      backoffMaxMs: 42,
+      maxPreferredDurationMs: 42,
+    }).forEach(([optionKey, optionValue]) => {
+      it(`should propagate ${optionKey} to wstransport`, () => {
+        setupPStream({ [optionKey]: optionValue });
+        const transportOptions = WSTransportFactorySpy.getCall(0).args[1];
+        assert(typeof transportOptions === 'object' && transportOptions !== null);
+        assert(transportOptions[optionKey] === optionValue);
+      });
     });
   });
 

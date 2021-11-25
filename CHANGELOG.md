@@ -20,6 +20,33 @@ const call = await device.connect(...);
 call.on('reconnected', () => { ... });
 ```
 
+There exists a limitation such that Signaling Reconnection and Edge Fallback are mutually exclusive. To opt-in to the Signaling Reconnection feature, a new option can be passed to the SDK: `maxCallSignalingTimeoutMs`. If this value is not present in the options object passed to the `Device` constructor, the default value will be `0`.
+
+Using a value of `30000` as an example: while a `Call` exists, the `Device` will attempt to reconnect to the edge that the `Call` was established on for approximately 30 seconds. After the next failure to connect, the Device will use edge-fallback.
+
+```ts
+const token = ...;
+const options = {
+  ...,
+  edge: ['ashburn', 'sydney'],
+  maxCallSignalingTimeoutMs: 30000,
+};
+const device = new Device(token, options);
+
+const call = device.connect(...);
+
+// As an example, the device has connected to the `ashburn` edge.
+
+call.on('accept', () => {
+  // Starting here, the device will only attempt to connect to `ashburn` if a
+  // network loss occurs.
+  // If it cannot connect within `maxCallSignalingTimeoutMs` (in this case 30
+  // seconds), then it will resort to Edge Fallback.
+  // The first Edge Fallback attempt will be the next `edge`, in this case
+  // `sydney`, as specified by the `edge` option passed to the `Device`.
+});
+```
+
 In order to ensure automatic reconnection is possible at any time, we've also added `Device.Event.TokenWillExpire`,
 which should prompt the application to obtain a new token and call `Device.updateToken()`.
 

@@ -95,19 +95,22 @@ describe('Reconnection', function() {
 
     before(async () => {
       await runDockerCommand('resetNetwork');
+    });
+
+    it('should reconnect to signaling on the same edge after 8 seconds', async () => {
       await setupDevices({
         edge: ['ashburn', 'sydney', 'dublin'],
+        maxCallSignalingTimeoutMs: 30000,
       }, {
         edge: ['ashburn', 'sydney', 'dublin'],
+        maxCallSignalingTimeoutMs: 30000,
       });
       /**
        * NOTE(mhuynh): This is a delay to ensure that the call has "settled" and
        * is no longer in some "ringing" state.
        */
       await new Promise(resolve => setTimeout(resolve, 4000));
-    });
 
-    it('should reconnect to signaling on the same edge after 8 seconds', async () => {
       await runDockerCommand('disconnectFromAllNetworks');
 
       const reconnectPromises = Promise.all([call1, call2].map(
@@ -122,6 +125,34 @@ describe('Reconnection', function() {
 
       assert.equal(device1.edge, 'ashburn');
       assert.equal(device2.edge, 'ashburn');
+    });
+
+    it.skip('should reconnect to a fallback edge after 8 seconds', async () => {
+      await setupDevices({
+        edge: ['ashburn', 'sydney', 'sydney', 'sydney', 'sydney', 'sydney'],
+        // default; maxCallSignalingTimeoutMs: 0,
+      }, {
+        edge: ['ashburn', 'sydney', 'sydney', 'sydney', 'sydney', 'sydney'],
+        // default; maxCallSignalingTimeoutMs: 0,
+      });
+      /**
+       * NOTE(mhuynh): This is a delay to ensure that the call has "settled" and
+       * is no longer in some "ringing" state.
+       */
+      await new Promise(resolve => setTimeout(resolve, 4000));
+
+      await runDockerCommand('disconnectFromAllNetworks');
+
+      const reconnectPromises = Promise.all([device1, device2].map(
+        dev => new Promise(res => dev.on('registered', res)),
+      ));
+
+      setTimeout(() => runDockerCommand('resetNetwork'), 12000);
+
+      await waitFor(reconnectPromises, 60000);
+
+      assert.equal(device1.edge, 'sydney');
+      assert.equal(device2.edge, 'sydney');
     });
 
     after(async () => {

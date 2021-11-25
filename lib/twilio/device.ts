@@ -335,6 +335,7 @@ class Device extends EventEmitter {
     dscp: true,
     forceAggressiveIceNomination: false,
     logLevel: LogLevels.ERROR,
+    maxCallSignalingTimeoutMs: 0,
     preflight: false,
     sounds: { },
     tokenRefreshMs: 10000,
@@ -1355,6 +1356,7 @@ class Device extends EventEmitter {
       this._chunderURIs,
       {
         backoffMaxMs: this._options.backoffMaxMs,
+        maxPreferredDurationMs: this._options.maxCallSignalingTimeoutMs,
       },
     );
 
@@ -1678,6 +1680,22 @@ namespace Device {
      * [RFC-7587 3.1.1](https://tools.ietf.org/html/rfc7587#section-3.1.1).
      */
     maxAverageBitrate?: number;
+
+    /**
+     * The maximum duration to attempt to reconnect to a preferred URI.
+     * This is used by signaling reconnection in that during the existence of
+     * any call, edge-fallback is disabled until this length of time has
+     * elapsed.
+     *
+     * Using a value of 30000 as an example: while a call exists, the Device
+     * will attempt to reconnect to the edge that the call was established on
+     * for approximately 30 seconds. After the next failure to connect, the
+     * Device will use edge-fallback.
+     *
+     * This feature is opt-in, and will not work until a number greater than 0
+     * is explicitly specified within the Device options.
+     */
+    maxCallSignalingTimeoutMs?: number;
 
     /**
      * A mapping of custom sound URLs by sound name.

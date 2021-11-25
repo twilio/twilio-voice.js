@@ -15,7 +15,10 @@ const Backoff = require('backoff');
 const CONNECT_SUCCESS_TIMEOUT = 10000;
 const CONNECT_TIMEOUT = 5000;
 const HEARTBEAT_TIMEOUT = 15000;
-const MAX_PREFERRED_URI_CONNECT_ATTEMPTS = 5;
+const MAX_PREFERRED_DURATION = 15000;
+const MAX_PRIMARY_DURATION = Infinity;
+const MAX_PREFERRED_DELAY = 1000;
+const MAX_PRIMARY_DELAY = 20000;
 
 export interface IMessageEvent {
   data: string;
@@ -48,31 +51,54 @@ export enum WSTransportState {
  */
 export interface IWSTransportConstructorOptions {
   /**
-   * Maximum time to wait before attempting to reconnect the signaling websocket.
-   * Default is 20000ms. Minimum is 3000ms.
-   */
-  backoffMaxMs?: number;
-
-  /**
    * Time in milliseconds before websocket times out when attempting to connect
    */
   connectTimeoutMs?: number;
 
   /**
-   * Max attempts on a preferred URI.
+   * The maximum delay for the preferred backoff to make a connection attempt.
    */
-  maxPreferredURIConnectAttempts?: number;
+  maxPreferredDelayMs?: number;
+
+  /**
+   * Max duration to attempt connecting to a preferred URI.
+   */
+  maxPreferredDurationMs?: number;
+
+  /**
+   * The maximum delay for the rimary backoff to make a connection attempt.
+   */
+  maxPrimaryDelayMs?: number;
+
+  /**
+   * Max duration to attempt connecting to a preferred URI.
+   */
+  maxPrimaryDurationMs?: number;
 
   /**
    * A WebSocket factory to use instead of WebSocket.
    */
-  WebSocket?: any;
+  WebSocket?: typeof WebSocket;
 }
+
+/**
+ * Type of the stored options property internally used by the WSTransport class.
+ */
+type IInternalWSTransportConstructorOptions = Required<IWSTransportConstructorOptions>;
 
 /**
  * WebSocket Transport
  */
 export default class WSTransport extends EventEmitter {
+  private static defaultConstructorOptions: IInternalWSTransportConstructorOptions = {
+    WebSocket,
+    connectTimeoutMs: CONNECT_TIMEOUT,
+    maxPreferredDelayMs: MAX_PREFERRED_DELAY,
+    maxPreferredDurationMs: MAX_PREFERRED_DURATION,
+    maxPrimaryDelayMs: MAX_PRIMARY_DELAY,
+    maxPrimaryDurationMs: MAX_PRIMARY_DURATION,
+  };
+
   /**
    * The current state of the WSTransport.
    */
@@ -81,12 +107,27 @@ export default class WSTransport extends EventEmitter {
   /**
    * The backoff instance used to schedule reconnection attempts.
    */
-  private readonly _backoff: any;
+  private readonly _backoff: {
+    preferred: any;
+    primary: any;
+  };
 
   /**
-   * The currently connected uri
+   * Start timestamp values for backoffs.
    */
-  private _connectedUri: string;
+  private _backoffStartTime: {
+    preferred: number | null;
+    primary: number | null;
+  } = {
+    preferred: null,
+    primary: null,
+  };
+
+  /**
+   * The URI that the transport is connecting or connected to. The value of this
+   * property is `null` if a connection attempt has not been made yet.
+   */
+  private _connectedUri: string | null = null;
 
   /**
    * The current connection timeout. If it times out, we've failed to connect
@@ -96,11 +137,6 @@ export default class WSTransport extends EventEmitter {
    * and one can't be cast to the other, despite their working interoperably.
    */
   private _connectTimeout?: any;
-
-  /**
-   * Time in milliseconds before websocket times out when attempting to connect
-   */
-  private _connectTimeoutMs?: number;
 
   /**
    * The current connection timeout. If it times out, we've failed to connect
@@ -117,9 +153,9 @@ export default class WSTransport extends EventEmitter {
   private _log: Log = Log.getInstance();
 
   /**
-   * Max attempts on a preferred URI.
+   * Options after missing values are defaulted.
    */
-  private _maxPreferredURIConnectAttempts: number;
+  private _options: IInternalWSTransportConstructorOptions;
 
   /**
    * Preferred URI endpoint to connect to.
@@ -158,11 +194,6 @@ export default class WSTransport extends EventEmitter {
   private _uris: string[];
 
   /**
-   * The constructor to use for WebSocket
-   */
-  private readonly _WebSocket: typeof WebSocket;
-
-  /**
    * @constructor
    * @param uris - List of URI of the endpoints to connect to.
    * @param [options] - Constructor options.
@@ -170,45 +201,11 @@ export default class WSTransport extends EventEmitter {
   constructor(uris: string[], options: IWSTransportConstructorOptions = { }) {
     super();
 
-    this._connectTimeoutMs = options.connectTimeoutMs || CONNECT_TIMEOUT;
-    this._maxPreferredURIConnectAttempts =
-      options.maxPreferredURIConnectAttempts || MAX_PREFERRED_URI_CONNECT_ATTEMPTS;
-
-    let initialDelay = 100;
-    if (uris && uris.length > 1) {
-      // We only want a random initial delay if there are any fallback edges
-      // Initial delay between 1s and 5s both inclusive
-      initialDelay = Math.floor(Math.random() * (5000 - 1000 + 1)) + 1000;
-    }
-
-    const backoffConfig = {
-      factor: 2.0,
-      initialDelay,
-      maxDelay: typeof options.backoffMaxMs === 'number'
-        ? Math.max(options.backoffMaxMs, 3000)
-        : 20000,
-      randomisationFactor: 0.40,
-    };
-
-    this._log.info('Initializing transport backoff using config: ', backoffConfig);
-    this._backoff = Backoff.exponential(backoffConfig);
+    this._options = { ...WSTransport.defaultConstructorOptions, ...options };
 
     this._uris = uris;
-    this._connectedUri = uris[0];
-    this._WebSocket = options.WebSocket || WebSocket;
 
-    // Called when a backoff timer is started.
-    this._backoff.on('backoff', (_: any, delay: number) => {
-      if (this.state === WSTransportState.Closed) { return; }
-      this._log.info(`Will attempt to reconnect WebSocket in ${delay}ms`);
-    });
-
-    // Called when a backoff timer ends. We want to try to reconnect
-    // the WebSocket at this point.
-    this._backoff.on('ready', (attempt: number) => {
-      if (this.state === WSTransportState.Closed) { return; }
-      this._connect(attempt + 1);
-    });
+    this._backoff = this._setupBackoffs();
   }
 
   /**
@@ -232,7 +229,11 @@ export default class WSTransport extends EventEmitter {
       return;
     }
 
-    this._connect();
+    if (this._preferredUri) {
+      this._connect(this._preferredUri);
+    } else {
+      this._connect(this._uris[this._uriIndex]);
+    }
   }
 
   /**
@@ -315,10 +316,12 @@ export default class WSTransport extends EventEmitter {
 
     // Reset backoff counter if connection was open for long enough to be considered successful
     if (this._timeOpened && Date.now() - this._timeOpened > CONNECT_SUCCESS_TIMEOUT) {
-      this._backoff.reset();
+      this._resetBackoffs();
     }
 
-    this._backoff.backoff();
+    if (this.state !== WSTransportState.Closed) {
+      this._performBackoff();
+    }
     delete this._socket;
 
     this.emit('close');
@@ -326,27 +329,24 @@ export default class WSTransport extends EventEmitter {
 
   /**
    * Attempt to connect to the endpoint via WebSocket.
+   * @param [uri] - URI string to connect to.
    * @param [retryCount] - Retry number, if this is a retry. Undefined if
    *   first attempt, 1+ if a retry.
    */
-  private _connect(retryCount?: number): void {
-    if (retryCount) {
-      this._log.info(`Attempting to reconnect (retry #${retryCount})...`);
-      if (this._preferredUri && retryCount > this._maxPreferredURIConnectAttempts) {
-        this._log.info(`Too many attempts on preferred URI, reverting to URI array...`);
-        this.updatePreferredURI(null);
-      }
-    } else {
-      this._log.info('Attempting to connect...');
-    }
+  private _connect(uri: string, retryCount?: number): void {
+    this._log.info(
+      typeof retryCount === 'number'
+        ? `Attempting to reconnect (retry #${retryCount})...`
+        : 'Attempting to connect...',
+    );
 
     this._closeSocket();
 
     this._setState(WSTransportState.Connecting);
-    let socket = null;
-    this._connectedUri = this._preferredUri || this._uris[this._uriIndex];
+    this._connectedUri = uri;
+
     try {
-      socket = new this._WebSocket(this._connectedUri);
+      this._socket = new this._options.WebSocket(this._connectedUri);
     } catch (e) {
       this._log.info('Could not connect to endpoint:', e.message);
       this._close();
@@ -358,18 +358,18 @@ export default class WSTransport extends EventEmitter {
       return;
     }
 
+    this._socket.addEventListener('close', this._onSocketClose as any);
+    this._socket.addEventListener('error', this._onSocketError as any);
+    this._socket.addEventListener('message', this._onSocketMessage as any);
+    this._socket.addEventListener('open', this._onSocketOpen as any);
+
     delete this._timeOpened;
+
     this._connectTimeout = setTimeout(() => {
       this._log.info('WebSocket connection attempt timed out.');
       this._moveUriIndex();
       this._closeSocket();
-    }, this._connectTimeoutMs);
-
-    socket.addEventListener('close', this._onSocketClose as any);
-    socket.addEventListener('error', this._onSocketError as any);
-    socket.addEventListener('message', this._onSocketMessage as any);
-    socket.addEventListener('open', this._onSocketOpen as any);
-    this._socket = socket;
+    }, this._options.connectTimeoutMs);
   }
 
   /**
@@ -463,8 +463,35 @@ export default class WSTransport extends EventEmitter {
     this._setState(WSTransportState.Open);
     clearTimeout(this._connectTimeout);
 
+    this._resetBackoffs();
+
     this._setHeartbeatTimeout();
     this.emit('open');
+  }
+
+  /**
+   * Perform a backoff. If a preferred URI is set (not null), then backoff
+   * using the preferred mechanism. Otherwise, use the primary mechanism.
+   */
+  private _performBackoff(): void {
+    if (this._preferredUri) {
+      this._log.info('Preferred URI set; backing off.');
+      this._backoff.preferred.backoff();
+    } else {
+      this._log.info('Preferred URI not set; backing off.');
+      this._backoff.primary.backoff();
+    }
+  }
+
+  /**
+   * Reset both primary and preferred backoff mechanisms.
+   */
+  private _resetBackoffs() {
+    this._backoff.preferred.reset();
+    this._backoff.primary.reset();
+
+    this._backoffStartTime.preferred = null;
+    this._backoffStartTime.primary = null;
   }
 
   /**
@@ -489,9 +516,104 @@ export default class WSTransport extends EventEmitter {
   }
 
   /**
+   * Set up the primary and preferred backoff mechanisms.
+   */
+  private _setupBackoffs(): typeof WSTransport.prototype._backoff {
+    const preferredBackoffConfig = {
+      factor: 2.0,
+      maxDelay: this._options.maxPreferredDelayMs,
+      randomisationFactor: 0.40,
+    };
+    this._log.info('Initializing preferred transport backoff using config: ', preferredBackoffConfig);
+    const preferredBackoff = Backoff.exponential(preferredBackoffConfig);
+
+    preferredBackoff.on('backoff', (attempt: number, delay: number) => {
+      if (this.state === WSTransportState.Closed) {
+        this._log.info('Preferred backoff initiated but transport state is closed; not attempting a connection.');
+        return;
+      }
+      this._log.info(`Will attempt to reconnect Websocket to preferred URI in ${delay}ms`);
+      if (attempt === 0) {
+        this._backoffStartTime.preferred = Date.now();
+        this._log.info(`Preferred backoff start; ${this._backoffStartTime.preferred}`);
+      }
+    });
+
+    preferredBackoff.on('ready', (attempt: number, _delay: number) => {
+      if (this.state === WSTransportState.Closed) {
+        this._log.info('Preferred backoff ready but transport state is closed; not attempting a connection.');
+        return;
+      }
+      if (this._backoffStartTime.preferred === null) {
+        this._log.info('Preferred backoff start time invalid; not attempting a connection.');
+        return;
+      }
+      if (Date.now() - this._backoffStartTime.preferred > this._options.maxPreferredDurationMs) {
+        this._log.info('Max preferred backoff attempt time exceeded; falling back to primary backoff.');
+        this._preferredUri = null;
+        this._backoff.primary.backoff();
+        return;
+      }
+      if (typeof this._preferredUri !== 'string') {
+        this._log.info('Preferred URI cleared; falling back to primary backoff.');
+        this._preferredUri = null;
+        this._backoff.primary.backoff();
+        return;
+      }
+      this._connect(this._preferredUri, attempt + 1);
+    });
+
+    const primaryBackoffConfig = {
+      factor: 2.0,
+      // We only want a random initial delay if there are any fallback edges
+      // Initial delay between 1s and 5s both inclusive
+      initialDelay: this._uris && this._uris.length > 1
+        ? Math.floor(Math.random() * (5000 - 1000 + 1)) + 1000
+        : 100,
+      maxDelay: this._options.maxPrimaryDelayMs,
+      randomisationFactor: 0.40,
+    };
+    this._log.info('Initializing primary transport backoff using config: ', primaryBackoffConfig);
+    const primaryBackoff = Backoff.exponential(primaryBackoffConfig);
+
+    primaryBackoff.on('backoff', (attempt: number, delay: number) => {
+      if (this.state === WSTransportState.Closed) {
+        this._log.info('Primary backoff initiated but transport state is closed; not attempting a connection.');
+        return;
+      }
+      this._log.info(`Will attempt to reconnect WebSocket in ${delay}ms`);
+      if (attempt === 0) {
+        this._backoffStartTime.primary = Date.now();
+        this._log.info(`Primary backoff start; ${this._backoffStartTime.primary}`);
+      }
+    });
+
+    primaryBackoff.on('ready', (attempt: number, _delay: number) => {
+      if (this.state === WSTransportState.Closed) {
+        this._log.info('Primary backoff ready but transport state is closed; not attempting a connection.');
+        return;
+      }
+      if (this._backoffStartTime.primary === null) {
+        this._log.info('Primary backoff start time invalid; not attempting a connection.');
+        return;
+      }
+      if (Date.now() - this._backoffStartTime.primary > this._options.maxPrimaryDurationMs) {
+        this._log.info('Max primary backoff attempt time exceeded; not attempting a connection.');
+        return;
+      }
+      this._connect(this._uris[this._uriIndex], attempt + 1);
+    });
+
+    return {
+      preferred: preferredBackoff,
+      primary: primaryBackoff,
+    };
+  }
+
+  /**
    * The uri the transport is currently connected to
    */
-  get uri(): string {
+  get uri(): string | null {
     return this._connectedUri;
   }
 }

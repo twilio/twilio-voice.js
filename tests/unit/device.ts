@@ -1045,44 +1045,84 @@ describe('Device', function() {
       describe('should use chunderw regardless', () => {
         it('when it is a string', async () => {
           await testWithOptions({ chunderw: 'foo' });
-          sinon.assert.calledOnce(PStream);
-          sinon.assert.calledWithExactly(PStream,
-            token, ['wss://foo/signal'],
-            { backoffMaxMs: undefined });
+          sinon.assert.calledOnceWithExactly(
+            PStream,
+            token,
+            ['wss://foo/signal'],
+            {
+              backoffMaxMs: undefined,
+              maxPreferredDurationMs: 0,
+            },
+          );
         });
 
         it('when it is an array', async () => {
           await testWithOptions({ chunderw: ['foo', 'bar'] });
-          sinon.assert.calledOnce(PStream);
-          sinon.assert.calledWithExactly(PStream,
-            token, ['wss://foo/signal', 'wss://bar/signal'],
-            { backoffMaxMs: undefined });
+          sinon.assert.calledOnceWithExactly(
+            PStream,
+            token,
+            ['wss://foo/signal', 'wss://bar/signal'],
+            {
+              backoffMaxMs: undefined,
+              maxPreferredDurationMs: 0,
+            },
+          );
         });
       });
 
       it('should use default chunder uri if no region or edge is passed in', async () => {
         await setupStream();
-        sinon.assert.calledOnce(PStream);
-        sinon.assert.calledWithExactly(PStream,
-          token, ['wss://chunderw-vpc-gll.twilio.com/signal'],
-          { backoffMaxMs: undefined });
+        sinon.assert.calledOnceWithExactly(
+          PStream,
+          token,
+          ['wss://chunderw-vpc-gll.twilio.com/signal'],
+          {
+            backoffMaxMs: undefined,
+            maxPreferredDurationMs: 0,
+          },
+        );
       });
 
       it('should use correct edge if only one is supplied', async () => {
         await testWithOptions({ edge: 'singapore' });
-        sinon.assert.calledOnce(PStream);
-        sinon.assert.calledWithExactly(PStream,
-          token, ['wss://chunderw-vpc-gll-sg1.twilio.com/signal'],
-          { backoffMaxMs: undefined });
+        sinon.assert.calledOnceWithExactly(
+          PStream,
+          token,
+          ['wss://chunderw-vpc-gll-sg1.twilio.com/signal'],
+          {
+            backoffMaxMs: undefined,
+            maxPreferredDurationMs: 0,
+          },
+        );
       });
 
       it('should use correct edges if more than one is supplied', async () => {
         await testWithOptions({ edge: ['singapore', 'sydney'] });
-        sinon.assert.calledOnce(PStream);
-        sinon.assert.calledWithExactly(PStream, token, [
-          'wss://chunderw-vpc-gll-sg1.twilio.com/signal',
-          'wss://chunderw-vpc-gll-au1.twilio.com/signal',
-        ], { backoffMaxMs: undefined });
+        sinon.assert.calledOnceWithExactly(
+          PStream,
+          token,
+          [
+            'wss://chunderw-vpc-gll-sg1.twilio.com/signal',
+            'wss://chunderw-vpc-gll-au1.twilio.com/signal',
+          ],
+          {
+            backoffMaxMs: undefined,
+            maxPreferredDurationMs: 0,
+          },
+        );
+      });
+
+      it('should propagate the signaling reconnection limit', async () => {
+        await testWithOptions({ maxCallSignalingTimeoutMs: 5 });
+        sinon.assert.calledOnceWithExactly(
+          PStream,
+          token,
+          ['wss://chunderw-vpc-gll.twilio.com/signal'],
+          {
+            backoffMaxMs: undefined,
+            maxPreferredDurationMs: 5,
+          },
+        );
       });
     });
 
