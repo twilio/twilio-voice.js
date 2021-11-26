@@ -80,8 +80,11 @@
 							<h3>Properties</h3>
 							<ul class="tsd-index-list">
 								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-external"><a href="tools.iwstransportconstructoroptions.html#websocket" class="tsd-kind-icon">Web<wbr>Socket</a></li>
-								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-external"><a href="tools.iwstransportconstructoroptions.html#backoffmaxms" class="tsd-kind-icon">backoff<wbr>Max<wbr>Ms</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-external"><a href="tools.iwstransportconstructoroptions.html#connecttimeoutms" class="tsd-kind-icon">connect<wbr>Timeout<wbr>Ms</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-external"><a href="tools.iwstransportconstructoroptions.html#maxpreferreddelayms" class="tsd-kind-icon">max<wbr>Preferred<wbr>Delay<wbr>Ms</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-external"><a href="tools.iwstransportconstructoroptions.html#maxpreferreddurationms" class="tsd-kind-icon">max<wbr>Preferred<wbr>Duration<wbr>Ms</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-external"><a href="tools.iwstransportconstructoroptions.html#maxprimarydelayms" class="tsd-kind-icon">max<wbr>Primary<wbr>Delay<wbr>Ms</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface tsd-is-external"><a href="tools.iwstransportconstructoroptions.html#maxprimarydurationms" class="tsd-kind-icon">max<wbr>Primary<wbr>Duration<wbr>Ms</a></li>
 							</ul>
 						</section>
 					</div>
@@ -92,10 +95,10 @@
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-external">
 					<a name="websocket" class="tsd-anchor"></a>
 					<h3><span class="tsd-flag ts-flagOptional">Optional</span> Web<wbr>Socket</h3>
-					<div class="tsd-signature tsd-kind-icon">Web<wbr>Socket<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">any</span></div>
+					<div class="tsd-signature tsd-kind-icon">Web<wbr>Socket<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">typeof WebSocket</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ba200f7/lib/twilio/wstransport.ts#L63">lib/twilio/wstransport.ts:63</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/c8b552a/lib/twilio/wstransport.ts#L81">lib/twilio/wstransport.ts:81</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -105,33 +108,77 @@
 					</div>
 				</section>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-external">
-					<a name="backoffmaxms" class="tsd-anchor"></a>
-					<h3><span class="tsd-flag ts-flagOptional">Optional</span> backoff<wbr>Max<wbr>Ms</h3>
-					<div class="tsd-signature tsd-kind-icon">backoff<wbr>Max<wbr>Ms<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span></div>
-					<aside class="tsd-sources">
-						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ba200f7/lib/twilio/wstransport.ts#L53">lib/twilio/wstransport.ts:53</a></li>
-						</ul>
-					</aside>
-					<div class="tsd-comment tsd-typography">
-						<div class="lead">
-							<p>Maximum time to wait before attempting to reconnect the signaling websocket.
-							Default is 20000ms. Minimum is 3000ms.</p>
-						</div>
-					</div>
-				</section>
-				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-external">
 					<a name="connecttimeoutms" class="tsd-anchor"></a>
 					<h3><span class="tsd-flag ts-flagOptional">Optional</span> connect<wbr>Timeout<wbr>Ms</h3>
 					<div class="tsd-signature tsd-kind-icon">connect<wbr>Timeout<wbr>Ms<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ba200f7/lib/twilio/wstransport.ts#L58">lib/twilio/wstransport.ts:58</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/c8b552a/lib/twilio/wstransport.ts#L56">lib/twilio/wstransport.ts:56</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
 						<div class="lead">
 							<p>Time in milliseconds before websocket times out when attempting to connect</p>
+						</div>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-external">
+					<a name="maxpreferreddelayms" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> max<wbr>Preferred<wbr>Delay<wbr>Ms</h3>
+					<div class="tsd-signature tsd-kind-icon">max<wbr>Preferred<wbr>Delay<wbr>Ms<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/c8b552a/lib/twilio/wstransport.ts#L61">lib/twilio/wstransport.ts:61</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>The maximum delay for the preferred backoff to make a connection attempt.</p>
+						</div>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-external">
+					<a name="maxpreferreddurationms" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> max<wbr>Preferred<wbr>Duration<wbr>Ms</h3>
+					<div class="tsd-signature tsd-kind-icon">max<wbr>Preferred<wbr>Duration<wbr>Ms<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/c8b552a/lib/twilio/wstransport.ts#L66">lib/twilio/wstransport.ts:66</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>Max duration to attempt connecting to a preferred URI.</p>
+						</div>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-external">
+					<a name="maxprimarydelayms" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> max<wbr>Primary<wbr>Delay<wbr>Ms</h3>
+					<div class="tsd-signature tsd-kind-icon">max<wbr>Primary<wbr>Delay<wbr>Ms<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/c8b552a/lib/twilio/wstransport.ts#L71">lib/twilio/wstransport.ts:71</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>The maximum delay for the rimary backoff to make a connection attempt.</p>
+						</div>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface tsd-is-external">
+					<a name="maxprimarydurationms" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> max<wbr>Primary<wbr>Duration<wbr>Ms</h3>
+					<div class="tsd-signature tsd-kind-icon">max<wbr>Primary<wbr>Duration<wbr>Ms<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/c8b552a/lib/twilio/wstransport.ts#L76">lib/twilio/wstransport.ts:76</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>Max duration to attempt connecting to a preferred URI.</p>
 						</div>
 					</div>
 				</section>
@@ -207,15 +254,27 @@
 								<a href="tools.iwstransportconstructoroptions.html#websocket" class="tsd-kind-icon">Web<wbr>Socket</a>
 							</li>
 							<li class=" tsd-kind-property tsd-parent-kind-interface tsd-is-external">
-								<a href="tools.iwstransportconstructoroptions.html#backoffmaxms" class="tsd-kind-icon">backoff<wbr>Max<wbr>Ms</a>
+								<a href="tools.iwstransportconstructoroptions.html#connecttimeoutms" class="tsd-kind-icon">connect<wbr>Timeout<wbr>Ms</a>
 							</li>
 							<li class=" tsd-kind-property tsd-parent-kind-interface tsd-is-external">
-								<a href="tools.iwstransportconstructoroptions.html#connecttimeoutms" class="tsd-kind-icon">connect<wbr>Timeout<wbr>Ms</a>
+								<a href="tools.iwstransportconstructoroptions.html#maxpreferreddelayms" class="tsd-kind-icon">max<wbr>Preferred<wbr>Delay<wbr>Ms</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface tsd-is-external">
+								<a href="tools.iwstransportconstructoroptions.html#maxpreferreddurationms" class="tsd-kind-icon">max<wbr>Preferred<wbr>Duration<wbr>Ms</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface tsd-is-external">
+								<a href="tools.iwstransportconstructoroptions.html#maxprimarydelayms" class="tsd-kind-icon">max<wbr>Primary<wbr>Delay<wbr>Ms</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface tsd-is-external">
+								<a href="tools.iwstransportconstructoroptions.html#maxprimarydurationms" class="tsd-kind-icon">max<wbr>Primary<wbr>Duration<wbr>Ms</a>
 							</li>
 						</ul>
 					</li>
 				</ul>
 				<ul class="after-current">
+					<li class=" tsd-kind-type-alias tsd-parent-kind-external-module tsd-is-external tsd-is-not-exported">
+						<a href="../modules/tools.html#iinternalwstransportconstructoroptions" class="tsd-kind-icon">IInternalWSTransport<wbr>Constructor<wbr>Options</a>
+					</li>
 					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-external tsd-is-not-exported">
 						<a href="../modules/tools.html#backoff" class="tsd-kind-icon">Backoff</a>
 					</li>
@@ -227,6 +286,18 @@
 					</li>
 					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-external tsd-is-not-exported">
 						<a href="../modules/tools.html#heartbeat_timeout" class="tsd-kind-icon">HEARTBEAT_<wbr>TIMEOUT</a>
+					</li>
+					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-external tsd-is-not-exported">
+						<a href="../modules/tools.html#max_preferred_delay" class="tsd-kind-icon">MAX_<wbr>PREFERRED_<wbr>DELAY</a>
+					</li>
+					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-external tsd-is-not-exported">
+						<a href="../modules/tools.html#max_preferred_duration" class="tsd-kind-icon">MAX_<wbr>PREFERRED_<wbr>DURATION</a>
+					</li>
+					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-external tsd-is-not-exported">
+						<a href="../modules/tools.html#max_primary_delay" class="tsd-kind-icon">MAX_<wbr>PRIMARY_<wbr>DELAY</a>
+					</li>
+					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-external tsd-is-not-exported">
+						<a href="../modules/tools.html#max_primary_duration" class="tsd-kind-icon">MAX_<wbr>PRIMARY_<wbr>DURATION</a>
 					</li>
 					<li class=" tsd-kind-object-literal tsd-parent-kind-external-module tsd-is-external tsd-is-not-exported">
 						<a href="../modules/tools.html#bandfrequencies" class="tsd-kind-icon">band<wbr>Frequencies</a>
