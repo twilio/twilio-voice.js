@@ -34,8 +34,7 @@ const device = new Device(token, {
   tokenRefreshMs: 30000,
 });
 
-device.on('tokenWillExpire', (dev: Device) => {
-  // device === dev
+device.on('tokenWillExpire', () => {
   return getTokenViaAjax().then(token => dev.updateToken(token));
 });
 ```
