@@ -28,10 +28,24 @@ EventTarget.prototype.addEventListener = function addEventListener() {
 };
 
 /**
+ * Add a single-use Event listener to the {@link EventTarget}.
+ */
+EventTarget.prototype.once = function once() {
+  return this._eventEmitter.once(...arguments);
+};
+
+/**
  * Remove an Event listener to the {@link EventTarget}.
  */
 EventTarget.prototype.removeEventListener = function removeEventListener() {
   return this._eventEmitter.removeListener(...arguments);
+};
+
+/**
+ * Remove all Event listeners to the {@link EventTarget}.
+ */
+EventTarget.prototype.removeAllListeners = function removeAllListeners() {
+  return this._eventEmitter.removeAllListeners(...arguments);
 };
 
 module.exports = EventTarget;

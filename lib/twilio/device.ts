@@ -24,6 +24,7 @@ import Log from './log';
 import { PreflightTest } from './preflight/preflight';
 import {
   createEventGatewayURI,
+  Edge,
   getChunderURIs,
   getRegionShortcode,
   Region,
@@ -334,6 +335,7 @@ class Device extends EventEmitter {
     dscp: true,
     forceAggressiveIceNomination: false,
     logLevel: LogLevels.ERROR,
+    maxCallSignalingTimeoutMs: 0,
     preflight: false,
     sounds: { },
     tokenRefreshMs: 10000,
@@ -383,6 +385,11 @@ class Device extends EventEmitter {
    * The options passed to {@link Device} constructor or {@link Device.updateOptions}.
    */
   private _options: IExtendedDeviceOptions = { };
+
+  /**
+   * The preferred URI to (re)-connect signaling to.
+   */
+  private _preferredURI: string | null = null;
 
   /**
    * An Insights Event Publisher.
@@ -965,9 +972,16 @@ class Device extends EventEmitter {
       twimlParams,
     }, options);
 
+    const maybeUnsetPreferredUri = () => {
+      if (this._activeCall === null && this._calls.length === 0) {
+        this._stream.updatePreferredURI(null);
+      }
+    };
+
     const call = new (this._options.Call || Call)(config, options);
 
     call.once('accept', () => {
+      this._stream.updatePreferredURI(this._preferredURI);
       this._removeCall(call);
       this._activeCall = call;
       if (this._audio) {
@@ -991,6 +1005,7 @@ class Device extends EventEmitter {
     call.addListener('error', (error: TwilioError) => {
       if (call.status() === 'closed') {
         this._removeCall(call);
+        maybeUnsetPreferredUri();
       }
       if (this._audio) {
         this._audio._maybeStopPollingVolume();
@@ -1001,6 +1016,7 @@ class Device extends EventEmitter {
     call.once('cancel', () => {
       this._log.info(`Canceled: ${call.parameters.CallSid}`);
       this._removeCall(call);
+      maybeUnsetPreferredUri();
       if (this._audio) {
         this._audio._maybeStopPollingVolume();
       }
@@ -1012,6 +1028,7 @@ class Device extends EventEmitter {
         this._audio._maybeStopPollingVolume();
       }
       this._removeCall(call);
+      maybeUnsetPreferredUri();
     });
 
     call.once('reject', () => {
@@ -1020,6 +1037,7 @@ class Device extends EventEmitter {
         this._audio._maybeStopPollingVolume();
       }
       this._removeCall(call);
+      maybeUnsetPreferredUri();
       this._maybeStopIncomingSound();
     });
 
@@ -1031,6 +1049,10 @@ class Device extends EventEmitter {
         this._audio._maybeStopPollingVolume();
       }
       this._removeCall(call);
+      /**
+       * NOTE(mhuynh): We don't want to call `maybeUnsetPreferredUri` because
+       * a `transportClose` will happen during signaling reconnection.
+       */
       this._maybeStopIncomingSound();
     });
 
@@ -1049,7 +1071,7 @@ class Device extends EventEmitter {
   /**
    * Called when a 'close' event is received from the signaling stream.
    */
-  private _onSignalingClose = () => {
+   private _onSignalingClose = () => {
     this._stream = null;
     this._streamConnectedPromise = null;
   }
@@ -1059,7 +1081,7 @@ class Device extends EventEmitter {
    */
   private _onSignalingConnected = (payload: Record<string, any>) => {
     const region = getRegionShortcode(payload.region);
-    this._edge = regionToEdge[region as Region] || payload.region;
+    this._edge = payload.edge || regionToEdge[region as Region] || payload.region;
     this._region = region || payload.region;
     this._publisher?.setHost(createEventGatewayURI(payload.home));
     if (payload.token) {
@@ -1081,11 +1103,11 @@ class Device extends EventEmitter {
     }
     this._home = payload.home;
 
-    this._stream.updateURIs(getChunderURIs(
-      this._edge,
+    this._preferredURI = getChunderURIs(
+      this._edge as Edge,
       undefined,
       this._log.warn.bind(this._log),
-    ));
+    )[0] || null;
 
     // The signaling stream emits a `connected` event after reconnection, if the
     // device was registered before this, then register again.
@@ -1344,6 +1366,7 @@ class Device extends EventEmitter {
       this._chunderURIs,
       {
         backoffMaxMs: this._options.backoffMaxMs,
+        maxPreferredDurationMs: this._options.maxCallSignalingTimeoutMs,
       },
     );
 
@@ -1667,6 +1690,22 @@ namespace Device {
      * [RFC-7587 3.1.1](https://tools.ietf.org/html/rfc7587#section-3.1.1).
      */
     maxAverageBitrate?: number;
+
+    /**
+     * The maximum duration to attempt to reconnect to a preferred URI.
+     * This is used by signaling reconnection in that during the existence of
+     * any call, edge-fallback is disabled until this length of time has
+     * elapsed.
+     *
+     * Using a value of 30000 as an example: while a call exists, the Device
+     * will attempt to reconnect to the edge that the call was established on
+     * for approximately 30 seconds. After the next failure to connect, the
+     * Device will use edge-fallback.
+     *
+     * This feature is opt-in, and will not work until a number greater than 0
+     * is explicitly specified within the Device options.
+     */
+    maxCallSignalingTimeoutMs?: number;
 
     /**
      * A mapping of custom sound URLs by sound name.

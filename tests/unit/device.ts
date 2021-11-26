@@ -3,6 +3,7 @@ import CallType from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { GeneralErrors } from '../../lib/twilio/errors';
 import {
+  Edge,
   Region,
   regionShortcodes,
   regionToEdge,
@@ -486,6 +487,11 @@ describe('Device', function() {
           sinon.assert.calledOnce(spy);
         });
 
+        it('should update the preferred uri', () => {
+          pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
+          assert.equal(device['_preferredURI'], ['chunderw-vpc-gll-ie1.twilio.com']);
+        });
+
         it('should set the identity', () => {
           pstream.emit('connected', { token: { identity: 'foobar' } });
           assert.equal(device['_identity'], 'foobar');
@@ -733,13 +739,13 @@ describe('Device', function() {
         });
 
         describe('on call.accept', () => {
-          it('should should set the active call', () => {
+          it('should set the active call', () => {
             const call = device.calls[0];
             call.emit('accept');
             assert.equal(call, device['_activeCall']);
           });
 
-          it('should should remove the call', () => {
+          it('should remove the call', () => {
             device.calls[0].emit('accept');
             assert.equal(device.calls.length, 0);
           });
@@ -750,13 +756,30 @@ describe('Device', function() {
             device.calls[0].emit('accept');
             sinon.assert.notCalled(spy.play);
           });
+
+          it('should update the preferred uri', () => {
+            pstream.emit('connected', { edge: 'sydney' });
+            const spy: any = device['_stream'].updatePreferredURI =
+              sinon.spy(device['_stream'].updatePreferredURI);
+            const call = device.calls[0];
+            call.emit('accept');
+            sinon.assert.calledOnce(spy);
+          });
         });
 
         describe('on call.error', () => {
-          it('should should remove the call if closed', () => {
+          it('should remove the call if closed', () => {
             device.calls[0].status = () => CallType.State.Closed;
             device.calls[0].emit('error');
             assert.equal(device.calls.length, 0);
+          });
+
+          it('should unset the preferred uri if the call was closed', () => {
+            const spy: any = device['_stream'].updatePreferredURI =
+              sinon.spy(device['_stream'].updatePreferredURI);
+            device.calls[0].status = () => CallType.State.Closed;
+            device.calls[0].emit('error');
+            sinon.assert.calledOnceWithExactly(spy, null);
           });
         });
 
@@ -783,12 +806,92 @@ describe('Device', function() {
             call.emit('disconnect');
             assert.equal(device['_activeCall'], null);
           });
+
+          it('should unset the preferred uri', () => {
+            const spy: any = device['_stream'].updatePreferredURI =
+              sinon.spy(device['_stream'].updatePreferredURI);
+            device.calls[0].emit('disconnect');
+            sinon.assert.calledOnceWithExactly(spy, null);
+          });
         });
 
         describe('on call.reject', () => {
-          it('should should remove the call', () => {
+          it('should remove the call', () => {
             device.calls[0].emit('reject');
             assert.equal(device.calls.length, 0);
+          });
+
+          it('should unset the preferred uri', () => {
+            const spy: any = device['_stream'].updatePreferredURI =
+              sinon.spy(device['_stream'].updatePreferredURI);
+            device.calls[0].emit('reject');
+            sinon.assert.calledOnceWithExactly(spy, null);
+          });
+        });
+      });
+
+      describe('with multiple calls', () => {
+        let call1: any;
+        let call2: any;
+
+        beforeEach(async () => {
+          device = new Device(token, {
+            ...setupOptions,
+            allowIncomingWhileBusy: true,
+          });
+          await setupStream();
+
+          const nextCallPromise = () => new Promise<any>(resolve => {
+            device.once(Device.EventName.Incoming, c => {
+              resolve(c);
+            });
+          });
+
+          const call1Promise = nextCallPromise();
+          pstream.emit('invite', {
+            callsid: 'CA1234',
+            sdp: 'foobar',
+          });
+          call1 = await call1Promise;
+          call1.emit('accept');
+          await clock.tickAsync(0);
+
+          const call2Promise = nextCallPromise();
+          pstream.emit('invite', {
+            callsid: 'CA5678',
+            sdp: 'biffbazz',
+          });
+          call2 = await call2Promise;
+
+          assert(device.calls.length === 1);
+        });
+
+        describe('on call.error', () => {
+          it('should not unset the preferred uri even if the call was closed', () => {
+            const spy: any = device['_stream'].updatePreferredURI =
+              sinon.spy(device['_stream'].updatePreferredURI);
+            call1.status = () => CallType.State.Closed;
+            call1.emit('error');
+            sinon.assert.notCalled(spy);
+          });
+        });
+
+        describe('on call.disconnect', () => {
+          it('should not unset the preferred uri', () => {
+            const spy: any = device['_stream'].updatePreferredURI =
+              sinon.spy(device['_stream'].updatePreferredURI);
+            call1.emit('disconnect');
+            sinon.assert.notCalled(spy);
+          });
+        });
+
+        describe('on call.reject', () => {
+          it('should not unset the preferred uri', () => {
+            const spy: any = device['_stream'].updatePreferredURI =
+              sinon.spy(device['_stream'].updatePreferredURI);
+            call1.parameters = { CallSid: 'foobar' };
+            call1.emit('reject');
+            sinon.assert.notCalled(spy);
           });
         });
       });
@@ -997,44 +1100,84 @@ describe('Device', function() {
       describe('should use chunderw regardless', () => {
         it('when it is a string', async () => {
           await testWithOptions({ chunderw: 'foo' });
-          sinon.assert.calledOnce(PStream);
-          sinon.assert.calledWithExactly(PStream,
-            token, ['wss://foo/signal'],
-            { backoffMaxMs: undefined });
+          sinon.assert.calledOnceWithExactly(
+            PStream,
+            token,
+            ['wss://foo/signal'],
+            {
+              backoffMaxMs: undefined,
+              maxPreferredDurationMs: 0,
+            },
+          );
         });
 
         it('when it is an array', async () => {
           await testWithOptions({ chunderw: ['foo', 'bar'] });
-          sinon.assert.calledOnce(PStream);
-          sinon.assert.calledWithExactly(PStream,
-            token, ['wss://foo/signal', 'wss://bar/signal'],
-            { backoffMaxMs: undefined });
+          sinon.assert.calledOnceWithExactly(
+            PStream,
+            token,
+            ['wss://foo/signal', 'wss://bar/signal'],
+            {
+              backoffMaxMs: undefined,
+              maxPreferredDurationMs: 0,
+            },
+          );
         });
       });
 
       it('should use default chunder uri if no region or edge is passed in', async () => {
         await setupStream();
-        sinon.assert.calledOnce(PStream);
-        sinon.assert.calledWithExactly(PStream,
-          token, ['wss://chunderw-vpc-gll.twilio.com/signal'],
-          { backoffMaxMs: undefined });
+        sinon.assert.calledOnceWithExactly(
+          PStream,
+          token,
+          ['wss://chunderw-vpc-gll.twilio.com/signal'],
+          {
+            backoffMaxMs: undefined,
+            maxPreferredDurationMs: 0,
+          },
+        );
       });
 
       it('should use correct edge if only one is supplied', async () => {
         await testWithOptions({ edge: 'singapore' });
-        sinon.assert.calledOnce(PStream);
-        sinon.assert.calledWithExactly(PStream,
-          token, ['wss://chunderw-vpc-gll-sg1.twilio.com/signal'],
-          { backoffMaxMs: undefined });
+        sinon.assert.calledOnceWithExactly(
+          PStream,
+          token,
+          ['wss://chunderw-vpc-gll-sg1.twilio.com/signal'],
+          {
+            backoffMaxMs: undefined,
+            maxPreferredDurationMs: 0,
+          },
+        );
       });
 
       it('should use correct edges if more than one is supplied', async () => {
         await testWithOptions({ edge: ['singapore', 'sydney'] });
-        sinon.assert.calledOnce(PStream);
-        sinon.assert.calledWithExactly(PStream, token, [
-          'wss://chunderw-vpc-gll-sg1.twilio.com/signal',
-          'wss://chunderw-vpc-gll-au1.twilio.com/signal',
-        ], { backoffMaxMs: undefined });
+        sinon.assert.calledOnceWithExactly(
+          PStream,
+          token,
+          [
+            'wss://chunderw-vpc-gll-sg1.twilio.com/signal',
+            'wss://chunderw-vpc-gll-au1.twilio.com/signal',
+          ],
+          {
+            backoffMaxMs: undefined,
+            maxPreferredDurationMs: 0,
+          },
+        );
+      });
+
+      it('should propagate the signaling reconnection limit', async () => {
+        await testWithOptions({ maxCallSignalingTimeoutMs: 5 });
+        sinon.assert.calledOnceWithExactly(
+          PStream,
+          token,
+          ['wss://chunderw-vpc-gll.twilio.com/signal'],
+          {
+            backoffMaxMs: undefined,
+            maxPreferredDurationMs: 5,
+          },
+        );
       });
     });
 

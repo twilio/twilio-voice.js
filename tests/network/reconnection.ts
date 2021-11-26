@@ -24,8 +24,6 @@ describe('Reconnection', function() {
   let token1: string;
   let token2: string;
 
-  const options = {};
-
   // Since both devices lives in the same machine, one device may receive
   // events faster than the other. We will then run the test on the device
   // who gets it first. The other device will receive hangup event which is
@@ -44,13 +42,16 @@ describe('Reconnection', function() {
     ]);
   };
 
-  const setupDevices = async () => {
+  const setupDevices = async (
+    device1Options: Device.Options = { },
+    device2Options: Device.Options = { },
+  ) => {
     identity1 = 'id1-' + Date.now();
     identity2 = 'id2-' + Date.now();
     token1 = generateAccessToken(identity1);
     token2 = generateAccessToken(identity2);
-    device1 = new Device(token1, options);
-    device2 = new Device(token2, options);
+    device1 = new Device(token1, device1Options);
+    device2 = new Device(token2, device2Options);
 
     device1.on('error', () => { });
     device2.on('error', () => { });
@@ -94,15 +95,22 @@ describe('Reconnection', function() {
 
     before(async () => {
       await runDockerCommand('resetNetwork');
-      await setupDevices();
+    });
+
+    it('should reconnect to signaling on the same edge after 8 seconds', async () => {
+      await setupDevices({
+        edge: ['ashburn', 'sydney', 'dublin'],
+        maxCallSignalingTimeoutMs: 30000,
+      }, {
+        edge: ['ashburn', 'sydney', 'dublin'],
+        maxCallSignalingTimeoutMs: 30000,
+      });
       /**
        * NOTE(mhuynh): This is a delay to ensure that the call has "settled" and
        * is no longer in some "ringing" state.
        */
       await new Promise(resolve => setTimeout(resolve, 4000));
-    });
 
-    it('should reconnect to signaling after 8 seconds', async () => {
       await runDockerCommand('disconnectFromAllNetworks');
 
       const reconnectPromises = Promise.all([call1, call2].map(
@@ -114,24 +122,37 @@ describe('Reconnection', function() {
       await waitFor(reconnectPromises, 20000);
 
       assert([call1, call2].every(call => call.status() === Call.State.Open));
+
+      assert.equal(device1.edge, 'ashburn');
+      assert.equal(device2.edge, 'ashburn');
     });
 
-    it('should reconnect to signaling multiple times', async () => {
-      await runDockerCommand('disconnectFromAllNetworks');
-      let reconnectPromises = Promise.all([call1, call2].map(
-        call => new Promise(res => call.on('reconnected', res)),
-      ));
-      setTimeout(() => runDockerCommand('resetNetwork'), 8000);
-      await waitFor(reconnectPromises, 20000);
-      assert([call1, call2].every(call => call.status() === Call.State.Open));
+    it.skip('should reconnect to a fallback edge after 8 seconds', async () => {
+      await setupDevices({
+        edge: ['ashburn', 'sydney', 'sydney', 'sydney', 'sydney', 'sydney'],
+        // default; maxCallSignalingTimeoutMs: 0,
+      }, {
+        edge: ['ashburn', 'sydney', 'sydney', 'sydney', 'sydney', 'sydney'],
+        // default; maxCallSignalingTimeoutMs: 0,
+      });
+      /**
+       * NOTE(mhuynh): This is a delay to ensure that the call has "settled" and
+       * is no longer in some "ringing" state.
+       */
+      await new Promise(resolve => setTimeout(resolve, 4000));
 
       await runDockerCommand('disconnectFromAllNetworks');
-      reconnectPromises = Promise.all([call1, call2].map(
-        call => new Promise(res => call.on('reconnected', res)),
+
+      const reconnectPromises = Promise.all([device1, device2].map(
+        dev => new Promise(res => dev.on('registered', res)),
       ));
-      setTimeout(() => runDockerCommand('resetNetwork'), 8000);
-      await waitFor(reconnectPromises, 20000);
-      assert([call1, call2].every(call => call.status() === Call.State.Open));
+
+      setTimeout(() => runDockerCommand('resetNetwork'), 12000);
+
+      await waitFor(reconnectPromises, 60000);
+
+      assert.equal(device1.edge, 'sydney');
+      assert.equal(device2.edge, 'sydney');
     });
 
     after(async () => {
