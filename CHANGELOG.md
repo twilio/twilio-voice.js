@@ -35,7 +35,7 @@ const device = new Device(token, {
 });
 
 device.on('tokenWillExpire', () => {
-  return getTokenViaAjax().then(token => device.updateToken(token));
+  return getTokenViaAjax().then(token => dev.updateToken(token));
 });
 ```
 

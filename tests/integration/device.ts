@@ -157,4 +157,60 @@ describe('Device', function() {
       });
     });
   });
+
+  describe('tokenWillExpire event', () => {
+    const setupDevice = (tokenTtl: number, tokenRefreshMs: number) => {
+      const accessToken = generateAccessToken(`device-tokenWillExpire-${Date.now()}`, tokenTtl);
+      const device = new Device(accessToken, { tokenRefreshMs });
+      device.on(Device.EventName.Error, () => { /* no-op */ });
+      return device;
+    };
+
+    it('should emit a "tokenWillExpire" event', async () => {
+      const device = setupDevice(10, 1000);
+      await new Promise(async (resolve, reject) => {
+        let failureTimeout: any = null;
+        device.on(Device.EventName.TokenWillExpire, () => {
+          if (failureTimeout) {
+            clearTimeout(failureTimeout);
+          }
+          resolve();
+        });
+        await device.register();
+        failureTimeout = setTimeout(reject, 9500);
+      });
+    });
+
+    it('should not emit a "tokenWillExpire" event early', async () => {
+      const device = setupDevice(10, 1000);
+      await new Promise(async (resolve, reject) => {
+        let successTimeout: any = null;
+        device.on(Device.EventName.TokenWillExpire, () => {
+          if (successTimeout) {
+            clearTimeout(successTimeout);
+          }
+          reject();
+        });
+        await device.register();
+        successTimeout = setTimeout(resolve, 8500);
+      });
+    });
+
+    it('should emit a "tokenWillExpire" event as soon as possible if the option is smaller than the ttl', async () => {
+      const device = setupDevice(5, 10000);
+
+      const eventPromises = Promise.all([
+        Device.EventName.TokenWillExpire,
+        Device.EventName.Registering,
+      ].map((eventName: string) => new Promise<number>(res => {
+        device.on(eventName, () => res(Date.now()));
+      })));
+
+      device.register();
+
+      const [expireTime, registeringTime] = await eventPromises;
+      const diff = Math.abs(expireTime - registeringTime);
+      assert(diff < 500, `event time occurred too late; diff: ${diff}`);
+    });
+  });
 });

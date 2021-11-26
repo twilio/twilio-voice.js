@@ -1064,10 +1064,20 @@ class Device extends EventEmitter {
     this._publisher?.setHost(createEventGatewayURI(payload.home));
     if (payload.token) {
       this._identity = payload.token.identity;
-      this._tokenWillExpireTimeout = setTimeout(() => {
-        this.emit('tokenWillExpire');
-        this._tokenWillExpireTimeout = null;
-      }, payload.token.ttl - this._options.tokenRefreshMs!);
+      if (
+        typeof payload.token.ttl === 'number' &&
+        typeof this._options.tokenRefreshMs === 'number'
+      ) {
+        const ttlMs: number = payload.token.ttl * 1000;
+        const timeoutMs: number = Math.max(0, ttlMs - this._options.tokenRefreshMs);
+        this._tokenWillExpireTimeout = setTimeout(() => {
+          this.emit('tokenWillExpire', this);
+          if (this._tokenWillExpireTimeout) {
+            clearTimeout(this._tokenWillExpireTimeout);
+            this._tokenWillExpireTimeout = null;
+          }
+        }, timeoutMs);
+      }
     }
     this._home = payload.home;
 
@@ -1520,7 +1530,7 @@ namespace Device {
    * })`
    * @event
    */
-  declare function registeredEvent(device: Device): void;
+  declare function tokenWillExpireEvent(device: Device): void;
 
   /**
    * All valid {@link Device} event names.
