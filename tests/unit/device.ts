@@ -491,6 +491,61 @@ describe('Device', function() {
           pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
           assert.equal(device['_preferredURI'], ['chunderw-vpc-gll-ie1.twilio.com']);
         });
+
+        it('should set the identity', () => {
+          pstream.emit('connected', { token: { identity: 'foobar' } });
+          assert.equal(device['_identity'], 'foobar');
+        });
+
+        it('should set a token expiry timeout', () => {
+          const ttlSeconds = 20;
+          pstream.emit('connected', { token: { ttl: ttlSeconds } });
+          assert.notEqual(device['_tokenWillExpireTimeout'], null);
+        });
+
+        describe('`tokenWillExpire` event', () => {
+          it('should emit a token expiry', () => {
+            const ttlSeconds = 20;
+            const ttlMilliseconds = ttlSeconds * 1000;
+            let expiredEventFired = false;
+
+            pstream.emit('connected', { token: { ttl: ttlSeconds } });
+            device.on('tokenWillExpire', () => {
+              expiredEventFired = true;
+            });
+
+            clock.tick(ttlMilliseconds);
+            assert(expiredEventFired);
+          });
+
+          it('should not emit a token expiry early', () => {
+            const ttlSeconds = 20;
+            const ttlMilliseconds = ttlSeconds * 1000;
+            let expiredEventFired = false;
+
+            pstream.emit('connected', { token: { ttl: ttlSeconds } });
+            device.on('tokenWillExpire', () => {
+              expiredEventFired = true;
+            });
+
+            clock.tick(ttlMilliseconds - 15000);
+            assert.notEqual(expiredEventFired, true);
+          });
+
+          it('should emit the device with the `tokenWillExpire` event', () => {
+            const ttlSeconds = 20;
+            const ttlMilliseconds = ttlSeconds * 1000;
+            let expiredEventDevice = false;
+
+            pstream.emit('connected', { token: { ttl: ttlSeconds } });
+            device.on('tokenWillExpire', (dev: Device) => {
+              expiredEventDevice = (device === dev);
+            });
+
+            clock.tick(ttlMilliseconds);
+            assert(expiredEventDevice);
+          });
+        });
       });
 
       describe('on signaling.error', () => {
