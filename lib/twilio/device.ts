@@ -24,6 +24,7 @@ import Log from './log';
 import { PreflightTest } from './preflight/preflight';
 import {
   createEventGatewayURI,
+  createSignalingEndpointURL,
   Edge,
   getChunderURIs,
   getRegionShortcode,
@@ -740,7 +741,7 @@ class Device extends EventEmitter {
         undefined,
         this._log.warn.bind(this._log),
       )
-    ).map((uri: string) => `wss://${uri}/signal`);
+    ).map(createSignalingEndpointURL);
 
     let hasChunderURIsChanged =
       originalChunderURIs.size !== newChunderURIs.length;
@@ -1103,11 +1104,17 @@ class Device extends EventEmitter {
     }
     this._home = payload.home;
 
-    this._preferredURI = getChunderURIs(
+    const preferredURIs = getChunderURIs(
       this._edge as Edge,
       undefined,
       this._log.warn.bind(this._log),
-    )[0] || null;
+    );
+    if (preferredURIs.length > 0) {
+      const [preferredURI] = preferredURIs;
+      this._preferredURI = createSignalingEndpointURL(preferredURI);
+    } else {
+      this._log.info('Could not parse a preferred URI from the stream#connected event.');
+    }
 
     // The signaling stream emits a `connected` event after reconnection, if the
     // device was registered before this, then register again.
