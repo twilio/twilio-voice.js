@@ -1077,6 +1077,10 @@ class Call extends EventEmitter {
    * @param payload
    */
   private _onHangup = (payload: Record<string, any>): void => {
+    if (this.status() === Call.State.Closed) {
+      return;
+    }
+
     /**
      *  see if callsid passed in message matches either callsid or outbound id
      *  call should always have either callsid or outbound id
