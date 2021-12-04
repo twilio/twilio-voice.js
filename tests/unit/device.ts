@@ -489,7 +489,12 @@ describe('Device', function() {
 
         it('should update the preferred uri', () => {
           pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
-          assert.equal(device['_preferredURI'], ['chunderw-vpc-gll-ie1.twilio.com']);
+          assert.equal(device['_preferredURI'], ['wss://chunderw-vpc-gll-ie1.twilio.com/signal']);
+        });
+
+        it('should update the preferred uri from the first edge', () => {
+          pstream.emit('connected', { region: 'EU_IRELAND', edge: [Edge.Dublin, Edge.Frankfurt] });
+          assert.equal(device['_preferredURI'], ['wss://chunderw-vpc-gll-ie1.twilio.com/signal']);
         });
 
         it('should set the identity', () => {

@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as sinon from 'sinon';
 import {
   createEventGatewayURI,
+  createSignalingEndpointURL,
   defaultEdge,
   defaultRegion,
   deprecatedRegions,
@@ -240,6 +241,14 @@ describe('regions', () => {
     it('should return null for an unknown shortcode', () => {
       const result = getRegionShortcode('foo');
       assert.equal(result, null);
+    });
+  });
+
+  describe('createSignalingEndpointURL', () => {
+    it('should transform a uri into an endpoint', () => {
+      const uri = 'foobar';
+      const url = createSignalingEndpointURL(uri);
+      assert.equal(url, 'wss://foobar/signal');
     });
   });
 });

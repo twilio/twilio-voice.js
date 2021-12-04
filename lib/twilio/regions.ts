@@ -268,6 +268,14 @@ export function createEventGatewayURI(region: string): string {
 }
 
 /**
+ * Create a signaling endpoint URL to connect a websocket to from a chunder URI.
+ * @param uri the chunder URI to create a signaling endpoint URL for
+ */
+export function createSignalingEndpointURL(uri: string): string {
+  return `wss://${uri}/signal`;
+}
+
+/**
  * Get the URI associated with the passed region or edge. If both are passed,
  * then we want to fail `Device` setup, so we throw an error.
  * As of CLIENT-7519, Regions are deprecated in favor of edges as part of
