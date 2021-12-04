@@ -10,7 +10,7 @@ const DURATION_PADDING = 3000;
 const EVENT_TIMEOUT = 30000;
 const MAX_TIMEOUT = 300000;
 
-describe('Preflight Test', function() {
+describe.skip('Preflight Test', function() {
   this.timeout(MAX_TIMEOUT);
 
   let callerIdentity: string;
