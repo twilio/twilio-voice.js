@@ -1,5 +1,5 @@
-2.1.0 (In progress)
-===================
+2.1.0 (December 16, 2021) - Release
+===================================
 
 New Features
 ------------
@@ -83,10 +83,19 @@ const accessToken = const accessToken = new twilio.jwt.AccessToken(
   },
 );
 
+const grant = new VoiceGrant({
+  outgoingApplicationSid: credentials.twimlAppSid,
+  incomingAllow: true,
+});
+
+accessToken.addGrant(grant);
+
 const device = new Device(accessToken, {
   edge: 'sydney',
 });
 ```
+
+Note that the API Key and Secret and TwiML App above must be created within the `au1` region.
 
 The current home region can be retrieved from the read-only string `Device.home`, which contains the currently
 connected home region after a successful registration.
