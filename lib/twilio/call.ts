@@ -1406,11 +1406,10 @@ namespace Call {
 
   /**
    * Emitted when the {@link Call} is rejected.
-   * @param call - The {@link Call}.
-   * @example `call.on('reject', call => { })`
+   * @example `call.on('reject', () => { })`
    * @event
    */
-  declare function rejectEvent(call: Call): void;
+  declare function rejectEvent(): void;
 
   /**
    * Emitted every 50ms with the current input and output volumes, as a percentage of maximum
