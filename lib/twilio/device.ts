@@ -945,6 +945,12 @@ class Device extends EventEmitter {
       audioHelper: this._audio,
       getUserMedia,
       isUnifiedPlanDefault: Device._isUnifiedPlanDefault,
+      onIgnore: (): void => {
+        if (this._audio) {
+          this._audio._maybeStopPollingVolume();
+        }
+        this._maybeStopIncomingSound();
+      },
       pstream: await (this._streamConnectedPromise || this._setupStream()),
       publisher: this._publisher,
       soundcache: this._soundcache,

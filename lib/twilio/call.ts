@@ -225,6 +225,11 @@ class Call extends EventEmitter {
   private readonly _monitor: StatsMonitor;
 
   /**
+   * Method to be run after {@link Call.ignore} is called.
+   */
+  private _onIgnore: () => void;
+
+  /**
    * Options passed to this {@link Call}.
    */
   private _options: Call.Options = {
@@ -289,6 +294,10 @@ class Call extends EventEmitter {
 
     this._isUnifiedPlanDefault = config.isUnifiedPlanDefault;
     this._soundcache = config.soundcache;
+
+    if (typeof config.onIgnore === 'function') {
+      this._onIgnore = config.onIgnore;
+    }
 
     const message = options && options.twimlParams || { };
     this.customParameters = new Map(
@@ -689,6 +698,7 @@ class Call extends EventEmitter {
     this._status = Call.State.Closed;
     this._mediaHandler.ignore(this.parameters.CallSid);
     this._publisher.info('connection', 'ignored-by-local', null, this);
+    this._onIgnore();
   }
 
   /**
@@ -1549,6 +1559,11 @@ namespace Call {
      * Whether or not the browser uses unified-plan SDP by default.
      */
     isUnifiedPlanDefault: boolean;
+
+    /**
+     * A function to be called after {@link Call.ignore} is called.
+     */
+    onIgnore: () => any;
 
     /**
      * The PStream instance to use for Twilio call signaling.

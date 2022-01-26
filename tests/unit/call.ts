@@ -18,6 +18,7 @@ describe('Call', function() {
   let getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
   let mediaHandler: any;
   let monitor: any;
+  let onIgnore: any;
   let options: Call.Options;
   let pstream: any;
   let publisher: any;
@@ -55,6 +56,7 @@ describe('Call', function() {
 
     audioHelper = createEmitterStub(require('../../lib/twilio/audiohelper').default);
     getUserMedia = sinon.spy(() => Promise.resolve(new MediaStream()));
+    onIgnore = sinon.spy();
     pstream = createEmitterStub(require('../../lib/twilio/pstream'));
     publisher = createEmitterStub(require('../../lib/twilio/eventpublisher'));
     publisher.postMetrics = sinon.spy(() => Promise.resolve());
@@ -72,6 +74,7 @@ describe('Call', function() {
       audioHelper,
       getUserMedia,
       isUnifiedPlanDefault: false,
+      onIgnore,
       publisher,
       pstream,
       soundcache,
@@ -731,6 +734,11 @@ describe('Call', function() {
       it('should publish an event to insights', () => {
         conn.ignore();
         sinon.assert.calledWith(publisher.info, 'connection', 'ignored-by-local');
+      });
+
+      it('should call the onIgnore callback', () => {
+        conn.ignore();
+        sinon.assert.called(onIgnore);
       });
     });
 
