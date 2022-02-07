@@ -217,6 +217,18 @@ export default class WSTransport extends EventEmitter {
   }
 
   /**
+   * Close the websocket and force a signaling reconnection
+   */
+  forceReconnect(): void {
+    if (this._socket && (
+        this._socket.readyState === WebSocket.CONNECTING ||
+        this._socket.readyState === WebSocket.OPEN)
+    ) {
+      this._socket.close();
+    }
+  }
+
+  /**
    * Attempt to open a WebSocket connection.
    */
   open(): void {

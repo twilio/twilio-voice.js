@@ -932,6 +932,14 @@ class Device extends EventEmitter {
   }
 
   /**
+   * Force a signaling reconnection
+   * @private
+   */
+  private _forceSignalingReconnect(): void {
+    this._stream.forceReconnect();
+  }
+
+  /**
    * Create a new {@link Call}.
    * @param twimlParams - A flat object containing key:value pairs to be sent to the TwiML app.
    * @param options - Options to be used to instantiate the {@link Call}.
