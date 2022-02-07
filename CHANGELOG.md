@@ -1,3 +1,12 @@
+2.1.1 (In Progress)
+===================
+
+Bug Fixes
+---------
+
+- Ignoring a call will now properly stop the ringing sound
+- NPM versioning has been fixed to specify >=12 rather than exactly 12
+
 2.1.0 (December 16, 2021) - Release
 ===================================
 
