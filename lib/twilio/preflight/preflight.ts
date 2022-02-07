@@ -61,7 +61,7 @@ export declare interface PreflightTest {
    * @example `preflight.on('failed', error => console.log(error))`
    * @event
    */
-  failedEvent(error: TwilioError | DOMError): void;
+  failedEvent(error: TwilioError | DOMException): void;
 
   /**
    * Raised when the [[Call]] gets a webrtc sample object. This event is published every second.
@@ -429,7 +429,7 @@ export class PreflightTest extends EventEmitter {
    * Called when there is a fatal error
    * @param error
    */
-  private _onFailed(error: TwilioError | DOMError): void {
+  private _onFailed(error: TwilioError | DOMException): void {
     clearTimeout(this._echoTimer);
     clearTimeout(this._signalingTimeoutTimer);
     this._releaseHandlers();
