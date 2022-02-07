@@ -7,6 +7,7 @@ Bug Fixes
 - Ignoring a call will now properly stop the ringing sound
 - NPM versioning has been fixed to specify >=12 rather than exactly 12
 - Use DOMException instead oof DOMError, which has been deprecated
+- Removed npm util from the package, instead favoring native functions
 
 2.1.0 (December 16, 2021) - Release
 ===================================
