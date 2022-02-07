@@ -698,7 +698,10 @@ class Call extends EventEmitter {
     this._status = Call.State.Closed;
     this._mediaHandler.ignore(this.parameters.CallSid);
     this._publisher.info('connection', 'ignored-by-local', null, this);
-    this._onIgnore();
+
+    if (this._onIgnore) {
+      this._onIgnore();
+    }
   }
 
   /**
@@ -1563,7 +1566,7 @@ namespace Call {
     /**
      * A function to be called after {@link Call.ignore} is called.
      */
-    onIgnore: () => any;
+    onIgnore: () => void;
 
     /**
      * The PStream instance to use for Twilio call signaling.
