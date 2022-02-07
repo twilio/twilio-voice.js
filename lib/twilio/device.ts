@@ -1350,7 +1350,7 @@ class Device extends EventEmitter {
       publisherOptions.host = this._options.eventgw;
     }
 
-    this._publisher = (this._options.Publisher || Publisher)(PUBLISHER_PRODUCT_NAME, this.token, publisherOptions);
+    this._publisher = new (this._options.Publisher || Publisher)(PUBLISHER_PRODUCT_NAME, this.token, publisherOptions);
 
     if (this._options.publishEvents === false) {
       this._publisher.disable();
@@ -1374,7 +1374,7 @@ class Device extends EventEmitter {
     }
 
     this._log.info('Setting up VSP');
-    this._stream = (this._options.PStream || PStream)(
+    this._stream = new (this._options.PStream || PStream)(
       this.token,
       this._chunderURIs,
       {
