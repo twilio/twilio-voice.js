@@ -85,6 +85,7 @@
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.call.config.html#audiohelper" class="tsd-kind-icon">audio<wbr>Helper</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.call.config.html#getusermedia" class="tsd-kind-icon">get<wbr>User<wbr>Media</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.call.config.html#isunifiedplandefault" class="tsd-kind-icon">is<wbr>Unified<wbr>Plan<wbr>Default</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.call.config.html#onignore" class="tsd-kind-icon">on<wbr>Ignore</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.call.config.html#pstream" class="tsd-kind-icon">pstream</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.call.config.html#publisher" class="tsd-kind-icon">publisher</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.call.config.html#soundcache" class="tsd-kind-icon">soundcache</a></li>
@@ -101,7 +102,7 @@
 					<div class="tsd-signature tsd-kind-icon">audio<wbr>Helper<span class="tsd-signature-symbol">:</span> <a href="../modules/voice.html#iaudiohelper" class="tsd-signature-type">IAudioHelper</a></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/679334e/lib/twilio/call.ts#L1541">lib/twilio/call.ts:1541</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/e70f0ca/lib/twilio/call.ts#L1553">lib/twilio/call.ts:1553</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -116,7 +117,7 @@
 					<div class="tsd-signature tsd-kind-icon">get<wbr>User<wbr>Media<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">function</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/679334e/lib/twilio/call.ts#L1546">lib/twilio/call.ts:1546</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/e70f0ca/lib/twilio/call.ts#L1558">lib/twilio/call.ts:1558</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -152,7 +153,7 @@
 					<div class="tsd-signature tsd-kind-icon">is<wbr>Unified<wbr>Plan<wbr>Default<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/679334e/lib/twilio/call.ts#L1551">lib/twilio/call.ts:1551</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/e70f0ca/lib/twilio/call.ts#L1563">lib/twilio/call.ts:1563</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -162,12 +163,42 @@
 					</div>
 				</section>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="onignore" class="tsd-anchor"></a>
+					<h3>on<wbr>Ignore</h3>
+					<div class="tsd-signature tsd-kind-icon">on<wbr>Ignore<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">function</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/e70f0ca/lib/twilio/call.ts#L1568">lib/twilio/call.ts:1568</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>A function to be called after <a href="../classes/voice.call.html#ignore">Call.ignore</a> is called.</p>
+						</div>
+					</div>
+					<div class="tsd-type-declaration">
+						<h4>Type declaration</h4>
+						<ul class="tsd-parameters">
+							<li class="tsd-parameter-siganture">
+								<ul class="tsd-signatures tsd-kind-type-literal tsd-parent-kind-property">
+									<li class="tsd-signature tsd-kind-icon"><span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+								</ul>
+								<ul class="tsd-descriptions">
+									<li class="tsd-description">
+										<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+									</li>
+								</ul>
+							</li>
+						</ul>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
 					<a name="pstream" class="tsd-anchor"></a>
 					<h3>pstream</h3>
 					<div class="tsd-signature tsd-kind-icon">pstream<span class="tsd-signature-symbol">:</span> <a href="../modules/voice.html#ipstream" class="tsd-signature-type">IPStream</a></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/679334e/lib/twilio/call.ts#L1556">lib/twilio/call.ts:1556</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/e70f0ca/lib/twilio/call.ts#L1573">lib/twilio/call.ts:1573</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -182,7 +213,7 @@
 					<div class="tsd-signature tsd-kind-icon">publisher<span class="tsd-signature-symbol">:</span> <a href="../modules/voice.html#ipublisher" class="tsd-signature-type">IPublisher</a></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/679334e/lib/twilio/call.ts#L1561">lib/twilio/call.ts:1561</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/e70f0ca/lib/twilio/call.ts#L1578">lib/twilio/call.ts:1578</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -197,7 +228,7 @@
 					<div class="tsd-signature tsd-kind-icon">soundcache<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Map</span><span class="tsd-signature-symbol">&lt;</span><a href="../enums/voice.device.soundname.html" class="tsd-signature-type">SoundName</a><span class="tsd-signature-symbol">, </span><a href="../modules/voice.html#isound" class="tsd-signature-type">ISound</a><span class="tsd-signature-symbol">&gt;</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/679334e/lib/twilio/call.ts#L1566">lib/twilio/call.ts:1566</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/e70f0ca/lib/twilio/call.ts#L1583">lib/twilio/call.ts:1583</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -293,6 +324,9 @@
 									</li>
 									<li class=" tsd-kind-property tsd-parent-kind-interface">
 										<a href="voice.call.config.html#isunifiedplandefault" class="tsd-kind-icon">is<wbr>Unified<wbr>Plan<wbr>Default</a>
+									</li>
+									<li class=" tsd-kind-property tsd-parent-kind-interface">
+										<a href="voice.call.config.html#onignore" class="tsd-kind-icon">on<wbr>Ignore</a>
 									</li>
 									<li class=" tsd-kind-property tsd-parent-kind-interface">
 										<a href="voice.call.config.html#pstream" class="tsd-kind-icon">pstream</a>

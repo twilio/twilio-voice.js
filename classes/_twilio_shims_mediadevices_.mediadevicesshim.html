@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>MediaFailure | @twilio/voice-sdk</title>
+	<title>MediaDevicesShim | @twilio/voice-sdk</title>
 	<meta name="description" content="">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" href="../assets/css/main.css">
@@ -44,16 +44,13 @@
 					<a href="../globals.html">Globals</a>
 				</li>
 				<li>
-					<a href="../modules/voice.html">Voice</a>
+					<a href="../modules/_twilio_shims_mediadevices_.html">&quot;twilio/shims/mediadevices&quot;</a>
 				</li>
 				<li>
-					<a href="../classes/voice.call.html">Call</a>
-				</li>
-				<li>
-					<a href="voice.call.mediafailure.html">MediaFailure</a>
+					<a href="_twilio_shims_mediadevices_.mediadevicesshim.html">MediaDevicesShim</a>
 				</li>
 			</ul>
-			<h1>Enumeration MediaFailure</h1>
+			<h1>Class MediaDevicesShim</h1>
 		</div>
 	</div>
 </header>
@@ -63,67 +60,87 @@
 			<section class="tsd-panel tsd-comment">
 				<div class="tsd-comment tsd-typography">
 					<div class="lead">
-						<p>Possible media failures</p>
+						<p>Make a custom MediaDevices object, and proxy through existing functionality. If
+							devicechange is present, we simply reemit the event. If not, we will do the
+							detection ourselves and fire the event when necessary. The same logic exists
+							for deviceinfochange for consistency, however deviceinfochange is our own event
+							so it is unlikely that it will ever be native. The w3c spec for devicechange
+							is unclear as to whether MediaDeviceInfo changes (such as label) will
+							trigger the devicechange event. We have an open question on this here:
+						<a href="https://bugs.chromium.org/p/chromium/issues/detail?id=585096">https://bugs.chromium.org/p/chromium/issues/detail?id=585096</a></p>
 					</div>
 				</div>
+			</section>
+			<section class="tsd-panel tsd-hierarchy">
+				<h3>Hierarchy</h3>
+				<ul class="tsd-hierarchy">
+					<li>
+						<a href="../modules/_twilio_shims_eventtarget_.html#eventtarget" class="tsd-signature-type">EventTarget</a>
+						<ul class="tsd-hierarchy">
+							<li>
+								<span class="target">MediaDevicesShim</span>
+							</li>
+						</ul>
+					</li>
+				</ul>
 			</section>
 			<section class="tsd-panel-group tsd-index-group">
 				<h2>Index</h2>
 				<section class="tsd-panel tsd-index-panel">
 					<div class="tsd-index-content">
-						<section class="tsd-index-section ">
-							<h3>Enumeration members</h3>
+						<section class="tsd-index-section tsd-is-external">
+							<h3>Constructors</h3>
 							<ul class="tsd-index-list">
-								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="voice.call.mediafailure.html#connectiondisconnected" class="tsd-kind-icon">Connection<wbr>Disconnected</a></li>
-								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="voice.call.mediafailure.html#connectionfailed" class="tsd-kind-icon">Connection<wbr>Failed</a></li>
-								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="voice.call.mediafailure.html#icegatheringfailed" class="tsd-kind-icon">Ice<wbr>Gathering<wbr>Failed</a></li>
-								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="voice.call.mediafailure.html#lowbytes" class="tsd-kind-icon">Low<wbr>Bytes</a></li>
+								<li class="tsd-kind-constructor tsd-parent-kind-class tsd-is-external"><a href="_twilio_shims_mediadevices_.mediadevicesshim.html#constructor" class="tsd-kind-icon">constructor</a></li>
+							</ul>
+						</section>
+						<section class="tsd-index-section tsd-is-external">
+							<h3>Methods</h3>
+							<ul class="tsd-index-list">
+								<li class="tsd-kind-method tsd-parent-kind-class tsd-is-static tsd-is-external"><a href="_twilio_shims_mediadevices_.mediadevicesshim.html#eventtarget" class="tsd-kind-icon">Event<wbr>Target</a></li>
 							</ul>
 						</section>
 					</div>
 				</section>
 			</section>
-			<section class="tsd-panel-group tsd-member-group ">
-				<h2>Enumeration members</h2>
-				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
-					<a name="connectiondisconnected" class="tsd-anchor"></a>
-					<h3>Connection<wbr>Disconnected</h3>
-					<div class="tsd-signature tsd-kind-icon">Connection<wbr>Disconnected<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;ConnectionDisconnected&quot;</span></div>
-					<aside class="tsd-sources">
-						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/e70f0ca/lib/twilio/call.ts#L1511">lib/twilio/call.ts:1511</a></li>
-						</ul>
-					</aside>
+			<section class="tsd-panel-group tsd-member-group tsd-is-external">
+				<h2>Constructors</h2>
+				<section class="tsd-panel tsd-member tsd-kind-constructor tsd-parent-kind-class tsd-is-external">
+					<a name="constructor" class="tsd-anchor"></a>
+					<h3>constructor</h3>
+					<ul class="tsd-signatures tsd-kind-constructor tsd-parent-kind-class tsd-is-external">
+						<li class="tsd-signature tsd-kind-icon">new <wbr>Media<wbr>Devices<wbr>Shim<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="_twilio_shims_mediadevices_.mediadevicesshim.html" class="tsd-signature-type">MediaDevicesShim</a></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/e70f0ca/lib/twilio/shims/mediadevices.js#L17">lib/twilio/shims/mediadevices.js:17</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-returns-title">Returns <a href="_twilio_shims_mediadevices_.mediadevicesshim.html" class="tsd-signature-type">MediaDevicesShim</a></h4>
+						</li>
+					</ul>
 				</section>
-				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
-					<a name="connectionfailed" class="tsd-anchor"></a>
-					<h3>Connection<wbr>Failed</h3>
-					<div class="tsd-signature tsd-kind-icon">Connection<wbr>Failed<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;ConnectionFailed&quot;</span></div>
-					<aside class="tsd-sources">
-						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/e70f0ca/lib/twilio/call.ts#L1512">lib/twilio/call.ts:1512</a></li>
-						</ul>
-					</aside>
-				</section>
-				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
-					<a name="icegatheringfailed" class="tsd-anchor"></a>
-					<h3>Ice<wbr>Gathering<wbr>Failed</h3>
-					<div class="tsd-signature tsd-kind-icon">Ice<wbr>Gathering<wbr>Failed<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;IceGatheringFailed&quot;</span></div>
-					<aside class="tsd-sources">
-						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/e70f0ca/lib/twilio/call.ts#L1513">lib/twilio/call.ts:1513</a></li>
-						</ul>
-					</aside>
-				</section>
-				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
-					<a name="lowbytes" class="tsd-anchor"></a>
-					<h3>Low<wbr>Bytes</h3>
-					<div class="tsd-signature tsd-kind-icon">Low<wbr>Bytes<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;LowBytes&quot;</span></div>
-					<aside class="tsd-sources">
-						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/e70f0ca/lib/twilio/call.ts#L1514">lib/twilio/call.ts:1514</a></li>
-						</ul>
-					</aside>
+			</section>
+			<section class="tsd-panel-group tsd-member-group tsd-is-external">
+				<h2>Methods</h2>
+				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-static tsd-is-external">
+					<a name="eventtarget" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> Event<wbr>Target</h3>
+					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-static tsd-is-external">
+						<li class="tsd-signature tsd-kind-icon">Event<wbr>Target<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/e70f0ca/lib/twilio/shims/eventtarget.js#L3">lib/twilio/shims/eventtarget.js:3</a></li>
+								</ul>
+							</aside>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+						</li>
+					</ul>
 				</section>
 			</section>
 		</div>
@@ -139,28 +156,8 @@
 					<li class=" tsd-kind-external-module">
 						<a href="../modules/_twilio_rtc_mos_.html">&quot;twilio/rtc/mos&quot;</a>
 					</li>
-					<li class="current tsd-kind-external-module">
+					<li class=" tsd-kind-external-module">
 						<a href="../modules/voice.html">Voice</a>
-						<ul>
-							<li class=" tsd-kind-module tsd-parent-kind-external-module">
-								<a href="../modules/voice.authorizationerrors.html">Authorization<wbr>Errors</a>
-							</li>
-							<li class=" tsd-kind-module tsd-parent-kind-external-module">
-								<a href="../modules/voice.clienterrors.html">Client<wbr>Errors</a>
-							</li>
-							<li class=" tsd-kind-module tsd-parent-kind-external-module">
-								<a href="../modules/voice.generalerrors.html">General<wbr>Errors</a>
-							</li>
-							<li class=" tsd-kind-module tsd-parent-kind-external-module">
-								<a href="../modules/voice.mediaerrors.html">Media<wbr>Errors</a>
-							</li>
-							<li class=" tsd-kind-module tsd-parent-kind-external-module">
-								<a href="../modules/voice.signalingerrors.html">Signaling<wbr>Errors</a>
-							</li>
-							<li class=" tsd-kind-module tsd-parent-kind-external-module">
-								<a href="../modules/voice.usermediaerrors.html">User<wbr>Media<wbr>Errors</a>
-							</li>
-						</ul>
 					</li>
 					<li class="label tsd-is-external">
 						<span>Externals</span>
@@ -183,7 +180,7 @@
 					<li class=" tsd-kind-external-module tsd-is-external">
 						<a href="../modules/_twilio_shims_eventtarget_.html">&quot;twilio/shims/eventtarget&quot;</a>
 					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
+					<li class="current tsd-kind-external-module tsd-is-external">
 						<a href="../modules/_twilio_shims_mediadevices_.html">&quot;twilio/shims/mediadevices&quot;</a>
 					</li>
 					<li class=" tsd-kind-external-module tsd-is-external">
@@ -198,30 +195,49 @@
 				<ul class="before-current">
 				</ul>
 				<ul class="current">
-					<li class="current tsd-kind-class tsd-parent-kind-external-module">
-						<a href="../classes/voice.call.html" class="tsd-kind-icon">Call</a>
+					<li class="current tsd-kind-class tsd-parent-kind-external-module tsd-is-external">
+						<a href="_twilio_shims_mediadevices_.mediadevicesshim.html" class="tsd-kind-icon">Media<wbr>Devices<wbr>Shim</a>
 						<ul>
-							<li class="current tsd-kind-enum tsd-parent-kind-class tsd-is-static">
-								<a href="voice.call.mediafailure.html" class="tsd-kind-icon">Media<wbr>Failure</a>
-								<ul>
-									<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
-										<a href="voice.call.mediafailure.html#connectiondisconnected" class="tsd-kind-icon">Connection<wbr>Disconnected</a>
-									</li>
-									<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
-										<a href="voice.call.mediafailure.html#connectionfailed" class="tsd-kind-icon">Connection<wbr>Failed</a>
-									</li>
-									<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
-										<a href="voice.call.mediafailure.html#icegatheringfailed" class="tsd-kind-icon">Ice<wbr>Gathering<wbr>Failed</a>
-									</li>
-									<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
-										<a href="voice.call.mediafailure.html#lowbytes" class="tsd-kind-icon">Low<wbr>Bytes</a>
-									</li>
-								</ul>
+							<li class=" tsd-kind-constructor tsd-parent-kind-class tsd-is-external">
+								<a href="_twilio_shims_mediadevices_.mediadevicesshim.html#constructor" class="tsd-kind-icon">constructor</a>
+							</li>
+							<li class=" tsd-kind-method tsd-parent-kind-class tsd-is-static tsd-is-external">
+								<a href="_twilio_shims_mediadevices_.mediadevicesshim.html#eventtarget" class="tsd-kind-icon">Event<wbr>Target</a>
 							</li>
 						</ul>
 					</li>
 				</ul>
 				<ul class="after-current">
+					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-external">
+						<a href="../modules/_twilio_shims_mediadevices_.html#eventtarget" class="tsd-kind-icon">Event<wbr>Target</a>
+					</li>
+					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-external">
+						<a href="../modules/_twilio_shims_mediadevices_.html#poll_interval_ms" class="tsd-kind-icon">POLL_<wbr>INTERVAL_<wbr>MS</a>
+					</li>
+					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-external">
+						<a href="../modules/_twilio_shims_mediadevices_.html#nativemediadevices" class="tsd-kind-icon">native<wbr>Media<wbr>Devices</a>
+					</li>
+					<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-is-external">
+						<a href="../modules/_twilio_shims_mediadevices_.html#deviceinfoshavechanged" class="tsd-kind-icon">device<wbr>Infos<wbr>Have<wbr>Changed</a>
+					</li>
+					<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-is-external">
+						<a href="../modules/_twilio_shims_mediadevices_.html#deviceshavechanged" class="tsd-kind-icon">devices<wbr>Have<wbr>Changed</a>
+					</li>
+					<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-is-external">
+						<a href="../modules/_twilio_shims_mediadevices_.html#haschangelisteners" class="tsd-kind-icon">has<wbr>Change<wbr>Listeners</a>
+					</li>
+					<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-is-private tsd-is-external">
+						<a href="../modules/_twilio_shims_mediadevices_.html#propertyhaschanged" class="tsd-kind-icon">property<wbr>Has<wbr>Changed</a>
+					</li>
+					<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-is-private tsd-is-external">
+						<a href="../modules/_twilio_shims_mediadevices_.html#reemitnativeevent" class="tsd-kind-icon">reemit<wbr>Native<wbr>Event</a>
+					</li>
+					<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-is-private tsd-is-external">
+						<a href="../modules/_twilio_shims_mediadevices_.html#sampledevices" class="tsd-kind-icon">sample<wbr>Devices</a>
+					</li>
+					<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-is-external">
+						<a href="../modules/_twilio_shims_mediadevices_.html#sortdevicesbyid" class="tsd-kind-icon">sort<wbr>Devices<wbr>ById</a>
+					</li>
 				</ul>
 			</nav>
 		</div>
