@@ -84,7 +84,7 @@ The Twilio Voice JS SDK now supports Twilio Regional. To use a home region, plea
 If you are using the `twilio-node` helper library to mint access tokens within your backend, you can specify the `au1` home region like so:
 
 ```ts
-const accessToken = const accessToken = new twilio.jwt.AccessToken(
+const accessToken = new twilio.jwt.AccessToken(
   credentials.accountSid,
   credentials.apiKeySid,
   credentials.apiKeySecret, {
@@ -120,7 +120,7 @@ Fixes
 -----
 
 - Updated `ws` version to fix a potential security vulnerability.
-- We now properly clean up all event listers after `Device.destroy()`
+- We now properly clean up all event listeners after `Device.destroy()`
 - We now log a warning rather than an throwing an uncaught promise rejection when Insights
   fails to post an event.
 
