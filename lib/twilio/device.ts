@@ -946,10 +946,7 @@ class Device extends EventEmitter {
       getUserMedia,
       isUnifiedPlanDefault: Device._isUnifiedPlanDefault,
       onIgnore: (): void => {
-        if (this._audio) {
-          this._audio._maybeStopPollingVolume();
-        }
-        this._maybeStopIncomingSound();
+        this._soundcache.get(Device.SoundName.Incoming).stop();
       },
       pstream: await (this._streamConnectedPromise || this._setupStream()),
       publisher: this._publisher,
