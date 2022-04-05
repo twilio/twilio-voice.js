@@ -30,10 +30,9 @@ parameters:
 ###
 executors:
   machine-executor:
-    machine: true
-  generic-executor:
-    docker:
-      - image: alpine:3.7
+    machine:
+      image: ubuntu-2004:current
+      docker_layer_caching: true
   docker-with-browser:
     parameters:
       browser:
