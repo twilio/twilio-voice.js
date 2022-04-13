@@ -33,7 +33,6 @@ describe('Call', function() {
     mediaHandler.answerIncomingCall = sinon.spy((a: any, b: any, c: any, d: RTCConfiguration, cb: Function) => {
       callback = cb;
       rtcConfig = d;
-      return Promise.reject('no');
     });
     mediaHandler.openWithConstraints = sinon.spy(() => Promise.resolve());
     mediaHandler.stream = Symbol('stream');

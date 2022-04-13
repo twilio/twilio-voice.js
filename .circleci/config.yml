@@ -78,7 +78,6 @@ commands:
             - ./node_modules
   build:
     steps:
-      - set-node-version
       - get-code-and-dependencies
       - run:
           name: Building project
