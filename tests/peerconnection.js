@@ -2,6 +2,8 @@ const sinon = require('sinon');
 const assert = require('assert');
 const PeerConnection = require('./../lib/twilio/rtc/peerconnection');
 
+const root = global;
+
 describe('PeerConnection', () => {
   context('PeerConnection.prototype._setInputTracksFromStream', () => {
     const METHOD = PeerConnection.prototype._setInputTracksFromStream;
