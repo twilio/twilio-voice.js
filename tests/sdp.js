@@ -12,6 +12,8 @@ const {
 const { makeSdpWithTracks } = require('./lib/mocksdp');
 const { combinationContext } = require('./lib/util');
 
+const root = global;
+
 describe('setIceAggressiveNomination', () => {
   const SDP_ICE_LITE = 'bar\na=ice-lite\nfoo';
   const SDP_FULL_ICE = 'a=group\nfoo\na=ice-options:trickle-ice\n';

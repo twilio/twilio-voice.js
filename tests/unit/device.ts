@@ -14,7 +14,7 @@ import { EventEmitter } from 'events';
 import { SinonFakeTimers, SinonSpy, SinonStubbedInstance } from 'sinon';
 import * as sinon from 'sinon';
 
-declare var root: any;
+const root = global as any;
 
 const ClientCapability = require('twilio').jwt.ClientCapability;
 
