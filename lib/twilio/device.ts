@@ -785,6 +785,10 @@ class Device extends EventEmitter {
         shouldLoop: soundDef.shouldLoop,
       });
 
+      const currentSound = this._soundcache.get(name as Device.SoundName)
+      if (currentSound) {
+        currentSound.stop()
+      }
       this._soundcache.set(name as Device.SoundName, sound);
     }
 
