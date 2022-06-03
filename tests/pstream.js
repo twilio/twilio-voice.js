@@ -315,19 +315,24 @@ describe('PStream', () => {
     ]],
     ['invite', [
       {
-        args: ['bar', 'foo', true, ''],
-        payload: { callsid: 'foo', sdp: 'bar', preflight: true, twilio: {} },
+        args: ['bar', 'foo', true, '', []],
+        payload: { callsid: 'foo', sdp: 'bar', preflight: true, twilio: {}, registerFor: [] },
         scenario: 'called with empty params'
       },
       {
-        args: ['bar', 'foo', true, 'baz=zee&foo=2'],
-        payload: { callsid: 'foo', sdp: 'bar', preflight: true,  twilio: { params: 'baz=zee&foo=2' } },
+        args: ['bar', 'foo', true, 'baz=zee&foo=2', []],
+        payload: { callsid: 'foo', sdp: 'bar', preflight: true,  twilio: { params: 'baz=zee&foo=2' }, registerFor: [] },
         scenario: 'called with non-empty params'
       },
       {
-        args: ['bar', 'foo', false, ''],
-        payload: { callsid: 'foo', sdp: 'bar', preflight: false,  twilio: {} },
+        args: ['bar', 'foo', false, '', []],
+        payload: { callsid: 'foo', sdp: 'bar', preflight: false,  twilio: {}, registerFor: [] },
         scenario: 'called with preflight = false'
+      },
+      {
+        args: ['bar', 'foo', false, '', ['registerFor-foo', 'registerFor-bar']],
+        payload: { callsid: 'foo', sdp: 'bar', preflight: false,  twilio: {}, registerFor: ['registerFor-foo', 'registerFor-bar'] },
+        scenario: 'passing events to "registerFor"'
       }
     ]],
     ['answer', [

@@ -516,7 +516,7 @@ describe('Call', function() {
             return p;
           });
 
-          mediaHandler.makeOutgoingCall = sinon.spy((a: any, b: any, c: any, d: any, e: any, _callback: Function) => {
+          mediaHandler.makeOutgoingCall = sinon.spy((a: any, b: any, c: any, d: any, e: any, f: any, _callback: Function) => {
             callback = _callback;
           });
         });
@@ -537,6 +537,14 @@ describe('Call', function() {
           conn.accept({ rtcConfiguration });
           return wait.then(() => {
             assert.deepEqual(mediaHandler.makeOutgoingCall.args[0][4], rtcConfiguration);
+          });
+        });
+
+        it('should call mediaHandler.makeOutgoingCall with an array of events to `registerFor`', () => {
+          const registerFor = ['registerFor-foo', 'registerFor-bar'] as any;
+          conn.accept({ registerFor });
+          return wait.then(() => {
+            assert.deepEqual(mediaHandler.makeOutgoingCall.args[0][5], registerFor);
           });
         });
 
