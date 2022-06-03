@@ -564,6 +564,14 @@ class Call extends EventEmitter {
     const rtcConfiguration = options.rtcConfiguration || this._options.rtcConfiguration;
     const rtcConstraints = options.rtcConstraints || this._options.rtcConstraints || { };
     const audioConstraints = rtcConstraints.audio || { audio: true };
+    const registerFor = options.registerFor || [];
+
+    if (
+      !Array.isArray(registerFor) ||
+      registerFor.some((event) => typeof event !== 'string')
+    ) {
+      throw new Error('`registerFor` option must be an array of strings.');
+    }
 
     this._status = Call.State.Connecting;
 
@@ -618,7 +626,7 @@ class Call extends EventEmitter {
          `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
         this._pstream.on('answer', this._onAnswer.bind(this));
         this._mediaHandler.makeOutgoingCall(this._pstream.token, params, this.outboundConnectionId,
-          rtcConstraints, rtcConfiguration, onAnswer);
+          rtcConstraints, rtcConfiguration, registerFor, onAnswer);
       }
     };
 
@@ -1515,9 +1523,24 @@ namespace Call {
   }
 
   /**
+   * Known call message types.
+   */
+  export enum EventType {
+    UserDefinedMessage = 'UserDefinedMessage',
+  }
+
+  /**
    * Options to be used to acquire media tracks and connect media.
    */
   export interface AcceptOptions {
+    /**
+     * An array containing strings representing events that this call is
+     * registering for. For example, "dial-callprogress-events" so that this
+     * call will raise such events to the end-user when the stream receives
+     * them.
+     */
+    registerFor?: Call.EventType[];
+
     /**
      * An RTCConfiguration to pass to the RTCPeerConnection constructor.
      */

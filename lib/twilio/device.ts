@@ -557,6 +557,14 @@ class Device extends EventEmitter {
       throw new InvalidStateError('A Call is already active');
     }
 
+    const registerFor = options.registerFor || [];
+    if (
+      !Array.isArray(registerFor) ||
+      registerFor.some((event) => typeof event !== 'string')
+    ) {
+      throw new InvalidArgumentError('`registerFor` option must be an array of strings.');
+    }
+
     const activeCall = this._activeCall = await this._makeCall(options.params || { }, {
       rtcConfiguration: options.rtcConfiguration,
     });
@@ -567,7 +575,7 @@ class Device extends EventEmitter {
     // Stop the incoming sound if it's playing
     this._soundcache.get(Device.SoundName.Incoming).stop();
 
-    activeCall.accept({ rtcConstraints: options.rtcConstraints });
+    activeCall.accept({ rtcConstraints: options.rtcConstraints, registerFor });
     this._publishNetworkChange();
     return activeCall;
   }
@@ -1618,9 +1626,9 @@ namespace Device {
    * Options to be passed to {@link Device.connect}.
    */
   export interface ConnectOptions extends Call.AcceptOptions {
-   /**
-    * A flat object containing key:value pairs to be sent to the TwiML app.
-    */
+    /**
+     * A flat object containing key:value pairs to be sent to the TwiML app.
+     */
     params?: Record<string, string>;
   }
 
