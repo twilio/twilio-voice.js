@@ -1517,7 +1517,8 @@ namespace Device {
   /**
    * Emitted when the {@link Device} receives an error.
    * @param error
-   * @example `device.on('error', call => { })`
+   * @param call - The associated {@link Call}, if applicable.
+   * @example `device.on('error', (error, call) => { })`
    * @event
    */
   declare function errorEvent(error: TwilioError, call?: Call): void;
