@@ -1,3 +1,17 @@
+2.1.2 (???? ??, 2022)
+=========================
+
+New Features
+---------
+
+### Call status event
+The SDK now allows you to subscribe to changes to the `Call` object's state using the `status` event.
+
+```ts
+const call = await device.connect(...);
+call.on('status', (status: Call.State) => { ... });
+```
+
 2.1.1 (February 18, 2022)
 =========================
 
