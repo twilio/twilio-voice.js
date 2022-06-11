@@ -348,6 +348,13 @@ describe('Call', function() {
           assert.equal(conn.status(), state);
         });
 
+        it('should not emit a status event', () => {
+          conn.on('status', () => {
+            throw new Error('status event should not be emitted');
+          });
+          conn.accept();
+        })
+
         it('should not call mediaHandler.openWithConstraints', () => {
           conn.accept();
           sinon.assert.notCalled(mediaHandler.openWithConstraints);
@@ -359,6 +366,15 @@ describe('Call', function() {
       conn.accept();
       assert.equal(conn.status(), Call.State.Connecting);
     });
+
+    it('should emit a status event set to connecting', (done) => {
+      conn.on('status', (status) => {
+        assert.equal(status, Call.State.Connecting);
+        done();
+      });
+
+      conn.accept();
+    })
 
     context('when getInputStream is not present', () => {
       it('should call mediaHandler.openWithConstraints with rtcConstraints if passed', () => {
@@ -730,6 +746,15 @@ describe('Call', function() {
         assert.equal(conn.status(), Call.State.Closed);
       });
 
+      it('should emit a status event set to closed', (done) => {
+        conn.on('status', (status) => {
+          assert.equal(status, Call.State.Closed);
+          done();
+        });
+
+        conn.ignore();
+      })
+
       it('should publish an event to insights', () => {
         conn.ignore();
         sinon.assert.calledWith(publisher.info, 'connection', 'ignored-by-local');
@@ -765,6 +790,12 @@ describe('Call', function() {
         it('should not transition state to closed', () => {
           conn.ignore();
           assert.equal(conn.status(), state);
+        });
+
+        it('should not emit a status event', () => {
+          conn.on('status', () => { throw new Error('Should not have emitted status'); });
+
+          conn.ignore();
         });
 
         it('should not publish an event to insights', () => {
@@ -907,7 +938,16 @@ describe('Call', function() {
 
       it('should transition status to closed', () => {
         conn.reject();
-        assert.equal(conn.status(), 'closed');
+        assert.equal(conn.status(), Call.State.Closed);
+      });
+
+      it('should emit a status event set to closed', (done) => {
+        conn.on('status', (status) => {
+          assert.equal(status, Call.State.Closed);
+          done()
+        })
+
+        conn.reject();
       });
     });
 
@@ -920,6 +960,9 @@ describe('Call', function() {
       context(`when call state is ${state}`, () => {
         beforeEach(() => {
           (conn as any)['_status'] = state;
+          conn.on('status', (status) => {
+            throw new Error('Got status event: ' + status);
+          })
         });
 
         it('should not call pstream.reject', () => {
@@ -1269,6 +1312,15 @@ describe('Call', function() {
               mediaHandler.onopen();
               assert.equal(conn.status(), Call.State.Open);
             });
+
+            it('should emit a status event set to open', (done) => {
+              conn.on('status', (status) => {
+                assert.equal(status, Call.State.Open);
+                done();
+              })
+
+              mediaHandler.onopen();
+            });
           });
 
           context('when this call is not answered', () => {
@@ -1286,6 +1338,12 @@ describe('Call', function() {
               mediaHandler.onopen();
               assert.equal(conn.status(), state);
             });
+
+            it('should not emit a status event', () => {
+              conn.on('status', () => { throw new Error('Expected to not emit status event'); });
+
+              mediaHandler.onopen();
+            })
           });
         });
       });
@@ -1318,6 +1376,15 @@ describe('Call', function() {
         mediaHandler.onclose();
         assert.equal(conn.status(), Call.State.Closed);
       });
+
+      it('should emit a status event set to closed', (done) => {
+        conn.on('status', (status) => {
+          assert.equal(status, Call.State.Closed);
+          done();
+        })
+
+        mediaHandler.onclose();
+      })
 
       it('should call monitor.disable', () => {
         mediaHandler.onclose();
@@ -1403,6 +1470,15 @@ describe('Call', function() {
           assert.equal(conn.status(), Call.State.Closed);
         });
 
+        it('should emit a status event set to closed', (done) => {
+          conn.on('status', (status: Call.State) => {
+            assert.equal(status, Call.State.Closed);
+            done();
+          })
+
+          pstream.emit('cancel', { callsid: 'CA123' });
+        })
+
         it('should emit a cancel event', (done) => {
           conn.on('cancel', () => done());
           pstream.emit('cancel', { callsid: 'CA123' });
@@ -1440,6 +1516,12 @@ describe('Call', function() {
         it('should not transition to closed', () => {
           pstream.emit('cancel', { callsid: 'foo' });
           assert.equal(conn.status(), Call.State.Pending);
+        });
+
+        it('should not emit a status event', () => {
+          conn.on('status', () => { throw new Error('Was expecting status to not be emitted'); });
+
+          pstream.emit('cancel', { callsid: 'foo' });
         });
 
         it('should not emit a cancel event', () => {
@@ -1519,6 +1601,15 @@ describe('Call', function() {
           it('should set status to ringing', () => {
             pstream.emit('ringing', { callsid: 'ABC123', });
             assert.equal(conn.status(), Call.State.Ringing);
+          });
+
+          it('should emit a status event with status equal to ringing', (done) => {
+            conn.on('status', (status) => {
+              assert.equal(status, Call.State.Ringing);
+              done();
+            });
+
+            pstream.emit('ringing', { callsid: 'ABC123' });
           });
 
           it('should publish an outgoing-ringing event with hasEarlyMedia: false if no sdp', () => {
