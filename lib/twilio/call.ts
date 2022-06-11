@@ -495,6 +495,7 @@ class Call extends EventEmitter {
 
     this._mediaHandler.onclose = () => {
       this._status = Call.State.Closed;
+      this.emit('status', this._status);
       if (this._options.shouldPlayDisconnect && this._options.shouldPlayDisconnect()
         // Don't play disconnect sound if this was from a cancel event. i.e. the call
         // was ignored or hung up even before it was answered.
@@ -566,6 +567,7 @@ class Call extends EventEmitter {
     const audioConstraints = rtcConstraints.audio || { audio: true };
 
     this._status = Call.State.Connecting;
+    this.emit('status', this._status);
 
     const connect = () => {
       if (this._status !== Call.State.Connecting) {
@@ -696,6 +698,7 @@ class Call extends EventEmitter {
     }
 
     this._status = Call.State.Closed;
+    this.emit('status', this._status);
     this._mediaHandler.ignore(this.parameters.CallSid);
     this._publisher.info('connection', 'ignored-by-local', null, this);
 
@@ -766,6 +769,7 @@ class Call extends EventEmitter {
 
     this._pstream.reject(this.parameters.CallSid);
     this._status = Call.State.Closed;
+    this.emit('status', this._status);
     this.emit('reject');
     this._mediaHandler.reject(this.parameters.CallSid);
     this._publisher.info('connection', 'rejected-by-local', null, this);
@@ -844,6 +848,7 @@ class Call extends EventEmitter {
 
   /**
    * Get the current {@link Call} status.
+   * @see {@link statusEvent}
    */
   status(): Call.State {
     return this._status;
@@ -1021,6 +1026,7 @@ class Call extends EventEmitter {
       this._signalingStatus = Call.State.Open;
       if (this._mediaHandler && this._mediaHandler.status === 'open') {
         this._status = Call.State.Open;
+        this.emit('status', this._status);
         if (!this._wasConnected) {
           this._wasConnected = true;
           this.emit('accept', this);
@@ -1065,6 +1071,7 @@ class Call extends EventEmitter {
       this._mediaHandler.close();
 
       this._status = Call.State.Closed;
+      this.emit('status', this._status);
       this.emit('cancel');
       this._pstream.removeListener('cancel', this._onCancel);
     }
@@ -1191,6 +1198,7 @@ class Call extends EventEmitter {
       this._mediaReconnectBackoff.backoff();
 
       this.emit('reconnecting', mediaReconnectionError);
+      this.emit('status', this._status);
     }
   }
 
@@ -1210,6 +1218,7 @@ class Call extends EventEmitter {
       this._publisher.info('connection', 'reconnected', null, this);
       this.emit('reconnected');
       this._status = Call.State.Open;
+      this.emit('status', this._status);
     }
   }
 
@@ -1227,6 +1236,7 @@ class Call extends EventEmitter {
 
     const hasEarlyMedia = !!payload.sdp;
     this._status = Call.State.Ringing;
+    this.emit('status', this._status);
     this._publisher.info('connection', 'outgoing-ringing', { hasEarlyMedia }, this);
     this.emit('ringing', hasEarlyMedia);
   }
@@ -1268,6 +1278,7 @@ class Call extends EventEmitter {
       this._publisher.info('connection', 'reconnected', null, this);
       this.emit('reconnected');
       this._status = Call.State.Open;
+      this.emit('status', this._status);
     }
   }
 
@@ -1286,6 +1297,7 @@ class Call extends EventEmitter {
       this._status = Call.State.Closed;
       this._signalingStatus = Call.State.Closed;
     }
+    this.emit('status', this._status);
   }
 
   /**
@@ -1425,6 +1437,15 @@ namespace Call {
   declare function rejectEvent(): void;
 
   /**
+   * Emitted when the current {@link Call} status changes.
+   * @see {@link status}
+   * @param status
+   * @example `call.on('status', status => { })`
+   * @event
+   */
+  declare function statusEvent(status: Call.State): void;
+
+  /**
    * Emitted every 50ms with the current input and output volumes, as a percentage of maximum
    * volume, between -100dB and -30dB. Represented by a floating point number.
    * @param inputVolume - A floating point number between 0.0 and 1.0 inclusive.
@@ -1445,13 +1466,33 @@ namespace Call {
 
   /**
    * Possible states of the {@link Call}.
+   * @see {@link status}
+   * @see {@link statusEvent}
    */
   export enum State {
+    /**
+     * The media session associated with the call has been disconnected.
+     */
     Closed = 'closed',
+    /**
+     * The call was accepted by or initiated by the local Device instance and the media session is being set up.
+     */
     Connecting = 'connecting',
+    /**
+     * The media session associated with the call has been established.
+     */
     Open = 'open',
+    /**
+     * The call is incoming and hasn't yet been accepted.
+     */
     Pending = 'pending',
+    /**
+     * The ICE connection was disconnected and a reconnection has been triggered.
+     */
     Reconnecting = 'reconnecting',
+    /**
+     * The callee has been notified of the call but has not yet responded.
+     */
     Ringing = 'ringing',
   }
 
