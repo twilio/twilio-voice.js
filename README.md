@@ -50,7 +50,7 @@ As of 2.0, the Twilio Voice SDK is no longer hosted via CDN.
 
 Although we recommend using `npm` to add the Voice SDK as a dependency, you can also get the Twilio Voice SDK code
 from GitHub and include it in your project directly. To do so, navigate to
-["Releases"](https://github.com/twilio/twilio-voice.js/releases) and find the most recent release, or
+["Tags"](https://github.com/twilio/twilio-voice.js/tags) and find the most recent release, or
 the particular release version you'd like to use.
 
 > **Note:** releases tagged with "-rc" are "Release Candidate" versions
