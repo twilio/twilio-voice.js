@@ -19,9 +19,8 @@ New Features
 
 The SDK now fully supports Call reconnection. Previously, the SDK only truly supported media reconnection -- if the
 media connection was lost but the signaling websocket recovered (generally within 10-15 seconds), reconnecting
-the Call was possible. However, if the websocket was lost, the Call was lost. Now, the SDK is able to reconnect
-a Call even if the websocket is lost. This means that a Call can potentially be recovered up to 30 seconds or
-in a network handover event, in which a user switches networks during a call.
+the Call was possible. However, if the websocket was lost due to a network handover event, the Call was lost. Now, the SDK is able to attempt to reconnect
+a Call for up to 30 seconds after a websocket is lost. 
 
 When a call has encountered a network error and signaling reconnection has succeeded, the `Call` object will emit the
 `reconnected` event.
