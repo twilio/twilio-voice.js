@@ -786,6 +786,16 @@ describe('Device', function() {
             device.calls[0].emit('error');
             sinon.assert.calledOnceWithExactly(spy, null);
           });
+
+          it('should not unset the preferred uri if stream is null', () => {
+            const spy: any = device['_stream'].updatePreferredURI =
+              sinon.spy(device['_stream'].updatePreferredURI);
+
+            device['_stream'] = null;
+            device.calls[0].status = () => CallType.State.Closed;
+            device.calls[0].emit('error');
+            sinon.assert.notCalled(spy);
+          });
         });
 
         describe('on call.transportClose', () => {

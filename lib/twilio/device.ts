@@ -977,7 +977,7 @@ class Device extends EventEmitter {
     }, options);
 
     const maybeUnsetPreferredUri = () => {
-      if (this._activeCall === null && this._calls.length === 0) {
+      if (this._stream && this._activeCall === null && this._calls.length === 0) {
         this._stream.updatePreferredURI(null);
       }
     };
