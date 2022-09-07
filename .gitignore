@@ -2,7 +2,6 @@
 .idea
 .nyc_output/
 config.yaml
-package-lock.json
 coverage
 dist
 es5

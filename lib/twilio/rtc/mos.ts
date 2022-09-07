@@ -1,3 +1,9 @@
+/**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+
 const r0 = 94.768; // Constant used in computing "rFactor".
 
 /**

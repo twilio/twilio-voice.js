@@ -17,7 +17,7 @@ parameters:
     default: true # by default pr workflow will get executed.
   tag:
     type: string
-    default: "" # use something like: "2.0.0-beta15" when invoking with parameters.
+    default: "" # use something like: "2.0.0-beta.15" when invoking with parameters.
   release_workflow:
     type: boolean
     default: false
@@ -57,13 +57,6 @@ commands:
           condition: <<pipeline.parameters.tag>>
           steps:
             - run: git checkout <<pipeline.parameters.tag>>
-  set-node-version:
-    steps:
-      - run:
-          name: Set node to version 12
-          command: |
-            sudo npm install -g n
-            sudo n 12
   get-code-and-dependencies:
     steps:
       - get-code
@@ -191,15 +184,16 @@ workflows:
             parameters:
               browser: ["chrome", "firefox"]
               bver: ["beta", "unstable", "stable"]
-      - run-network-tests:
-          name: Network Tests <<matrix.browser>> <<matrix.bver>>
-          context:
-            - dockerhub-pulls
-            - vblocks-js
-          matrix:
-            parameters:
-              browser: ["chrome", "firefox"]
-              bver: ["stable"]
+      # NOTE(csantos): Will be addressed on a future epic
+      # - run-network-tests:
+      #     name: Network Tests <<matrix.browser>> <<matrix.bver>>
+      #     context:
+      #       - dockerhub-pulls
+      #       - vblocks-js
+      #     matrix:
+      #       parameters:
+      #         browser: ["chrome", "firefox"]
+      #         bver: ["stable"]
   release-workflow:
     when: <<pipeline.parameters.release_workflow>>
     jobs:
@@ -216,15 +210,16 @@ workflows:
             parameters:
               browser: ["chrome", "firefox"]
               bver: ["beta", "unstable", "stable"]
-      - run-network-tests:
-          context:
-            - dockerhub-pulls
-            - vblocks-js
-          name: Network Tests <<matrix.browser>> <<matrix.bver>>
-          matrix:
-            parameters:
-              browser: ["chrome", "firefox"]
-              bver: ["stable"]
+      # NOTE(csantos): Will be addressed on a future epic
+      # - run-network-tests:
+      #     context:
+      #       - dockerhub-pulls
+      #       - vblocks-js
+      #     name: Network Tests <<matrix.browser>> <<matrix.bver>>
+      #     matrix:
+      #       parameters:
+      #         browser: ["chrome", "firefox"]
+      #         bver: ["stable"]
       - run-release:
           context:
             - dockerhub-pulls
