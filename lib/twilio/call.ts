@@ -517,6 +517,7 @@ class Call extends EventEmitter {
     this._pstream.on('ringing', this._onRinging);
     this._pstream.on('transportClose', this._onTransportClose);
     this._pstream.on('connected', this._onConnected);
+    this._pstream.on('message', this._onMessage);
 
     this.on('error', error => {
       this._publisher.error('connection', 'error', {
@@ -564,7 +565,7 @@ class Call extends EventEmitter {
     const rtcConfiguration = options.rtcConfiguration || this._options.rtcConfiguration;
     const rtcConstraints = options.rtcConstraints || this._options.rtcConstraints || { };
     const audioConstraints = rtcConstraints.audio || { audio: true };
-    const registerFor = options.registerFor || [];
+    const registerFor = options.messagesToRegisterFor || [];
 
     if (
       !Array.isArray(registerFor) ||
@@ -904,6 +905,7 @@ class Call extends EventEmitter {
       this._pstream.removeListener('ringing', this._onRinging);
       this._pstream.removeListener('transportClose', this._onTransportClose);
       this._pstream.removeListener('connected', this._onConnected);
+      this._pstream.removeListener('message', this._onMessage);
     };
 
     // This is kind of a hack, but it lets us avoid rewriting more code.
@@ -1222,6 +1224,26 @@ class Call extends EventEmitter {
   }
 
   /**
+   * Raised when a Call receives a message from the backend.
+   *
+   * @remarks
+   * Note that in this context a "message" is limited to a
+   * "User Defined Message" from the Voice User Defined Message Service (VUDMS)
+   * with forward compatibility for other messages from Twilio in the future,
+   * such as "participant muted" and "unmuted" events.
+   *
+   * @param payload - A record representing the payload of the message from the
+   * Twilio backend.
+   */
+  private _onMessage = (payload: Record<string, string>): void => {
+    if (this.parameters.CallSid !== payload.callsid) {
+      return;
+    }
+
+    this.emit('message', payload);
+  }
+
+  /**
    * When we get a RINGING signal from PStream, update the {@link Call} status.
    * @param payload
    */
@@ -1402,6 +1424,22 @@ namespace Call {
   declare function errorEvent(error: TwilioError): void;
 
   /**
+   * Emitted when a Call receives a message from the backend.
+   *
+   * @remarks
+   * Note that in this context a "message" is limited to a
+   * "User Defined Message" from the Voice User Defined Message Service (VUDMS)
+   * with forward compatibility for other messages from Twilio in the future,
+   * such as "participant muted" and "unmuted" events.
+   *
+   * @param payload - A record representing the payload of the message from the
+   * Twilio backend.
+   * @example `call.on('message', (payload) => { })`
+   * @event
+   */
+  declare function messageEvent(payload: Record<string, string>): void;
+
+  /**
    * Emitted when the {@link Call} is muted or unmuted.
    * @param isMuted - Whether the {@link Call} is muted.
    * @param call - The {@link Call}.
@@ -1525,8 +1563,8 @@ namespace Call {
   /**
    * Known call message types.
    */
-  export enum EventType {
-    UserDefinedMessage = 'UserDefinedMessage',
+  export enum Message {
+    UserDefinedMessage = 'user-defined-message',
   }
 
   /**
@@ -1539,7 +1577,7 @@ namespace Call {
      * call will raise such events to the end-user when the stream receives
      * them.
      */
-    registerFor?: Call.EventType[];
+    messagesToRegisterFor?: Call.Message[];
 
     /**
      * An RTCConfiguration to pass to the RTCPeerConnection constructor.
