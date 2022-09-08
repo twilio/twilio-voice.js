@@ -65,6 +65,7 @@
     "docs:ts"
   ],
   "devDependencies": {
+    "@types/mime": "3.0.0",
     "@types/mocha": "5.2.7",
     "@types/node": "13.1.8",
     "@types/sinon": "9.0.5",
@@ -102,13 +103,12 @@
     "nyc": "15.0.0",
     "pre-commit": "1.2.2",
     "querystring": "0.2.0",
-    "twilio-release-tool": "1.0.1",
     "selenium-webdriver": "3.6.0",
     "sinon": "9.0.3",
-    "travis-multirunner": "4.6.0",
     "ts-node": "8.6.2",
     "tslint": "5.20.1",
     "twilio": "3.39.2",
+    "twilio-release-tool": "1.0.1",
     "typedoc": "0.16.11",
     "typedoc-plugin-as-member-of": "1.0.2",
     "typedoc-plugin-external-module-name": "3.0.0",
