@@ -540,11 +540,11 @@ describe('Call', function() {
           });
         });
 
-        it('should call mediaHandler.makeOutgoingCall with an array of events to `registerFor`', () => {
-          const registerFor = ['registerFor-foo', 'registerFor-bar'] as any;
-          conn.accept({ registerFor });
+        it('should call mediaHandler.makeOutgoingCall with an array of messages to `messagesToRegisterFor`', () => {
+          const messagesToRegisterFor = ['messagesToRegisterFor-foo', 'messagesToRegisterFor-bar'] as any;
+          conn.accept({ messagesToRegisterFor });
           return wait.then(() => {
-            assert.deepEqual(mediaHandler.makeOutgoingCall.args[0][5], registerFor);
+            assert.deepEqual(mediaHandler.makeOutgoingCall.args[0][5], messagesToRegisterFor);
           });
         });
 

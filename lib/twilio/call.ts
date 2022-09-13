@@ -565,13 +565,13 @@ class Call extends EventEmitter {
     const rtcConfiguration = options.rtcConfiguration || this._options.rtcConfiguration;
     const rtcConstraints = options.rtcConstraints || this._options.rtcConstraints || { };
     const audioConstraints = rtcConstraints.audio || { audio: true };
-    const registerFor = options.messagesToRegisterFor || [];
+    const messagesToRegisterFor = options.messagesToRegisterFor || [];
 
     if (
-      !Array.isArray(registerFor) ||
-      registerFor.some((event) => typeof event !== 'string')
+      !Array.isArray(messagesToRegisterFor) ||
+      messagesToRegisterFor.some((event) => typeof event !== 'string')
     ) {
-      throw new Error('`registerFor` option must be an array of strings.');
+      throw new Error('`messagesToRegisterFor` option must be an array of strings.');
     }
 
     this._status = Call.State.Connecting;
@@ -627,7 +627,7 @@ class Call extends EventEmitter {
          `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
         this._pstream.on('answer', this._onAnswer.bind(this));
         this._mediaHandler.makeOutgoingCall(this._pstream.token, params, this.outboundConnectionId,
-          rtcConstraints, rtcConfiguration, registerFor, onAnswer);
+          rtcConstraints, rtcConfiguration, messagesToRegisterFor, onAnswer);
       }
     };
 
