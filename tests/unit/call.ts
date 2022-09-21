@@ -4,7 +4,7 @@ import * as assert from 'assert';
 import { EventEmitter } from 'events';
 import { SinonFakeTimers, SinonSpy, SinonStubbedInstance } from 'sinon';
 import * as sinon from 'sinon';
-import { GeneralErrors, MediaErrors } from '../../lib/twilio/errors';
+import { GeneralErrors, MediaErrors, InvalidStateError, InvalidArgumentError } from '../../lib/twilio/errors';
 
 const Util = require('../../lib/twilio/util');
 
@@ -24,6 +24,7 @@ describe('Call', function() {
   let publisher: any;
   let rtcConfig: RTCConfiguration;
   let soundcache: Map<Device.SoundName, any>;
+  let voiceEventSidGenerator: () => string;
 
   const MediaHandler = () => {
     mediaHandler = createEmitterStub(require('../../lib/twilio/rtc/peerconnection'));
@@ -69,6 +70,8 @@ describe('Call', function() {
       soundcache.set(soundName, { play: sinon.spy() });
     });
 
+    voiceEventSidGenerator = sinon.stub().returns('foobar-voice-event-sid');
+
     config = {
       audioHelper,
       getUserMedia,
@@ -82,6 +85,7 @@ describe('Call', function() {
     options = {
       MediaHandler,
       StatsMonitor,
+      voiceEventSidGenerator,
     };
 
     conn = new Call(config, options);
@@ -980,6 +984,72 @@ describe('Call', function() {
 
     it('should throw if issue is invalid', () => {
       assert.throws(() => { (conn as any)['postFeedback'](Call.FeedbackScore.Five, 'foo'); });
+    });
+  });
+
+  describe('.sendMessage()', () => {
+    context('when messageType is invalid', () => {
+      [
+        undefined,
+        null,
+        {},
+        1234,
+        true,
+      ].forEach((messageType: any) => {
+        it(`should throw on ${JSON.stringify(messageType)}`, () => {
+          assert.throws(
+            () => conn.sendMessage(messageType, {}),
+            new InvalidArgumentError(
+              'Message type must be an enumeration value of ' +
+              '`Call.MessageType` or a string.',
+            ),
+          );
+        });
+      });
+
+      context('when messageType is valid', () => {
+        ['foo', 'bar'].forEach((messageType: string) => {
+          it(`should not throw on '${messageType}'`, () => {
+            conn.parameters.CallSid = 'foobar';
+            assert.doesNotThrow(() => {
+              conn.sendMessage(messageType as Call.MessageType, {});
+            });
+          });
+        });
+      });
+
+      it('should throw if pstream is unavailable', () => {
+        // @ts-ignore
+        conn._pstream = null;
+        assert.throws(
+          () => conn.sendMessage('foobar' as Call.MessageType, {}),
+          new InvalidStateError(
+            'Could not send CallMessage; Signaling channel is disconnected',
+          ),
+        );
+      });
+
+      it('should invoke pstream.sendMessage', () => {
+        const mockCallSid = conn.parameters.CallSid = 'foobar-callsid';
+        const mockVoiceEventSid = 'foobar-voice-event-sid';
+        const mockContent = {};
+        conn.sendMessage(Call.MessageType.UserDefinedMessage, mockContent);
+        sinon.assert.calledOnceWithExactly(
+          pstream.sendMessage,
+          mockCallSid,
+          mockVoiceEventSid,
+          Call.MessageType.UserDefinedMessage,
+          mockContent,
+        );
+      });
+
+      it('should generate a voiceEventSid', () => {
+        conn.parameters.CallSid = 'foobar-callsid';
+        conn.sendMessage(Call.MessageType.UserDefinedMessage, {});
+        sinon.assert.calledOnceWithExactly(
+          voiceEventSidGenerator as sinon.SinonStub,
+        );
+      });
     });
   });
 

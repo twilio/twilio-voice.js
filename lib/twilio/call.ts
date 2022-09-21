@@ -10,6 +10,7 @@ import DialtonePlayer from './dialtonePlayer';
 import {
   GeneralErrors,
   InvalidArgumentError,
+  InvalidStateError,
   MediaErrors,
   SignalingErrors,
   TwilioError,
@@ -21,6 +22,7 @@ import RTCSample from './rtc/sample';
 import RTCWarning from './rtc/warning';
 import StatsMonitor from './statsMonitor';
 import { isChrome } from './util';
+import { generateVoiceEventSid } from './uuid';
 
 const Backoff = require('backoff');
 const C = require('./constants');
@@ -236,6 +238,7 @@ class Call extends EventEmitter {
     MediaHandler: PeerConnection,
     offerSdp: null,
     shouldPlayDisconnect: () => true,
+    voiceEventSidGenerator: generateVoiceEventSid,
   };
 
   /**
@@ -279,6 +282,11 @@ class Call extends EventEmitter {
   private _status: Call.State = Call.State.Pending;
 
   /**
+   * Voice event SID generator, creates a unique voice event SID.
+   */
+  private _voiceEventSidGenerator: () => string;
+
+  /**
    * Whether the {@link Call} has been connected. Used to determine if we are reconnected.
    */
   private _wasConnected: boolean = false;
@@ -312,6 +320,9 @@ class Call extends EventEmitter {
     if (this._options.reconnectToken) {
       this._signalingReconnectToken = this._options.reconnectToken;
     }
+
+    this._voiceEventSidGenerator =
+      this._options.voiceEventSidGenerator || generateVoiceEventSid;
 
     this._direction = this.parameters.CallSid ? Call.CallDirection.Incoming : Call.CallDirection.Outgoing;
 
@@ -849,6 +860,45 @@ class Call extends EventEmitter {
       const error = new GeneralErrors.ConnectionError('Could not send DTMF: Signaling channel is disconnected');
       this.emit('error', error);
     }
+  }
+
+  /**
+   * Send a message to Twilio.
+   *
+   * @example
+   * ```ts
+   * call.sendMessage(Call.MessageType.UserDefinedMessage, {
+   *   ahoy: 'world!,
+   * });
+   * ```
+   *
+   * @param messageType - The type of the message to send to Twilio.
+   * @param content - The content of the message to send to Twilio.
+   */
+  sendMessage(messageType: Call.MessageType, content: any) {
+    if (typeof messageType !== 'string') {
+      throw new InvalidArgumentError(
+        'Message type must be an enumeration value of `Call.MessageType` or ' +
+        'a string.',
+      );
+    }
+
+    if (this._pstream === null) {
+      throw new InvalidStateError(
+        'Could not send CallMessage; Signaling channel is disconnected',
+      );
+    }
+
+    const callSid = this.parameters.CallSid;
+    if (typeof callSid !== 'string') {
+      throw new InvalidStateError(
+        'Could not send CallMessage; Call has no CallSid',
+      );
+    }
+
+    const voiceEventSid = this._voiceEventSidGenerator();
+
+    this._pstream.sendMessage(callSid, voiceEventSid, messageType, content);
   }
 
   /**
@@ -1563,7 +1613,7 @@ namespace Call {
   /**
    * Known call message types.
    */
-  export enum Message {
+  export enum MessageType {
     UserDefinedMessage = 'user-defined-message',
   }
 
@@ -1577,7 +1627,7 @@ namespace Call {
      * call will raise such events to the end-user when the stream receives
      * them.
      */
-    messagesToRegisterFor?: Call.Message[];
+    messagesToRegisterFor?: Call.MessageType[];
 
     /**
      * An RTCConfiguration to pass to the RTCPeerConnection constructor.
@@ -1760,6 +1810,11 @@ namespace Call {
      * TwiML params for the call. May be set for either outgoing or incoming calls.
      */
     twimlParams?: Record<string, any>;
+
+    /**
+     * Voice event SID generator.
+     */
+    voiceEventSidGenerator?: () => string;
   }
 
   /**
