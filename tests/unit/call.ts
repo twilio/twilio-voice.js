@@ -540,11 +540,11 @@ describe('Call', function() {
           });
         });
 
-        it('should call mediaHandler.makeOutgoingCall with an array of events to `registerFor`', () => {
-          const registerFor = ['registerFor-foo', 'registerFor-bar'] as any;
-          conn.accept({ registerFor });
+        it('should call mediaHandler.makeOutgoingCall with an array of messages to `messagesToRegisterFor`', () => {
+          const messagesToRegisterFor = ['messagesToRegisterFor-foo', 'messagesToRegisterFor-bar'] as any;
+          conn.accept({ messagesToRegisterFor });
           return wait.then(() => {
-            assert.deepEqual(mediaHandler.makeOutgoingCall.args[0][5], registerFor);
+            assert.deepEqual(mediaHandler.makeOutgoingCall.args[0][5], messagesToRegisterFor);
           });
         });
 
@@ -1607,6 +1607,65 @@ describe('Call', function() {
           pstream.emit('answer', pStreamAnswerPayload);
           sinon.assert.calledOnce(spy);
         });
+      });
+    });
+
+    describe('pstream.message event', () => {
+      const wait = (timeout?: number) => new Promise(r => {
+        setTimeout(r, timeout || 0);
+        clock.tick(0);
+      });
+
+      const mockcallsid = 'mock-callsid';
+
+      beforeEach(() => {
+        conn.parameters = {
+          ...conn.parameters,
+          CallSid: mockcallsid,
+        };
+      });
+
+      it('emits the payload', async () => {
+        const mockPayload = {
+          callsid: mockcallsid,
+          content: {
+            foo: 'bar',
+          },
+          contenttype: 'application/json',
+          messagetype: 'foo-bar',
+          voiceeventsid: 'mock-voiceeventsid-foobar',
+        };
+
+        const payloadPromise = new Promise((resolve) => {
+          conn.on('message', resolve);
+        });
+
+        pstream.emit('message', mockPayload);
+
+        assert.deepEqual(mockPayload, await payloadPromise);
+      });
+
+      it('ignores messages when callSids do not match', async () => {
+        const mockPayload = {
+          callsid: 'mock-callsid-foobar',
+          content: {
+            foo: 'bar',
+          },
+          contenttype: 'application/json',
+          messagetype: 'foo-bar',
+          voiceeventsid: 'mock-voiceeventsid-foobar',
+        };
+
+        const messagePromise = new Promise((resolve, reject) => {
+          conn.on('message', reject);
+        });
+
+        pstream.emit('message', mockPayload);
+
+        await Promise.race([
+          wait(),
+          messagePromise,
+        ]);
       });
     });
   });

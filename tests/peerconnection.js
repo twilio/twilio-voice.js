@@ -783,7 +783,7 @@ describe('PeerConnection', () => {
     const eIceServers = 'iceServers';
     const eIss = 'this is iss';
     const eSDP = 'sdp';
-    const eRegisterFor = ['registerFor-foo', 'registerFor-bar'];
+    const messagesToRegisterFor = ['messagesToRegisterFor-foo', 'messagesToRegisterFor-bar'];
 
     let context = null;
     let version = null;
@@ -825,7 +825,7 @@ describe('PeerConnection', () => {
         eCallSid,
         eConstraints,
         eIceServers,
-        eRegisterFor,
+        messagesToRegisterFor,
         callback,
       );
     });
@@ -867,7 +867,7 @@ describe('PeerConnection', () => {
       assert(version.createOffer.calledWithExactly(undefined, undefined, {audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
       assert(context.pstream.invite.calledOnce);
-      assert(context.pstream.invite.calledWithExactly(eSDP, eCallSid, true, eParams, eRegisterFor));
+      assert(context.pstream.invite.calledWithExactly(eSDP, eCallSid, true, eParams, messagesToRegisterFor));
       assert(version.getSDP.calledOnce);
       assert(version.getSDP.calledWithExactly());
       assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
@@ -884,7 +884,7 @@ describe('PeerConnection', () => {
       assert(version.createOffer.calledWithExactly(undefined, undefined, {audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
       assert(context.pstream.invite.calledOnce);
-      assert(context.pstream.invite.calledWithExactly(eSDP, eCallSid, true, eParams, eRegisterFor));
+      assert(context.pstream.invite.calledWithExactly(eSDP, eCallSid, true, eParams, messagesToRegisterFor));
       assert(version.getSDP.calledOnce);
       assert(version.getSDP.calledWithExactly());
       assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
