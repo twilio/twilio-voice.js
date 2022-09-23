@@ -1,7 +1,7 @@
 import * as md5 from 'md5';
 import { NotSupportedError } from '../twilio/errors';
 
-export function generateUuid(): string {
+function generateUuid(): string {
   if (typeof window !== 'object') {
     throw new NotSupportedError('This platform is not supported.');
   }

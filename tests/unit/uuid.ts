@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import * as sinon from 'sinon';
 import { NotSupportedError } from '../../lib/twilio/errors';
-import { generateUuid, generateVoiceEventSid } from '../../lib/twilio/uuid';
+import { generateVoiceEventSid } from '../../lib/twilio/uuid';
 
 const root = global as any;
 
@@ -37,11 +37,11 @@ describe('uuid util', () => {
     root.window = originalWindow;
   });
 
-  describe('generateUuid', () => {
+  describe('generateVoiceEventSid', () => {
     it('should throw if window is not available', () => {
       root.window = undefined;
       assert.throws(
-        () => generateUuid(),
+        () => generateVoiceEventSid(),
         new NotSupportedError('This platform is not supported.'),
       );
     });
@@ -49,7 +49,7 @@ describe('uuid util', () => {
     it('should throw if crypto is not available', () => {
       injectWindow({ Uint32Array: Uint32ArrMock });
       assert.throws(
-        () => generateUuid(),
+        () => generateVoiceEventSid(),
         new NotSupportedError('The `crypto` module is not available on this platform.'),
       );
     });
@@ -57,7 +57,7 @@ describe('uuid util', () => {
     it('should throw if neither randomUUID or getRandomValues are available', () => {
       injectWindow({ crypto: {}, Uint32Array: Uint32ArrMock });
       assert.throws(
-        () => generateUuid(),
+        () => generateVoiceEventSid(),
         new NotSupportedError(
           'Neither `crypto.randomUUID` or `crypto.getRandomValues` are ' +
           'available on this platform.',
@@ -68,32 +68,30 @@ describe('uuid util', () => {
     it('should throw if Uint32Array is not available', () => {
       injectWindow({ crypto: { randomUUID, getRandomValues } });
       assert.throws(
-        () => generateUuid(),
+        () => generateVoiceEventSid(),
         new NotSupportedError('The `Uint32Array` module is not available on this platform.'),
       );
     });
 
     it('should generate a uuid using randomUUID', () => {
       injectWindow({ crypto: { randomUUID }, Uint32Array: Uint32ArrMock });
-      assert(typeof generateUuid() === 'string');
+      assert(typeof generateVoiceEventSid() === 'string');
       sinon.assert.calledOnce(randomUUID);
     });
 
     it('should generate a uuid using getRandomValues', () => {
       injectWindow({ crypto: { getRandomValues }, Uint32Array: Uint32ArrMock });
-      assert(typeof generateUuid() === 'string');
+      assert(typeof generateVoiceEventSid() === 'string');
       sinon.assert.calledOnce(getRandomValues);
     });
 
     it('should prefer randomUUID if both randomUUID and getRandomValues are available', () => {
       injectWindow({ crypto: { randomUUID, getRandomValues }, Uint32Array: Uint32ArrMock });
-      assert(typeof generateUuid() === 'string');
+      assert(typeof generateVoiceEventSid() === 'string');
       sinon.assert.calledOnce(randomUUID);
       sinon.assert.notCalled(getRandomValues);
     });
-  });
 
-  describe('generateVoiceEventSid', () => {
     it('should be prefixed with `KX`', () => {
       injectWindow({ crypto: { randomUUID }, Uint32Array: Uint32ArrMock });
       const sid = generateVoiceEventSid();

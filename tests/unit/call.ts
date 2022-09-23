@@ -1000,7 +1000,7 @@ describe('Call', function() {
           assert.throws(
             () => conn.sendMessage(messageType, {}),
             new InvalidArgumentError(
-              'Message type must be an enumeration value of ' +
+              '`messageType` must be an enumeration value of ' +
               '`Call.MessageType` or a string.',
             ),
           );
@@ -1010,6 +1010,7 @@ describe('Call', function() {
       context('when messageType is valid', () => {
         ['foo', 'bar'].forEach((messageType: string) => {
           it(`should not throw on '${messageType}'`, () => {
+            conn['_status'] = Call.State.Open;
             conn.parameters.CallSid = 'foobar';
             assert.doesNotThrow(() => {
               conn.sendMessage(messageType as Call.MessageType, {});
@@ -1030,6 +1031,7 @@ describe('Call', function() {
       });
 
       it('should invoke pstream.sendMessage', () => {
+        conn['_status'] = Call.State.Open;
         const mockCallSid = conn.parameters.CallSid = 'foobar-callsid';
         const mockVoiceEventSid = 'foobar-voice-event-sid';
         const mockContent = {};
@@ -1044,10 +1046,20 @@ describe('Call', function() {
       });
 
       it('should generate a voiceEventSid', () => {
+        conn['_status'] = Call.State.Open;
         conn.parameters.CallSid = 'foobar-callsid';
         conn.sendMessage(Call.MessageType.UserDefinedMessage, {});
         sinon.assert.calledOnceWithExactly(
           voiceEventSidGenerator as sinon.SinonStub,
+        );
+      });
+
+      it('should throw if the call state is not open', () => {
+        assert.throws(
+          () => conn.sendMessage(Call.MessageType.UserDefinedMessage, {}),
+          new InvalidStateError(
+            `Could not send CallMessage; Call is in "${Call.State.Pending}" state`,
+          ),
         );
       });
     });

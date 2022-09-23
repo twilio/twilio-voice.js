@@ -878,8 +878,14 @@ class Call extends EventEmitter {
   sendMessage(messageType: Call.MessageType, content: any) {
     if (typeof messageType !== 'string') {
       throw new InvalidArgumentError(
-        'Message type must be an enumeration value of `Call.MessageType` or ' +
+        '`messageType` must be an enumeration value of `Call.MessageType` or ' +
         'a string.',
+      );
+    }
+
+    if (messageType.length === 0) {
+      throw new InvalidArgumentError(
+        '`messageType` must be a non-empty string.',
       );
     }
 
@@ -889,15 +895,14 @@ class Call extends EventEmitter {
       );
     }
 
-    const callSid = this.parameters.CallSid;
-    if (typeof callSid !== 'string') {
+    if (this._status !== Call.State.Open) {
       throw new InvalidStateError(
-        'Could not send CallMessage; Call has no CallSid',
+        `Could not send CallMessage; Call is in "${this._status}" state`,
       );
     }
 
+    const callSid = this.parameters.CallSid;
     const voiceEventSid = this._voiceEventSidGenerator();
-
     this._pstream.sendMessage(callSid, voiceEventSid, messageType, content);
   }
 
