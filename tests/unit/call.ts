@@ -1062,6 +1062,16 @@ describe('Call', function() {
           ),
         );
       });
+
+      it('should throw if the call sid is not set', () => {
+        conn['_status'] = Call.State.Open;
+        assert.throws(
+          () => conn.sendMessage(Call.MessageType.UserDefinedMessage, {}),
+          new InvalidStateError(
+            'Could not send CallMessage; Call has no CallSid',
+          ),
+        );
+      });
     });
   });
 

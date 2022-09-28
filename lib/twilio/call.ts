@@ -902,6 +902,12 @@ class Call extends EventEmitter {
     }
 
     const callSid = this.parameters.CallSid;
+    if (typeof this.parameters.CallSid === 'undefined') {
+      throw new InvalidStateError(
+        'Could not send CallMessage; Call has no CallSid',
+      );
+    }
+
     const voiceEventSid = this._voiceEventSidGenerator();
     this._pstream.sendMessage(callSid, voiceEventSid, messageType, content);
   }
