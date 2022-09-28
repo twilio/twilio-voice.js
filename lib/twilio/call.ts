@@ -895,12 +895,6 @@ class Call extends EventEmitter {
       );
     }
 
-    if (this._status !== Call.State.Open) {
-      throw new InvalidStateError(
-        `Could not send CallMessage; Call is in "${this._status}" state`,
-      );
-    }
-
     const callSid = this.parameters.CallSid;
     if (typeof this.parameters.CallSid === 'undefined') {
       throw new InvalidStateError(
