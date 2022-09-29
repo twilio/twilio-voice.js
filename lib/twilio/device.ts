@@ -564,14 +564,6 @@ class Device extends EventEmitter {
       throw new InvalidStateError('A Call is already active');
     }
 
-    const messagesToRegisterFor = options.messagesToRegisterFor || [];
-    if (
-      !Array.isArray(messagesToRegisterFor) ||
-      messagesToRegisterFor.some((event) => typeof event !== 'string')
-    ) {
-      throw new InvalidArgumentError('`messagesToRegisterFor` option must be an array of strings.');
-    }
-
     const activeCall = this._activeCall = await this._makeCall(options.params || { }, {
       rtcConfiguration: options.rtcConfiguration,
       voiceEventSidGenerator: this._options.voiceEventSidGenerator,
@@ -583,7 +575,7 @@ class Device extends EventEmitter {
     // Stop the incoming sound if it's playing
     this._soundcache.get(Device.SoundName.Incoming).stop();
 
-    activeCall.accept({ rtcConstraints: options.rtcConstraints, messagesToRegisterFor });
+    activeCall.accept({ rtcConstraints: options.rtcConstraints });
     this._publishNetworkChange();
     return activeCall;
   }

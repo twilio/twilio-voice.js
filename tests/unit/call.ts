@@ -26,6 +26,8 @@ describe('Call', function() {
   let soundcache: Map<Device.SoundName, any>;
   let voiceEventSidGenerator: () => string;
 
+  const wait = (timeout?: number) => new Promise(r => setTimeout(r, timeout || 0));
+
   const MediaHandler = () => {
     mediaHandler = createEmitterStub(require('../../lib/twilio/rtc/peerconnection'));
     mediaHandler.setInputTracksFromStream = sinon.spy((rejectCode?: number) => {
@@ -520,7 +522,7 @@ describe('Call', function() {
             return p;
           });
 
-          mediaHandler.makeOutgoingCall = sinon.spy((a: any, b: any, c: any, d: any, e: any, f: any, _callback: Function) => {
+          mediaHandler.makeOutgoingCall = sinon.spy((a: any, b: any, c: any, d: any, e: any, _callback: Function) => {
             callback = _callback;
           });
         });
@@ -541,14 +543,6 @@ describe('Call', function() {
           conn.accept({ rtcConfiguration });
           return wait.then(() => {
             assert.deepEqual(mediaHandler.makeOutgoingCall.args[0][4], rtcConfiguration);
-          });
-        });
-
-        it('should call mediaHandler.makeOutgoingCall with an array of messages to `messagesToRegisterFor`', () => {
-          const messagesToRegisterFor = ['messagesToRegisterFor-foo', 'messagesToRegisterFor-bar'] as any;
-          conn.accept({ messagesToRegisterFor });
-          return wait.then(() => {
-            assert.deepEqual(mediaHandler.makeOutgoingCall.args[0][5], messagesToRegisterFor);
           });
         });
 
@@ -988,6 +982,15 @@ describe('Call', function() {
   });
 
   describe('.sendMessage()', () => {
+    let message: Call.Message;
+
+    beforeEach(() => {
+      message = {
+        content: { foo: 'foo' },
+        messageType: Call.MessageType.UserDefinedMessage,
+      };
+    });
+
     context('when messageType is invalid', () => {
       [
         undefined,
@@ -998,7 +1001,7 @@ describe('Call', function() {
       ].forEach((messageType: any) => {
         it(`should throw on ${JSON.stringify(messageType)}`, () => {
           assert.throws(
-            () => conn.sendMessage(messageType, {}),
+            () => conn.sendMessage({ ...message, messageType }),
             new InvalidArgumentError(
               '`messageType` must be an enumeration value of ' +
               '`Call.MessageType` or a string.',
@@ -1006,62 +1009,67 @@ describe('Call', function() {
           );
         });
       });
+    });
 
-      context('when messageType is valid', () => {
-        ['foo', 'bar'].forEach((messageType: string) => {
-          it(`should not throw on '${messageType}'`, () => {
-            conn['_status'] = Call.State.Open;
-            conn.parameters.CallSid = 'foobar';
-            assert.doesNotThrow(() => {
-              conn.sendMessage(messageType as Call.MessageType, {});
-            });
-          });
+    context('when content is invalid', () => {
+      [
+        undefined,
+        null,
+      ].forEach((content: any) => {
+        it(`should throw on ${JSON.stringify(content)}`, () => {
+          assert.throws(
+            () => conn.sendMessage({ ...message, content }),
+            new InvalidArgumentError('`content` is empty'),
+          );
         });
       });
+    });
 
-      it('should throw if pstream is unavailable', () => {
-        // @ts-ignore
-        conn._pstream = null;
-        assert.throws(
-          () => conn.sendMessage('foobar' as Call.MessageType, {}),
-          new InvalidStateError(
-            'Could not send CallMessage; Signaling channel is disconnected',
-          ),
-        );
-      });
+    it('should throw if pstream is unavailable', () => {
+      // @ts-ignore
+      conn._pstream = null;
+      assert.throws(
+        () => conn.sendMessage(message),
+        new InvalidStateError(
+          'Could not send CallMessage; Signaling channel is disconnected',
+        ),
+      );
+    });
 
-      it('should invoke pstream.sendMessage', () => {
-        conn['_status'] = Call.State.Open;
-        const mockCallSid = conn.parameters.CallSid = 'foobar-callsid';
-        const mockVoiceEventSid = 'foobar-voice-event-sid';
-        const mockContent = {};
-        conn.sendMessage(Call.MessageType.UserDefinedMessage, mockContent);
-        sinon.assert.calledOnceWithExactly(
-          pstream.sendMessage,
-          mockCallSid,
-          mockVoiceEventSid,
-          Call.MessageType.UserDefinedMessage,
-          mockContent,
-        );
-      });
+    it('should throw if the call sid is not set', () => {
+      assert.throws(
+        () => conn.sendMessage(message),
+        new InvalidStateError(
+          'Could not send CallMessage; Call has no CallSid',
+        ),
+      );
+    });
 
-      it('should generate a voiceEventSid', () => {
-        conn['_status'] = Call.State.Open;
-        conn.parameters.CallSid = 'foobar-callsid';
-        conn.sendMessage(Call.MessageType.UserDefinedMessage, {});
-        sinon.assert.calledOnceWithExactly(
-          voiceEventSidGenerator as sinon.SinonStub,
-        );
-      });
+    it('should invoke pstream.sendMessage', () => {
+      const mockCallSid = conn.parameters.CallSid = 'foobar-callsid';
+      conn.sendMessage(message);
+      sinon.assert.calledOnceWithExactly(
+        pstream.sendMessage,
+        mockCallSid,
+        message.content,
+        undefined,
+        Call.MessageType.UserDefinedMessage,
+        'foobar-voice-event-sid',
+      );
+    });
 
-      it('should throw if the call sid is not set', () => {
-        assert.throws(
-          () => conn.sendMessage(Call.MessageType.UserDefinedMessage, {}),
-          new InvalidStateError(
-            'Could not send CallMessage; Call has no CallSid',
-          ),
-        );
-      });
+    it('should return voiceEventSid', () => {
+      conn.parameters.CallSid = 'foobar-callsid';
+      const sid = conn.sendMessage(message);
+      assert.strictEqual(sid, 'foobar-voice-event-sid');
+    });
+
+    it('should generate a voiceEventSid', () => {
+      conn.parameters.CallSid = 'foobar-callsid';
+      conn.sendMessage(message);
+      sinon.assert.calledOnceWithExactly(
+        voiceEventSidGenerator as sinon.SinonStub,
+      );
     });
   });
 
@@ -1692,23 +1700,143 @@ describe('Call', function() {
       });
     });
 
-    describe('pstream.message event', () => {
-      const wait = (timeout?: number) => new Promise(r => {
-        setTimeout(r, timeout || 0);
-        clock.tick(0);
-      });
-
+    describe('pstream.ack event', () => {
       const mockcallsid = 'mock-callsid';
+      let mockMessagePayload: any;
+      let mockAckPayload: any;
 
       beforeEach(() => {
+        mockMessagePayload = {
+          content: {
+            foo: 'bar',
+          },
+          contentType: 'application/json',
+          messageType: 'foo-bar',
+        };
+
+        mockAckPayload = {
+          acktype: 'message',
+          callsid: mockcallsid,
+          voiceeventsid: 'mockvoiceeventsid',
+        };
+
         conn.parameters = {
           ...conn.parameters,
           CallSid: mockcallsid,
         };
+        clock.restore();
       });
 
-      it('emits the payload', async () => {
-        const mockPayload = {
+      it('should emit messageSent', async () => {
+        const sid = conn.sendMessage(mockMessagePayload);
+        const payloadPromise = new Promise((resolve) => {
+          conn.on('messageSent', resolve);
+        });
+        pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid });
+        assert.deepEqual(await payloadPromise, { ...mockMessagePayload, voiceEventSid: sid });
+      });
+
+      it('should ignore ack when callSids do not match', async () => {
+        const sid = conn.sendMessage(mockMessagePayload);
+        const payloadPromise = new Promise((resolve, reject) => {
+          conn.on('messageSent', reject);
+        });
+        pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid, callsid: 'foo' });
+        await Promise.race([
+          wait(1),
+          payloadPromise,
+        ]);
+      });
+
+      it('should not emit messageSent when acktype is not `message`', async () => {
+        const sid = conn.sendMessage(mockMessagePayload);
+        const payloadPromise = new Promise((resolve, reject) => {
+          conn.on('messageSent', reject);
+        });
+        pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid, acktype: 'foo' });
+        await Promise.race([
+          wait(1),
+          payloadPromise,
+        ]);
+      });
+
+      it('should not emit messageSent if voiceEventSid was not previously sent', async () => {
+        const sid = conn.sendMessage(mockMessagePayload);
+        const payloadPromise = new Promise((resolve, reject) => {
+          conn.on('messageSent', reject);
+        });
+        pstream.emit('ack', { ...mockAckPayload, voiceeventsid: 'foo' });
+        await Promise.race([
+          wait(1),
+          payloadPromise,
+        ]);
+      });
+
+      it('should emit messageSent only once', async () => {
+        const sid = conn.sendMessage(mockMessagePayload);
+        const handler = sinon.stub();
+        const payloadPromise = new Promise((resolve) => {
+          conn.on('messageSent', () => {
+            handler();
+            resolve(null);
+          });
+        });
+        pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid });
+        pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid });
+        await payloadPromise;
+        sinon.assert.calledOnce(handler);
+      });
+
+      it('should not emit messageSent after an error', async () => {
+        const sid = conn.sendMessage(mockMessagePayload);
+        const payloadPromise = new Promise((resolve, reject) => {
+          conn.on('messageSent', reject);
+        });
+        pstream.emit('error', { callsid: mockcallsid, voiceeventsid: sid });
+        pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid });
+        await Promise.race([
+          wait(1),
+          payloadPromise,
+        ]);
+      });
+
+      it('should ignore errors with different callsid', async () => {
+        const sid = conn.sendMessage(mockMessagePayload);
+        const payloadPromise = new Promise((resolve) => {
+          conn.on('messageSent', resolve);
+        });
+        pstream.emit('error', { callsid: 'foo', voiceeventsid: sid });
+        pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid });
+        await payloadPromise;
+      });
+
+      it('should ignore errors with different voiceeventsid', async () => {
+        const sid = conn.sendMessage(mockMessagePayload);
+        const payloadPromise = new Promise((resolve) => {
+          conn.on('messageSent', resolve);
+        });
+        pstream.emit('error', { callsid: mockcallsid, voiceeventsid: 'foo' });
+        pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid });
+        await payloadPromise;
+      });
+
+      it('should ignore errors with missing voiceeventsid', async () => {
+        const sid = conn.sendMessage(mockMessagePayload);
+        const payloadPromise = new Promise((resolve) => {
+          conn.on('messageSent', resolve);
+        });
+        pstream.emit('error', { callsid: mockcallsid });
+        pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid });
+        await payloadPromise;
+      });
+    });
+
+    describe('pstream.message event', () => {
+      const mockcallsid = 'mock-callsid';
+      let mockPayload: any;
+
+      beforeEach(() => {
+        mockPayload = {
           callsid: mockcallsid,
           content: {
             foo: 'bar',
@@ -1717,35 +1845,33 @@ describe('Call', function() {
           messagetype: 'foo-bar',
           voiceeventsid: 'mock-voiceeventsid-foobar',
         };
-
-        const payloadPromise = new Promise((resolve) => {
-          conn.on('message', resolve);
-        });
-
-        pstream.emit('message', mockPayload);
-
-        assert.deepEqual(mockPayload, await payloadPromise);
+        conn.parameters = {
+          ...conn.parameters,
+          CallSid: mockcallsid,
+        };
+        clock.restore();
       });
 
-      it('ignores messages when callSids do not match', async () => {
-        const mockPayload = {
-          callsid: 'mock-callsid-foobar',
-          content: {
-            foo: 'bar',
-          },
-          contenttype: 'application/json',
-          messagetype: 'foo-bar',
-          voiceeventsid: 'mock-voiceeventsid-foobar',
-        };
-
-        const messagePromise = new Promise((resolve, reject) => {
-          conn.on('message', reject);
+      it('should emit messageReceived', async () => {
+        const payloadPromise = new Promise((resolve) => {
+          conn.on('messageReceived', resolve);
         });
-
         pstream.emit('message', mockPayload);
+        assert.deepEqual(await payloadPromise, {
+          content: mockPayload.content,
+          contentType: mockPayload.contenttype,
+          messageType: mockPayload.messagetype,
+          voiceEventSid: mockPayload.voiceeventsid,
+        });
+      });
 
+      it('should ignore messages when callSids do not match', async () => {
+        const messagePromise = new Promise((resolve, reject) => {
+          conn.on('messageReceived', reject);
+        });
+        pstream.emit('message', { ...mockPayload, callsid: 'foo' });
         await Promise.race([
-          wait(),
+          wait(1),
           messagePromise,
         ]);
       });

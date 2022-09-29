@@ -216,6 +216,12 @@ class Call extends EventEmitter {
   private _mediaStatus: Call.State = Call.State.Pending;
 
   /**
+   * A map of messages sent via sendMessage API.
+   * The message will be deleted once an 'ack' or an error is received from the server.
+   */
+  private _messages: Map<string, Call.Message> = new Map();
+
+  /**
    * A batch of metrics samples to send to Insights. Gets cleared after
    * each send and appended to on each new sample.
    */
@@ -524,11 +530,13 @@ class Call extends EventEmitter {
     };
 
     this._pstream = config.pstream;
+    this._pstream.on('ack', this._onAck);
     this._pstream.on('cancel', this._onCancel);
+    this._pstream.on('error', this._onSignalingError);
     this._pstream.on('ringing', this._onRinging);
     this._pstream.on('transportClose', this._onTransportClose);
     this._pstream.on('connected', this._onConnected);
-    this._pstream.on('message', this._onMessage);
+    this._pstream.on('message', this._onMessageReceived);
 
     this.on('error', error => {
       this._publisher.error('connection', 'error', {
@@ -576,14 +584,6 @@ class Call extends EventEmitter {
     const rtcConfiguration = options.rtcConfiguration || this._options.rtcConfiguration;
     const rtcConstraints = options.rtcConstraints || this._options.rtcConstraints || { };
     const audioConstraints = rtcConstraints.audio || { audio: true };
-    const messagesToRegisterFor = options.messagesToRegisterFor || [];
-
-    if (
-      !Array.isArray(messagesToRegisterFor) ||
-      messagesToRegisterFor.some((event) => typeof event !== 'string')
-    ) {
-      throw new Error('`messagesToRegisterFor` option must be an array of strings.');
-    }
 
     this._status = Call.State.Connecting;
 
@@ -638,7 +638,7 @@ class Call extends EventEmitter {
          `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
         this._pstream.on('answer', this._onAnswer.bind(this));
         this._mediaHandler.makeOutgoingCall(this._pstream.token, params, this.outboundConnectionId,
-          rtcConstraints, rtcConfiguration, messagesToRegisterFor, onAnswer);
+          rtcConstraints, rtcConfiguration, onAnswer);
       }
     };
 
@@ -863,19 +863,15 @@ class Call extends EventEmitter {
   }
 
   /**
-   * Send a message to Twilio.
-   *
-   * @example
-   * ```ts
-   * call.sendMessage(Call.MessageType.UserDefinedMessage, {
-   *   ahoy: 'world!,
-   * });
-   * ```
-   *
-   * @param messageType - The type of the message to send to Twilio.
-   * @param content - The content of the message to send to Twilio.
+   * TODO
    */
-  sendMessage(messageType: Call.MessageType, content: any) {
+  sendMessage(message: Call.Message): string {
+    const { content, contentType, messageType } = message;
+
+    if (typeof content === 'undefined' || content === null) {
+      throw new InvalidArgumentError('`content` is empty');
+    }
+
     if (typeof messageType !== 'string') {
       throw new InvalidArgumentError(
         '`messageType` must be an enumeration value of `Call.MessageType` or ' +
@@ -903,7 +899,9 @@ class Call extends EventEmitter {
     }
 
     const voiceEventSid = this._voiceEventSidGenerator();
-    this._pstream.sendMessage(callSid, voiceEventSid, messageType, content);
+    this._messages.set(voiceEventSid, { content, contentType, messageType, voiceEventSid });
+    this._pstream.sendMessage(callSid, content, contentType, messageType, voiceEventSid);
+    return voiceEventSid;
   }
 
   /**
@@ -954,13 +952,15 @@ class Call extends EventEmitter {
     const cleanup = () => {
       if (!this._pstream) { return; }
 
+      this._pstream.removeListener('ack', this._onAck);
       this._pstream.removeListener('answer', this._onAnswer);
       this._pstream.removeListener('cancel', this._onCancel);
+      this._pstream.removeListener('error', this._onSignalingError);
       this._pstream.removeListener('hangup', this._onHangup);
       this._pstream.removeListener('ringing', this._onRinging);
       this._pstream.removeListener('transportClose', this._onTransportClose);
       this._pstream.removeListener('connected', this._onConnected);
-      this._pstream.removeListener('message', this._onMessage);
+      this._pstream.removeListener('message', this._onMessageReceived);
     };
 
     // This is kind of a hack, but it lets us avoid rewriting more code.
@@ -1091,6 +1091,21 @@ class Call extends EventEmitter {
           this.emit('accept', this);
         }
       }
+    }
+  }
+
+  /**
+   * Called when the {@link Call} receives an ack from signaling
+   * @param payload
+   */
+  private _onAck = (payload: Record<string, any>): void => {
+    const { acktype, callsid, voiceeventsid } = payload;
+    if (this.parameters.CallSid !== callsid) {
+      this._log.warn(`Received ack from a different callsid: ${callsid}`);
+      return;
+    }
+    if (acktype === 'message') {
+      this._onMessageSent(voiceeventsid);
     }
   }
 
@@ -1280,7 +1295,7 @@ class Call extends EventEmitter {
 
   /**
    * Raised when a Call receives a message from the backend.
-   *
+   * TODO
    * @remarks
    * Note that in this context a "message" is limited to a
    * "User Defined Message" from the Voice User Defined Message Service (VUDMS)
@@ -1290,12 +1305,34 @@ class Call extends EventEmitter {
    * @param payload - A record representing the payload of the message from the
    * Twilio backend.
    */
-  private _onMessage = (payload: Record<string, string>): void => {
-    if (this.parameters.CallSid !== payload.callsid) {
+  private _onMessageReceived = (payload: Record<string, any>): void => {
+    const { callsid, content, contenttype, messagetype, voiceeventsid } = payload;
+
+    if (this.parameters.CallSid !== callsid) {
+      this._log.warn(`Received a message from a different callsid: ${callsid}`);
       return;
     }
 
-    this.emit('message', payload);
+    this.emit('messageReceived', {
+      content,
+      contentType: contenttype,
+      messageType: messagetype,
+      voiceEventSid: voiceeventsid,
+    });
+  }
+
+  /**
+   * TODO
+   * @param voiceEventSid
+   */
+  private _onMessageSent = (voiceEventSid: string): void => {
+    if (!this._messages.has(voiceEventSid)) {
+      this._log.warn(`Received a messageSent with a voiceEventSid that doesn't exists: ${voiceEventSid}`);
+      return;
+    }
+    const message = this._messages.get(voiceEventSid);
+    this._messages.delete(voiceEventSid);
+    this.emit('messageSent', message);
   }
 
   /**
@@ -1337,6 +1374,22 @@ class Call extends EventEmitter {
 
     this.emit('sample', sample);
   }
+
+  /**
+   * Called when an 'error' event is received from the signaling stream.
+   */
+  private _onSignalingError = (payload: Record<string, any>): void => {
+    const { callsid, voiceeventsid } = payload;
+    if (this.parameters.CallSid !== callsid) {
+      this._log.warn(`Received an error from a different callsid: ${callsid}`);
+      return;
+    }
+    if (voiceeventsid && this._messages.has(voiceeventsid)) {
+      // Do not emit an error here. Device is handling all signaling related errors.
+      this._messages.delete(voiceeventsid);
+      this._log.warn(`Received an error while sending a message.`, payload);
+    }
+   }
 
   /**
    * Called when signaling is restored
@@ -1480,7 +1533,7 @@ namespace Call {
 
   /**
    * Emitted when a Call receives a message from the backend.
-   *
+   * TODO
    * @remarks
    * Note that in this context a "message" is limited to a
    * "User Defined Message" from the Voice User Defined Message Service (VUDMS)
@@ -1492,7 +1545,12 @@ namespace Call {
    * @example `call.on('message', (payload) => { })`
    * @event
    */
-  declare function messageEvent(payload: Record<string, string>): void;
+  declare function messageReceivedEvent(message: Call.Message): void;
+
+  /**
+   * TODO
+   */
+  declare function messageSentEvent(message: Call.Message): void;
 
   /**
    * Emitted when the {@link Call} is muted or unmuted.
@@ -1627,14 +1685,6 @@ namespace Call {
    */
   export interface AcceptOptions {
     /**
-     * An array containing strings representing events that this call is
-     * registering for. For example, "dial-callprogress-events" so that this
-     * call will raise such events to the end-user when the stream receives
-     * them.
-     */
-    messagesToRegisterFor?: Call.MessageType[];
-
-    /**
      * An RTCConfiguration to pass to the RTCPeerConnection constructor.
      */
     rtcConfiguration?: RTCConfiguration;
@@ -1697,6 +1747,34 @@ namespace Call {
      * A Map of Sounds to play.
      */
     soundcache: Map<Device.SoundName, ISound>;
+  }
+
+  /**
+   * A Call Message represents the data that is being transferred between
+   * the signaling server and the SDK.
+   */
+  export interface Message {
+    /**
+     * The content of the message which should match the contentType parameter.
+     */
+    content: any;
+
+    /**
+     * The MIME type of the content. Default is application/json.
+     */
+    contentType?: string;
+
+    /**
+     * The type of message
+     */
+    messageType: MessageType;
+
+    /**
+     * An autogenerated id that uniquely identifies the instance of this message.
+     * This is not required when sending a message from the SDK as this is autogenerated.
+     * But it will be available after the message is sent, or when a message is received.
+     */
+    voiceEventSid?: string;
   }
 
   /**
