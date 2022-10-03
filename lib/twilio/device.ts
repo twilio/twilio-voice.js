@@ -6,7 +6,7 @@
  */
 import { EventEmitter } from 'events';
 import { levels as LogLevels, LogLevelDesc } from 'loglevel';
-import AudioHelper from './audiohelper';
+import AudioHelper, { defaultEnabledSounds } from './audiohelper';
 import Call from './call';
 import DialtonePlayer from './dialtonePlayer';
 import {
@@ -346,15 +346,6 @@ class Device extends EventEmitter {
    * The name of the edge the {@link Device} is connected to.
    */
   private _edge: string | null = null;
-
-  /**
-   * Whether each sound is enabled.
-   */
-  private _enabledSounds: Record<Device.ToggleableSound, boolean> = {
-    [Device.SoundName.Disconnect]: true,
-    [Device.SoundName.Incoming]: true,
-    [Device.SoundName.Outgoing]: true,
-  };
 
   /**
    * The name of the home region the {@link Device} is connected to.
@@ -972,7 +963,7 @@ class Device extends EventEmitter {
       maxAverageBitrate: this._options.maxAverageBitrate,
       preflight: this._options.preflight,
       rtcConstraints: this._options.rtcConstraints,
-      shouldPlayDisconnect: () => this._enabledSounds.disconnect,
+      shouldPlayDisconnect: () => this._audio ? this._audio.disconnect() : defaultEnabledSounds.disconnect,
       twimlParams,
     }, options);
 
@@ -992,7 +983,8 @@ class Device extends EventEmitter {
         this._audio._maybeStartPollingVolume();
       }
 
-      if (call.direction === Call.CallDirection.Outgoing && this._enabledSounds.outgoing) {
+      const shouldPlayOutgoing = this._audio ? this._audio.outgoing() : defaultEnabledSounds.outgoing;
+      if (call.direction === Call.CallDirection.Outgoing && shouldPlayOutgoing) {
         this._soundcache.get(Device.SoundName.Outgoing).play();
       }
 
@@ -1198,7 +1190,9 @@ class Device extends EventEmitter {
       this._publishNetworkChange();
     });
 
-    const play = (this._enabledSounds.incoming && !wasBusy)
+    const shouldPlayIncoming = this._audio ? this._audio.incoming() : defaultEnabledSounds.incoming;
+
+    const play = (shouldPlayIncoming && !wasBusy)
       ? () => this._soundcache.get(Device.SoundName.Incoming).play()
       : () => Promise.resolve();
 
@@ -1307,7 +1301,6 @@ class Device extends EventEmitter {
       getUserMedia,
       {
         audioContext: Device.audioContext,
-        enabledSounds: this._enabledSounds,
       },
     );
 

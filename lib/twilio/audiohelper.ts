@@ -21,6 +21,12 @@ const kindAliases: Record<string, string> = {
   audiooutput: 'Audio Output',
 };
 
+export const defaultEnabledSounds: Record<Device.ToggleableSound, boolean> = {
+  [Device.SoundName.Disconnect]: true,
+  [Device.SoundName.Incoming]: true,
+  [Device.SoundName.Outgoing]: true,
+};
+
 /**
  * Provides input and output audio-based functionality in one convenient class.
  * @publicapi
@@ -30,6 +36,23 @@ class AudioHelper extends EventEmitter {
    * The currently set audio constraints set by setAudioConstraints(). Starts as null.
    */
   get audioConstraints(): MediaTrackConstraints | null { return this._audioConstraints; }
+
+  /**
+   * If no value is passed, it returns a boolean indicating whether the disconnect sound
+   * is enabled or disabled otherwise it enables or disables the disconnect event sound.
+   */
+  [Device.SoundName.Disconnect]: EnableSoundFn;
+
+  /**
+   * If no value is passed, it returns a boolean indicating whether the incoming sound
+   * is enabled or disabled otherwise it enables or disables the incoming event sound.
+   */
+  [Device.SoundName.Incoming]: EnableSoundFn;
+  /**
+   * If no value is passed, it returns a boolean indicating whether the outgoing sound
+   * is enabled or disabled otherwise it enables or disables the outgoing event sound.
+   */
+  [Device.SoundName.Outgoing]: EnableSoundFn;
 
   /**
    * A Map of all audio input devices currently available to the browser by their device ID.
@@ -89,6 +112,11 @@ class AudioHelper extends EventEmitter {
    * An AudioContext to use.
    */
   private _audioContext?: AudioContext;
+
+  /**
+   * Whether each sound is enabled.
+   */
+  private _enabledSounds: Record<Device.ToggleableSound, boolean>;
 
   /**
    * The `getUserMedia()` function to use.
@@ -164,6 +192,7 @@ class AudioHelper extends EventEmitter {
 
     this._getUserMedia = getUserMedia;
     this._mediaDevices = options.mediaDevices || defaultMediaDevices;
+    this._enabledSounds = options.enabledSounds || defaultEnabledSounds;
     this._onActiveInputChanged = onActiveInputChanged;
 
     const isAudioContextSupported: boolean = !!(options.AudioContext || options.audioContext);
@@ -172,9 +201,7 @@ class AudioHelper extends EventEmitter {
     this.isOutputSelectionSupported = isEnumerationSupported && isSetSinkSupported;
     this.isVolumeSupported = isAudioContextSupported;
 
-    if (options.enabledSounds) {
-      this._addEnabledSounds(options.enabledSounds);
-    }
+    this._addEnabledSounds();
 
     if (this.isVolumeSupported) {
       this._audioContext = options.audioContext || options.AudioContext && new options.AudioContext();
@@ -347,10 +374,11 @@ class AudioHelper extends EventEmitter {
    * Merge the passed enabledSounds into {@link AudioHelper}. Currently used to merge the deprecated
    *   Device.sounds object onto the new {@link AudioHelper} interface. Mutates
    *   by reference, sharing state between {@link Device} and {@link AudioHelper}.
-   * @param enabledSounds - The initial sound settings to merge.
    * @private
    */
-  private _addEnabledSounds(enabledSounds: { [name: string]: boolean }) {
+  private _addEnabledSounds() {
+    const enabledSounds = this._enabledSounds;
+
     function setValue(key: Device.ToggleableSound, value: boolean) {
       if (typeof value !== 'undefined') {
         enabledSounds[key] = value;
@@ -359,8 +387,8 @@ class AudioHelper extends EventEmitter {
       return enabledSounds[key];
     }
 
-    Object.keys(enabledSounds).forEach(key => {
-      (this as any)[key] = setValue.bind(null, key);
+    Object.keys(enabledSounds).forEach((key: Device.ToggleableSound) => {
+      this[key] = setValue.bind(null, key);
     });
   }
 
@@ -620,6 +648,8 @@ class AudioHelper extends EventEmitter {
     return new MediaDeviceInfoShim(options) as MediaDeviceInfo;
   }
 }
+
+export type EnableSoundFn = (value?: boolean) => boolean;
 
 namespace AudioHelper {
   /**
