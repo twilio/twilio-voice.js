@@ -216,7 +216,7 @@ class Call extends EventEmitter {
   private _mediaStatus: Call.State = Call.State.Pending;
 
   /**
-   * A map of messages sent via sendMessage API.
+   * A map of messages sent via sendMessage API using voiceEventSid as the key.
    * The message will be deleted once an 'ack' or an error is received from the server.
    */
   private _messages: Map<string, Call.Message> = new Map();
