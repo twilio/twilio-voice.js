@@ -249,6 +249,47 @@ describe('PStream', () => {
     });
   });
 
+  describe('sendMessage', () => {
+    const callsid = 'testcallsid';
+    const content = { foo: 'content' };
+    const messagetype = 'user-defined-message';
+    const voiceeventsid = 'testvoiceeventsid';
+
+    it('should send a message with the provided info', () => {
+      pstream.sendMessage(callsid, content, undefined, messagetype, voiceeventsid);
+      assert.equal(pstream.transport.send.callCount, 1);
+      console.log(pstream.transport.send.args[0][0])
+      assert.deepEqual(JSON.parse(pstream.transport.send.args[0][0]), {
+        type: 'message',
+        version:EXPECTED_PSTREAM_VERSION,
+        payload: {
+          callsid,
+          content,
+          contenttype: 'application/json',
+          messagetype,
+          voiceeventsid,
+        }
+      });
+    });
+
+    it('should override contenttype', () => {
+      pstream.sendMessage(callsid, content, 'text/plain', messagetype, voiceeventsid);
+      assert.equal(pstream.transport.send.callCount, 1);
+      console.log(pstream.transport.send.args[0][0])
+      assert.deepEqual(JSON.parse(pstream.transport.send.args[0][0]), {
+        type: 'message',
+        version:EXPECTED_PSTREAM_VERSION,
+        payload: {
+          callsid,
+          content,
+          contenttype: 'text/plain',
+          messagetype,
+          voiceeventsid,
+        }
+      });
+    });
+  });
+
   describe('destroy', () => {
     it('should return this', () => {
       assert.equal(pstream.destroy(), pstream);
@@ -315,24 +356,19 @@ describe('PStream', () => {
     ]],
     ['invite', [
       {
-        args: ['bar', 'foo', true, '', []],
-        payload: { callsid: 'foo', sdp: 'bar', preflight: true, twilio: {}, registerFor: [] },
+        args: ['bar', 'foo', true, ''],
+        payload: { callsid: 'foo', sdp: 'bar', preflight: true, twilio: {} },
         scenario: 'called with empty params'
       },
       {
-        args: ['bar', 'foo', true, 'baz=zee&foo=2', []],
-        payload: { callsid: 'foo', sdp: 'bar', preflight: true,  twilio: { params: 'baz=zee&foo=2' }, registerFor: [] },
+        args: ['bar', 'foo', true, 'baz=zee&foo=2'],
+        payload: { callsid: 'foo', sdp: 'bar', preflight: true,  twilio: { params: 'baz=zee&foo=2' } },
         scenario: 'called with non-empty params'
       },
       {
-        args: ['bar', 'foo', false, '', []],
-        payload: { callsid: 'foo', sdp: 'bar', preflight: false,  twilio: {}, registerFor: [] },
+        args: ['bar', 'foo', false, ''],
+        payload: { callsid: 'foo', sdp: 'bar', preflight: false,  twilio: {} },
         scenario: 'called with preflight = false'
-      },
-      {
-        args: ['bar', 'foo', false, '', ['registerFor-foo', 'registerFor-bar']],
-        payload: { callsid: 'foo', sdp: 'bar', preflight: false,  twilio: {}, registerFor: ['registerFor-foo', 'registerFor-bar'] },
-        scenario: 'passing events to "registerFor"'
       }
     ]],
     ['answer', [

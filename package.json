@@ -122,10 +122,10 @@
   "dependencies": {
     "@twilio/audioplayer": "1.0.6",
     "@twilio/voice-errors": "1.1.1",
-    "@types/md5": "^2.3.2",
+    "@types/md5": "2.3.2",
     "backoff": "2.5.0",
     "loglevel": "1.6.7",
-    "md5": "^2.3.0",
+    "md5": "2.3.0",
     "rtcpeerconnection-shim": "1.2.8",
     "ws": "7.4.6",
     "xmlhttprequest": "1.8.0"

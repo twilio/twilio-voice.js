@@ -28,7 +28,7 @@ function generateUuid(): string {
 
   const generateRandomValues: () => string =
     typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID
+      ? () => crypto.randomUUID!()
       : () => crypto.getRandomValues(new Uint32Array(32)).toString();
 
   return md5(generateRandomValues());
