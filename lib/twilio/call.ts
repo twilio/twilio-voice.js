@@ -863,7 +863,10 @@ class Call extends EventEmitter {
   }
 
   /**
-   * TODO
+   * Send a message to Twilio. Your backend application can listen for these
+   * messages to allow communication between your frontend and backend applications.
+   * @param message - The message object to send.
+   * @returns A voice event sid that uniquely identifies the message that was sent.
    */
   sendMessage(message: Call.Message): string {
     const { content, contentType, messageType } = message;
@@ -1295,13 +1298,6 @@ class Call extends EventEmitter {
 
   /**
    * Raised when a Call receives a message from the backend.
-   * TODO
-   * @remarks
-   * Note that in this context a "message" is limited to a
-   * "User Defined Message" from the Voice User Defined Message Service (VUDMS)
-   * with forward compatibility for other messages from Twilio in the future,
-   * such as "participant muted" and "unmuted" events.
-   *
    * @param payload - A record representing the payload of the message from the
    * Twilio backend.
    */
@@ -1322,7 +1318,8 @@ class Call extends EventEmitter {
   }
 
   /**
-   * TODO
+   * Raised when a Call receives an 'ack' with an 'acktype' of 'message.
+   * This means that the message sent via sendMessage API has been received by the signaling server.
    * @param voiceEventSid
    */
   private _onMessageSent = (voiceEventSid: string): void => {
@@ -1533,22 +1530,17 @@ namespace Call {
 
   /**
    * Emitted when a Call receives a message from the backend.
-   * TODO
-   * @remarks
-   * Note that in this context a "message" is limited to a
-   * "User Defined Message" from the Voice User Defined Message Service (VUDMS)
-   * with forward compatibility for other messages from Twilio in the future,
-   * such as "participant muted" and "unmuted" events.
-   *
-   * @param payload - A record representing the payload of the message from the
-   * Twilio backend.
-   * @example `call.on('message', (payload) => { })`
+   * @param message - A message object representing the payload
+   * that was received from the Twilio backend.
    * @event
    */
   declare function messageReceivedEvent(message: Call.Message): void;
 
   /**
-   * TODO
+   * Emitted after calling the {@link Call.sendMessage} API and that
+   * Twilio has received the message.
+   * @param message - A message object that was sent to the Twilio backend.
+   * @event
    */
   declare function messageSentEvent(message: Call.Message): void;
 
@@ -1677,6 +1669,12 @@ namespace Call {
    * Known call message types.
    */
   export enum MessageType {
+    /**
+     * Allows for any object types to be defined by the user.
+     * When this value is used in the {@link Call.Message} object,
+     * The {@link Call.Message.content} can be of any type as long as
+     * it matches the MIME type defined in {@link Call.Message.contentType}.
+     */
     UserDefinedMessage = 'user-defined-message',
   }
 
@@ -1751,7 +1749,7 @@ namespace Call {
 
   /**
    * A Call Message represents the data that is being transferred between
-   * the signaling server and the SDK.
+   * Twilio and the SDK.
    */
   export interface Message {
     /**
