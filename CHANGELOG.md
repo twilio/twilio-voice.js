@@ -1,3 +1,11 @@
+2.2.0 (In Progress)
+===================
+
+New Features
+------------
+
+TODO: Need to coordinate with DevEd and Backend Docs
+
 2.1.1 (February 18, 2022)
 =========================
 
@@ -9,8 +17,8 @@ Bug Fixes
 - Use DOMException instead of DOMError, which has been deprecated
 - Removed npm util from the package, instead favoring native functions
 
-2.1.0 (December 16, 2021) - Release
-===================================
+2.1.0 (December 16, 2021)
+=========================
 
 New Features
 ------------
@@ -132,8 +140,8 @@ This patch increment was necessary because the 2.0.0 pilot artifact was erroneou
 now removed from npm so that it is not mistakenly used. The first npm artifact will be 2.0.1.
 
 
-2.0.0 (July 7, 2021) - Release
-==============================
+2.0.0 (July 7, 2021)
+====================
 
 ## Migration from twilio-client.js 1.x
 This product, Twilio's JavaScript Voice SDK, is the next version of Twilio's Javascript Client SDK. It is
