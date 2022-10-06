@@ -18,7 +18,7 @@ Bug Fixes
 - Removed npm util from the package, instead favoring native functions
 
 2.1.0 (December 16, 2021)
-===================================
+=========================
 
 New Features
 ------------
@@ -141,7 +141,7 @@ now removed from npm so that it is not mistakenly used. The first npm artifact w
 
 
 2.0.0 (July 7, 2021)
-==============================
+====================
 
 ## Migration from twilio-client.js 1.x
 This product, Twilio's JavaScript Voice SDK, is the next version of Twilio's Javascript Client SDK. It is
