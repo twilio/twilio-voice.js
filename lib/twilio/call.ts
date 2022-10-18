@@ -922,15 +922,10 @@ class Call extends EventEmitter {
       call_sid: this.parameters.CallSid,
       dscp: !!this._options.dscp,
       sdk_version: C.RELEASE_VERSION,
-      selected_region: this._options.selectedRegion,
     };
 
     if (this._options.gateway) {
       payload.gateway = this._options.gateway;
-    }
-
-    if (this._options.region) {
-      payload.region = this._options.region;
     }
 
     payload.direction = this._direction;
@@ -1665,11 +1660,6 @@ namespace Call {
     reconnectToken?: string;
 
     /**
-     * The Region currently connected to.
-     */
-    region?: string;
-
-    /**
      * An RTCConfiguration to pass to the RTCPeerConnection constructor.
      */
     rtcConfiguration?: RTCConfiguration;
@@ -1679,11 +1669,6 @@ namespace Call {
      * The format of this object depends on browser.
      */
     rtcConstraints?: MediaStreamConstraints;
-
-    /**
-     * The region passed to {@link Device} on setup.
-     */
-    selectedRegion?: string;
 
     /**
      * Whether the disconnect sound should be played.
