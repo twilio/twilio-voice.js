@@ -179,7 +179,7 @@ export function getChunderURIs(edge?: string[] | string): string[] {
 
   if (edge) {
     const edgeParams = Array.isArray(edge) ? edge : [edge];
-    uris = edgeParams.map((param: Edge) =>createChunderEdgeURI(param));
+    uris = edgeParams.map((param: Edge) => createChunderEdgeURI(param));
   } else {
     uris = [createChunderEdgeURI(defaultEdge)];
   }
