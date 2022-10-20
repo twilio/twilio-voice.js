@@ -252,6 +252,85 @@ export namespace GeneralErrors {
   }
 }
 
+export namespace MalformedRequestErrors {
+  export class MalformedRequestError extends TwilioError {
+    causes: string[] = [
+      'No CallSid in the message object.',
+      'No VoiceEventSid in the message object.',
+      'No payload in the message object.',
+      'Invalid or missing payload in the message object.',
+      'No message type in the message object.',
+    ];
+    code: number = 31100;
+    description: string = 'The request had malformed syntax.';
+    explanation: string = 'The request could not be understood due to malformed syntax.';
+    name: string = 'MalformedRequestError';
+    solutions: string[] = [
+      'Ensure the message object contains a valid CallSid.',
+      'Ensure the message object contains a valid VoiceEventSid.',
+      'Ensure the message object has a valid payload.',
+      'Ensure the message object has a valid message type.',
+    ];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, MalformedRequestErrors.MalformedRequestError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+}
+
+export namespace AuthorizationErrors {
+  export class RateExceededError extends TwilioError {
+    causes: string[] = [
+      'Message payload size limit exceeded.',
+      'Rate limit exceeded.',
+    ];
+    code: number = 31206;
+    description: string = 'Rate exceeded authorized limit.';
+    explanation: string = 'The request performed exceeds the authorized limit.';
+    name: string = 'RateExceededError';
+    solutions: string[] = [
+      'Ensure the message payload does not exceed size limits.',
+      'Ensure message send rate does not exceed authorized limits.',
+    ];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, AuthorizationErrors.RateExceededError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+}
+
 export namespace UserMediaErrors {
   export class PermissionDeniedError extends TwilioError {
     causes: string[] = [
@@ -507,6 +586,8 @@ export const errorsByCode: ReadonlyMap<number, any> = new Map([
   [ 31005, GeneralErrors.ConnectionError ],
   [ 31008, GeneralErrors.CallCancelledError ],
   [ 31009, GeneralErrors.TransportError ],
+  [ 31100, MalformedRequestErrors.MalformedRequestError ],
+  [ 31206, AuthorizationErrors.RateExceededError ],
   [ 31401, UserMediaErrors.PermissionDeniedError ],
   [ 31402, UserMediaErrors.AcquisitionFailedError ],
   [ 53000, SignalingErrors.ConnectionError ],
