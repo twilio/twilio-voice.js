@@ -1347,6 +1347,10 @@ class Device extends EventEmitter {
       publisherOptions.host = this._options.eventgw;
     }
 
+    if (this._home) {
+      publisherOptions.host = createEventGatewayURI(this._home);
+    }
+
     this._publisher = new (this._options.Publisher || Publisher)(PUBLISHER_PRODUCT_NAME, this.token, publisherOptions);
 
     if (this._options.publishEvents === false) {
