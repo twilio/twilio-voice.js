@@ -26,6 +26,7 @@ import {
   createEventGatewayURI,
   createSignalingEndpointURL,
   Edge,
+  defaultEventGatewayURI,
   getChunderURIs,
   getRegionShortcode,
   Region,
@@ -1329,7 +1330,9 @@ class Device extends EventEmitter {
    * Create and set a publisher for the {@link Device} to use.
    */
   private _setupPublisher(): IPublisher {
+    let host = defaultEventGatewayURI;
     if (this._publisher) {
+      host = this._publisher._host;
       this._log.info('Found existing publisher; destroying...');
       this._destroyPublisher();
     }
@@ -1341,6 +1344,7 @@ class Device extends EventEmitter {
         app_name: this._options.appName,
         app_version: this._options.appVersion,
       },
+      host
     } as any;
 
     if (this._options.eventgw) {

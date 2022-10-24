@@ -237,7 +237,7 @@ export const defaultChunderRegionURI: string = 'chunderw-vpc-gll.twilio.com';
  * @constant
  * @private
  */
-const defaultEventGatewayURI: string = 'eventgw.twilio.com';
+export const defaultEventGatewayURI: string = 'eventgw.twilio.com';
 
 /**
  * String template for a region chunder URI
