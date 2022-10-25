@@ -1537,8 +1537,8 @@ namespace Call {
   declare function messageReceivedEvent(message: Call.Message): void;
 
   /**
-   * Emitted after calling the {@link Call.sendMessage} API and that
-   * Twilio has received the message.
+   * Emitted after calling the {@link Call.sendMessage} API.
+   * This event indicates that Twilio has received the message.
    * @param message - A message object that was sent to the Twilio backend.
    * @event
    */
