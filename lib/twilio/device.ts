@@ -1087,7 +1087,9 @@ class Device extends EventEmitter {
     const region = getRegionShortcode(payload.region);
     this._edge = payload.edge || regionToEdge[region as Region] || payload.region;
     this._region = region || payload.region;
+    this._home = payload.home;
     this._publisher?.setHost(createEventGatewayURI(payload.home));
+
     if (payload.token) {
       this._identity = payload.token.identity;
       if (
@@ -1105,7 +1107,6 @@ class Device extends EventEmitter {
         }, timeoutMs);
       }
     }
-    this._home = payload.home;
 
     const preferredURIs = getChunderURIs(
       this._edge as Edge,
