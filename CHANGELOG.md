@@ -6,6 +6,14 @@ New Features
 
 TODO: Need to coordinate with DevEd and Backend Docs
 
+2.1.2 (In Progress)
+=========================
+
+Bug Fixes
+---------
+
+- Fixed an issue where insights data stops getting published after calling `device.updateOptions`.
+
 2.1.1 (February 18, 2022)
 =========================
 

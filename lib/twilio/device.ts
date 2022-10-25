@@ -1096,7 +1096,9 @@ class Device extends EventEmitter {
     const region = getRegionShortcode(payload.region);
     this._edge = payload.edge || regionToEdge[region as Region] || payload.region;
     this._region = region || payload.region;
+    this._home = payload.home;
     this._publisher?.setHost(createEventGatewayURI(payload.home));
+
     if (payload.token) {
       this._identity = payload.token.identity;
       if (
@@ -1114,7 +1116,6 @@ class Device extends EventEmitter {
         }, timeoutMs);
       }
     }
-    this._home = payload.home;
 
     const preferredURIs = getChunderURIs(
       this._edge as Edge,
@@ -1355,6 +1356,10 @@ class Device extends EventEmitter {
 
     if (this._options.eventgw) {
       publisherOptions.host = this._options.eventgw;
+    }
+
+    if (this._home) {
+      publisherOptions.host = createEventGatewayURI(this._home);
     }
 
     this._publisher = new (this._options.Publisher || Publisher)(PUBLISHER_PRODUCT_NAME, this.token, publisherOptions);
