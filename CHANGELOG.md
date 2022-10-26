@@ -39,8 +39,8 @@ const eventSid = call.sendMessage({
 });
 ```
 
-2.1.2 (In Progress)
-=========================
+2.1.2 (October 26, 2022)
+========================
 
 Bug Fixes
 ---------
