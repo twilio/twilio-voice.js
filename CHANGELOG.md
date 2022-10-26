@@ -4,7 +4,40 @@
 New Features
 ------------
 
-TODO: Need to coordinate with DevEd and Backend Docs
+### SDK Message Events (Beta)
+
+// TODO: Polish up, add links to public documentation, update API doc links to typedoc after cutting a release
+
+The SDK can now send and receive custom messages to and from Twilio's backend via the following new `Call` APIs.
+
+- [sendMessage](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#sendmessage)
+- [messageReceivedEvent](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#messagereceivedevent)
+- [messageSentEvent](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#messagesentevent)
+
+**Example**
+
+```js
+const device = new Device(token, options);
+
+const setupCallHandlers = call => {
+  call.on('messageReceived', message => messageReceivedHandler(message));
+  call.on('messageSent', message => messageSentHandler(message));
+};
+
+// For outgoing calls
+const call = await device.connect();
+setupCallHandlers(call);
+
+// For incoming calls
+device.on('incoming', call => setupCallHandlers(call));
+await device.register();
+
+// For sending a message
+const eventSid = call.sendMessage({
+  content: { foo: 'foo' },
+  messageType: Call.MessageType.UserDefinedMessage,
+});
+```
 
 2.1.2 (In Progress)
 =========================
