@@ -8,7 +8,7 @@ New Features
 
 // TODO: Polish up, add links to public documentation, update API doc links to typedoc after cutting a release
 
-The SDK can now send and receive custom messages to and from Twilio's backend via the following new `Call` API.
+The SDK can now send and receive custom messages to and from Twilio's backend via the following new `Call` APIs.
 
 - [sendMessage](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#sendmessage)
 - [messageReceivedEvent](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#messagereceivedevent)
