@@ -4,9 +4,7 @@
 New Features
 ------------
 
-### SDK Message Events (Beta)
-
-// TODO: Polish up, add links to public documentation, update API doc links to typedoc after cutting a release
+### Call Message Events (Beta)
 
 The SDK can now send and receive custom messages to and from Twilio's backend via the following new `Call` APIs.
 
@@ -15,6 +13,8 @@ The SDK can now send and receive custom messages to and from Twilio's backend vi
 - [messageSentEvent](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#messagesentevent)
 
 **Example**
+
+The following example demonstrates how to send a message and how to handle incoming messages for both inbound and outbound calls. Please visit this [page](todo) for more details about this new feature.
 
 ```js
 const device = new Device(token, options);
