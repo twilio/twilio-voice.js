@@ -15,6 +15,7 @@ module.exports.USED_ERRORS = [
   'AuthorizationErrors.AccessTokenExpired',
   'AuthorizationErrors.AccessTokenInvalid',
   'AuthorizationErrors.AuthenticationFailed',
+  'AuthorizationErrors.PayloadSizeExceededError',
   'AuthorizationErrors.RateExceededError',
   'ClientErrors.BadRequest',
   'GeneralErrors.CallCancelledError',
