@@ -1,3 +1,9 @@
+/**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+
 import * as md5 from 'md5';
 import { NotSupportedError } from '../twilio/errors';
 
