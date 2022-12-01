@@ -255,21 +255,14 @@ export namespace GeneralErrors {
 export namespace MalformedRequestErrors {
   export class MalformedRequestError extends TwilioError {
     causes: string[] = [
-      'No CallSid in the message object.',
-      'No VoiceEventSid in the message object.',
-      'No payload in the message object.',
-      'Invalid or missing payload in the message object.',
-      'No message type in the message object.',
+      'Invalid content or MessageType passed to sendMessage method.',
     ];
     code: number = 31100;
     description: string = 'The request had malformed syntax.';
     explanation: string = 'The request could not be understood due to malformed syntax.';
     name: string = 'MalformedRequestError';
     solutions: string[] = [
-      'Ensure the message object contains a valid CallSid.',
-      'Ensure the message object contains a valid VoiceEventSid.',
-      'Ensure the message object has a valid payload.',
-      'Ensure the message object has a valid message type.',
+      'Ensure content and MessageType passed to sendMessage method are valid.',
     ];
 
     constructor();
