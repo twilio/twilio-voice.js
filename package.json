@@ -121,7 +121,7 @@
   },
   "dependencies": {
     "@twilio/audioplayer": "1.0.6",
-    "@twilio/voice-errors": "1.3.0",
+    "@twilio/voice-errors": "1.3.1",
     "@types/md5": "2.3.2",
     "backoff": "2.5.0",
     "loglevel": "1.6.7",
