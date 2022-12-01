@@ -12,9 +12,14 @@ The SDK can now send and receive custom messages to and from Twilio's backend vi
 - [messageReceivedEvent](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#messagereceivedevent)
 - [messageSentEvent](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#messagesentevent)
 
-**Example**
+Please visit this [page](https://www.twilio.com/docs/voice/sdks/call-message-events) for more details about this feature. Additionally, please see the following for more information on how to send and receive messages on the server.
 
-The following example demonstrates how to send a message and how to handle incoming messages for both inbound and outbound calls. Please visit this [page](todo) for more details about this new feature.
+- [UserDefinedMessage](https://www.twilio.com/docs/voice/api/userdefinedmessage-resource)
+- [UserDefinedMessageSubscription](https://www.twilio.com/docs/voice/api/userdefinedmessagesubscription-resource)
+
+**NOTE:** This feature should not be used with [PII](https://www.twilio.com/docs/glossary/what-is-personally-identifiable-information-pii#fields-marked-not-pii).
+
+**Example**
 
 ```js
 const device = new Device(token, options);

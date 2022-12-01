@@ -865,6 +865,7 @@ class Call extends EventEmitter {
   /**
    * Send a message to Twilio. Your backend application can listen for these
    * messages to allow communication between your frontend and backend applications.
+   * <br/><br/>This feature is currently in Beta.
    * @param message - The message object to send.
    * @returns A voice event sid that uniquely identifies the message that was sent.
    */
@@ -1530,6 +1531,7 @@ namespace Call {
 
   /**
    * Emitted when a Call receives a message from the backend.
+   * <br/><br/>This feature is currently in Beta.
    * @param message - A message object representing the payload
    * that was received from the Twilio backend.
    * @event
@@ -1539,6 +1541,7 @@ namespace Call {
   /**
    * Emitted after calling the {@link Call.sendMessage} API.
    * This event indicates that Twilio has received the message.
+   * <br/><br/>This feature is currently in Beta.
    * @param message - A message object that was sent to the Twilio backend.
    * @event
    */
