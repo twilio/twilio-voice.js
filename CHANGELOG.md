@@ -17,7 +17,7 @@ Please visit this [page](https://www.twilio.com/docs/voice/sdks/call-message-eve
 - [UserDefinedMessage](https://www.twilio.com/docs/voice/api/userdefinedmessage-resource)
 - [UserDefinedMessageSubscription](https://www.twilio.com/docs/voice/api/userdefinedmessagesubscription-resource)
 
-**NOTE:** This feature should not be used with [PII](https://www.twilio.com/docs/glossary/what-is-personally-identifiable-information-pii#fields-marked-not-pii).
+**NOTE:** This feature should not be used with [PII](https://www.twilio.com/docs/glossary/what-is-personally-identifiable-information-pii).
 
 **Example**
 
