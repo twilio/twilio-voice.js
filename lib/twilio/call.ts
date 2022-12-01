@@ -1758,7 +1758,8 @@ namespace Call {
     content: any;
 
     /**
-     * The MIME type of the content. Default is application/json.
+     * The MIME type of the content. The default value is application/json
+     * and is the only contentType that is supported at the moment.
      */
     contentType?: string;
 
