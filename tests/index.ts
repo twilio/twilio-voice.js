@@ -95,3 +95,4 @@ require('./unit/statsMonitor');
 require('./unit/error');
 require('./unit/log');
 require('./unit/regions');
+require('./unit/uuid');

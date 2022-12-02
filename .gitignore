@@ -9,3 +9,5 @@ extension/token.js
 node_modules
 docs
 lib/twilio/constants.js
+nodemon.json
+tests/webpack/package-lock.json

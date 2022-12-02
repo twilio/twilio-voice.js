@@ -252,6 +252,109 @@ export namespace GeneralErrors {
   }
 }
 
+export namespace MalformedRequestErrors {
+  export class MalformedRequestError extends TwilioError {
+    causes: string[] = [
+      'Invalid content or MessageType passed to sendMessage method.',
+    ];
+    code: number = 31100;
+    description: string = 'The request had malformed syntax.';
+    explanation: string = 'The request could not be understood due to malformed syntax.';
+    name: string = 'MalformedRequestError';
+    solutions: string[] = [
+      'Ensure content and MessageType passed to sendMessage method are valid.',
+    ];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, MalformedRequestErrors.MalformedRequestError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+}
+
+export namespace AuthorizationErrors {
+  export class RateExceededError extends TwilioError {
+    causes: string[] = [
+      'Rate limit exceeded.',
+    ];
+    code: number = 31206;
+    description: string = 'Rate exceeded authorized limit.';
+    explanation: string = 'The request performed exceeds the authorized limit.';
+    name: string = 'RateExceededError';
+    solutions: string[] = [
+      'Ensure message send rate does not exceed authorized limits.',
+    ];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, AuthorizationErrors.RateExceededError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
+  export class PayloadSizeExceededError extends TwilioError {
+    causes: string[] = [
+      'The payload size of Call Message Event exceeds the authorized limit.',
+    ];
+    code: number = 31209;
+    description: string = 'Call Message Event Payload size exceeded authorized limit.';
+    explanation: string = 'The request performed to send a Call Message Event exceeds the payload size authorized limit';
+    name: string = 'PayloadSizeExceededError';
+    solutions: string[] = [
+      'Reduce payload size of Call Message Event to be within the authorized limit and try again.',
+    ];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, AuthorizationErrors.PayloadSizeExceededError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+}
+
 export namespace UserMediaErrors {
   export class PermissionDeniedError extends TwilioError {
     causes: string[] = [
@@ -507,6 +610,9 @@ export const errorsByCode: ReadonlyMap<number, any> = new Map([
   [ 31005, GeneralErrors.ConnectionError ],
   [ 31008, GeneralErrors.CallCancelledError ],
   [ 31009, GeneralErrors.TransportError ],
+  [ 31100, MalformedRequestErrors.MalformedRequestError ],
+  [ 31206, AuthorizationErrors.RateExceededError ],
+  [ 31209, AuthorizationErrors.PayloadSizeExceededError ],
   [ 31401, UserMediaErrors.PermissionDeniedError ],
   [ 31402, UserMediaErrors.AcquisitionFailedError ],
   [ 53000, SignalingErrors.ConnectionError ],

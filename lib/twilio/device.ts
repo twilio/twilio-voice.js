@@ -36,6 +36,7 @@ import {
   isUnifiedPlanDefault,
   queryToJson,
 } from './util';
+import { generateVoiceEventSid } from './uuid';
 
 const C = require('./constants');
 const Publisher = require('./eventpublisher');
@@ -142,6 +143,11 @@ export interface IExtendedDeviceOptions extends Device.Options {
    * Custom Sound constructor
    */
   Sound?: ISound;
+
+  /**
+   * Voice event SID generator.
+   */
+  voiceEventSidGenerator?: () => string;
 }
 
 /**
@@ -340,6 +346,7 @@ class Device extends EventEmitter {
     preflight: false,
     sounds: { },
     tokenRefreshMs: 10000,
+    voiceEventSidGenerator: generateVoiceEventSid,
   };
 
   /**
@@ -559,6 +566,7 @@ class Device extends EventEmitter {
 
     const activeCall = this._activeCall = await this._makeCall(options.params || { }, {
       rtcConfiguration: options.rtcConfiguration,
+      voiceEventSidGenerator: this._options.voiceEventSidGenerator,
     });
 
     // Make sure any incoming calls are ignored
@@ -974,6 +982,7 @@ class Device extends EventEmitter {
       rtcConstraints: this._options.rtcConstraints,
       shouldPlayDisconnect: () => this._enabledSounds.disconnect,
       twimlParams,
+      voiceEventSidGenerator: this._options.voiceEventSidGenerator,
     }, options);
 
     const maybeUnsetPreferredUri = () => {
@@ -1190,6 +1199,7 @@ class Device extends EventEmitter {
       callParameters,
       offerSdp: payload.sdp,
       reconnectToken: payload.reconnect,
+      voiceEventSidGenerator: this._options.voiceEventSidGenerator,
     });
 
     this._calls.push(call);
@@ -1623,9 +1633,9 @@ namespace Device {
    * Options to be passed to {@link Device.connect}.
    */
   export interface ConnectOptions extends Call.AcceptOptions {
-   /**
-    * A flat object containing key:value pairs to be sent to the TwiML app.
-    */
+    /**
+     * A flat object containing key:value pairs to be sent to the TwiML app.
+     */
     params?: Record<string, string>;
   }
 

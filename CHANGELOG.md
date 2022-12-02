@@ -1,3 +1,49 @@
+2.2.0 (In Progress)
+===================
+
+New Features
+------------
+
+### Call Message Events (Beta)
+
+The SDK can now send and receive custom messages to and from Twilio's backend via the following new `Call` APIs.
+
+- [sendMessage](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#sendmessage)
+- [messageReceivedEvent](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#messagereceivedevent)
+- [messageSentEvent](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#messagesentevent)
+
+Please visit this [page](https://www.twilio.com/docs/voice/sdks/call-message-events) for more details about this feature. Additionally, please see the following for more information on how to send and receive messages on the server.
+
+- [UserDefinedMessage](https://www.twilio.com/docs/voice/api/userdefinedmessage-resource)
+- [UserDefinedMessageSubscription](https://www.twilio.com/docs/voice/api/userdefinedmessagesubscription-resource)
+
+**NOTE:** This feature should not be used with [PII](https://www.twilio.com/docs/glossary/what-is-personally-identifiable-information-pii).
+
+**Example**
+
+```js
+const device = new Device(token, options);
+
+const setupCallHandlers = call => {
+  call.on('messageReceived', message => messageReceivedHandler(message));
+  call.on('messageSent', message => messageSentHandler(message));
+};
+
+// For outgoing calls
+const call = await device.connect();
+setupCallHandlers(call);
+
+// For incoming calls
+device.on('incoming', call => setupCallHandlers(call));
+await device.register();
+
+// For sending a message
+const eventSid = call.sendMessage({
+  content: { foo: 'foo' },
+  messageType: Call.MessageType.UserDefinedMessage,
+});
+```
+
 2.1.2 (October 26, 2022)
 ========================
 
@@ -17,8 +63,8 @@ Bug Fixes
 - Use DOMException instead of DOMError, which has been deprecated
 - Removed npm util from the package, instead favoring native functions
 
-2.1.0 (December 16, 2021) - Release
-===================================
+2.1.0 (December 16, 2021)
+=========================
 
 New Features
 ------------
@@ -140,8 +186,8 @@ This patch increment was necessary because the 2.0.0 pilot artifact was erroneou
 now removed from npm so that it is not mistakenly used. The first npm artifact will be 2.0.1.
 
 
-2.0.0 (July 7, 2021) - Release
-==============================
+2.0.0 (July 7, 2021)
+====================
 
 ## Migration from twilio-client.js 1.x
 This product, Twilio's JavaScript Voice SDK, is the next version of Twilio's Javascript Client SDK. It is
