@@ -1,4 +1,4 @@
-2.2.0 (In Progress)
+2.2.0 (December 5, 2022)
 ===================
 
 New Features
