@@ -628,15 +628,17 @@ class Call extends EventEmitter {
 
       this._pstream.addListener('hangup', this._onHangup);
 
+      this._onAnswerBind = this._onAnswer.bind(this);
+
       if (this._direction === Call.CallDirection.Incoming) {
         this._isAnswered = true;
-        this._pstream.on('answer', this._onAnswer.bind(this));
+        this._pstream.on('answer', this._onAnswerBind);
         this._mediaHandler.answerIncomingCall(this.parameters.CallSid, this._options.offerSdp,
           rtcConstraints, rtcConfiguration, onAnswer);
       } else {
         const params = Array.from(this.customParameters.entries()).map(pair =>
          `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
-        this._pstream.on('answer', this._onAnswer.bind(this));
+        this._pstream.on('answer', this._onAnswerBind);
         this._mediaHandler.makeOutgoingCall(this._pstream.token, params, this.outboundConnectionId,
           rtcConstraints, rtcConfiguration, onAnswer);
       }
@@ -957,7 +959,7 @@ class Call extends EventEmitter {
       if (!this._pstream) { return; }
 
       this._pstream.removeListener('ack', this._onAck);
-      this._pstream.removeListener('answer', this._onAnswer);
+      this._pstream.removeListener('answer', this._onAnswerBind);
       this._pstream.removeListener('cancel', this._onCancel);
       this._pstream.removeListener('error', this._onSignalingError);
       this._pstream.removeListener('hangup', this._onHangup);
@@ -1134,6 +1136,7 @@ class Call extends EventEmitter {
     this._isAnswered = true;
     this._maybeTransitionToOpen();
   }
+  private _onAnswerBind = (): void => { /* void */ };
 
   /**
    * Called when the {@link Call} is cancelled.

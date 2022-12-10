@@ -2254,6 +2254,32 @@ describe('Call', function() {
       sinon.assert.callCount(callback, 1);
     });
   });
+
+  describe('pstream listener memory leak', () => {
+    context(`no listeners on 'answer' after accept / disconnect`, () => {
+      let wait: Promise<any>;
+
+      beforeEach(() => {
+         conn.accept();
+         const p = Promise.resolve();
+         wait = p.then(() => Promise.resolve());
+      });
+
+      it(`should call pstream.addListener on 'answer'`, () => {
+        return wait.then(() => {
+          assert.equal(pstream.listenerCount('answer'), 1);
+        });
+      });
+
+      it(`should call pstream.removeListener on 'answer'`, () => {
+        return wait.then(() => {
+          conn.disconnect();
+          clock.tick(10);
+          assert.equal(pstream.listenerCount('answer'), 0);
+        });
+      });
+    });
+  });
 });
 
 /**
