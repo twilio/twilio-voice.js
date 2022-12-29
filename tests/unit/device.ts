@@ -776,6 +776,14 @@ describe('Device', function() {
             call.emit('accept');
             sinon.assert.calledOnce(spy);
           });
+
+          it('should stop playing incoming sound', () => {
+            const spy: any = { stop: sinon.spy() };
+            device['_soundcache'].set(Device.SoundName.Incoming, spy);
+            const call = device.calls[0];
+            call.emit("disconnect");
+            sinon.assert.calledOnce(spy.stop);
+          })
         });
 
         describe('on call.error', () => {
