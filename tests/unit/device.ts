@@ -387,6 +387,12 @@ describe('Device', function() {
           assert.equal(device['_options'].appName, 'baz');
         });
 
+        it('should re-initialize publisher with the correct host', () => {
+          pstream.emit('connected', { home: 'foo'});
+          device.updateOptions({ appName: 'bar' });
+          assert.equal(Publisher.args[1][2].host, 'eventgw.foo.twilio.com');
+        });
+
         it('should set up an audio helper', () => {
           const spy = device['_setupAudioHelper'] = sinon.spy(device['_setupAudioHelper']);
           device.updateOptions({});

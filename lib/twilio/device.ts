@@ -36,6 +36,7 @@ import {
   isUnifiedPlanDefault,
   queryToJson,
 } from './util';
+import { generateVoiceEventSid } from './uuid';
 
 const C = require('./constants');
 const Publisher = require('./eventpublisher');
@@ -142,6 +143,11 @@ export interface IExtendedDeviceOptions extends Device.Options {
    * Custom Sound constructor
    */
   Sound?: ISound;
+
+  /**
+   * Voice event SID generator.
+   */
+  voiceEventSidGenerator?: () => string;
 }
 
 /**
@@ -340,6 +346,7 @@ class Device extends EventEmitter {
     preflight: false,
     sounds: { },
     tokenRefreshMs: 10000,
+    voiceEventSidGenerator: generateVoiceEventSid,
   };
 
   /**
@@ -559,6 +566,7 @@ class Device extends EventEmitter {
 
     const activeCall = this._activeCall = await this._makeCall(options.params || { }, {
       rtcConfiguration: options.rtcConfiguration,
+      voiceEventSidGenerator: this._options.voiceEventSidGenerator,
     });
 
     // Make sure any incoming calls are ignored
@@ -970,6 +978,7 @@ class Device extends EventEmitter {
       rtcConstraints: this._options.rtcConstraints,
       shouldPlayDisconnect: () => this._enabledSounds.disconnect,
       twimlParams,
+      voiceEventSidGenerator: this._options.voiceEventSidGenerator,
     }, options);
 
     const maybeUnsetPreferredUri = () => {
@@ -1083,7 +1092,9 @@ class Device extends EventEmitter {
     const region = getRegionShortcode(payload.region);
     this._edge = payload.edge || regionToEdge[region as Region] || payload.region;
     this._region = region || payload.region;
+    this._home = payload.home;
     this._publisher?.setHost(createEventGatewayURI(payload.home));
+
     if (payload.token) {
       this._identity = payload.token.identity;
       if (
@@ -1101,7 +1112,6 @@ class Device extends EventEmitter {
         }, timeoutMs);
       }
     }
-    this._home = payload.home;
 
     const preferredURIs = getChunderURIs(this._edge as Edge);
     if (preferredURIs.length > 0) {
@@ -1181,6 +1191,7 @@ class Device extends EventEmitter {
       callParameters,
       offerSdp: payload.sdp,
       reconnectToken: payload.reconnect,
+      voiceEventSidGenerator: this._options.voiceEventSidGenerator,
     });
 
     this._calls.push(call);
@@ -1337,6 +1348,10 @@ class Device extends EventEmitter {
 
     if (this._options.eventgw) {
       publisherOptions.host = this._options.eventgw;
+    }
+
+    if (this._home) {
+      publisherOptions.host = createEventGatewayURI(this._home);
     }
 
     this._publisher = new (this._options.Publisher || Publisher)(PUBLISHER_PRODUCT_NAME, this.token, publisherOptions);
@@ -1610,9 +1625,9 @@ namespace Device {
    * Options to be passed to {@link Device.connect}.
    */
   export interface ConnectOptions extends Call.AcceptOptions {
-   /**
-    * A flat object containing key:value pairs to be sent to the TwiML app.
-    */
+    /**
+     * A flat object containing key:value pairs to be sent to the TwiML app.
+     */
     params?: Record<string, string>;
   }
 

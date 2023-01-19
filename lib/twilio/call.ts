@@ -10,6 +10,7 @@ import DialtonePlayer from './dialtonePlayer';
 import {
   GeneralErrors,
   InvalidArgumentError,
+  InvalidStateError,
   MediaErrors,
   SignalingErrors,
   TwilioError,
@@ -21,6 +22,7 @@ import RTCSample from './rtc/sample';
 import RTCWarning from './rtc/warning';
 import StatsMonitor from './statsMonitor';
 import { isChrome } from './util';
+import { generateVoiceEventSid } from './uuid';
 
 const Backoff = require('backoff');
 const C = require('./constants');
@@ -214,6 +216,12 @@ class Call extends EventEmitter {
   private _mediaStatus: Call.State = Call.State.Pending;
 
   /**
+   * A map of messages sent via sendMessage API using voiceEventSid as the key.
+   * The message will be deleted once an 'ack' or an error is received from the server.
+   */
+  private _messages: Map<string, Call.Message> = new Map();
+
+  /**
    * A batch of metrics samples to send to Insights. Gets cleared after
    * each send and appended to on each new sample.
    */
@@ -236,6 +244,7 @@ class Call extends EventEmitter {
     MediaHandler: PeerConnection,
     offerSdp: null,
     shouldPlayDisconnect: () => true,
+    voiceEventSidGenerator: generateVoiceEventSid,
   };
 
   /**
@@ -279,6 +288,11 @@ class Call extends EventEmitter {
   private _status: Call.State = Call.State.Pending;
 
   /**
+   * Voice event SID generator, creates a unique voice event SID.
+   */
+  private _voiceEventSidGenerator: () => string;
+
+  /**
    * Whether the {@link Call} has been connected. Used to determine if we are reconnected.
    */
   private _wasConnected: boolean = false;
@@ -312,6 +326,9 @@ class Call extends EventEmitter {
     if (this._options.reconnectToken) {
       this._signalingReconnectToken = this._options.reconnectToken;
     }
+
+    this._voiceEventSidGenerator =
+      this._options.voiceEventSidGenerator || generateVoiceEventSid;
 
     this._direction = this.parameters.CallSid ? Call.CallDirection.Incoming : Call.CallDirection.Outgoing;
 
@@ -513,10 +530,13 @@ class Call extends EventEmitter {
     };
 
     this._pstream = config.pstream;
+    this._pstream.on('ack', this._onAck);
     this._pstream.on('cancel', this._onCancel);
+    this._pstream.on('error', this._onSignalingError);
     this._pstream.on('ringing', this._onRinging);
     this._pstream.on('transportClose', this._onTransportClose);
     this._pstream.on('connected', this._onConnected);
+    this._pstream.on('message', this._onMessageReceived);
 
     this.on('error', error => {
       this._publisher.error('connection', 'error', {
@@ -843,6 +863,52 @@ class Call extends EventEmitter {
   }
 
   /**
+   * Send a message to Twilio. Your backend application can listen for these
+   * messages to allow communication between your frontend and backend applications.
+   * <br/><br/>This feature is currently in Beta.
+   * @param message - The message object to send.
+   * @returns A voice event sid that uniquely identifies the message that was sent.
+   */
+  sendMessage(message: Call.Message): string {
+    const { content, contentType, messageType } = message;
+
+    if (typeof content === 'undefined' || content === null) {
+      throw new InvalidArgumentError('`content` is empty');
+    }
+
+    if (typeof messageType !== 'string') {
+      throw new InvalidArgumentError(
+        '`messageType` must be an enumeration value of `Call.MessageType` or ' +
+        'a string.',
+      );
+    }
+
+    if (messageType.length === 0) {
+      throw new InvalidArgumentError(
+        '`messageType` must be a non-empty string.',
+      );
+    }
+
+    if (this._pstream === null) {
+      throw new InvalidStateError(
+        'Could not send CallMessage; Signaling channel is disconnected',
+      );
+    }
+
+    const callSid = this.parameters.CallSid;
+    if (typeof this.parameters.CallSid === 'undefined') {
+      throw new InvalidStateError(
+        'Could not send CallMessage; Call has no CallSid',
+      );
+    }
+
+    const voiceEventSid = this._voiceEventSidGenerator();
+    this._messages.set(voiceEventSid, { content, contentType, messageType, voiceEventSid });
+    this._pstream.sendMessage(callSid, content, contentType, messageType, voiceEventSid);
+    return voiceEventSid;
+  }
+
+  /**
    * Get the current {@link Call} status.
    */
   status(): Call.State {
@@ -890,12 +956,15 @@ class Call extends EventEmitter {
     const cleanup = () => {
       if (!this._pstream) { return; }
 
+      this._pstream.removeListener('ack', this._onAck);
       this._pstream.removeListener('answer', this._onAnswer);
       this._pstream.removeListener('cancel', this._onCancel);
+      this._pstream.removeListener('error', this._onSignalingError);
       this._pstream.removeListener('hangup', this._onHangup);
       this._pstream.removeListener('ringing', this._onRinging);
       this._pstream.removeListener('transportClose', this._onTransportClose);
       this._pstream.removeListener('connected', this._onConnected);
+      this._pstream.removeListener('message', this._onMessageReceived);
     };
 
     // This is kind of a hack, but it lets us avoid rewriting more code.
@@ -1021,6 +1090,21 @@ class Call extends EventEmitter {
           this.emit('accept', this);
         }
       }
+    }
+  }
+
+  /**
+   * Called when the {@link Call} receives an ack from signaling
+   * @param payload
+   */
+  private _onAck = (payload: Record<string, any>): void => {
+    const { acktype, callsid, voiceeventsid } = payload;
+    if (this.parameters.CallSid !== callsid) {
+      this._log.warn(`Received ack from a different callsid: ${callsid}`);
+      return;
+    }
+    if (acktype === 'message') {
+      this._onMessageSent(voiceeventsid);
     }
   }
 
@@ -1209,6 +1293,42 @@ class Call extends EventEmitter {
   }
 
   /**
+   * Raised when a Call receives a message from the backend.
+   * @param payload - A record representing the payload of the message from the
+   * Twilio backend.
+   */
+  private _onMessageReceived = (payload: Record<string, any>): void => {
+    const { callsid, content, contenttype, messagetype, voiceeventsid } = payload;
+
+    if (this.parameters.CallSid !== callsid) {
+      this._log.warn(`Received a message from a different callsid: ${callsid}`);
+      return;
+    }
+
+    this.emit('messageReceived', {
+      content,
+      contentType: contenttype,
+      messageType: messagetype,
+      voiceEventSid: voiceeventsid,
+    });
+  }
+
+  /**
+   * Raised when a Call receives an 'ack' with an 'acktype' of 'message.
+   * This means that the message sent via sendMessage API has been received by the signaling server.
+   * @param voiceEventSid
+   */
+  private _onMessageSent = (voiceEventSid: string): void => {
+    if (!this._messages.has(voiceEventSid)) {
+      this._log.warn(`Received a messageSent with a voiceEventSid that doesn't exists: ${voiceEventSid}`);
+      return;
+    }
+    const message = this._messages.get(voiceEventSid);
+    this._messages.delete(voiceEventSid);
+    this.emit('messageSent', message);
+  }
+
+  /**
    * When we get a RINGING signal from PStream, update the {@link Call} status.
    * @param payload
    */
@@ -1247,6 +1367,22 @@ class Call extends EventEmitter {
 
     this.emit('sample', sample);
   }
+
+  /**
+   * Called when an 'error' event is received from the signaling stream.
+   */
+  private _onSignalingError = (payload: Record<string, any>): void => {
+    const { callsid, voiceeventsid } = payload;
+    if (this.parameters.CallSid !== callsid) {
+      this._log.warn(`Received an error from a different callsid: ${callsid}`);
+      return;
+    }
+    if (voiceeventsid && this._messages.has(voiceeventsid)) {
+      // Do not emit an error here. Device is handling all signaling related errors.
+      this._messages.delete(voiceeventsid);
+      this._log.warn(`Received an error while sending a message.`, payload);
+    }
+   }
 
   /**
    * Called when signaling is restored
@@ -1389,6 +1525,24 @@ namespace Call {
   declare function errorEvent(error: TwilioError): void;
 
   /**
+   * Emitted when a Call receives a message from the backend.
+   * <br/><br/>This feature is currently in Beta.
+   * @param message - A message object representing the payload
+   * that was received from the Twilio backend.
+   * @event
+   */
+  declare function messageReceivedEvent(message: Call.Message): void;
+
+  /**
+   * Emitted after calling the {@link Call.sendMessage} API.
+   * This event indicates that Twilio has received the message.
+   * <br/><br/>This feature is currently in Beta.
+   * @param message - A message object that was sent to the Twilio backend.
+   * @event
+   */
+  declare function messageSentEvent(message: Call.Message): void;
+
+  /**
    * Emitted when the {@link Call} is muted or unmuted.
    * @param isMuted - Whether the {@link Call} is muted.
    * @param call - The {@link Call}.
@@ -1510,6 +1664,19 @@ namespace Call {
   }
 
   /**
+   * Known call message types.
+   */
+  export enum MessageType {
+    /**
+     * Allows for any object types to be defined by the user.
+     * When this value is used in the {@link Call.Message} object,
+     * The {@link Call.Message.content} can be of any type as long as
+     * it matches the MIME type defined in {@link Call.Message.contentType}.
+     */
+    UserDefinedMessage = 'user-defined-message',
+  }
+
+  /**
    * Options to be used to acquire media tracks and connect media.
    */
   export interface AcceptOptions {
@@ -1576,6 +1743,35 @@ namespace Call {
      * A Map of Sounds to play.
      */
     soundcache: Map<Device.SoundName, ISound>;
+  }
+
+  /**
+   * A Call Message represents the data that is being transferred between
+   * Twilio and the SDK.
+   */
+  export interface Message {
+    /**
+     * The content of the message which should match the contentType parameter.
+     */
+    content: any;
+
+    /**
+     * The MIME type of the content. The default value is application/json
+     * and is the only contentType that is supported at the moment.
+     */
+    contentType?: string;
+
+    /**
+     * The type of message
+     */
+    messageType: MessageType;
+
+    /**
+     * An autogenerated id that uniquely identifies the instance of this message.
+     * This is not required when sending a message from the SDK as this is autogenerated.
+     * But it will be available after the message is sent, or when a message is received.
+     */
+    voiceEventSid?: string;
   }
 
   /**
@@ -1684,6 +1880,11 @@ namespace Call {
      * TwiML params for the call. May be set for either outgoing or incoming calls.
      */
     twimlParams?: Record<string, any>;
+
+    /**
+     * Voice event SID generator.
+     */
+    voiceEventSidGenerator?: () => string;
   }
 
   /**

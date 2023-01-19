@@ -824,7 +824,7 @@ describe('PeerConnection', () => {
         eCallSid,
         eConstraints,
         eIceServers,
-        callback
+        callback,
       );
     });
 

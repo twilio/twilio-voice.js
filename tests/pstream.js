@@ -249,6 +249,47 @@ describe('PStream', () => {
     });
   });
 
+  describe('sendMessage', () => {
+    const callsid = 'testcallsid';
+    const content = { foo: 'content' };
+    const messagetype = 'user-defined-message';
+    const voiceeventsid = 'testvoiceeventsid';
+
+    it('should send a message with the provided info', () => {
+      pstream.sendMessage(callsid, content, undefined, messagetype, voiceeventsid);
+      assert.equal(pstream.transport.send.callCount, 1);
+      console.log(pstream.transport.send.args[0][0])
+      assert.deepEqual(JSON.parse(pstream.transport.send.args[0][0]), {
+        type: 'message',
+        version:EXPECTED_PSTREAM_VERSION,
+        payload: {
+          callsid,
+          content,
+          contenttype: 'application/json',
+          messagetype,
+          voiceeventsid,
+        }
+      });
+    });
+
+    it('should override contenttype', () => {
+      pstream.sendMessage(callsid, content, 'text/plain', messagetype, voiceeventsid);
+      assert.equal(pstream.transport.send.callCount, 1);
+      console.log(pstream.transport.send.args[0][0])
+      assert.deepEqual(JSON.parse(pstream.transport.send.args[0][0]), {
+        type: 'message',
+        version:EXPECTED_PSTREAM_VERSION,
+        payload: {
+          callsid,
+          content,
+          contenttype: 'text/plain',
+          messagetype,
+          voiceeventsid,
+        }
+      });
+    });
+  });
+
   describe('destroy', () => {
     it('should return this', () => {
       assert.equal(pstream.destroy(), pstream);
