@@ -137,27 +137,27 @@ Use the following policy directives to enable [CSP](https://developer.mozilla.or
 ```
 script-src https://media.twiliocdn.com https://sdk.twilio.com
 media-src mediastream https://media.twiliocdn.com https://sdk.twilio.com
-connect-src https://eventgw.twilio.com wss://chunderw-vpc-gll.twilio.com https://media.twiliocdn.com https://sdk.twilio.com
+connect-src https://eventgw.twilio.com wss://voice-js.roaming.twilio.com https://media.twiliocdn.com https://sdk.twilio.com
 ```
 
-If you are providing a non-default value for `Device.ConnectOptions.edge` parameter, you need to add the Signaling URI `wss://chunderw-vpc-gll-{regionId}.twilio.com` in your `connect-src` directive where `regionId` is the `Region ID` as defined in this [page](https://www.twilio.com/docs/global-infrastructure/edge-locations/legacy-regions). See examples below.
+If you are providing a non-default value for `Device.ConnectOptions.edge` parameter, you need to add the Signaling URI `wss://voice-js.{edgeId}.twilio.com` in your `connect-src` directive where `edgeId` is the `Edge ID` as defined in this [page](https://www.twilio.com/docs/global-infrastructure/edge-locations). See examples below.
 
 **If `Device.ConnectOptions.edge` is `ashburn`**
 
 ```
-connect-src https://eventgw.twilio.com https://media.twiliocdn.com https://sdk.twilio.com wss://chunderw-vpc-gll-us1.twilio.com
+connect-src https://eventgw.twilio.com https://media.twiliocdn.com https://sdk.twilio.com wss://voice-js.ashburn.twilio.com
 ```
 
 **If `Device.ConnectOptions.edge` is `['ashburn', 'sydney', 'roaming']`**
 
 ```
-connect-src https://eventgw.twilio.com https://media.twiliocdn.com https://sdk.twilio.com wss://chunderw-vpc-gll-us1.twilio.com wss://chunderw-vpc-gll-au1.twilio.com wss://chunderw-vpc-gll.twilio.com
+connect-src https://eventgw.twilio.com https://media.twiliocdn.com https://sdk.twilio.com wss://voice-js.ashburn.twilio.com wss://voice-js.sydney.twilio.com wss://voice-js.roaming.twilio.com
 ```
 
 If you are providing a home region grant into your [Twilio access token](https://www.twilio.com/docs/iam/access-tokens), you need to add the insights endpoint in your `connect-src` directive using `eventgw.{homeRegion}.twilio.com` format. Below is an example if your home region grant is `sg1`.
 
 ```
-connect-src https://eventgw.sg1.twilio.com wss://chunderw-vpc-gll.twilio.com https://media.twiliocdn.com https://sdk.twilio.com
+connect-src https://eventgw.sg1.twilio.com wss://voice-js.roaming.twilio.com https://media.twiliocdn.com https://sdk.twilio.com
 ```
 
 License

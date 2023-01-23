@@ -744,11 +744,7 @@ class Device extends EventEmitter {
       : Array.isArray(this._options.chunderw) && this._options.chunderw;
 
     const newChunderURIs = this._chunderURIs = (
-      chunderw || getChunderURIs(
-        this._options.edge,
-        undefined,
-        this._log.warn.bind(this._log),
-      )
+      chunderw || getChunderURIs(this._options.edge)
     ).map(createSignalingEndpointURL);
 
     let hasChunderURIsChanged =
@@ -1117,11 +1113,7 @@ class Device extends EventEmitter {
       }
     }
 
-    const preferredURIs = getChunderURIs(
-      this._edge as Edge,
-      undefined,
-      this._log.warn.bind(this._log),
-    );
+    const preferredURIs = getChunderURIs(this._edge as Edge);
     if (preferredURIs.length > 0) {
       const [preferredURI] = preferredURIs;
       this._preferredURI = createSignalingEndpointURL(preferredURI);

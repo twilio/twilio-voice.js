@@ -1,3 +1,13 @@
+2.3.0 (January 23, 2023)
+===================
+
+Changes
+-------
+
+This release includes updated DNS names for [Twilio Edge Locations](https://www.twilio.com/docs/global-infrastructure/edge-locations). The Voice JS SDK uses these Edge Locations to connect to Twilio’s infrastructure via the parameter `Device.Options.edge`. The current usage of this parameter does not change as the SDK automatically maps the edge value to the new DNS names.
+
+Additionally, you need to update your [Content Security Policies (CSP)](README.md#content-security-policy-csp) if you have it enabled for your application. You also need to update your network configuration such as firewalls, if necessary, to allow connections to the new [DNS names and IP addresses](https://www.twilio.com/docs/voice/sdks/network-connectivity-requirements).
+
 2.2.0 (December 5, 2022)
 ===================
 

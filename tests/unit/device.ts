@@ -495,12 +495,12 @@ describe('Device', function() {
 
         it('should update the preferred uri', () => {
           pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
-          assert.equal(device['_preferredURI'], ['wss://chunderw-vpc-gll-ie1.twilio.com/signal']);
+          assert.equal(device['_preferredURI'], ['wss://voice-js.dublin.twilio.com/signal']);
         });
 
         it('should update the preferred uri from the first edge', () => {
           pstream.emit('connected', { region: 'EU_IRELAND', edge: [Edge.Dublin, Edge.Frankfurt] });
-          assert.equal(device['_preferredURI'], ['wss://chunderw-vpc-gll-ie1.twilio.com/signal']);
+          assert.equal(device['_preferredURI'], ['wss://voice-js.dublin.twilio.com/signal']);
         });
 
         it('should set the identity', () => {
@@ -1141,7 +1141,7 @@ describe('Device', function() {
         sinon.assert.calledOnceWithExactly(
           PStream,
           token,
-          ['wss://chunderw-vpc-gll.twilio.com/signal'],
+          ['wss://voice-js.roaming.twilio.com/signal'],
           {
             backoffMaxMs: undefined,
             maxPreferredDurationMs: 0,
@@ -1154,7 +1154,7 @@ describe('Device', function() {
         sinon.assert.calledOnceWithExactly(
           PStream,
           token,
-          ['wss://chunderw-vpc-gll-sg1.twilio.com/signal'],
+          ['wss://voice-js.singapore.twilio.com/signal'],
           {
             backoffMaxMs: undefined,
             maxPreferredDurationMs: 0,
@@ -1168,8 +1168,8 @@ describe('Device', function() {
           PStream,
           token,
           [
-            'wss://chunderw-vpc-gll-sg1.twilio.com/signal',
-            'wss://chunderw-vpc-gll-au1.twilio.com/signal',
+            'wss://voice-js.singapore.twilio.com/signal',
+            'wss://voice-js.sydney.twilio.com/signal',
           ],
           {
             backoffMaxMs: undefined,
@@ -1183,7 +1183,7 @@ describe('Device', function() {
         sinon.assert.calledOnceWithExactly(
           PStream,
           token,
-          ['wss://chunderw-vpc-gll.twilio.com/signal'],
+          ['wss://voice-js.roaming.twilio.com/signal'],
           {
             backoffMaxMs: undefined,
             maxPreferredDurationMs: 5,
