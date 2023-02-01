@@ -732,7 +732,11 @@ describe('Device', function() {
       });
 
       describe('with a pending incoming call', () => {
+        let spyIncomingSound: any;
         beforeEach(async () => {
+          spyIncomingSound = { play: sinon.spy(), stop: sinon.spy() };
+          device['_soundcache'].set(Device.SoundName.Incoming, spyIncomingSound);
+
           const incomingPromise = new Promise(resolve =>
             device.once(Device.EventName.Incoming, () => {
               device.emit = sinon.spy();
@@ -762,19 +766,29 @@ describe('Device', function() {
           });
 
           it('should not play outgoing sound', () => {
+            sinon.assert.calledOnce(spyIncomingSound.play);
             const spy: any = { play: sinon.spy() };
             device['_soundcache'].set(Device.SoundName.Outgoing, spy);
             device.calls[0].emit('accept');
             sinon.assert.notCalled(spy.play);
+            sinon.assert.calledOnce(spyIncomingSound.stop);
           });
 
           it('should update the preferred uri', () => {
+            sinon.assert.calledOnce(spyIncomingSound.play);
             pstream.emit('connected', { edge: 'sydney' });
             const spy: any = device['_stream'].updatePreferredURI =
               sinon.spy(device['_stream'].updatePreferredURI);
             const call = device.calls[0];
             call.emit('accept');
             sinon.assert.calledOnce(spy);
+            sinon.assert.calledOnce(spyIncomingSound.stop);
+          });
+
+          it('should stop playing incoming sound', () => {
+            sinon.assert.calledOnce(spyIncomingSound.play);
+            device.calls[0].emit("disconnect");
+            sinon.assert.calledOnce(spyIncomingSound.stop);
           });
         });
 
@@ -792,6 +806,13 @@ describe('Device', function() {
             device.calls[0].emit('error');
             sinon.assert.calledOnceWithExactly(spy, null);
           });
+
+          it('should stop playing incoming sound', () => {
+            sinon.assert.calledOnce(spyIncomingSound.play);
+            device.calls[0].status = () => CallType.State.Closed;
+            device.calls[0].emit('error');
+            sinon.assert.calledOnce(spyIncomingSound.stop);
+          });
         });
 
         describe('on call.transportClose', () => {
@@ -804,6 +825,12 @@ describe('Device', function() {
             device.calls[0].status = () => CallType.State.Open;
             device.calls[0].emit('transportClose');
             assert.equal(device.calls.length, 1);
+          });
+          it('should stop playing incoming sound', () => {
+            sinon.assert.calledOnce(spyIncomingSound.play);
+            device.calls[0].status = () => CallType.State.Pending;
+            device.calls[0].emit('transportClose');
+            sinon.assert.calledOnce(spyIncomingSound.stop);
           });
         });
 
@@ -824,6 +851,12 @@ describe('Device', function() {
             device.calls[0].emit('disconnect');
             sinon.assert.calledOnceWithExactly(spy, null);
           });
+
+          it('should stop playing incoming sound', () => {
+            sinon.assert.calledOnce(spyIncomingSound.play);
+            device.calls[0].emit('disconnect');
+            sinon.assert.calledOnce(spyIncomingSound.stop);
+          });
         });
 
         describe('on call.reject', () => {
@@ -837,6 +870,12 @@ describe('Device', function() {
               sinon.spy(device['_stream'].updatePreferredURI);
             device.calls[0].emit('reject');
             sinon.assert.calledOnceWithExactly(spy, null);
+          });
+
+          it('should stop playing incoming sound', () => {
+            sinon.assert.calledOnce(spyIncomingSound.play);
+            device.calls[0].emit('reject');
+            sinon.assert.calledOnce(spyIncomingSound.stop);
           });
         });
       });

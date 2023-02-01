@@ -1038,6 +1038,12 @@ class Device extends EventEmitter {
       }
       this._removeCall(call);
       maybeUnsetPreferredUri();
+      /**
+       * NOTE(kamalbennani): We need to stop the incoming sound when the call is
+       * disconnected right after the user has accepted the call (activeCall.accept()), and before
+       * the call has been fully connected (i.e. before the `pstream.answer` event)
+       */
+      this._maybeStopIncomingSound();
     });
 
     call.once('reject', () => {
