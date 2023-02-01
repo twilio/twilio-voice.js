@@ -1,3 +1,11 @@
+2.3.1 (In Progress)
+===================
+
+Bug Fixes
+---------
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/133) where incoming sound will not stop playing after the call is disconnected. Thank you @kamalbennani for your [contribution](https://github.com/twilio/twilio-voice.js/pull/134).
+
 2.3.0 (January 23, 2023)
 ===================
 
