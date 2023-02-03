@@ -1,4 +1,4 @@
-2.3.1 (In Progress)
+2.3.1 (February 3, 2023)
 ===================
 
 Bug Fixes
