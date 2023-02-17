@@ -982,6 +982,9 @@ class Device extends EventEmitter {
     }, options);
 
     const maybeUnsetPreferredUri = () => {
+      if (!this._stream) {
+        return this._log.warn('UnsetPreferredUri called without a stream');
+      }
       if (this._activeCall === null && this._calls.length === 0) {
         this._stream.updatePreferredURI(null);
       }
