@@ -4,7 +4,7 @@
 Bug Fixes
 ---------
 
-- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/95) where Twilio error code is not being returned when microphone access is blocked. Thank you @SiimMardus and @ostap0207 for your [contribution](https://github.com/twilio/twilio-voice.js/pull/143).
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/95) where a Twilio error is not returned when microphone access is blocked. Thank you @SiimMardus and @ostap0207 for your [contribution](https://github.com/twilio/twilio-voice.js/pull/143).
 
 2.3.1 (February 3, 2023)
 ===================
