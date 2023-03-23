@@ -676,8 +676,13 @@ describe('Call', function() {
         });
 
         [
+          'ack',
           'answer',
+          'cancel',
+          'connected',
+          'error',
           'hangup',
+          'message',
           'ringing',
           'transportClose',
         ].forEach((eventName: string) => {
@@ -901,6 +906,11 @@ describe('Call', function() {
         sinon.assert.calledOnce(mediaHandler.reject);
       });
 
+      it('should call mediaHandler.close', () => {
+        conn.reject();
+        sinon.assert.calledOnce(mediaHandler.close);
+      });
+
       it('should emit cancel', (done) => {
         conn.on('reject', () => done());
         conn.reject();
@@ -914,6 +924,40 @@ describe('Call', function() {
       it('should transition status to closed', () => {
         conn.reject();
         assert.equal(conn.status(), 'closed');
+      });
+
+      it('should not emit a disconnect event', () => {
+        const callback = sinon.stub();
+        conn['_mediaHandler'].close = () => mediaHandler.onclose();
+        conn.on('disconnect', callback);
+        conn.reject();
+        clock.tick(10);
+        sinon.assert.notCalled(callback);
+      });
+
+      it('should not play disconnect sound', () => {
+        conn['_mediaHandler'].close = () => mediaHandler.onclose();
+        conn.reject();
+        clock.tick(10);
+        sinon.assert.notCalled(soundcache.get(Device.SoundName.Disconnect).play);
+      });
+
+      [
+        'ack',
+        'answer',
+        'cancel',
+        'connected',
+        'error',
+        'hangup',
+        'message',
+        'ringing',
+        'transportClose',
+      ].forEach((eventName: string) => {
+        it(`should call pstream.removeListener on ${eventName}`, () => {
+          conn.reject();
+          clock.tick(10);
+          assert.equal(pstream.listenerCount(eventName), 0);
+        });
       });
     });
 
@@ -936,6 +980,11 @@ describe('Call', function() {
         it('should not call mediaHandler.reject', () => {
           conn.reject();
           sinon.assert.notCalled(mediaHandler.reject);
+        });
+
+        it('should not call mediaHandler.close', () => {
+          conn.reject();
+          sinon.assert.notCalled(mediaHandler.close);
         });
 
         it('should not emit reject', () => {
