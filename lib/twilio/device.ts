@@ -812,6 +812,8 @@ class Device extends EventEmitter {
 
   /**
    * Update the token used by this {@link Device} to connect to Twilio.
+   * It is recommended to call this API after [[Device.tokenWillExpireEvent]] is emitted,
+   * and before or after a call to prevent a potential ~1s audio loss during the update process.
    * @param token
    */
   updateToken(token: string) {
