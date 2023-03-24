@@ -175,6 +175,11 @@ class Call extends EventEmitter {
   private _isCancelled: boolean = false;
 
   /**
+   * Whether the call has been rejected
+   */
+  private _isRejected: boolean = false;
+
+  /**
    * Whether or not the browser uses unified-plan SDP by default.
    */
   private readonly _isUnifiedPlanDefault: boolean | undefined;
@@ -515,7 +520,8 @@ class Call extends EventEmitter {
       if (this._options.shouldPlayDisconnect && this._options.shouldPlayDisconnect()
         // Don't play disconnect sound if this was from a cancel event. i.e. the call
         // was ignored or hung up even before it was answered.
-        && !this._isCancelled) {
+        // Similarly, don't play disconnect sound if the call was rejected.
+        && !this._isCancelled && !this._isRejected) {
 
         this._soundcache.get(Device.SoundName.Disconnect).play();
       }
@@ -523,7 +529,7 @@ class Call extends EventEmitter {
       monitor.disable();
       this._publishMetrics();
 
-      if (!this._isCancelled) {
+      if (!this._isCancelled && !this._isRejected) {
         // tslint:disable no-console
         this.emit('disconnect', this);
       }
@@ -784,11 +790,14 @@ class Call extends EventEmitter {
       return;
     }
 
+    this._isRejected = true;
     this._pstream.reject(this.parameters.CallSid);
-    this._status = Call.State.Closed;
-    this.emit('reject');
     this._mediaHandler.reject(this.parameters.CallSid);
     this._publisher.info('connection', 'rejected-by-local', null, this);
+    this._cleanupEventListeners();
+    this._mediaHandler.close();
+    this._status = Call.State.Closed;
+    this.emit('reject');
   }
 
   /**
