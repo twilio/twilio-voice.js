@@ -84,6 +84,9 @@ commands:
       - run:
           name: Running unit tests
           command: npm run test:unit
+      - store_artifacts:
+          path: coverage
+          destination: coverage
   integration-tests:
     steps:
       - build
