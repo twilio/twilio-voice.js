@@ -91,6 +91,15 @@ class AudioHelper extends EventEmitter {
   private _audioContext?: AudioContext;
 
   /**
+   * Whether each sound is enabled.
+   */
+  private _enabledSounds: Record<Device.ToggleableSound, boolean> = {
+    [Device.SoundName.Disconnect]: true,
+    [Device.SoundName.Incoming]: true,
+    [Device.SoundName.Outgoing]: true,
+  };
+
+  /**
    * The `getUserMedia()` function to use.
    */
   private _getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
@@ -171,10 +180,6 @@ class AudioHelper extends EventEmitter {
     const isSetSinkSupported: boolean = typeof options.setSinkId === 'function';
     this.isOutputSelectionSupported = isEnumerationSupported && isSetSinkSupported;
     this.isVolumeSupported = isAudioContextSupported;
-
-    if (options.enabledSounds) {
-      this._addEnabledSounds(options.enabledSounds);
-    }
 
     if (this.isVolumeSupported) {
       this._audioContext = options.audioContext || options.AudioContext && new options.AudioContext();
@@ -288,6 +293,33 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
+   * Set whether the disconnect sound is enabled or not
+   * @param isEnabled - Whether the disconnect sound is enabled or not
+   * @returns Whether the disconnect sound is enabled or not
+   */
+  disconnect(isEnabled?: boolean): boolean {
+    return this._maybeEnableSound(Device.SoundName.Disconnect, isEnabled);
+  }
+
+  /**
+   * Set whether the incoming sound is enabled or not
+   * @param isEnabled - Whether the incoming sound is enabled or not
+   * @returns Whether the incoming sound is enabled or not
+   */
+  incoming(isEnabled?: boolean): boolean {
+    return this._maybeEnableSound(Device.SoundName.Incoming, isEnabled);
+  }
+
+  /**
+   * Set whether the outgoing sound is enabled or not
+   * @param isEnabled - Whether the outgoing sound is enabled or not
+   * @returns Whether the outgoing sound is enabled or not
+   */
+  outgoing(isEnabled?: boolean): boolean {
+    return this._maybeEnableSound(Device.SoundName.Outgoing, isEnabled);
+  }
+
+  /**
    * Set the MediaTrackConstraints to be applied on every getUserMedia call for new input
    * device audio. Any deviceId specified here will be ignored. Instead, device IDs should
    * be specified using {@link AudioHelper#setInputDevice}. The returned Promise resolves
@@ -344,27 +376,6 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Merge the passed enabledSounds into {@link AudioHelper}. Currently used to merge the deprecated
-   *   Device.sounds object onto the new {@link AudioHelper} interface. Mutates
-   *   by reference, sharing state between {@link Device} and {@link AudioHelper}.
-   * @param enabledSounds - The initial sound settings to merge.
-   * @private
-   */
-  private _addEnabledSounds(enabledSounds: { [name: string]: boolean }) {
-    function setValue(key: Device.ToggleableSound, value: boolean) {
-      if (typeof value !== 'undefined') {
-        enabledSounds[key] = value;
-      }
-
-      return enabledSounds[key];
-    }
-
-    Object.keys(enabledSounds).forEach(key => {
-      (this as any)[key] = setValue.bind(null, key);
-    });
-  }
-
-  /**
    * Get the index of an un-labeled Device.
    * @param mediaDeviceInfo
    * @returns The index of the passed MediaDeviceInfo
@@ -405,6 +416,19 @@ class AudioHelper extends EventEmitter {
         this._log.warn(`Warning: Unable to set audio output devices. ${reason}`);
       });
     });
+  }
+
+  /**
+   * Set whether the sound is enabled or not
+   * @param soundName
+   * @param isEnabled
+   * @returns Whether the sound is enabled or not
+   */
+  private _maybeEnableSound(soundName: Device.ToggleableSound, isEnabled?: boolean): boolean {
+    if (typeof isEnabled !== 'undefined') {
+      this._enabledSounds[soundName] = isEnabled;
+    }
+    return this._enabledSounds[soundName];
   }
 
   /**
@@ -668,13 +692,6 @@ namespace AudioHelper {
      * An existing AudioContext instance to use.
      */
     audioContext?: AudioContext;
-
-    /**
-     * A Record of sounds. This is modified by reference, and is used to
-     * maintain backward-compatibility. This should be removed or refactored in 2.0.
-     * TODO: Remove / refactor in 2.0. (CLIENT-5302)
-     */
-    enabledSounds?: Record<Device.ToggleableSound, boolean>;
 
     /**
      * A custom MediaDevices instance to use.

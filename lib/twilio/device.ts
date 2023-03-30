@@ -355,15 +355,6 @@ class Device extends EventEmitter {
   private _edge: string | null = null;
 
   /**
-   * Whether each sound is enabled.
-   */
-  private _enabledSounds: Record<Device.ToggleableSound, boolean> = {
-    [Device.SoundName.Disconnect]: true,
-    [Device.SoundName.Incoming]: true,
-    [Device.SoundName.Outgoing]: true,
-  };
-
-  /**
    * The name of the home region the {@link Device} is connected to.
    */
   private _home: string | null = null;
@@ -978,7 +969,7 @@ class Device extends EventEmitter {
       maxAverageBitrate: this._options.maxAverageBitrate,
       preflight: this._options.preflight,
       rtcConstraints: this._options.rtcConstraints,
-      shouldPlayDisconnect: () => this._enabledSounds.disconnect,
+      shouldPlayDisconnect: () => this.audio?.disconnect(),
       twimlParams,
       voiceEventSidGenerator: this._options.voiceEventSidGenerator,
     }, options);
@@ -1003,7 +994,7 @@ class Device extends EventEmitter {
         this._audio._maybeStartPollingVolume();
       }
 
-      if (call.direction === Call.CallDirection.Outgoing && this._enabledSounds.outgoing) {
+      if (call.direction === Call.CallDirection.Outgoing && this.audio?.outgoing()) {
         this._soundcache.get(Device.SoundName.Outgoing).play();
       }
 
@@ -1213,7 +1204,7 @@ class Device extends EventEmitter {
       this._publishNetworkChange();
     });
 
-    const play = (this._enabledSounds.incoming && !wasBusy)
+    const play = (this.audio?.incoming() && !wasBusy)
       ? () => this._soundcache.get(Device.SoundName.Incoming).play()
       : () => Promise.resolve();
 
@@ -1320,10 +1311,7 @@ class Device extends EventEmitter {
       this._updateSinkIds,
       this._updateInputStream,
       getUserMedia,
-      {
-        audioContext: Device.audioContext,
-        enabledSounds: this._enabledSounds,
-      },
+      { audioContext: Device.audioContext },
     );
 
     this._audio.on('deviceChange', (lostActiveDevices: MediaDeviceInfo[]) => {
