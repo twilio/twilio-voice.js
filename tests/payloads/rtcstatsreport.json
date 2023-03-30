@@ -162,12 +162,11 @@
     "type": "local-candidate",
     "transportId": "RTCTransport_audio_1",
     "isRemote": false,
-    "ip": "107.20.226.156",
+    "address": "107.20.226.156",
     "port": 52513,
     "protocol": "udp",
     "candidateType": "prflx",
-    "priority": 1853824767,
-    "deleted": false
+    "priority": 1853824767
   },
   {
     "id": "RTCIceCandidate_yB1+bJsu",
@@ -179,8 +178,7 @@
     "port": 11270,
     "protocol": "udp",
     "candidateType": "host",
-    "priority": 2130714367,
-    "deleted": false
+    "priority": 2130714367
   },
   {
     "id": "RTCInboundRTPAudioStream_774468856",

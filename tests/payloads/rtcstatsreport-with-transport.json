@@ -284,8 +284,7 @@
     "port": 53585,
     "protocol": "udp",
     "candidateType": "srflx",
-    "priority": 1686052607,
-    "deleted": false
+    "priority": 1686052607
   },
   {
     "id": "RTCIceCandidate_Di/J4tEz",
@@ -297,8 +296,7 @@
     "port": 19282,
     "protocol": "udp",
     "candidateType": "host",
-    "priority": 2130706431,
-    "deleted": false
+    "priority": 2130706431
   },
   {
     "id": "RTCIceCandidate_UqrtRLJZ",
@@ -312,8 +310,7 @@
     "protocol": "udp",
     "relayProtocol": "udp",
     "candidateType": "relay",
-    "priority": 41754879,
-    "deleted": false
+    "priority": 41754879
   },
   {
     "id": "RTCIceCandidate_e3FLKFoG",
@@ -326,8 +323,7 @@
     "port": 52497,
     "protocol": "udp",
     "candidateType": "srflx",
-    "priority": 1685921535,
-    "deleted": false
+    "priority": 1685921535
   },
   {
     "id": "RTCIceCandidate_oYROhau8",
@@ -341,8 +337,7 @@
     "protocol": "udp",
     "relayProtocol": "udp",
     "candidateType": "relay",
-    "priority": 41885951,
-    "deleted": false
+    "priority": 41885951
   },
   {
     "id": "RTCIceCandidate_qQRsdncV",
@@ -355,8 +350,7 @@
     "port": 50951,
     "protocol": "udp",
     "candidateType": "host",
-    "priority": 2122194687,
-    "deleted": false
+    "priority": 2122194687
   },
   {
     "id": "RTCInboundRTPAudioStream_976775258",

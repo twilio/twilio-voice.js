@@ -10,6 +10,7 @@
  */
 interface RTCIceCandidatePayload {
   candidate_type: string;
+  // Deprecated by newer browsers. Will likely not show on most recent versions of browsers.
   deleted: boolean;
   ip: string;
   is_remote: boolean;
