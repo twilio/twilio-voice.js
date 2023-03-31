@@ -293,30 +293,33 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Set whether the disconnect sound is enabled or not
-   * @param isEnabled - Whether the disconnect sound is enabled or not
-   * @returns Whether the disconnect sound is enabled or not
+   * Enable or disable the disconnect sound.
+   * @param doEnable Passing `true` will enable the sound and `false` will disable the sound.
+   * Not passing this parameter will not alter the enable-status of the sound.
+   * @returns The enable-status of the sound.
    */
-  disconnect(isEnabled?: boolean): boolean {
-    return this._maybeEnableSound(Device.SoundName.Disconnect, isEnabled);
+  disconnect(doEnable?: boolean): boolean {
+    return this._maybeEnableSound(Device.SoundName.Disconnect, doEnable);
   }
 
   /**
-   * Set whether the incoming sound is enabled or not
-   * @param isEnabled - Whether the incoming sound is enabled or not
-   * @returns Whether the incoming sound is enabled or not
+   * Enable or disable the incoming sound.
+   * @param doEnable Passing `true` will enable the sound and `false` will disable the sound.
+   * Not passing this parameter will not alter the enable-status of the sound.
+   * @returns The enable-status of the sound.
    */
-  incoming(isEnabled?: boolean): boolean {
-    return this._maybeEnableSound(Device.SoundName.Incoming, isEnabled);
+  incoming(doEnable?: boolean): boolean {
+    return this._maybeEnableSound(Device.SoundName.Incoming, doEnable);
   }
 
   /**
-   * Set whether the outgoing sound is enabled or not
-   * @param isEnabled - Whether the outgoing sound is enabled or not
-   * @returns Whether the outgoing sound is enabled or not
+   * Enable or disable the outgoing sound.
+   * @param doEnable Passing `true` will enable the sound and `false` will disable the sound.
+   * Not passing this parameter will not alter the enable-status of the sound.
+   * @returns The enable-status of the sound.
    */
-  outgoing(isEnabled?: boolean): boolean {
-    return this._maybeEnableSound(Device.SoundName.Outgoing, isEnabled);
+  outgoing(doEnable?: boolean): boolean {
+    return this._maybeEnableSound(Device.SoundName.Outgoing, doEnable);
   }
 
   /**
@@ -421,12 +424,12 @@ class AudioHelper extends EventEmitter {
   /**
    * Set whether the sound is enabled or not
    * @param soundName
-   * @param isEnabled
+   * @param doEnable
    * @returns Whether the sound is enabled or not
    */
-  private _maybeEnableSound(soundName: Device.ToggleableSound, isEnabled?: boolean): boolean {
-    if (typeof isEnabled !== 'undefined') {
-      this._enabledSounds[soundName] = isEnabled;
+  private _maybeEnableSound(soundName: Device.ToggleableSound, doEnable?: boolean): boolean {
+    if (typeof doEnable !== 'undefined') {
+      this._enabledSounds[soundName] = doEnable;
     }
     return this._enabledSounds[soundName];
   }
