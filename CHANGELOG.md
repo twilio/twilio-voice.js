@@ -6,6 +6,8 @@ Changes
 
 - Updated the description of [Device.updateToken](https://twilio.github.io/twilio-voice.js/classes/voice.device.html#updatetoken) API. It is recommended to call this API after [Device.tokenWillExpireEvent](https://twilio.github.io/twilio-voice.js/classes/voice.device.html#tokenwillexpireevent) is emitted, and before or after a call to prevent a potential ~1s audio loss during the update process.
 
+- Updated stats reporting to stop using deprecated `RTCIceCandidateStats` - `ip` and `deleted`.
+
 Bug Fixes
 ---------
 
