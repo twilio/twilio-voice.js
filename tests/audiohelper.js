@@ -297,7 +297,33 @@ describe('AudioHelper', () => {
       });
     });
 
-    describe('setAudioConstraints', () => {
+    ['disconnect', 'incoming', 'outgoing'].forEach(soundName => {
+      describe(`.${soundName}`, () => {
+        let testFn;
+
+        beforeEach(() => {
+          testFn = audio[soundName].bind(audio);
+        });
+
+        it('should return true as default', () => {
+          assert.strictEqual(testFn(), true);
+        });
+
+        it('should return false after setting to false', () => {
+          assert.strictEqual(testFn(false), false);
+          assert.strictEqual(testFn(), false);
+        });
+
+        it('should return true after setting to true', () => {
+          assert.strictEqual(testFn(false), false);
+          assert.strictEqual(testFn(), false);
+          assert.strictEqual(testFn(true), true);
+          assert.strictEqual(testFn(), true);
+        });
+      });
+    });
+
+    describe('.setAudioConstraints', () => {
       context('when no input device is active', () => {
         it('should set .audioConstraints', () => {
           audio.setAudioConstraints({ foo: 'bar' });
@@ -328,7 +354,7 @@ describe('AudioHelper', () => {
       });
     });
 
-    describe('unsetAudioConstraints', () => {
+    describe('.unsetAudioConstraints', () => {
       beforeEach(() => {
         audio.setAudioConstraints({ foo: 'bar' });
       });
