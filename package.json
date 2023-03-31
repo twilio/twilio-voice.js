@@ -20,7 +20,7 @@
     "url": "git@github.com:twilio/twilio-voice.js.git"
   },
   "scripts": {
-    "build": "npm-run-all clean build:constants build:errors docs:ts build:es5 build:ts build:dist build:dist-min",
+    "build": "npm-run-all clean build:constants build:errors docs:ts build:es5 build:ts build:dist build:dist-min test:typecheck",
     "build:errors": "node ./scripts/errors.js",
     "build:es5": "rimraf ./es5 && babel lib -d es5",
     "build:dev": "ENV=dev npm run build",
@@ -55,6 +55,7 @@
     "test:integration": "karma start $PWD/karma.conf.ts",
     "test:network": "node ./scripts/karma.js $PWD/karma.network.conf.ts",
     "test:selenium": "mocha tests/browser/index.js",
+    "test:typecheck": "./node_modules/typescript/bin/tsc tests/typecheck/index.ts --noEmit",
     "test:unit": "nyc mocha -r ts-node/register ./tests/index.ts",
     "test:webpack": "cd ./tests/webpack && npm install && npm test"
   },

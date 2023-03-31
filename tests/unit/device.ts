@@ -26,6 +26,7 @@ describe('Device', function() {
   let clock: SinonFakeTimers;
   let connectOptions: Record<string, any> | undefined;
   let device: Device;
+  let enabledSounds: Record<Device.ToggleableSound, boolean>;
   let pstream: any;
   let publisher: any;
   let stub: SinonStubbedInstance<Device>;
@@ -40,7 +41,11 @@ describe('Device', function() {
   const AudioHelper = (_updateSinkIds: Function, _updateInputStream: Function) => {
     updateInputStream = _updateInputStream;
     updateSinkIds = _updateSinkIds;
-    return audioHelper = createEmitterStub(require('../../lib/twilio/audiohelper').default);
+    const audioHelper = createEmitterStub(require('../../lib/twilio/audiohelper').default);
+    audioHelper.disconnect = () => enabledSounds[Device.SoundName.Disconnect];
+    audioHelper.incoming = () => enabledSounds[Device.SoundName.Incoming];
+    audioHelper.outgoing = () => enabledSounds[Device.SoundName.Outgoing];
+    return audioHelper;
   };
   const Call = (_?: any, _connectOptions?: Record<string, any>) => {
     connectOptions = _connectOptions;
@@ -63,6 +68,11 @@ describe('Device', function() {
   });
 
   beforeEach(() => {
+    enabledSounds = {
+      [Device.SoundName.Disconnect]: true,
+      [Device.SoundName.Incoming]: true,
+      [Device.SoundName.Outgoing]: true,
+    };
     pstream = null;
     publisher = null;
     clock = sinon.useFakeTimers(Date.now());
@@ -226,6 +236,16 @@ describe('Device', function() {
           activeCall._direction = 'OUTGOING';
           activeCall.emit('accept');
           sinon.assert.calledOnce(spy.play);
+        });
+
+        it('should not play outgoing sound after accepted if disabled', async () => {
+          enabledSounds[Device.SoundName.Outgoing] = false;
+          const spy: any = { play: sinon.spy() };
+          device['_soundcache'].set(Device.SoundName.Outgoing, spy);
+          await device.connect();
+          activeCall._direction = 'OUTGOING';
+          activeCall.emit('accept');
+          sinon.assert.notCalled(spy.play);
         });
       });
 
@@ -670,12 +690,21 @@ describe('Device', function() {
           });
         });
 
-        it('should play the incoming sound', async () => {
+        it('should play the incoming sound if enabled', async () => {
           const spy = { play: sinon.spy() };
           device['_soundcache'].set(Device.SoundName.Incoming, spy);
           pstream.emit('invite', { callsid: 'foo', sdp: 'bar' });
           await clock.tickAsync(0);
           sinon.assert.calledOnce(spy.play);
+        });
+
+        it('should not play the incoming sound if disabled', async () => {
+          enabledSounds[Device.SoundName.Incoming] = false;
+          const spy = { play: sinon.spy() };
+          device['_soundcache'].set(Device.SoundName.Incoming, spy);
+          pstream.emit('invite', { callsid: 'foo', sdp: 'bar' });
+          await clock.tickAsync(0);
+          sinon.assert.notCalled(spy.play);
         });
 
         context('when allowIncomingWhileBusy is true', () => {
