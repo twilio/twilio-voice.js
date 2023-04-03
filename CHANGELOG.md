@@ -13,6 +13,8 @@ Bug Fixes
 
 - Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/100) where a `TypeError` is thrown after rejecting a call then invoking `updateToken`.
 
+- Fixed an issue (https://github.com/twilio/twilio-voice.js/issues/87, https://github.com/twilio/twilio-voice.js/issues/145) where the `PeerConnection` object is not properly disposed.
+
 - Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/14) where `device.audio.disconnect`, `device.audio.incoming` and `device.audio.outgoing` do not have the correct type definitions.
 
 2.3.2 (February 27, 2023)
