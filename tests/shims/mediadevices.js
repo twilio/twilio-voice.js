@@ -12,9 +12,8 @@ describe('MediaDevicesShim', () => {
   let mediaDeviceList;
   let nativeMediaDevices;
 
-  const sampleDevices = async (count = 1) => {
-    clock.tick(500);
-    await new Promise(res => res());
+  const sampleDevices = async () => {
+    await clock.tickAsync(500);
   };
 
   beforeEach(() => {
