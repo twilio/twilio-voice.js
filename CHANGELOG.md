@@ -17,6 +17,8 @@ Bug Fixes
 
 - Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/14) where `device.audio.disconnect`, `device.audio.incoming` and `device.audio.outgoing` do not have the correct type definitions.
 
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/126) where the internal `deviceinfochange` event is being emitted indefinitely, causing high cpu usage.
+
 2.3.2 (February 27, 2023)
 ===================
 
