@@ -676,8 +676,13 @@ describe('Call', function() {
         });
 
         [
+          'ack',
           'answer',
+          'cancel',
+          'connected',
+          'error',
           'hangup',
+          'message',
           'ringing',
           'transportClose',
         ].forEach((eventName: string) => {
@@ -901,6 +906,11 @@ describe('Call', function() {
         sinon.assert.calledOnce(mediaHandler.reject);
       });
 
+      it('should call mediaHandler.close', () => {
+        conn.reject();
+        sinon.assert.calledOnce(mediaHandler.close);
+      });
+
       it('should emit cancel', (done) => {
         conn.on('reject', () => done());
         conn.reject();
@@ -914,6 +924,40 @@ describe('Call', function() {
       it('should transition status to closed', () => {
         conn.reject();
         assert.equal(conn.status(), 'closed');
+      });
+
+      it('should not emit a disconnect event', () => {
+        const callback = sinon.stub();
+        conn['_mediaHandler'].close = () => mediaHandler.onclose();
+        conn.on('disconnect', callback);
+        conn.reject();
+        clock.tick(10);
+        sinon.assert.notCalled(callback);
+      });
+
+      it('should not play disconnect sound', () => {
+        conn['_mediaHandler'].close = () => mediaHandler.onclose();
+        conn.reject();
+        clock.tick(10);
+        sinon.assert.notCalled(soundcache.get(Device.SoundName.Disconnect).play);
+      });
+
+      [
+        'ack',
+        'answer',
+        'cancel',
+        'connected',
+        'error',
+        'hangup',
+        'message',
+        'ringing',
+        'transportClose',
+      ].forEach((eventName: string) => {
+        it(`should call pstream.removeListener on ${eventName}`, () => {
+          conn.reject();
+          clock.tick(10);
+          assert.equal(pstream.listenerCount(eventName), 0);
+        });
       });
     });
 
@@ -936,6 +980,11 @@ describe('Call', function() {
         it('should not call mediaHandler.reject', () => {
           conn.reject();
           sinon.assert.notCalled(mediaHandler.reject);
+        });
+
+        it('should not call mediaHandler.close', () => {
+          conn.reject();
+          sinon.assert.notCalled(mediaHandler.close);
         });
 
         it('should not emit reject', () => {
@@ -1657,45 +1706,72 @@ describe('Call', function() {
     describe('pstream.answer event', () => {
       let pStreamAnswerPayload: any;
 
-      beforeEach(async () => {
+      beforeEach(() => {
         pStreamAnswerPayload = {
           edge: 'foobar-edge',
           reconnect: 'foobar-reconnect-token',
         };
-        conn = new Call(config, options);
-        conn.accept();
-        await clock.tickAsync(0);
       });
 
-      it('should set the call to "answered"', () => {
-        pstream.emit('answer', pStreamAnswerPayload);
-        assert(conn['_isAnswered']);
-      });
+      describe('for incoming calls', () => {
+        beforeEach(async () => {
+          // With a CallSid, this becomes an incoming call
+          const callParameters = { CallSid: 'CA1234' };
+          conn = new Call(config, Object.assign(options, { callParameters }));
+          conn.accept();
+          await clock.tickAsync(0);
+        });
 
-      it('should save the reconnect token', () => {
-        pstream.emit('answer', pStreamAnswerPayload);
-        assert.equal(conn['_signalingReconnectToken'], pStreamAnswerPayload.reconnect);
-      });
-
-      describe('if raised multiple times', () => {
-        it('should save the reconnect token multiple times', () => {
+        it('should remove event handler after disconnect for an incoming call', () => {
           pstream.emit('answer', pStreamAnswerPayload);
-          assert.equal(conn['_signalingReconnectToken'], pStreamAnswerPayload.reconnect);
+          conn.disconnect();
+          assert.strictEqual(pstream.listenerCount('answer'), 0);
+        });
+      });
 
-          pStreamAnswerPayload.reconnect = 'biffbazz-reconnect-token';
+      describe('for outgoing calls', () => {
+        beforeEach(async () => {
+          conn = new Call(config, options);
+          conn.accept();
+          await clock.tickAsync(0);
+        });
 
+        it('should set the call to "answered"', () => {
+          pstream.emit('answer', pStreamAnswerPayload);
+          assert(conn['_isAnswered']);
+        });
+
+        it('should save the reconnect token', () => {
           pstream.emit('answer', pStreamAnswerPayload);
           assert.equal(conn['_signalingReconnectToken'], pStreamAnswerPayload.reconnect);
         });
 
-        it('should not invoke "call._maybeTransitionToOpen" more than once', () => {
-          const spy = conn['_maybeTransitionToOpen'] = sinon.spy(conn['_maybeTransitionToOpen']);
-
+        it('should remove event handler after disconnect for an outgoing call', () => {
           pstream.emit('answer', pStreamAnswerPayload);
-          sinon.assert.calledOnce(spy);
+          conn.disconnect();
+          assert.strictEqual(pstream.listenerCount('answer'), 0);
+        });
 
-          pstream.emit('answer', pStreamAnswerPayload);
-          sinon.assert.calledOnce(spy);
+        describe('if raised multiple times', () => {
+          it('should save the reconnect token multiple times', () => {
+            pstream.emit('answer', pStreamAnswerPayload);
+            assert.equal(conn['_signalingReconnectToken'], pStreamAnswerPayload.reconnect);
+
+            pStreamAnswerPayload.reconnect = 'biffbazz-reconnect-token';
+
+            pstream.emit('answer', pStreamAnswerPayload);
+            assert.equal(conn['_signalingReconnectToken'], pStreamAnswerPayload.reconnect);
+          });
+
+          it('should not invoke "call._maybeTransitionToOpen" more than once', () => {
+            const spy = conn['_maybeTransitionToOpen'] = sinon.spy(conn['_maybeTransitionToOpen']);
+
+            pstream.emit('answer', pStreamAnswerPayload);
+            sinon.assert.calledOnce(spy);
+
+            pstream.emit('answer', pStreamAnswerPayload);
+            sinon.assert.calledOnce(spy);
+          });
         });
       });
     });

@@ -1,3 +1,24 @@
+2.4.0 (In Progress)
+===================
+
+Changes
+-------
+
+- Updated the description of [Device.updateToken](https://twilio.github.io/twilio-voice.js/classes/voice.device.html#updatetoken) API. It is recommended to call this API after [Device.tokenWillExpireEvent](https://twilio.github.io/twilio-voice.js/classes/voice.device.html#tokenwillexpireevent) is emitted, and before or after a call to prevent a potential ~1s audio loss during the update process.
+
+- Updated stats reporting to stop using deprecated `RTCIceCandidateStats` - `ip` and `deleted`.
+
+Bug Fixes
+---------
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/100) where a `TypeError` is thrown after rejecting a call then invoking `updateToken`.
+
+- Fixed an issue (https://github.com/twilio/twilio-voice.js/issues/87, https://github.com/twilio/twilio-voice.js/issues/145) where the `PeerConnection` object is not properly disposed.
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/14) where `device.audio.disconnect`, `device.audio.incoming` and `device.audio.outgoing` do not have the correct type definitions.
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/126) where the internal `deviceinfochange` event is being emitted indefinitely, causing high cpu usage.
+
 2.3.2 (February 27, 2023)
 ===================
 
