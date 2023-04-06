@@ -6,7 +6,7 @@ For help on migrating from 1.x, see our [migration guide](https://www.twilio.com
 @twilio/voice-sdk
 =================
 
-[![NPM](https://img.shields.io/npm/v/%40twilio/voice-sdk.svg)](https://www.npmjs.com/package/%40twilio/voice-sdk) [![CircleCI](https://circleci.com/gh/twilio/twilio-voice.js/tree/master.svg?style=svg&circle-token=80e91c8284c21ff16d3003702e17b903c0b32f1d)](https://circleci.com/gh/twilio/twilio-voice.js/tree/master)
+[![NPM](https://img.shields.io/npm/v/%40twilio/voice-sdk.svg)](https://www.npmjs.com/package/%40twilio/voice-sdk) [![CircleCI](https://dl.circleci.com/status-badge/img/gh/twilio/twilio-voice.js/tree/master.svg?style=shield)](https://circleci.com/gh/twilio/twilio-voice.js/tree/master)
 
 Twilio's Voice SDK allows you to add real-time voice and PSTN calling to your web apps.
 
