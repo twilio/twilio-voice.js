@@ -940,7 +940,7 @@ class Device extends EventEmitter {
 
     const config: Call.Config = {
       audioHelper: this._audio,
-      getUserMedia,
+      getUserMedia: this._options.getUserMedia || getUserMedia,
       isUnifiedPlanDefault: Device._isUnifiedPlanDefault,
       onIgnore: (): void => {
         this._soundcache.get(Device.SoundName.Incoming).stop();
@@ -952,6 +952,7 @@ class Device extends EventEmitter {
 
     options = Object.assign({
       MediaStream: this._options.MediaStream || rtc.PeerConnection,
+      RTCPeerConnection: this._options.RTCPeerConnection,
       beforeAccept: (currentCall: Call) => {
         if (!this._activeCall || this._activeCall === currentCall) {
           return;
@@ -969,7 +970,7 @@ class Device extends EventEmitter {
       maxAverageBitrate: this._options.maxAverageBitrate,
       preflight: this._options.preflight,
       rtcConstraints: this._options.rtcConstraints,
-      shouldPlayDisconnect: () => this.audio?.disconnect(),
+      shouldPlayDisconnect: () => this._audio?.disconnect(),
       twimlParams,
       voiceEventSidGenerator: this._options.voiceEventSidGenerator,
     }, options);
@@ -986,6 +987,12 @@ class Device extends EventEmitter {
 
     const call = new (this._options.Call || Call)(config, options);
 
+    this._publisher.info('settings', 'init', {
+      RTCPeerConnection: !!this._options.RTCPeerConnection,
+      enumerateDevices: !!this._options.enumerateDevices,
+      getUserMedia: !!this._options.getUserMedia,
+    }, call);
+
     call.once('accept', () => {
       this._stream.updatePreferredURI(this._preferredURI);
       this._removeCall(call);
@@ -994,7 +1001,7 @@ class Device extends EventEmitter {
         this._audio._maybeStartPollingVolume();
       }
 
-      if (call.direction === Call.CallDirection.Outgoing && this.audio?.outgoing()) {
+      if (call.direction === Call.CallDirection.Outgoing && this._audio?.outgoing()) {
         this._soundcache.get(Device.SoundName.Outgoing).play();
       }
 
@@ -1204,7 +1211,7 @@ class Device extends EventEmitter {
       this._publishNetworkChange();
     });
 
-    const play = (this.audio?.incoming() && !wasBusy)
+    const play = (this._audio?.incoming() && !wasBusy)
       ? () => this._soundcache.get(Device.SoundName.Incoming).play()
       : () => Promise.resolve();
 
@@ -1310,8 +1317,11 @@ class Device extends EventEmitter {
     this._audio = new (this._options.AudioHelper || AudioHelper)(
       this._updateSinkIds,
       this._updateInputStream,
-      getUserMedia,
-      { audioContext: Device.audioContext },
+      this._options.getUserMedia || getUserMedia,
+      {
+        audioContext: Device.audioContext,
+        enumerateDevices: this._options.enumerateDevices,
+      },
     );
 
     this._audio.on('deviceChange', (lostActiveDevices: MediaDeviceInfo[]) => {
@@ -1688,10 +1698,20 @@ namespace Device {
     edge?: string[] | string;
 
     /**
+     * Overrides the native MediaDevices.enumerateDevices API.
+     */
+    enumerateDevices?: any;
+
+    /**
      * Experimental feature.
      * Whether to use ICE Aggressive nomination.
      */
     forceAggressiveIceNomination?: boolean;
+
+    /**
+     * Overrides the native MediaDevices.getUserMedia API.
+     */
+    getUserMedia?: any;
 
     /**
      * Log level.
@@ -1723,6 +1743,11 @@ namespace Device {
      * is explicitly specified within the Device options.
      */
     maxCallSignalingTimeoutMs?: number;
+
+    /**
+     * Overrides the native RTCPeerConnection class.
+     */
+    RTCPeerConnection?: any;
 
     /**
      * A mapping of custom sound URLs by sound name.
