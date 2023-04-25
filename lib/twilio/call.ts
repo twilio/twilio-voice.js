@@ -1519,7 +1519,7 @@ namespace Call {
   /**
    * Emitted after the HTMLAudioElement for the remote audio is created.
    * @param remoteAudio - The HTMLAudioElement.
-   * @example `connection.on('audio', handler(remoteAudio))`
+   * @example `call.on('audio', handler(remoteAudio))`
    * @event
    */
   declare function audioEvent(remoteAudio: HTMLAudioElement): void;
