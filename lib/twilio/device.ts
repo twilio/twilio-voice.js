@@ -1746,6 +1746,41 @@ namespace Device {
 
     /**
      * Overrides the native RTCPeerConnection class.
+     *
+     * By default, the SDK will use the `unified-plan` SDP format if the browser supports it.
+     * Unexpected behavior may happen if the `RTCPeerConnection` parameter uses an SDP format
+     * that is different than what the SDK uses.
+     *
+     * For example, if the browser supports `unified-plan` and the `RTCPeerConnection`
+     * parameter uses `plan-b` by default, the SDK will use `unified-plan`
+     * which will cause conflicts with the usage of the `RTCPeerConnection`.
+     *
+     * In order to avoid this issue, you need to explicitly set the SDP format that you want
+     * the SDK to use with the `RTCPeerConnection` via [[Device.ConnectOptions.rtcConfiguration]] for outgoing calls.
+     * Or [[Call.AcceptOptions.rtcConfiguration]] for incoming calls.
+     *
+     * See the example below. Assuming the `RTCPeerConnection` you provided uses `plan-b` by default, the following
+     * code sets the SDP format to `unified-plan` instead.
+     *
+     * ```ts
+     * // Outgoing calls
+     * const call = await device.connect({
+     *   rtcConfiguration: {
+     *     sdpSemantics: 'unified-plan'
+     *   }
+     *   // Other options
+     * });
+     *
+     * // Incoming calls
+     * device.on('incoming', call => {
+     *   call.accept({
+     *     rtcConfiguration: {
+     *       sdpSemantics: 'unified-plan'
+     *     }
+     *     // Other options
+     *   });
+     * });
+     * ```
      */
     RTCPeerConnection?: any;
 
