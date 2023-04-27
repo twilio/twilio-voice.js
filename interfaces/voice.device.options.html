@@ -87,6 +87,7 @@
 						<section class="tsd-index-section ">
 							<h3>Properties</h3>
 							<ul class="tsd-index-list">
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.device.options.html#rtcpeerconnection" class="tsd-kind-icon">RTCPeer<wbr>Connection</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.device.options.html#allowincomingwhilebusy" class="tsd-kind-icon">allow<wbr>Incoming<wbr>While<wbr>Busy</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.device.options.html#appname" class="tsd-kind-icon">app<wbr>Name</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.device.options.html#appversion" class="tsd-kind-icon">app<wbr>Version</a></li>
@@ -95,7 +96,9 @@
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.device.options.html#disableaudiocontextsounds" class="tsd-kind-icon">disable<wbr>Audio<wbr>Context<wbr>Sounds</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.device.options.html#dscp" class="tsd-kind-icon">dscp</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.device.options.html#edge" class="tsd-kind-icon">edge</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.device.options.html#enumeratedevices" class="tsd-kind-icon">enumerate<wbr>Devices</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.device.options.html#forceaggressiveicenomination" class="tsd-kind-icon">force<wbr>Aggressive<wbr>Ice<wbr>Nomination</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.device.options.html#getusermedia" class="tsd-kind-icon">get<wbr>User<wbr>Media</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.device.options.html#loglevel" class="tsd-kind-icon">log<wbr>Level</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.device.options.html#maxaveragebitrate" class="tsd-kind-icon">max<wbr>Average<wbr>Bitrate</a></li>
 								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="voice.device.options.html#maxcallsignalingtimeoutms" class="tsd-kind-icon">max<wbr>Call<wbr>Signaling<wbr>Timeout<wbr>Ms</a></li>
@@ -109,12 +112,55 @@
 			<section class="tsd-panel-group tsd-member-group ">
 				<h2>Properties</h2>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="rtcpeerconnection" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> RTCPeer<wbr>Connection</h3>
+					<div class="tsd-signature tsd-kind-icon">RTCPeer<wbr>Connection<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">any</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1785">lib/twilio/device.ts:1785</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>Overrides the native RTCPeerConnection class.</p>
+						</div>
+						<p>By default, the SDK will use the <code>unified-plan</code> SDP format if the browser supports it.
+							Unexpected behavior may happen if the <code>RTCPeerConnection</code> parameter uses an SDP format
+						that is different than what the SDK uses.</p>
+						<p>For example, if the browser supports <code>unified-plan</code> and the <code>RTCPeerConnection</code>
+							parameter uses <code>plan-b</code> by default, the SDK will use <code>unified-plan</code>
+						which will cause conflicts with the usage of the <code>RTCPeerConnection</code>.</p>
+						<p>In order to avoid this issue, you need to explicitly set the SDP format that you want
+							the SDK to use with the <code>RTCPeerConnection</code> via <a href="voice.device.connectoptions.html#rtcconfiguration">Device.ConnectOptions.rtcConfiguration</a> for outgoing calls.
+						Or <a href="voice.call.acceptoptions.html#rtcconfiguration">Call.AcceptOptions.rtcConfiguration</a> for incoming calls.</p>
+						<p>See the example below. Assuming the <code>RTCPeerConnection</code> you provided uses <code>plan-b</code> by default, the following
+						code sets the SDP format to <code>unified-plan</code> instead.</p>
+						<pre><code class="language-ts"><span class="hljs-comment">// Outgoing calls</span>
+<span class="hljs-keyword">const</span> call = <span class="hljs-keyword">await</span> device.connect({
+  rtcConfiguration: {
+    sdpSemantics: <span class="hljs-string">'unified-plan'</span>
+  }
+  <span class="hljs-comment">// Other options</span>
+});
+
+<span class="hljs-comment">// Incoming calls</span>
+device.on(<span class="hljs-string">'incoming'</span>, <span class="hljs-function"><span class="hljs-params">call</span> =&gt;</span> {
+  call.accept({
+    rtcConfiguration: {
+      sdpSemantics: <span class="hljs-string">'unified-plan'</span>
+    }
+    <span class="hljs-comment">// Other options</span>
+  });
+});</code></pre>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
 					<a name="allowincomingwhilebusy" class="tsd-anchor"></a>
 					<h3><span class="tsd-flag ts-flagOptional">Optional</span> allow<wbr>Incoming<wbr>While<wbr>Busy</h3>
 					<div class="tsd-signature tsd-kind-icon">allow<wbr>Incoming<wbr>While<wbr>Busy<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">false</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">true</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a881300/lib/twilio/device.ts#L1642">lib/twilio/device.ts:1642</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1652">lib/twilio/device.ts:1652</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -130,7 +176,7 @@
 					<div class="tsd-signature tsd-kind-icon">app<wbr>Name<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">string</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a881300/lib/twilio/device.ts#L1649">lib/twilio/device.ts:1649</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1659">lib/twilio/device.ts:1659</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -147,7 +193,7 @@
 					<div class="tsd-signature tsd-kind-icon">app<wbr>Version<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">string</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a881300/lib/twilio/device.ts#L1656">lib/twilio/device.ts:1656</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1666">lib/twilio/device.ts:1666</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -164,7 +210,7 @@
 					<div class="tsd-signature tsd-kind-icon">close<wbr>Protection<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">string</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a881300/lib/twilio/device.ts#L1663">lib/twilio/device.ts:1663</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1673">lib/twilio/device.ts:1673</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -181,7 +227,7 @@
 					<div class="tsd-signature tsd-kind-icon">codec<wbr>Preferences<span class="tsd-signature-symbol">:</span> <a href="../enums/voice.call.codec.html" class="tsd-signature-type">Codec</a><span class="tsd-signature-symbol">[]</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a881300/lib/twilio/device.ts#L1668">lib/twilio/device.ts:1668</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1678">lib/twilio/device.ts:1678</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -196,7 +242,7 @@
 					<div class="tsd-signature tsd-kind-icon">disable<wbr>Audio<wbr>Context<wbr>Sounds<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">false</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">true</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a881300/lib/twilio/device.ts#L1675">lib/twilio/device.ts:1675</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1685">lib/twilio/device.ts:1685</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -213,7 +259,7 @@
 					<div class="tsd-signature tsd-kind-icon">dscp<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">false</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">true</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a881300/lib/twilio/device.ts#L1680">lib/twilio/device.ts:1680</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1690">lib/twilio/device.ts:1690</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -228,7 +274,7 @@
 					<div class="tsd-signature tsd-kind-icon">edge<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">string</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a881300/lib/twilio/device.ts#L1688">lib/twilio/device.ts:1688</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1698">lib/twilio/device.ts:1698</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -241,12 +287,27 @@
 					</div>
 				</section>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="enumeratedevices" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> enumerate<wbr>Devices</h3>
+					<div class="tsd-signature tsd-kind-icon">enumerate<wbr>Devices<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">any</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1703">lib/twilio/device.ts:1703</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>Overrides the native MediaDevices.enumerateDevices API.</p>
+						</div>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
 					<a name="forceaggressiveicenomination" class="tsd-anchor"></a>
 					<h3><span class="tsd-flag ts-flagOptional">Optional</span> force<wbr>Aggressive<wbr>Ice<wbr>Nomination</h3>
 					<div class="tsd-signature tsd-kind-icon">force<wbr>Aggressive<wbr>Ice<wbr>Nomination<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">false</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">true</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a881300/lib/twilio/device.ts#L1694">lib/twilio/device.ts:1694</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1709">lib/twilio/device.ts:1709</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -257,12 +318,27 @@
 					</div>
 				</section>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="getusermedia" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> get<wbr>User<wbr>Media</h3>
+					<div class="tsd-signature tsd-kind-icon">get<wbr>User<wbr>Media<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">any</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1714">lib/twilio/device.ts:1714</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>Overrides the native MediaDevices.getUserMedia API.</p>
+						</div>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
 					<a name="loglevel" class="tsd-anchor"></a>
 					<h3><span class="tsd-flag ts-flagOptional">Optional</span> log<wbr>Level</h3>
 					<div class="tsd-signature tsd-kind-icon">log<wbr>Level<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">LogLevelDesc</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a881300/lib/twilio/device.ts#L1699">lib/twilio/device.ts:1699</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1719">lib/twilio/device.ts:1719</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -277,7 +353,7 @@
 					<div class="tsd-signature tsd-kind-icon">max<wbr>Average<wbr>Bitrate<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a881300/lib/twilio/device.ts#L1709">lib/twilio/device.ts:1709</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1729">lib/twilio/device.ts:1729</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -297,7 +373,7 @@
 					<div class="tsd-signature tsd-kind-icon">max<wbr>Call<wbr>Signaling<wbr>Timeout<wbr>Ms<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a881300/lib/twilio/device.ts#L1725">lib/twilio/device.ts:1725</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1745">lib/twilio/device.ts:1745</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -321,7 +397,7 @@
 					<div class="tsd-signature tsd-kind-icon">sounds<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Partial</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><a href="../enums/voice.device.soundname.html" class="tsd-signature-type">SoundName</a><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a881300/lib/twilio/device.ts#L1730">lib/twilio/device.ts:1730</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1790">lib/twilio/device.ts:1790</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -336,7 +412,7 @@
 					<div class="tsd-signature tsd-kind-icon">token<wbr>Refresh<wbr>Ms<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a881300/lib/twilio/device.ts#L1736">lib/twilio/device.ts:1736</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0330b47/lib/twilio/device.ts#L1796">lib/twilio/device.ts:1796</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -400,6 +476,9 @@
 								<a href="voice.device.options.html" class="tsd-kind-icon">Options</a>
 								<ul>
 									<li class=" tsd-kind-property tsd-parent-kind-interface">
+										<a href="voice.device.options.html#rtcpeerconnection" class="tsd-kind-icon">RTCPeer<wbr>Connection</a>
+									</li>
+									<li class=" tsd-kind-property tsd-parent-kind-interface">
 										<a href="voice.device.options.html#allowincomingwhilebusy" class="tsd-kind-icon">allow<wbr>Incoming<wbr>While<wbr>Busy</a>
 									</li>
 									<li class=" tsd-kind-property tsd-parent-kind-interface">
@@ -424,7 +503,13 @@
 										<a href="voice.device.options.html#edge" class="tsd-kind-icon">edge</a>
 									</li>
 									<li class=" tsd-kind-property tsd-parent-kind-interface">
+										<a href="voice.device.options.html#enumeratedevices" class="tsd-kind-icon">enumerate<wbr>Devices</a>
+									</li>
+									<li class=" tsd-kind-property tsd-parent-kind-interface">
 										<a href="voice.device.options.html#forceaggressiveicenomination" class="tsd-kind-icon">force<wbr>Aggressive<wbr>Ice<wbr>Nomination</a>
+									</li>
+									<li class=" tsd-kind-property tsd-parent-kind-interface">
+										<a href="voice.device.options.html#getusermedia" class="tsd-kind-icon">get<wbr>User<wbr>Media</a>
 									</li>
 									<li class=" tsd-kind-property tsd-parent-kind-interface">
 										<a href="voice.device.options.html#loglevel" class="tsd-kind-icon">log<wbr>Level</a>
