@@ -378,13 +378,13 @@ class Call extends EventEmitter {
 
     this._mediaHandler = new (this._options.MediaHandler)
       (config.audioHelper, config.pstream, config.getUserMedia, {
+        RTCPeerConnection: this._options.RTCPeerConnection,
         codecPreferences: this._options.codecPreferences,
         dscp: this._options.dscp,
         forceAggressiveIceNomination: this._options.forceAggressiveIceNomination,
         isUnifiedPlan: this._isUnifiedPlanDefault,
         maxAverageBitrate: this._options.maxAverageBitrate,
         preflight: this._options.preflight,
-        RTCPeerConnection: this._options.RTCPeerConnection,
       });
 
     this.on('volume', (inputVolume: number, outputVolume: number): void => {

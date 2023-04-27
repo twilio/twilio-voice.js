@@ -78,12 +78,12 @@ commands:
       - store_artifacts:
           path: ./dist
           prefix: ./dist
-  unit-tests:
+  build-checks:
     steps:
       - build
       - run:
-          name: Running unit tests
-          command: npm run test:unit
+          name: Running build checks
+          command: npm run test:typecheck && npm run lint && npm run test:unit
       - store_artifacts:
           path: coverage
           destination: coverage
@@ -105,9 +105,9 @@ commands:
 # Jobs
 ###
 jobs:
-  run-unit-tests:
+  run-build-checks:
     executor: docker-with-browser
-    steps: [unit-tests]
+    steps: [build-checks]
   run-network-tests:
     parameters:
       bver:
@@ -174,10 +174,10 @@ workflows:
           - equal: [true, <<pipeline.parameters.pr_workflow>>]
           - equal: [false, <<pipeline.parameters.release_workflow>>]
     jobs:
-      - run-unit-tests:
+      - run-build-checks:
           context:
             - vblocks-js
-          name: Unit Tests
+          name: Build Checks
       - run-integration-tests:
           name: Integration Tests <<matrix.browser>> <<matrix.bver>>
           context:
@@ -200,10 +200,10 @@ workflows:
   release-workflow:
     when: <<pipeline.parameters.release_workflow>>
     jobs:
-      - run-unit-tests:
+      - run-build-checks:
           context:
             - vblocks-js
-          name: Unit Tests
+          name: Build Checks
       - run-integration-tests:
           context:
             - dockerhub-pulls
@@ -230,7 +230,7 @@ workflows:
           name: Create Release Dry Run
           dryRun: true
           requires:
-            - Unit Tests
+            - Build Checks
             # NOTE(mhuynh): Temporarily allow release without these tests passing
             # # Chrome integration tests
             # - Integration Tests chrome beta

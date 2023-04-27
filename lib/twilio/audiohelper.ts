@@ -91,11 +91,6 @@ class AudioHelper extends EventEmitter {
   private _audioContext?: AudioContext;
 
   /**
-   * The enumerateDevices method to use
-   */
-  private _enumerateDevices: any;
-
-  /**
    * Whether each sound is enabled.
    */
   private _enabledSounds: Record<Device.ToggleableSound, boolean> = {
@@ -103,6 +98,11 @@ class AudioHelper extends EventEmitter {
     [Device.SoundName.Incoming]: true,
     [Device.SoundName.Outgoing]: true,
   };
+
+  /**
+   * The enumerateDevices method to use
+   */
+  private _enumerateDevices: any;
 
   /**
    * The `getUserMedia()` function to use.
