@@ -1042,7 +1042,7 @@ describe('Device', function() {
               });
 
               it('should publish a speaker-devices-set event', () => {
-                sinon.assert.calledOnce(publisher.info);
+                sinon.assert.calledTwice(publisher.info);
                 sinon.assert.calledWith(publisher.info, 'audio', 'speaker-devices-set',
                   { audio_device_ids: sinkIds });
               });
@@ -1085,7 +1085,7 @@ describe('Device', function() {
               });
 
               it('should publish a ringtone-devices-set event', () => {
-                sinon.assert.calledOnce(publisher.info);
+                sinon.assert.calledTwice(publisher.info);
                 sinon.assert.calledWith(publisher.info, 'audio', 'ringtone-devices-set',
                   { audio_device_ids: sinkIds });
               });

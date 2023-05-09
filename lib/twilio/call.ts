@@ -378,6 +378,7 @@ class Call extends EventEmitter {
 
     this._mediaHandler = new (this._options.MediaHandler)
       (config.audioHelper, config.pstream, config.getUserMedia, {
+        RTCPeerConnection: this._options.RTCPeerConnection,
         codecPreferences: this._options.codecPreferences,
         dscp: this._options.dscp,
         forceAggressiveIceNomination: this._options.forceAggressiveIceNomination,
@@ -394,6 +395,11 @@ class Call extends EventEmitter {
       this._latestInputVolume = inputVolume;
       this._latestOutputVolume = outputVolume;
     });
+
+    this._mediaHandler.onaudio = (remoteAudio: typeof Audio) => {
+      this._log.info('Remote audio created');
+      this.emit('audio', remoteAudio);
+    };
 
     this._mediaHandler.onvolume = (inputVolume: number, outputVolume: number,
                                    internalInputVolume: number, internalOutputVolume: number) => {
@@ -1511,6 +1517,14 @@ namespace Call {
   declare function acceptEvent(call: Call): void;
 
   /**
+   * Emitted after the HTMLAudioElement for the remote audio is created.
+   * @param remoteAudio - The HTMLAudioElement.
+   * @example `call.on('audio', handler(remoteAudio))`
+   * @event
+   */
+  declare function audioEvent(remoteAudio: HTMLAudioElement): void;
+
+  /**
    * Emitted when the {@link Call} is canceled.
    * @example `call.on('cancel', () => { })`
    * @event
@@ -1874,6 +1888,11 @@ namespace Call {
      * The format of this object depends on browser.
      */
     rtcConstraints?: MediaStreamConstraints;
+
+    /**
+     * The RTCPeerConnection passed to {@link Device} on setup.
+     */
+    RTCPeerConnection?: any;
 
     /**
      * Whether the disconnect sound should be played.

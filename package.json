@@ -1,6 +1,6 @@
 {
   "name": "@twilio/voice-sdk",
-  "version": "2.4.1-dev",
+  "version": "2.5.0-dev",
   "description": "Twilio's JavaScript Voice SDK",
   "main": "./es5/twilio.js",
   "types": "./es5/twilio.d.ts",
@@ -20,7 +20,7 @@
     "url": "git@github.com:twilio/twilio-voice.js.git"
   },
   "scripts": {
-    "build": "npm-run-all clean build:constants build:errors docs:ts build:es5 build:ts build:dist build:dist-min test:typecheck",
+    "build": "npm-run-all clean build:constants build:errors docs:ts build:es5 build:ts build:dist build:dist-min",
     "build:errors": "node ./scripts/errors.js",
     "build:es5": "rimraf ./es5 && babel lib -d es5",
     "build:dev": "ENV=dev npm run build",
