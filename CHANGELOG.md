@@ -1,3 +1,18 @@
+2.5.0 (May 9, 2023)
+===================
+
+New Features
+------------
+
+### WebRTC API Overrides (Beta)
+
+The SDK now allows you to override WebRTC APIs using the following options and events. If your environment supports WebRTC redirection, such as [Citrix HDX](https://www.citrix.com/solutions/vdi-and-daas/hdx/what-is-hdx.html)'s WebRTC [redirection technologies](https://www.citrix.com/blogs/2019/01/15/hdx-a-webrtc-manifesto/), your application can use this new *beta* feature for improved audio quality in those environments.
+
+- [Device.Options.enumerateDevices](https://twilio.github.io/twilio-voice.js/interfaces/voice.device.options.html#enumeratedevices)
+- [Device.Options.getUserMedia](https://twilio.github.io/twilio-voice.js/interfaces/voice.device.options.html#getusermedia)
+- [Device.Options.RTCPeerConnection](https://twilio.github.io/twilio-voice.js/interfaces/voice.device.options.html#rtcpeerconnection)
+- [call.on('audio', handler(remoteAudio))](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#audioevent)
+
 2.4.0 (April 6, 2023)
 ===================
 
