@@ -168,6 +168,28 @@ jobs:
 # Workflows
 ###
 workflows:
+  daily-build-workflow:
+    triggers:
+      - schedule:
+          cron: "0 16 * * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - run-build-checks:
+          context:
+            - vblocks-js
+          name: Build Checks
+      - run-integration-tests:
+          name: Integration Tests <<matrix.browser>> <<matrix.bver>>
+          context:
+            - dockerhub-pulls
+            - vblocks-js
+          matrix:
+            parameters:
+              browser: ["chrome", "firefox"]
+              bver: ["beta", "unstable", "stable"]
   pull-request-workflow:
     when:
         and:
