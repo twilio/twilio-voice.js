@@ -7,10 +7,9 @@ import Device from './device';
 import { InvalidArgumentError, NotSupportedError } from './errors';
 import Log from './log';
 import OutputDeviceCollection from './outputdevicecollection';
-import * as getMediaDevicesInstance from './shims/mediadevices';
+import MediaDeviceInfoShim from './shims/mediadeviceinfo';
+import getMediaDevicesInstance from './shims/mediadevices';
 import { average, difference, isFirefox } from './util';
-
-const MediaDeviceInfoShim = require('./shims/mediadeviceinfo');
 
 /**
  * Aliases for audio kinds, used for labelling.
@@ -177,7 +176,7 @@ class AudioHelper extends EventEmitter {
     }, options);
 
     this._getUserMedia = getUserMedia;
-    this._mediaDevices = options.mediaDevices || getMediaDevicesInstance();
+    this._mediaDevices = options.mediaDevices || getMediaDevicesInstance() as AudioHelper.MediaDevicesLike;
     this._onActiveInputChanged = onActiveInputChanged;
     this._enumerateDevices = typeof options.enumerateDevices === 'function'
       ? options.enumerateDevices

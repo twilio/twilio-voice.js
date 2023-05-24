@@ -83,7 +83,7 @@ commands:
       - build
       - run:
           name: Running build checks
-          command: npm run test:typecheck && npm run lint && npm run test:unit
+          command: npm run test:es5 && npm run test:typecheck && npm run lint && npm run test:unit
       - store_artifacts:
           path: coverage
           destination: coverage

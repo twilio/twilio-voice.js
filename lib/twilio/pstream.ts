@@ -1,9 +1,14 @@
-const C = require('./constants');
-const EventEmitter = require('events').EventEmitter;
-const Log = require('./log').default;
-
-const WSTransport = require('./wstransport').default;
-const { GeneralErrors, SignalingErrors } = require('./errors');
+/**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+// @ts-nocheck
+import { EventEmitter } from 'events';
+import * as C from './constants';
+import { GeneralErrors, SignalingErrors } from './errors';
+import Log from './log';
+import WSTransport from './wstransport';
 
 const PSTREAM_VERSION = '1.6';
 
@@ -34,7 +39,9 @@ class PStream extends EventEmitter {
     };
     options = options || {};
     for (const prop in defaults) {
-      if (prop in options) continue;
+      if (prop in options) {
+        continue;
+      }
       options[prop] = defaults[prop];
     }
     this.options = options;
@@ -54,7 +61,9 @@ class PStream extends EventEmitter {
     this._log = Log.getInstance();
 
     // NOTE(mroberts): EventEmitter requires that we catch all errors.
-    this.on('error', () => { });
+    this.on('error', () => {
+      this._log.warn('Unexpected error handled in pstream');
+    });
 
     /*
      *events used by device
@@ -96,8 +105,8 @@ class PStream extends EventEmitter {
         enumerable: true,
         get() {
           return this.transport.uri;
-        }
-      }
+        },
+      },
     });
 
     this.transport.on('close', this._handleTransportClose);
@@ -171,8 +180,8 @@ PStream.prototype.setToken = function(token) {
   this._log.info('Setting token and publishing listen');
   this.token = token;
   const payload = {
+    browserinfo: getBrowserInfo(),
     token,
-    browserinfo: getBrowserInfo()
   };
   this._publish('listen', payload);
 };
@@ -182,7 +191,7 @@ PStream.prototype.sendMessage = function(
   content,
   contenttype = 'application/json',
   messagetype,
-  voiceeventsid
+  voiceeventsid,
 ) {
   const payload = {
     callsid,
@@ -195,18 +204,16 @@ PStream.prototype.sendMessage = function(
 };
 
 PStream.prototype.register = function(mediaCapabilities) {
-  const regPayload = {
-    media: mediaCapabilities
-  };
+  const regPayload = { media: mediaCapabilities };
   this._publish('register', regPayload, true);
 };
 
 PStream.prototype.invite = function(sdp, callsid, preflight, params) {
   const payload = {
     callsid,
-    sdp,
     preflight: !!preflight,
-    twilio: params ? { params } : {}
+    sdp,
+    twilio: params ? { params } : {},
   };
   this._publish('invite', payload, true);
 };
@@ -214,10 +221,10 @@ PStream.prototype.invite = function(sdp, callsid, preflight, params) {
 PStream.prototype.reconnect = function(sdp, callsid, reconnect, params) {
   const payload = {
     callsid,
-    sdp,
-    reconnect,
     preflight: false,
-    twilio: params ? { params } : {}
+    reconnect,
+    sdp,
+    twilio: params ? { params } : {},
   };
   this._publish('invite', payload, true);
 };
@@ -275,9 +282,9 @@ PStream.prototype.publish = function(type, payload) {
 
 PStream.prototype._publish = function(type, payload, shouldRetry) {
   const msg = JSON.stringify({
+    payload,
     type,
     version: PSTREAM_VERSION,
-    payload
   });
   const isSent = !!this.transport.send(msg);
 
@@ -298,16 +305,16 @@ function getBrowserInfo() {
   const nav = typeof navigator !== 'undefined' ? navigator : {};
 
   const info = {
-    p: 'browser',
-    v: C.RELEASE_VERSION,
     browser: {
+      platform: nav.platform || 'unknown',
       userAgent: nav.userAgent || 'unknown',
-      platform: nav.platform || 'unknown'
     },
-    plugin: 'rtc'
+    p: 'browser',
+    plugin: 'rtc',
+    v: C.RELEASE_VERSION,
   };
 
   return info;
 }
 
-module.exports = PStream;
+export default PStream;

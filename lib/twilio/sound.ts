@@ -1,6 +1,12 @@
-const AsyncQueue = require('./asyncQueue').AsyncQueue;
-const AudioPlayer = require('@twilio/audioplayer');
-const InvalidArgumentError = require('./errors').InvalidArgumentError;
+/**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+// @ts-nocheck
+import * as AudioPlayer from '@twilio/audioplayer';
+import { AsyncQueue } from './asyncQueue';
+import { InvalidArgumentError } from './errors';
 
 /**
  * @class
@@ -11,7 +17,8 @@ const InvalidArgumentError = require('./errors').InvalidArgumentError;
  * @property {string} name - Name of the sound
  * @property {string} url - URL of the sound
  * @property {AudioContext} audioContext - The AudioContext to use if available for AudioPlayer.
- *//**
+ */
+/**
  * @typedef {Object} Sound#ConstructorOptions
  * @property {number} [maxDuration=0] - The maximum length of time to play the sound
  *   before stopping it.
@@ -29,7 +36,7 @@ function Sound(name, url, options) {
   options = Object.assign({
     AudioFactory: typeof Audio !== 'undefined' ? Audio : null,
     maxDuration: 0,
-    shouldLoop: false
+    shouldLoop: false,
   }, options);
 
   options.AudioPlayer = options.audioContext
@@ -37,50 +44,38 @@ function Sound(name, url, options) {
     : options.AudioFactory;
 
   Object.defineProperties(this, {
-    _activeEls: {
-      value: new Map()
-    },
-    _Audio: {
-      value: options.AudioPlayer
-    },
+    _Audio: { value: options.AudioPlayer },
+    _activeEls: { value: new Map() },
     _isSinkSupported: {
       value: options.AudioFactory !== null
-        && typeof options.AudioFactory.prototype.setSinkId === 'function'
+        && typeof options.AudioFactory.prototype.setSinkId === 'function',
     },
-    _maxDuration: {
-      value: options.maxDuration
-    },
+    _maxDuration: { value: options.maxDuration },
     _maxDurationTimeout: {
       value: null,
-      writable: true
+      writable: true,
     },
-    _operations: {
-      value: new AsyncQueue()
-    },
+    _operations: { value: new AsyncQueue() },
     _playPromise: {
       value: null,
-      writable: true
+      writable: true,
     },
-    _shouldLoop: {
-      value: options.shouldLoop
-    },
-    _sinkIds: {
-      value: ['default']
-    },
+    _shouldLoop: { value: options.shouldLoop },
+    _sinkIds: { value: ['default'] },
     isPlaying: {
       enumerable: true,
       get() {
         return !!this._playPromise;
-      }
+      },
     },
     name: {
       enumerable: true,
-      value: name
+      value: name,
     },
     url: {
       enumerable: true,
-      value: url
-    }
+      value: url,
+    },
   });
 
   if (this._Audio) {
@@ -231,4 +226,4 @@ Sound.prototype.play = function play() {
   return this._operations.enqueue(() => this._play());
 };
 
-module.exports = Sound;
+export default Sound;

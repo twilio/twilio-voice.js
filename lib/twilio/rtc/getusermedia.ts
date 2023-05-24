@@ -1,5 +1,11 @@
-const NotSupportedError = require('../errors').NotSupportedError;
-const util = require('../util');
+/**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+// @ts-nocheck
+import { NotSupportedError } from '../errors';
+import * as util from '../util';
 
 function getUserMedia(constraints, options) {
   options = options || {};
@@ -33,4 +39,4 @@ function getUserMedia(constraints, options) {
   });
 }
 
-module.exports = getUserMedia;
+export default getUserMedia;

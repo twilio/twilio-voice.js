@@ -1,13 +1,16 @@
-const EventEmitter = require('events').EventEmitter;
+/**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+// @ts-nocheck
+
+import { EventEmitter } from 'events';
 
 function EventTarget() {
   Object.defineProperties(this, {
-    _eventEmitter: {
-      value: new EventEmitter()
-    },
-    _handlers: {
-      value: { }
-    },
+    _eventEmitter: { value: new EventEmitter() },
+    _handlers: { value: { } },
   });
 }
 
@@ -44,8 +47,8 @@ EventTarget.prototype._defineEventHandler = function _defineEventHandler(eventNa
         self._handlers[eventName] = newHandler;
         self.addEventListener(eventName, newHandler);
       }
-    }
+    },
   });
 };
 
-module.exports = EventTarget;
+export default EventTarget;

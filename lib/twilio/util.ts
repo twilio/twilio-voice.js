@@ -1,4 +1,11 @@
 /**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+// @ts-nocheck
+
+/**
  * Exception class.
  * @class
  * @name Exception
@@ -26,7 +33,7 @@ function average(values) {
   return values && values.length ? values.reduce((t, v) => t + v) / values.length : 0;
 }
 
-function difference(lefts, rights, getKey) {
+function difference(lefts, rights, getKey?) {
   getKey = getKey || (a => a);
   const rightKeys = new Set(rights.map(getKey));
   return lefts.filter(left => !rightKeys.has(getKey(left)));
@@ -47,7 +54,7 @@ function isChrome(window, navigator) {
   return isCriOS || isElectron(navigator) || isGoogle || isHeadlessChrome;
 }
 
-function isFirefox(navigator) {
+function isFirefox(navigator?) {
   navigator = navigator || (typeof window === 'undefined'
     ? global.navigator : window.navigator);
 
@@ -55,7 +62,7 @@ function isFirefox(navigator) {
     && /firefox|fxios/i.test(navigator.userAgent);
 }
 
-function isLegacyEdge(navigator) {
+function isLegacyEdge(navigator?) {
   navigator = navigator || (typeof window === 'undefined'
     ? global.navigator : window.navigator);
 
@@ -137,14 +144,18 @@ function flatMap(list, mapFn) {
   }, []);
 }
 
-exports.Exception = TwilioException;
-exports.average = average;
-exports.difference = difference;
-exports.isElectron = isElectron;
-exports.isChrome = isChrome;
-exports.isFirefox = isFirefox;
-exports.isLegacyEdge = isLegacyEdge;
-exports.isSafari = isSafari;
-exports.isUnifiedPlanDefault = isUnifiedPlanDefault;
-exports.queryToJson = queryToJson;
-exports.flatMap = flatMap;
+const Exception = TwilioException;
+
+export {
+  Exception,
+  average,
+  difference,
+  isElectron,
+  isChrome,
+  isFirefox,
+  isLegacyEdge,
+  isSafari,
+  isUnifiedPlanDefault,
+  queryToJson,
+  flatMap,
+};

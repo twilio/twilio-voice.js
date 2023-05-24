@@ -29,7 +29,7 @@ describe('Call', function() {
   const wait = (timeout?: number) => new Promise(r => setTimeout(r, timeout || 0));
 
   const MediaHandler = () => {
-    mediaHandler = createEmitterStub(require('../../lib/twilio/rtc/peerconnection'));
+    mediaHandler = createEmitterStub(require('../../lib/twilio/rtc/peerconnection').default);
     mediaHandler.setInputTracksFromStream = sinon.spy((rejectCode?: number) => {
       return rejectCode ? Promise.reject({ code: rejectCode }) : Promise.resolve();
     });
@@ -59,8 +59,8 @@ describe('Call', function() {
     audioHelper = createEmitterStub(require('../../lib/twilio/audiohelper').default);
     getUserMedia = sinon.spy(() => Promise.resolve(new MediaStream()));
     onIgnore = sinon.spy();
-    pstream = createEmitterStub(require('../../lib/twilio/pstream'));
-    publisher = createEmitterStub(require('../../lib/twilio/eventpublisher'));
+    pstream = createEmitterStub(require('../../lib/twilio/pstream').default);
+    publisher = createEmitterStub(require('../../lib/twilio/eventpublisher').default);
     publisher.postMetrics = sinon.spy(() => Promise.resolve());
 
     pstream.transport = {

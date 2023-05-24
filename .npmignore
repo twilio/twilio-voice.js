@@ -1,3 +1,4 @@
+.env
 .idea
 .nyc_output
 BUILD.md
@@ -9,6 +10,7 @@ docs
 extension
 lib
 node_modules
+nodemon.json
 scripts
 server.js
 tests

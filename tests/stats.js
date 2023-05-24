@@ -9,7 +9,7 @@ const withTransportPayload = require('./payloads/rtcstatsreport-with-transport.j
 const withoutTransportPayload = require('./payloads/rtcstatsreport-without-transport.json');
 const withTransportSpec = require('./spec/rtcicecandidates-with-transport.json');
 const withoutTransportSpec = require('./spec/rtcicecandidates-without-transport.json');
-const MockRTCStatsReport = require('../lib/twilio/rtc/mockrtcstatsreport');
+const MockRTCStatsReport = require('../lib/twilio/rtc/mockrtcstatsreport').default;
 
 describe('Stats Report', () => {
   describe('getRTCIceCandidateStatsReport', () => {

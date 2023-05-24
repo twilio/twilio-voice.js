@@ -1,4 +1,10 @@
-const XHR = require('xmlhttprequest').XMLHttpRequest;
+/**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+// @ts-nocheck
+import { XMLHttpRequest as XHR } from 'xmlhttprequest';
 
 function request(method, params, callback) {
   const options = {};
@@ -16,7 +22,7 @@ function request(method, params, callback) {
 
     callback(new Error(xhr.responseText));
   };
-
+  // tslint:disable-next-line
   for (const headerName in params.headers) {
     xhr.setRequestHeader(headerName, params.headers[headerName]);
   }
@@ -31,7 +37,7 @@ function request(method, params, callback) {
  * @param {Array}  params.headers - An array of headers to pass [{ headerName : headerBody }]
  * @param {Object} params.body - A JSON body to send to the resource
  * @returns {response}
- **/
+ */
 const Request = request;
 
 /**
@@ -52,4 +58,4 @@ Request.post = function post(params, callback) {
   return new this('POST', params, callback);
 };
 
-module.exports = Request;
+export default Request;

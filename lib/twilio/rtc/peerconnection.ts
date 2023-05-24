@@ -1,13 +1,19 @@
-const {
+/**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+// @ts-nocheck
+import {
   InvalidArgumentError,
   MediaErrors,
   NotSupportedError,
   SignalingErrors,
-} = require('../errors');
-const Log = require('../log').default;
-const util = require('../util');
-const RTCPC = require('./rtcpc');
-const { setIceAggressiveNomination } = require('./sdp');
+} from '../errors';
+import Log from '../log';
+import * as util from '../util';
+import RTCPC from './rtcpc';
+import { setIceAggressiveNomination } from './sdp';
 
 const ICE_GATHERING_TIMEOUT = 15000;
 const ICE_GATHERING_FAIL_NONE = 'none';
@@ -32,7 +38,11 @@ function PeerConnection(audioHelper, pstream, getUserMedia, options) {
     return new PeerConnection(audioHelper, pstream, getUserMedia, options);
   }
 
-  function noop() { }
+  this._log = Log.getInstance();
+
+  function noop() {
+    this._log.warn('Unexpected noop call in peerconnection');
+  }
   this.onaudio = noop;
   this.onopen = noop;
   this.onerror = noop;
@@ -91,8 +101,6 @@ function PeerConnection(audioHelper, pstream, getUserMedia, options) {
   this.util = options.util || util;
   this.codecPreferences = options.codecPreferences;
 
-  this._log = Log.getInstance();
-
   return this;
 }
 
@@ -131,6 +139,7 @@ PeerConnection.prototype._createAnalyser = (audioContext, options) => {
   }, options);
 
   const analyser = audioContext.createAnalyser();
+  // tslint:disable-next-line
   for (const field in options) {
     analyser[field] = options[field];
   }
@@ -152,8 +161,8 @@ PeerConnection.prototype._startPollingVolume = function() {
   const inputBufferLength = inputAnalyser.frequencyBinCount;
   const inputDataArray = new Uint8Array(inputBufferLength);
   this._inputAnalyser2 = this._createAnalyser(audioContext, {
-    minDecibels: -127,
     maxDecibels: 0,
+    minDecibels: -127,
     smoothingTimeConstant: 0,
   });
 
@@ -161,8 +170,8 @@ PeerConnection.prototype._startPollingVolume = function() {
   const outputBufferLength = outputAnalyser.frequencyBinCount;
   const outputDataArray = new Uint8Array(outputBufferLength);
   this._outputAnalyser2 = this._createAnalyser(audioContext, {
-    minDecibels: -127,
     maxDecibels: 0,
+    minDecibels: -127,
     smoothingTimeConstant: 0,
   });
 
@@ -211,10 +220,9 @@ PeerConnection.prototype._stopStream = function _stopStream(stream) {
     audioTracks.forEach(track => {
       track.stop();
     });
-  }
-  // NOTE(mroberts): This is just a fallback to any ancient browsers that may
-  // not implement MediaStreamTrack.stop.
-  else {
+  } else {
+    // NOTE(mroberts): This is just a fallback to any ancient browsers that may
+    // not implement MediaStreamTrack.stop.
     stream.stop();
   }
 };
@@ -497,7 +505,7 @@ PeerConnection.prototype._createAudioOutput = function createAudioOutput(id) {
   return audio.setSinkId(id).then(() => audio.play()).then(() => {
     self.outputs.set(id, {
       audio,
-      dest
+      dest,
     });
   });
 };
@@ -589,9 +597,7 @@ PeerConnection.prototype._onAddTrack = function onAddTrack(pc, stream) {
   // Assign the initial master audio element to a random active output device
   const deviceId = Array.from(pc.outputs.keys())[0] || 'default';
   pc._masterAudioDeviceId = deviceId;
-  pc.outputs.set(deviceId, {
-    audio
-  });
+  pc.outputs.set(deviceId, { audio });
 
   try {
     pc._mediaStreamSource = pc._audioContext.createMediaStreamSource(stream);
@@ -617,9 +623,7 @@ PeerConnection.prototype._fallbackOnAddTrack = function fallbackOnAddTrack(pc, s
     pc._log.info('Error attaching stream to element.');
   }
 
-  pc.outputs.set('default', {
-    audio
-  });
+  pc.outputs.set('default', { audio });
 };
 
 PeerConnection.prototype._setEncodingParameters = function(enableDscp) {
@@ -1121,7 +1125,6 @@ function addStream(pc, stream) {
 function cloneStream(oldStream) {
   const newStream = typeof MediaStream !== 'undefined'
     ? new MediaStream()
-    // eslint-disable-next-line
     : new webkitMediaStream();
 
   oldStream.getAudioTracks().forEach(newStream.addTrack, newStream);
@@ -1159,4 +1162,4 @@ function setAudioSource(audio, stream) {
 
 PeerConnection.enabled = RTCPC.test();
 
-module.exports = PeerConnection;
+export default PeerConnection;

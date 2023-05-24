@@ -1,6 +1,6 @@
 const sinon = require('sinon');
 const assert = require('assert');
-const getUserMedia = require('../lib/twilio/rtc/getusermedia');
+const getUserMedia = require('../lib/twilio/rtc/getusermedia').default;
 
 context('navigatorhelper', () => {
   context('getUserMedia', () => {

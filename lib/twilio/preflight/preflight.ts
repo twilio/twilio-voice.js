@@ -20,7 +20,7 @@ import RTCWarning from '../rtc/warning';
 import StatsMonitor from '../statsMonitor';
 import { NetworkTiming, TimeMeasurement } from './timing';
 
-const { COWBELL_AUDIO_URL, ECHO_TEST_DURATION } = require('../constants');
+import { COWBELL_AUDIO_URL, ECHO_TEST_DURATION } from '../constants';
 
 /**
  * Placeholder until we convert peerconnection.js to TypeScript.

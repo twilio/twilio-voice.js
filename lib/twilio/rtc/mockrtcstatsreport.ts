@@ -1,10 +1,15 @@
 /**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+// @ts-nocheck
+
+/**
  * This file was imported from another project. If making changes to this file, please don't
  * make them here. Make them on the linked repo below, then copy back:
  * https://code.hq.twilio.com/client/MockRTCStatsReport
  */
-
-/* eslint-disable no-undefined */
 
 // The legacy max volume, which is the positive half of a signed short integer.
 const OLD_MAX_VOLUME = 32767;
@@ -27,13 +32,13 @@ function MockRTCStatsReport(statsMap) {
 
   const self = this;
   Object.defineProperties(this, {
+    _map: { value: statsMap },
     size: {
       enumerable: true,
       get() {
         return self._map.size;
-      }
+      },
     },
-    _map: { value: statsMap }
   });
 
   this[Symbol.iterator] = statsMap[Symbol.iterator];
@@ -132,16 +137,16 @@ MockRTCStatsReport.fromRTCStatsResponse = function fromRTCStatsResponse(statsRes
  */
 function createRTCTransportStats(report) {
   return {
-    type: 'transport',
-    id: report.id,
-    timestamp: Date.parse(report.timestamp),
-    bytesSent: undefined,
     bytesReceived: undefined,
-    rtcpTransportStatsId: undefined,
+    bytesSent: undefined,
     dtlsState: undefined,
-    selectedCandidatePairId: report.stat('selectedCandidatePairId'),
+    id: report.id,
     localCertificateId: report.stat('localCertificateId'),
-    remoteCertificateId: report.stat('remoteCertificateId')
+    remoteCertificateId: report.stat('remoteCertificateId'),
+    rtcpTransportStatsId: undefined,
+    selectedCandidatePairId: report.stat('selectedCandidatePairId'),
+    timestamp: Date.parse(report.timestamp),
+    type: 'transport',
   };
 }
 
@@ -151,15 +156,15 @@ function createRTCTransportStats(report) {
  */
 function createRTCCodecStats(report) {
   return {
-    type: 'codec',
-    id: report.id,
-    timestamp: Date.parse(report.timestamp),
-    payloadType: undefined,
-    mimeType: `${report.stat('mediaType')}/${report.stat('googCodecName')}`,
-    clockRate: undefined,
     channels: undefined,
+    clockRate: undefined,
+    id: report.id,
+    implementation: undefined,
+    mimeType: `${report.stat('mediaType')}/${report.stat('googCodecName')}`,
+    payloadType: undefined,
     sdpFmtpLine: undefined,
-    implementation: undefined
+    timestamp: Date.parse(report.timestamp),
+    type: 'codec',
   };
 }
 
@@ -169,34 +174,34 @@ function createRTCCodecStats(report) {
  */
 function createRTCMediaStreamTrackStats(report) {
   return {
-    type: 'track',
-    id: report.id,
-    timestamp: Date.parse(report.timestamp),
-    trackIdentifier: report.stat('googTrackId'),
-    remoteSource: undefined,
-    ended: undefined,
-    kind: report.stat('mediaType'),
-    detached: undefined,
-    ssrcIds: undefined,
-    frameWidth: isPresent(report, 'googFrameWidthReceived')
-      ? getInt(report, 'googFrameWidthReceived')
-      : getInt(report, 'googFrameWidthSent'),
-    frameHeight: isPresent(report, 'googFrameHeightReceived')
-      ? getInt(report, 'googFrameHeightReceived')
-      : getInt(report, 'googFrameHeightSent'),
-    framesPerSecond: undefined,
-    framesSent: getInt(report, 'framesEncoded'),
-    framesReceived: undefined,
-    framesDecoded: getInt(report, 'framesDecoded'),
-    framesDropped: undefined,
-    framesCorrupted: undefined,
-    partialFramesLost: undefined,
-    fullFramesLost: undefined,
     audioLevel: isPresent(report, 'audioOutputLevel')
       ? getInt(report, 'audioOutputLevel') / OLD_MAX_VOLUME
       : (getInt(report, 'audioInputLevel') || 0) / OLD_MAX_VOLUME,
+    detached: undefined,
     echoReturnLoss: getFloat(report, 'googEchoCancellationReturnLoss'),
-    echoReturnLossEnhancement: getFloat(report, 'googEchoCancellationReturnLossEnhancement')
+    echoReturnLossEnhancement: getFloat(report, 'googEchoCancellationReturnLossEnhancement'),
+    ended: undefined,
+    frameHeight: isPresent(report, 'googFrameHeightReceived')
+      ? getInt(report, 'googFrameHeightReceived')
+      : getInt(report, 'googFrameHeightSent'),
+    frameWidth: isPresent(report, 'googFrameWidthReceived')
+      ? getInt(report, 'googFrameWidthReceived')
+      : getInt(report, 'googFrameWidthSent'),
+    framesCorrupted: undefined,
+    framesDecoded: getInt(report, 'framesDecoded'),
+    framesDropped: undefined,
+    framesPerSecond: undefined,
+    framesReceived: undefined,
+    framesSent: getInt(report, 'framesEncoded'),
+    fullFramesLost: undefined,
+    id: report.id,
+    kind: report.stat('mediaType'),
+    partialFramesLost: undefined,
+    remoteSource: undefined,
+    ssrcIds: undefined,
+    timestamp: Date.parse(report.timestamp),
+    trackIdentifier: report.stat('googTrackId'),
+    type: 'track',
   };
 }
 
@@ -207,26 +212,26 @@ function createRTCMediaStreamTrackStats(report) {
  */
 function createRTCRTPStreamStats(report, isInbound) {
   return {
-    id: report.id,
-    timestamp: Date.parse(report.timestamp),
-    ssrc: report.stat('ssrc'),
     associateStatsId: undefined,
-    isRemote: undefined,
-    mediaType: report.stat('mediaType'),
-    trackId: `track-${report.id}`,
-    transportId: report.stat('transportId'),
     codecId: `codec-${report.id}`,
     firCount: isInbound
       ? getInt(report, 'googFirsSent')
       : undefined,
-    pliCount: isInbound
-      ? getInt(report, 'googPlisSent')
-      : getInt(report, 'googPlisReceived'),
+    id: report.id,
+    isRemote: undefined,
+    mediaType: report.stat('mediaType'),
     nackCount: isInbound
       ? getInt(report, 'googNacksSent')
       : getInt(report, 'googNacksReceived'),
+    pliCount: isInbound
+      ? getInt(report, 'googPlisSent')
+      : getInt(report, 'googPlisReceived'),
+    qpSum: getInt(report, 'qpSum'),
     sliCount: undefined,
-    qpSum: getInt(report, 'qpSum')
+    ssrc: report.stat('ssrc'),
+    timestamp: Date.parse(report.timestamp),
+    trackId: `track-${report.id}`,
+    transportId: report.stat('transportId'),
   };
 }
 
@@ -238,24 +243,24 @@ function createRTCInboundRTPStreamStats(report) {
   const rtp = createRTCRTPStreamStats(report, true);
 
   Object.assign(rtp, {
-    type: 'inbound-rtp',
-    packetsReceived: getInt(report, 'packetsReceived'),
-    bytesReceived: getInt(report, 'bytesReceived'),
-    packetsLost: getInt(report, 'packetsLost'),
-    jitter: convertMsToSeconds(report.stat('googJitterReceived')),
-    fractionLost: undefined,
-    roundTripTime: convertMsToSeconds(report.stat('googRtt')),
-    packetsDiscarded: undefined,
-    packetsRepaired: undefined,
-    burstPacketsLost: undefined,
-    burstPacketsDiscarded: undefined,
-    burstLossCount: undefined,
     burstDiscardCount: undefined,
-    burstLossRate: undefined,
     burstDiscardRate: undefined,
-    gapLossRate: undefined,
+    burstLossCount: undefined,
+    burstLossRate: undefined,
+    burstPacketsDiscarded: undefined,
+    burstPacketsLost: undefined,
+    bytesReceived: getInt(report, 'bytesReceived'),
+    fractionLost: undefined,
+    framesDecoded: getInt(report, 'framesDecoded'),
     gapDiscardRate: undefined,
-    framesDecoded: getInt(report, 'framesDecoded')
+    gapLossRate: undefined,
+    jitter: convertMsToSeconds(report.stat('googJitterReceived')),
+    packetsDiscarded: undefined,
+    packetsLost: getInt(report, 'packetsLost'),
+    packetsReceived: getInt(report, 'packetsReceived'),
+    packetsRepaired: undefined,
+    roundTripTime: convertMsToSeconds(report.stat('googRtt')),
+    type: 'inbound-rtp',
   });
 
   return rtp;
@@ -269,12 +274,12 @@ function createRTCOutboundRTPStreamStats(report) {
   const rtp = createRTCRTPStreamStats(report, false);
 
   Object.assign(rtp, {
-    type: 'outbound-rtp',
-    remoteTimestamp: undefined,
-    packetsSent: getInt(report, 'packetsSent'),
     bytesSent: getInt(report, 'bytesSent'),
+    framesEncoded: getInt(report, 'framesEncoded'),
+    packetsSent: getInt(report, 'packetsSent'),
+    remoteTimestamp: undefined,
     targetBitrate: undefined,
-    framesEncoded: getInt(report, 'framesEncoded')
+    type: 'outbound-rtp',
   });
 
   return rtp;
@@ -287,21 +292,21 @@ function createRTCOutboundRTPStreamStats(report) {
  */
 function createRTCIceCandidateStats(report, isRemote) {
   return {
+    candidateType: translateCandidateType(report.stat('candidateType')),
+    deleted: undefined,
+    id: report.id,
+    ip: report.stat('ipAddress'),
+    isRemote,
+    port: getInt(report, 'portNumber'),
+    priority: getFloat(report, 'priority'),
+    protocol: report.stat('transport'),
+    relayProtocol: undefined,
+    timestamp: Date.parse(report.timestamp),
+    transportId: undefined,
     type: isRemote
       ? 'remote-candidate'
       : 'local-candidate',
-    id: report.id,
-    timestamp: Date.parse(report.timestamp),
-    transportId: undefined,
-    isRemote,
-    ip: report.stat('ipAddress'),
-    port: getInt(report, 'portNumber'),
-    protocol: report.stat('transport'),
-    candidateType: translateCandidateType(report.stat('candidateType')),
-    priority: getFloat(report, 'priority'),
     url: undefined,
-    relayProtocol: undefined,
-    deleted: undefined
   };
 }
 
@@ -311,32 +316,32 @@ function createRTCIceCandidateStats(report, isRemote) {
  */
 function createRTCIceCandidatePairStats(report) {
   return {
-    type: 'candidate-pair',
-    id: report.id,
-    timestamp: Date.parse(report.timestamp),
-    transportId: report.stat('googChannelId'),
-    localCandidateId: report.stat('localCandidateId'),
-    remoteCandidateId: report.stat('remoteCandidateId'),
-    state: undefined,
-    priority: undefined,
-    nominated: undefined,
-    writable: getBoolean(report, 'googWritable'),
-    readable: undefined,
-    bytesSent: getInt(report, 'bytesSent'),
-    bytesReceived: getInt(report, 'bytesReceived'),
-    lastPacketSentTimestamp: undefined,
-    lastPacketReceivedTimestamp: undefined,
-    totalRoundTripTime: undefined,
-    currentRoundTripTime: convertMsToSeconds(report.stat('googRtt')),
-    availableOutgoingBitrate: undefined,
     availableIncomingBitrate: undefined,
+    availableOutgoingBitrate: undefined,
+    bytesReceived: getInt(report, 'bytesReceived'),
+    bytesSent: getInt(report, 'bytesSent'),
+    consentRequestsSent: getInt(report, 'consentRequestsSent'),
+    currentRoundTripTime: convertMsToSeconds(report.stat('googRtt')),
+    id: report.id,
+    lastPacketReceivedTimestamp: undefined,
+    lastPacketSentTimestamp: undefined,
+    localCandidateId: report.stat('localCandidateId'),
+    nominated: undefined,
+    priority: undefined,
+    readable: undefined,
+    remoteCandidateId: report.stat('remoteCandidateId'),
     requestsReceived: getInt(report, 'requestsReceived'),
     requestsSent: getInt(report, 'requestsSent'),
     responsesReceived: getInt(report, 'responsesReceived'),
     responsesSent: getInt(report, 'responsesSent'),
     retransmissionsReceived: undefined,
     retransmissionsSent: undefined,
-    consentRequestsSent: getInt(report, 'consentRequestsSent')
+    state: undefined,
+    timestamp: Date.parse(report.timestamp),
+    totalRoundTripTime: undefined,
+    transportId: report.stat('googChannelId'),
+    type: 'candidate-pair',
+    writable: getBoolean(report, 'googWritable'),
   };
 }
 
@@ -346,13 +351,13 @@ function createRTCIceCandidatePairStats(report) {
  */
 function createRTCCertificateStats(report) {
   return {
-    type: 'certificate',
-    id: report.id,
-    timestamp: Date.parse(report.timestamp),
+    base64Certificate: report.stat('googDerBase64'),
     fingerprint: report.stat('googFingerprint'),
     fingerprintAlgorithm: report.stat('googFingerprintAlgorithm'),
-    base64Certificate: report.stat('googDerBase64'),
-    issuerCertificateId: report.stat('googIssuerId')
+    id: report.id,
+    issuerCertificateId: report.stat('googIssuerId'),
+    timestamp: Date.parse(report.timestamp),
+    type: 'certificate',
   };
 }
 
@@ -362,18 +367,18 @@ function createRTCCertificateStats(report) {
  */
 function createRTCDataChannelStats(report) {
   return {
-    type: 'data-channel',
-    id: report.id,
-    timestamp: Date.parse(report.timestamp),
-    label: report.stat('label'),
-    protocol: report.stat('protocol'),
-    datachannelid: report.stat('datachannelid'),
-    transportId: report.stat('transportId'),
-    state: report.stat('state'),
-    messagesSent: undefined,
+    bytesReceived: undefined,
     bytesSent: undefined,
+    datachannelid: report.stat('datachannelid'),
+    id: report.id,
+    label: report.stat('label'),
     messagesReceived: undefined,
-    bytesReceived: undefined
+    messagesSent: undefined,
+    protocol: report.stat('protocol'),
+    state: report.stat('state'),
+    timestamp: Date.parse(report.timestamp),
+    transportId: report.stat('transportId'),
+    type: 'data-channel',
   };
 }
 
@@ -430,4 +435,4 @@ function isPresent(report, statName) {
   return typeof stat !== 'undefined' && stat !== '';
 }
 
-module.exports = MockRTCStatsReport;
+export default MockRTCStatsReport;

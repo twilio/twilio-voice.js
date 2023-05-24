@@ -1,4 +1,11 @@
-const EventTarget = require('./eventtarget');
+/**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+// @ts-nocheck
+
+import EventTarget from './eventtarget';
 
 const POLL_INTERVAL_MS = 500;
 
@@ -23,19 +30,13 @@ class MediaDevicesShim extends EventTarget {
 
     const knownDevices = [];
     Object.defineProperties(this, {
-      _deviceChangeIsNative: {
-        value: reemitNativeEvent(this, 'devicechange')
-      },
-      _deviceInfoChangeIsNative: {
-        value: reemitNativeEvent(this, 'deviceinfochange')
-      },
-      _knownDevices: {
-        value: knownDevices
-      },
+      _deviceChangeIsNative: { value: reemitNativeEvent(this, 'devicechange') },
+      _deviceInfoChangeIsNative: { value: reemitNativeEvent(this, 'deviceinfochange') },
+      _knownDevices: { value: knownDevices },
       _pollInterval: {
         value: null,
-        writable: true
-      }
+        writable: true,
+      },
     });
 
     if (typeof nativeMediaDevices.enumerateDevices === 'function') {
@@ -181,7 +182,9 @@ function sortDevicesById(a, b) {
   return a.deviceId < b.deviceId;
 }
 
-module.exports = () => {
+const getMediaDevicesInstance = () => {
   nativeMediaDevices = typeof navigator !== 'undefined' ? navigator.mediaDevices : null;
   return nativeMediaDevices ? new MediaDevicesShim() : null;
 };
+
+export default getMediaDevicesInstance;

@@ -1,5 +1,11 @@
-const EventEmitter = require('events').EventEmitter;
-const request = require('./request');
+/**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+// @ts-nocheck
+import { EventEmitter } from 'events';
+import request from './request';
 
 /**
  * Builds Endpoint Analytics (EA) event payloads and sends them to
@@ -12,7 +18,8 @@ const request = require('./request');
  * @property {Boolean} isEnabled - Whether or not this publisher is publishing
  *   to the server. Currently ignores the request altogether, in the future this
  *   may store them in case publishing is re-enabled later. Defaults to true.
- *//**
+ */
+/**
  * @typedef {Object} EventPublisher.Options
  * @property {Object} [metadata=undefined] - A publisher_metadata object to send
  *   with each payload.
@@ -33,9 +40,7 @@ class EventPublisher extends EventEmitter {
     }
 
     // Apply default options
-    options = Object.assign({
-      defaultPayload() { return { }; }
-    }, options);
+    options = Object.assign({ defaultPayload() { return { }; } }, options);
 
     let defaultPayload = options.defaultPayload;
 
@@ -44,32 +49,31 @@ class EventPublisher extends EventEmitter {
     }
 
     let isEnabled = true;
-    // eslint-disable-next-line camelcase,no-undefined
     const metadata = Object.assign({ app_name: undefined, app_version: undefined }, options.metadata);
 
     Object.defineProperties(this, {
       _defaultPayload: { value: defaultPayload },
+      _host: { value: options.host, writable: true },
       _isEnabled: {
         get() { return isEnabled; },
-        set(_isEnabled) { isEnabled = _isEnabled; }
+        set(_isEnabled) { isEnabled = _isEnabled; },
       },
-      _host: { value: options.host, writable: true },
       _log: { value: options.log },
       _request: { value: options.request || request, writable: true },
       _token: { value: token, writable: true },
       isEnabled: {
         enumerable: true,
-        get() { return isEnabled; }
+        get() { return isEnabled; },
       },
       metadata: {
         enumerable: true,
-        get() { return metadata; }
+        get() { return metadata; },
       },
       productName: { enumerable: true, value: productName },
       token: {
         enumerable: true,
-        get() { return this._token; }
-      }
+        get() { return this._token; },
+      },
     });
   }
 }
@@ -98,31 +102,28 @@ EventPublisher.prototype._post = function _post(endpointName, level, group, name
   }
 
   const event = {
-    /* eslint-disable camelcase */
-    publisher: this.productName,
     group,
-    name,
-    timestamp: (new Date()).toISOString(),
     level: level.toUpperCase(),
-    payload_type: 'application/json',
-    private: false,
+    name,
     payload: (payload && payload.forEach) ?
-      payload.slice(0) : Object.assign(this._defaultPayload(connection), payload)
-    /* eslint-enable camelcase */
+      payload.slice(0) : Object.assign(this._defaultPayload(connection), payload),
+      payload_type: 'application/json',
+      private: false,
+    publisher: this.productName,
+    timestamp: (new Date()).toISOString(),
   };
 
   if (this.metadata) {
-    // eslint-disable-next-line camelcase
     event.publisher_metadata = this.metadata;
   }
 
   const requestParams = {
-    url: `https://${this._host}/v4/${endpointName}`,
     body: event,
     headers: {
       'Content-Type': 'application/json',
-      'X-Twilio-Token': this.token
-    }
+      'X-Twilio-Token': this.token,
+    },
+    url: `https://${this._host}/v4/${endpointName}`,
   };
 
   return new Promise((resolve, reject) => {
@@ -229,7 +230,7 @@ EventPublisher.prototype.postMetrics = function postMetrics(group, name, metrics
  * Update the host address of the insights server to publish to.
  * @param {String} host - The new host address of the insights server.
  */
- EventPublisher.prototype.setHost = function setHost(host) {
+EventPublisher.prototype.setHost = function setHost(host) {
   this._host = host;
 };
 
@@ -258,29 +259,27 @@ EventPublisher.prototype.disable = function disable() {
 
 function formatMetric(sample) {
   return {
-    /* eslint-disable camelcase */
-    timestamp: (new Date(sample.timestamp)).toISOString(),
-    total_packets_received: sample.totals.packetsReceived,
-    total_packets_lost: sample.totals.packetsLost,
-    total_packets_sent: sample.totals.packetsSent,
-    total_bytes_received: sample.totals.bytesReceived,
-    total_bytes_sent: sample.totals.bytesSent,
-    packets_received: sample.packetsReceived,
-    packets_lost: sample.packetsLost,
-    packets_lost_fraction: sample.packetsLostFraction &&
-    (Math.round(sample.packetsLostFraction * 100) / 100),
-    bytes_received: sample.bytesReceived,
-    bytes_sent: sample.bytesSent,
     audio_codec: sample.codecName,
     audio_level_in: sample.audioInputLevel,
     audio_level_out: sample.audioOutputLevel,
+    bytes_received: sample.bytesReceived,
+    bytes_sent: sample.bytesSent,
     call_volume_input: sample.inputVolume,
     call_volume_output: sample.outputVolume,
     jitter: sample.jitter,
+    mos: sample.mos && (Math.round(sample.mos * 100) / 100),
+    packets_lost: sample.packetsLost,
+    packets_lost_fraction: sample.packetsLostFraction &&
+      (Math.round(sample.packetsLostFraction * 100) / 100),
+    packets_received: sample.packetsReceived,
     rtt: sample.rtt,
-    mos: sample.mos && (Math.round(sample.mos * 100) / 100)
-    /* eslint-enable camelcase */
+    timestamp: (new Date(sample.timestamp)).toISOString(),
+    total_bytes_received: sample.totals.bytesReceived,
+    total_bytes_sent: sample.totals.bytesSent,
+    total_packets_lost: sample.totals.packetsLost,
+    total_packets_received: sample.totals.packetsReceived,
+    total_packets_sent: sample.totals.packetsSent,
   };
 }
 
-module.exports = EventPublisher;
+export default EventPublisher;

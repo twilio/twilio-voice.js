@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 'use strict';
 const env = require('../../env.js');
 const fetchRequest = require('./fetchRequest');
