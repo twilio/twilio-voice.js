@@ -1,6 +1,11 @@
+.circleci
+.deepsource.toml
 .env
+.github
 .idea
 .nyc_output
+.nycrc
+.release.json
 BUILD.md
 build.yaml
 config.example.yaml
@@ -8,9 +13,13 @@ config.yaml
 coverage
 docs
 extension
-lib
+karma.conf.ts
+karma.network.conf.ts
 node_modules
 nodemon.json
+PREFLIGHT.md
 scripts
 server.js
+templates
 tests
+tslint.json
