@@ -8,6 +8,7 @@ import { EventEmitter } from 'events';
 import { levels as LogLevels, LogLevelDesc } from 'loglevel';
 import AudioHelper from './audiohelper';
 import Call from './call';
+import * as C from './constants';
 import DialtonePlayer from './dialtonePlayer';
 import {
   AuthorizationErrors,
@@ -20,8 +21,10 @@ import {
   NotSupportedError,
   TwilioError,
 } from './errors';
+import Publisher from './eventpublisher';
 import Log from './log';
 import { PreflightTest } from './preflight/preflight';
+import PStream from './pstream';
 import {
   createEventGatewayURI,
   createSignalingEndpointURL,
@@ -31,19 +34,15 @@ import {
   Region,
   regionToEdge,
 } from './regions';
+import * as rtc from './rtc';
+import getUserMedia from './rtc/getusermedia';
+import Sound from './sound';
 import {
   isLegacyEdge,
   isUnifiedPlanDefault,
   queryToJson,
 } from './util';
 import { generateVoiceEventSid } from './uuid';
-
-const C = require('./constants');
-const Publisher = require('./eventpublisher');
-const PStream = require('./pstream');
-const rtc = require('./rtc');
-const getUserMedia = require('./rtc/getusermedia');
-const Sound = require('./sound');
 
 // Placeholders until we convert the respective files to TypeScript.
 /**

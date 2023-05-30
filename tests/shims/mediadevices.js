@@ -1,6 +1,6 @@
 const assert = require('assert');
 const sinon = require('sinon');
-const getMediaDevicesInstance = require('../../lib/twilio/shims/mediadevices');
+const getMediaDevicesInstance = require('../../lib/twilio/shims/mediadevices').default;
 
 describe('MediaDevicesShim', () => {
   const userMediaStream = 'USER-STREAM';

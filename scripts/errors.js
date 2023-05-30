@@ -1,6 +1,26 @@
 const fs = require('fs');
 const VoiceErrors = require('@twilio/voice-errors');
-const { USED_ERRORS } = require('../lib/twilio/constants');
+
+const USED_ERRORS = [
+  'AuthorizationErrors.AccessTokenExpired',
+  'AuthorizationErrors.AccessTokenInvalid',
+  'AuthorizationErrors.AuthenticationFailed',
+  'AuthorizationErrors.PayloadSizeExceededError',
+  'AuthorizationErrors.RateExceededError',
+  'ClientErrors.BadRequest',
+  'GeneralErrors.CallCancelledError',
+  'GeneralErrors.ConnectionError',
+  'GeneralErrors.TransportError',
+  'GeneralErrors.UnknownError',
+  'MalformedRequestErrors.MalformedRequestError',
+  'MediaErrors.ClientLocalDescFailed',
+  'MediaErrors.ClientRemoteDescFailed',
+  'MediaErrors.ConnectionError',
+  'SignalingErrors.ConnectionDisconnected',
+  'SignalingErrors.ConnectionError',
+  'UserMediaErrors.PermissionDeniedError',
+  'UserMediaErrors.AcquisitionFailedError',
+];
 
 let output = `/* tslint:disable max-classes-per-file max-line-length */
 /**

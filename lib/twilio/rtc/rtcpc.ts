@@ -1,8 +1,17 @@
+/**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+// @ts-nocheck
+// tslint:disable only-arrow-functions
 /* global webkitRTCPeerConnection, mozRTCPeerConnection, mozRTCSessionDescription, mozRTCIceCandidate */
+
+import Log from '../log';
+import * as util from '../util';
+import { setCodecPreferences, setMaxAverageBitrate } from './sdp';
+
 const RTCPeerConnectionShim = require('rtcpeerconnection-shim');
-const Log = require('../log').default;
-const { setCodecPreferences, setMaxAverageBitrate } = require('./sdp');
-const util = require('../util');
 
 function RTCPC(options) {
   if (typeof window === 'undefined') {
@@ -76,8 +85,8 @@ RTCPC.prototype.createOffer = function(maxAverageBitrate, codecPreferences, cons
     const sdp = setMaxAverageBitrate(offer.sdp, maxAverageBitrate);
 
     return promisifySet(this.pc.setLocalDescription, this.pc)(new RTCSessionDescription({
-      type: 'offer',
       sdp: setCodecPreferences(sdp, codecPreferences),
+      type: 'offer',
     }));
   }).then(onSuccess, onError);
 };
@@ -88,8 +97,8 @@ RTCPC.prototype.createAnswer = function(maxAverageBitrate, codecPreferences, con
     const sdp = setMaxAverageBitrate(answer.sdp, maxAverageBitrate);
 
     return promisifySet(this.pc.setLocalDescription, this.pc)(new RTCSessionDescription({
-      type: 'answer',
       sdp: setCodecPreferences(sdp, codecPreferences),
+      type: 'answer',
     }));
   }).then(onSuccess, onError);
 };
@@ -108,7 +117,7 @@ RTCPC.prototype.processAnswer = function(codecPreferences, sdp, onSuccess, onErr
   sdp = setCodecPreferences(sdp, codecPreferences);
 
   return promisifySet(this.pc.setRemoteDescription, this.pc)(
-    new RTCSessionDescription({ sdp, type: 'answer' })
+    new RTCSessionDescription({ sdp, type: 'answer' }),
   ).then(onSuccess, onError);
 };
 /* NOTE(mroberts): Firefox 18 through 21 include a `mozRTCPeerConnection`
@@ -122,7 +131,6 @@ RTCPC.prototype.processAnswer = function(codecPreferences, sdp, onSuccess, onErr
    test that we use to detect Firefox 24 and above, namely:
 
        typeof (new mozRTCPeerConnection()).getLocalStreams === 'function'
-
 
     NOTE(rrowland): We no longer support Legacy Edge as of Sep 1, 2020.
 */
@@ -143,10 +151,10 @@ RTCPC.test = () => {
       return true;
     } else if (getUserMedia && typeof window.mozRTCPeerConnection === 'function') {
       try {
-        // eslint-disable-next-line babel/new-cap
         const test = new window.mozRTCPeerConnection();
-        if (typeof test.getLocalStreams !== 'function')
+        if (typeof test.getLocalStreams !== 'function') {
           return false;
+        }
       } catch (e) {
         return false;
       }
@@ -190,4 +198,4 @@ function promisifySet(fn, ctx) {
   return promisify(fn, ctx, false, false);
 }
 
-module.exports = RTCPC;
+export default RTCPC;

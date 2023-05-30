@@ -1,7 +1,7 @@
 const assert = require('assert');
 const sinon = require('sinon');
 
-const PStream = require('../lib/twilio/pstream');
+const PStream = require('../lib/twilio/pstream').default;
 const { RELEASE_VERSION } = require('../lib/twilio/constants');
 const TransportFactory = require('./mock/WSTransport');
 

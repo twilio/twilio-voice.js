@@ -52,11 +52,11 @@ describe('Device', function() {
     return activeCall = createEmitterStub(require('../../lib/twilio/call').default);
   };
   const PStream = sinon.spy((...args: any[]) =>
-    pstream = createEmitterStub(require('../../lib/twilio/pstream')));
+    pstream = createEmitterStub(require('../../lib/twilio/pstream').default));
   const Publisher = sinon.spy((...args: any[]) =>
-    publisher = createEmitterStub(require('../../lib/twilio/eventpublisher')));
+    publisher = createEmitterStub(require('../../lib/twilio/eventpublisher').default));
   const Sound = (name: Device.SoundName) =>
-    sounds[name] = sinon.createStubInstance(require('../../lib/twilio/sound'));
+    sounds[name] = sinon.createStubInstance(require('../../lib/twilio/sound').default);
   const setupOptions: any = { AudioHelper, Call, PStream, Publisher, Sound };
 
   afterEach(() => {

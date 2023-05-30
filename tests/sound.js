@@ -1,7 +1,7 @@
 const assert = require('assert');
 const sinon = require('sinon');
 
-const Sound = require('../lib/twilio/sound');
+const Sound = require('../lib/twilio/sound').default;
 
 describe('Sound', () => {
   const root = global;

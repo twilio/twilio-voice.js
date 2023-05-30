@@ -1,7 +1,6 @@
 'use strict';
 
 // NOTE(mroberts): We need to do this for envify.
-/* eslint no-process-env:0 */
 const processEnv = {
   ACCOUNT_SID: process.env.ACCOUNT_SID,
   APPLICATION_SID: process.env.APPLICATION_SID,

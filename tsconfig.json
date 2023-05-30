@@ -11,8 +11,7 @@
     "noImplicitThis": true,
     "rootDir": "lib",
     "outDir": "es5",
-    "sourceMap": true,
-    "inlineSources": true,
+    "inlineSourceMap": true,
     "strictNullChecks": true
   },
   "include": [

@@ -1,8 +1,14 @@
-const util = require('../util');
+/**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+// @ts-nocheck
+import * as util from '../util';
 
 const ptToFixedBitrateAudioCodecName = {
   0: 'PCMU',
-  8: 'PCMA'
+  8: 'PCMA',
 };
 
 const defaultOpusId = 111;
@@ -178,9 +184,9 @@ function getPayloadTypesInMediaSection(section) {
   return matches.slice(1).map(match => parseInt(match, 10));
 }
 
-module.exports = {
+export {
   getPreferredCodecInfo,
   setCodecPreferences,
   setIceAggressiveNomination,
-  setMaxAverageBitrate
+  setMaxAverageBitrate,
 };

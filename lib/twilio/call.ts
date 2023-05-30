@@ -17,17 +17,17 @@ import {
   UserMediaErrors,
 } from './errors';
 import Log from './log';
+import { PeerConnection } from './rtc';
 import { IceCandidate, RTCIceCandidate } from './rtc/icecandidate';
 import RTCSample from './rtc/sample';
+import { getPreferredCodecInfo } from './rtc/sdp';
 import RTCWarning from './rtc/warning';
 import StatsMonitor from './statsMonitor';
 import { isChrome } from './util';
 import { generateVoiceEventSid } from './uuid';
 
 const Backoff = require('backoff');
-const C = require('./constants');
-const { PeerConnection } = require('./rtc');
-const { getPreferredCodecInfo } = require('./rtc/sdp');
+const { RELEASE_VERSION } = require('./constants');
 
 // Placeholders until we convert the respective files to TypeScript.
 /**
@@ -1005,7 +1005,7 @@ class Call extends EventEmitter {
     const payload: Partial<Record<string, string|boolean>> = {
       call_sid: this.parameters.CallSid,
       dscp: !!this._options.dscp,
-      sdk_version: C.RELEASE_VERSION,
+      sdk_version: RELEASE_VERSION,
     };
 
     if (this._options.gateway) {

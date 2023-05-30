@@ -1,6 +1,12 @@
-/* eslint-disable no-fallthrough */
-const { NotSupportedError, InvalidArgumentError } = require('../errors');
-const MockRTCStatsReport = require('./mockrtcstatsreport');
+/**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+// @ts-nocheck
+// tslint:disable no-empty
+import { InvalidArgumentError, NotSupportedError } from '../errors';
+import MockRTCStatsReport from './mockrtcstatsreport';
 
 const ERROR_PEER_CONNECTION_NULL = 'PeerConnection is null';
 const ERROR_WEB_RTC_UNSUPPORTED = 'WebRTC statistics are unsupported';
@@ -54,9 +60,7 @@ function getRTCStatsReport(peerConnection) {
  * @return {Promise<RTCSample>} Universally-formatted version of RTC stats.
  */
 function getRTCStats(peerConnection, options) {
-  options = Object.assign({
-    createRTCSample
-  }, options);
+  options = Object.assign({ createRTCSample }, options);
 
   return getRTCStatsReport(peerConnection).then(options.createRTCSample);
 }
@@ -105,8 +109,7 @@ function getRTCIceCandidateStatsReport(peerConnection) {
       // Firefox
       pair.selected ||
       // Spec-compliant way
-      (transport && pair.id === transport.selectedCandidatePairId)
-    );
+      (transport && pair.id === transport.selectedCandidatePairId));
 
     let selectedIceCandidatePairStats;
     if (selectedCandidatePairReport) {
@@ -225,7 +228,7 @@ function createRTCSample(statsReport) {
   return sample;
 }
 
-module.exports = {
+export {
   getRTCStats,
   getRTCIceCandidateStatsReport,
 };

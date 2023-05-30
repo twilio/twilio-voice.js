@@ -1,6 +1,6 @@
 const assert = require('assert');
 const sinon = require('sinon');
-const EventPublisher = require('../lib/twilio/eventpublisher');
+const EventPublisher = require('../lib/twilio/eventpublisher').default;
 
 describe('EventPublisher', () => {
   let publisher;

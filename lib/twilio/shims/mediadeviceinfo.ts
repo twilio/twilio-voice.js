@@ -1,3 +1,9 @@
+/**
+ * @packageDocumentation
+ * @module Voice
+ * @internalapi
+ */
+// @ts-nocheck
 class MediaDeviceInfoShim {
   constructor(options) {
     Object.defineProperties(this, {
@@ -9,5 +15,4 @@ class MediaDeviceInfoShim {
   }
 }
 
-module.exports = MediaDeviceInfoShim;
-
+export default MediaDeviceInfoShim;
