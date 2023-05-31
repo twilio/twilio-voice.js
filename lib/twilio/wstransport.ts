@@ -6,11 +6,9 @@
 
 import { EventEmitter } from 'events';
 import * as WebSocket from 'ws';
+import Backoff from './backoff';
 import { SignalingErrors } from './errors';
 import Log from './log';
-
-// tslint:disable-next-line
-const Backoff = require('backoff');
 
 const CONNECT_SUCCESS_TIMEOUT = 10000;
 const CONNECT_TIMEOUT = 5000;
@@ -521,11 +519,12 @@ export default class WSTransport extends EventEmitter {
   private _setupBackoffs(): typeof WSTransport.prototype._backoff {
     const preferredBackoffConfig = {
       factor: 2.0,
-      maxDelay: this._options.maxPreferredDelayMs,
-      randomisationFactor: 0.40,
+      jitter: 0.40,
+      max: this._options.maxPreferredDelayMs,
+      min: 100,
     };
     this._log.info('Initializing preferred transport backoff using config: ', preferredBackoffConfig);
-    const preferredBackoff = Backoff.exponential(preferredBackoffConfig);
+    const preferredBackoff = new Backoff(preferredBackoffConfig);
 
     preferredBackoff.on('backoff', (attempt: number, delay: number) => {
       if (this.state === WSTransportState.Closed) {
@@ -565,16 +564,16 @@ export default class WSTransport extends EventEmitter {
 
     const primaryBackoffConfig = {
       factor: 2.0,
+      jitter: 0.40,
+      max: this._options.maxPrimaryDelayMs,
       // We only want a random initial delay if there are any fallback edges
       // Initial delay between 1s and 5s both inclusive
-      initialDelay: this._uris && this._uris.length > 1
+      min: this._uris && this._uris.length > 1
         ? Math.floor(Math.random() * (5000 - 1000 + 1)) + 1000
         : 100,
-      maxDelay: this._options.maxPrimaryDelayMs,
-      randomisationFactor: 0.40,
     };
     this._log.info('Initializing primary transport backoff using config: ', primaryBackoffConfig);
-    const primaryBackoff = Backoff.exponential(primaryBackoffConfig);
+    const primaryBackoff = new Backoff(primaryBackoffConfig);
 
     primaryBackoff.on('backoff', (attempt: number, delay: number) => {
       if (this.state === WSTransportState.Closed) {
