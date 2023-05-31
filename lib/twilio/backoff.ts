@@ -20,21 +20,9 @@ class Backoff extends EventEmitter {
   constructor(options) {
     super();
     Object.defineProperties(this, {
-      _min: {
-        value: options.min || 100
-      },
-      _max: {
-        value: options.max || 10000
-      },
-      _jitter: {
-        value: options.jitter > 0 && options.jitter <= 1 ? options.jitter : 0
-      },
-      _factor: {
-        value: options.factor || 2
-      },
       _attempts: {
         value: 0,
-        writable: true
+        writable: true,
       },
       _duration: {
         enumerable: false,
@@ -43,20 +31,26 @@ class Backoff extends EventEmitter {
           if (this._jitter) {
             const rand =  Math.random();
             const deviation = Math.floor(rand * this._jitter * ms);
+            // tslint:disable-next-line
             ms = (Math.floor(rand * 10) & 1) === 0  ? ms - deviation : ms + deviation;
           }
+          // tslint:disable-next-line
           return Math.min(ms, this._max) | 0;
-        }
+        },
       },
+      _factor: { value: options.factor || 2 },
+      _jitter: { value: options.jitter > 0 && options.jitter <= 1 ? options.jitter : 0 },
+      _max: { value: options.max || 10000 },
+      _min: { value: options.min || 100 },
       _timeoutID: {
         value: null,
-        writable: true
-      }
+        writable: true,
+      },
     });
   }
 
   backoff() {
-    let duration = this._duration;
+    const duration = this._duration;
     if (this._timeoutID) {
       clearTimeout(this._timeoutID);
       this._timeoutID = null;
