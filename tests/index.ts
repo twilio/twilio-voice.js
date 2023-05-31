@@ -85,6 +85,7 @@ require('./sound');
 require('./sdp');
 
 require('./unit/asyncQueue');
+require('./unit/backoff');
 require('./unit/icecandidate');
 require('./unit/call');
 require('./unit/device');
