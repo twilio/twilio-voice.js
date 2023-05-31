@@ -5,6 +5,7 @@
  * @internal
  */
 import { EventEmitter } from 'events';
+import Backoff from './backoff';
 import Device from './device';
 import DialtonePlayer from './dialtonePlayer';
 import {
@@ -26,7 +27,6 @@ import StatsMonitor from './statsMonitor';
 import { isChrome } from './util';
 import { generateVoiceEventSid } from './uuid';
 
-const Backoff = require('backoff');
 const { RELEASE_VERSION } = require('./constants');
 
 // Placeholders until we convert the respective files to TypeScript.
@@ -53,9 +53,9 @@ export type ISound = any;
 
 const BACKOFF_CONFIG = {
   factor: 1.1,
-  initialDelay: 1,
-  maxDelay: 30000,
-  randomisationFactor: 0.5,
+  jitter: 0.5,
+  max: 30000,
+  min: 1,
 };
 
 const DTMF_INTER_TONE_GAP: number = 70;
@@ -345,7 +345,7 @@ class Call extends EventEmitter {
       this.callerInfo = null;
     }
 
-    this._mediaReconnectBackoff = Backoff.exponential(BACKOFF_CONFIG);
+    this._mediaReconnectBackoff = new Backoff(BACKOFF_CONFIG);
     this._mediaReconnectBackoff.on('ready', () => this._mediaHandler.iceRestart());
 
     // temporary call sid to be used for outgoing calls
@@ -1242,7 +1242,7 @@ class Call extends EventEmitter {
       if (isEndOfIceCycle) {
 
         // We already exceeded max retry time.
-        if (Date.now() - this._mediaReconnectStartTime > BACKOFF_CONFIG.maxDelay) {
+        if (Date.now() - this._mediaReconnectStartTime > BACKOFF_CONFIG.max) {
           this._log.info('Exceeded max ICE retries');
           return this._mediaHandler.onerror(MEDIA_DISCONNECT_ERROR);
         }
