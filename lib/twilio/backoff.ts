@@ -1,6 +1,5 @@
 /**
  * @packageDocumentation
- * @module Voice
  * @internalapi
  */
 // @ts-nocheck
