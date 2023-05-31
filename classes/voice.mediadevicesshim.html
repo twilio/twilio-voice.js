@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>&quot;twilio/constants&quot; | @twilio/voice-sdk</title>
+	<title>MediaDevicesShim | @twilio/voice-sdk</title>
 	<meta name="description" content="">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" href="../assets/css/main.css">
@@ -44,67 +44,51 @@
 					<a href="../globals.html">Globals</a>
 				</li>
 				<li>
-					<a href="_twilio_constants_.html">&quot;twilio/constants&quot;</a>
+					<a href="../modules/voice.html">Voice</a>
+				</li>
+				<li>
+					<a href="voice.mediadevicesshim.html">MediaDevicesShim</a>
 				</li>
 			</ul>
-			<h1>External module &quot;twilio/constants&quot;</h1>
+			<h1>Class MediaDevicesShim</h1>
 		</div>
 	</div>
 </header>
 <div class="container container-main">
 	<div class="row">
 		<div class="col-8 col-content">
+			<section class="tsd-panel tsd-comment">
+				<div class="tsd-comment tsd-typography">
+					<div class="lead">
+						<p>Make a custom MediaDevices object, and proxy through existing functionality. If
+							devicechange is present, we simply reemit the event. If not, we will do the
+							detection ourselves and fire the event when necessary. The same logic exists
+							for deviceinfochange for consistency, however deviceinfochange is our own event
+							so it is unlikely that it will ever be native. The w3c spec for devicechange
+							is unclear as to whether MediaDeviceInfo changes (such as label) will
+							trigger the devicechange event. We have an open question on this here:
+						<a href="https://bugs.chromium.org/p/chromium/issues/detail?id=585096">https://bugs.chromium.org/p/chromium/issues/detail?id=585096</a></p>
+					</div>
+				</div>
+			</section>
+			<section class="tsd-panel tsd-hierarchy">
+				<h3>Hierarchy</h3>
+				<ul class="tsd-hierarchy">
+					<li>
+						<span class="tsd-signature-type">any</span>
+						<ul class="tsd-hierarchy">
+							<li>
+								<span class="target">MediaDevicesShim</span>
+							</li>
+						</ul>
+					</li>
+				</ul>
+			</section>
 			<section class="tsd-panel-group tsd-index-group">
 				<h2>Index</h2>
 				<section class="tsd-panel tsd-index-panel">
 					<div class="tsd-index-content">
-						<section class="tsd-index-section tsd-is-external">
-							<h3>Variables</h3>
-							<ul class="tsd-index-list">
-								<li class="tsd-kind-variable tsd-parent-kind-external-module tsd-is-external"><a href="_twilio_constants_.html#package_name" class="tsd-kind-icon">PACKAGE_<wbr>NAME</a></li>
-								<li class="tsd-kind-variable tsd-parent-kind-external-module tsd-is-external"><a href="_twilio_constants_.html#release_version" class="tsd-kind-icon">RELEASE_<wbr>VERSION</a></li>
-								<li class="tsd-kind-variable tsd-parent-kind-external-module tsd-is-external"><a href="_twilio_constants_.html#sounds_base_url" class="tsd-kind-icon">SOUNDS_<wbr>BASE_<wbr>URL</a></li>
-							</ul>
-						</section>
 					</div>
-				</section>
-			</section>
-			<section class="tsd-panel-group tsd-member-group tsd-is-external">
-				<h2>Variables</h2>
-				<section class="tsd-panel tsd-member tsd-kind-variable tsd-parent-kind-external-module tsd-is-external">
-					<a name="package_name" class="tsd-anchor"></a>
-					<h3><span class="tsd-flag ts-flagConst">Const</span> PACKAGE_<wbr>NAME</h3>
-					<div class="tsd-signature tsd-kind-icon">PACKAGE_<wbr>NAME<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">"@twilio/voice-sdk"</span><span class="tsd-signature-symbol"> = &quot;@twilio/voice-sdk&quot;</span></div>
-					<aside class="tsd-sources">
-						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/6d5eaea/lib/twilio/constants.js#L4">lib/twilio/constants.js:4</a></li>
-						</ul>
-					</aside>
-					<div class="tsd-comment tsd-typography">
-						<div class="lead">
-							<p>This file is generated on build. To make changes, see /templates/constants.js</p>
-						</div>
-					</div>
-				</section>
-				<section class="tsd-panel tsd-member tsd-kind-variable tsd-parent-kind-external-module tsd-is-external">
-					<a name="release_version" class="tsd-anchor"></a>
-					<h3><span class="tsd-flag ts-flagConst">Const</span> RELEASE_<wbr>VERSION</h3>
-					<div class="tsd-signature tsd-kind-icon">RELEASE_<wbr>VERSION<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">"2.5.0"</span><span class="tsd-signature-symbol"> = &quot;2.5.0&quot;</span></div>
-					<aside class="tsd-sources">
-						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/6d5eaea/lib/twilio/constants.js#L5">lib/twilio/constants.js:5</a></li>
-						</ul>
-					</aside>
-				</section>
-				<section class="tsd-panel tsd-member tsd-kind-variable tsd-parent-kind-external-module tsd-is-external">
-					<a name="sounds_base_url" class="tsd-anchor"></a>
-					<h3><span class="tsd-flag ts-flagConst">Const</span> SOUNDS_<wbr>BASE_<wbr>URL</h3>
-					<div class="tsd-signature tsd-kind-icon">SOUNDS_<wbr>BASE_<wbr>URL<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">"https://sdk.twilio.com/js/client/sounds/releases/1.0.0"</span><span class="tsd-signature-symbol"> = &quot;https://sdk.twilio.com/js/client/sounds/releases/1.0.0&quot;</span></div>
-					<aside class="tsd-sources">
-						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/6d5eaea/lib/twilio/constants.js#L6">lib/twilio/constants.js:6</a></li>
-						</ul>
-					</aside>
 				</section>
 			</section>
 		</div>
@@ -117,49 +101,37 @@
 					<li class="label tsd-is-external">
 						<span>Internals</span>
 					</li>
-					<li class=" tsd-kind-external-module">
-						<a href="voice.html">Voice</a>
+					<li class="current tsd-kind-external-module">
+						<a href="../modules/voice.html">Voice</a>
 					</li>
 					<li class="label tsd-is-external">
 						<span>Externals</span>
 					</li>
-					<li class="current tsd-kind-external-module tsd-is-external">
-						<a href="_twilio_constants_.html">&quot;twilio/constants&quot;</a>
+					<li class=" tsd-kind-external-module tsd-is-external">
+						<a href="../modules/_twilio_backoff_.html">&quot;twilio/backoff&quot;</a>
 					</li>
 					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="_twilio_errors_index_.html">&quot;twilio/errors/index&quot;</a>
+						<a href="../modules/_twilio_errors_index_.html">&quot;twilio/errors/index&quot;</a>
 					</li>
 					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="_twilio_rtc_mockrtcstatsreport_.html">&quot;twilio/rtc/mockrtcstatsreport&quot;</a>
-					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="_twilio_rtc_stats_.html">&quot;twilio/rtc/stats&quot;</a>
-					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="_twilio_shims_eventtarget_.html">&quot;twilio/shims/eventtarget&quot;</a>
-					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="_twilio_shims_mediadevices_.html">&quot;twilio/shims/mediadevices&quot;</a>
-					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="_twilio_util_.html">&quot;twilio/util&quot;</a>
-					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="tools.html">Tools</a>
+						<a href="../modules/tools.html">Tools</a>
 					</li>
 				</ul>
 			</nav>
 			<nav class="tsd-navigation secondary menu-sticky">
 				<ul class="before-current">
-					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-external">
-						<a href="_twilio_constants_.html#package_name" class="tsd-kind-icon">PACKAGE_<wbr>NAME</a>
+				</ul>
+				<ul class="current">
+					<li class="current tsd-kind-class tsd-parent-kind-external-module tsd-is-external tsd-is-not-exported">
+						<a href="voice.mediadevicesshim.html" class="tsd-kind-icon">Media<wbr>Devices<wbr>Shim</a>
+						<ul>
+							<li class=" tsd-kind-constructor tsd-parent-kind-class tsd-is-external tsd-is-not-exported">
+								<a href="voice.mediadevicesshim.html#constructor" class="tsd-kind-icon">constructor</a>
+							</li>
+						</ul>
 					</li>
-					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-external">
-						<a href="_twilio_constants_.html#release_version" class="tsd-kind-icon">RELEASE_<wbr>VERSION</a>
-					</li>
-					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-external">
-						<a href="_twilio_constants_.html#sounds_base_url" class="tsd-kind-icon">SOUNDS_<wbr>BASE_<wbr>URL</a>
-					</li>
+				</ul>
+				<ul class="after-current">
 				</ul>
 			</nav>
 		</div>

@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>MediaDevicesShim | @twilio/voice-sdk</title>
+	<title>MediaDeviceInfoShim | @twilio/voice-sdk</title>
 	<meta name="description" content="">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" href="../assets/css/main.css">
@@ -44,43 +44,24 @@
 					<a href="../globals.html">Globals</a>
 				</li>
 				<li>
-					<a href="../modules/_twilio_shims_mediadevices_.html">&quot;twilio/shims/mediadevices&quot;</a>
+					<a href="../modules/voice.html">Voice</a>
 				</li>
 				<li>
-					<a href="_twilio_shims_mediadevices_.mediadevicesshim.html">MediaDevicesShim</a>
+					<a href="voice.mediadeviceinfoshim.html">MediaDeviceInfoShim</a>
 				</li>
 			</ul>
-			<h1>Class MediaDevicesShim</h1>
+			<h1>Class MediaDeviceInfoShim</h1>
 		</div>
 	</div>
 </header>
 <div class="container container-main">
 	<div class="row">
 		<div class="col-8 col-content">
-			<section class="tsd-panel tsd-comment">
-				<div class="tsd-comment tsd-typography">
-					<div class="lead">
-						<p>Make a custom MediaDevices object, and proxy through existing functionality. If
-							devicechange is present, we simply reemit the event. If not, we will do the
-							detection ourselves and fire the event when necessary. The same logic exists
-							for deviceinfochange for consistency, however deviceinfochange is our own event
-							so it is unlikely that it will ever be native. The w3c spec for devicechange
-							is unclear as to whether MediaDeviceInfo changes (such as label) will
-							trigger the devicechange event. We have an open question on this here:
-						<a href="https://bugs.chromium.org/p/chromium/issues/detail?id=585096">https://bugs.chromium.org/p/chromium/issues/detail?id=585096</a></p>
-					</div>
-				</div>
-			</section>
 			<section class="tsd-panel tsd-hierarchy">
 				<h3>Hierarchy</h3>
 				<ul class="tsd-hierarchy">
 					<li>
-						<a href="../modules/_twilio_shims_eventtarget_.html#eventtarget" class="tsd-signature-type">EventTarget</a>
-						<ul class="tsd-hierarchy">
-							<li>
-								<span class="target">MediaDevicesShim</span>
-							</li>
-						</ul>
+						<span class="target">MediaDeviceInfoShim</span>
 					</li>
 				</ul>
 			</section>
@@ -91,13 +72,7 @@
 						<section class="tsd-index-section tsd-is-external">
 							<h3>Constructors</h3>
 							<ul class="tsd-index-list">
-								<li class="tsd-kind-constructor tsd-parent-kind-class tsd-is-external"><a href="_twilio_shims_mediadevices_.mediadevicesshim.html#constructor" class="tsd-kind-icon">constructor</a></li>
-							</ul>
-						</section>
-						<section class="tsd-index-section tsd-is-external">
-							<h3>Methods</h3>
-							<ul class="tsd-index-list">
-								<li class="tsd-kind-method tsd-parent-kind-class tsd-is-static tsd-is-external"><a href="_twilio_shims_mediadevices_.mediadevicesshim.html#eventtarget" class="tsd-kind-icon">Event<wbr>Target</a></li>
+								<li class="tsd-kind-constructor tsd-parent-kind-class tsd-is-external"><a href="voice.mediadeviceinfoshim.html#constructor" class="tsd-kind-icon">constructor</a></li>
 							</ul>
 						</section>
 					</div>
@@ -109,36 +84,22 @@
 					<a name="constructor" class="tsd-anchor"></a>
 					<h3>constructor</h3>
 					<ul class="tsd-signatures tsd-kind-constructor tsd-parent-kind-class tsd-is-external">
-						<li class="tsd-signature tsd-kind-icon">new <wbr>Media<wbr>Devices<wbr>Shim<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="_twilio_shims_mediadevices_.mediadevicesshim.html" class="tsd-signature-type">MediaDevicesShim</a></li>
+						<li class="tsd-signature tsd-kind-icon">new <wbr>Media<wbr>Device<wbr>Info<wbr>Shim<span class="tsd-signature-symbol">(</span>options<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="voice.mediadeviceinfoshim.html" class="tsd-signature-type">MediaDeviceInfoShim</a></li>
 					</ul>
 					<ul class="tsd-descriptions">
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/6d5eaea/lib/twilio/shims/mediadevices.js#L17">lib/twilio/shims/mediadevices.js:17</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/6f5f3bd/lib/twilio/shims/mediadeviceinfo.ts#L7">lib/twilio/shims/mediadeviceinfo.ts:7</a></li>
 								</ul>
 							</aside>
-							<h4 class="tsd-returns-title">Returns <a href="_twilio_shims_mediadevices_.mediadevicesshim.html" class="tsd-signature-type">MediaDevicesShim</a></h4>
-						</li>
-					</ul>
-				</section>
-			</section>
-			<section class="tsd-panel-group tsd-member-group tsd-is-external">
-				<h2>Methods</h2>
-				<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-static tsd-is-external">
-					<a name="eventtarget" class="tsd-anchor"></a>
-					<h3><span class="tsd-flag ts-flagStatic">Static</span> Event<wbr>Target</h3>
-					<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-static tsd-is-external">
-						<li class="tsd-signature tsd-kind-icon">Event<wbr>Target<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
-					</ul>
-					<ul class="tsd-descriptions">
-						<li class="tsd-description">
-							<aside class="tsd-sources">
-								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/6d5eaea/lib/twilio/shims/eventtarget.js#L3">lib/twilio/shims/eventtarget.js:3</a></li>
-								</ul>
-							</aside>
-							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>options: <span class="tsd-signature-type">any</span></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <a href="voice.mediadeviceinfoshim.html" class="tsd-signature-type">MediaDeviceInfoShim</a></h4>
 						</li>
 					</ul>
 				</section>
@@ -153,32 +114,17 @@
 					<li class="label tsd-is-external">
 						<span>Internals</span>
 					</li>
-					<li class=" tsd-kind-external-module">
+					<li class="current tsd-kind-external-module">
 						<a href="../modules/voice.html">Voice</a>
 					</li>
 					<li class="label tsd-is-external">
 						<span>Externals</span>
 					</li>
 					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="../modules/_twilio_constants_.html">&quot;twilio/constants&quot;</a>
+						<a href="../modules/_twilio_backoff_.html">&quot;twilio/backoff&quot;</a>
 					</li>
 					<li class=" tsd-kind-external-module tsd-is-external">
 						<a href="../modules/_twilio_errors_index_.html">&quot;twilio/errors/index&quot;</a>
-					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="../modules/_twilio_rtc_mockrtcstatsreport_.html">&quot;twilio/rtc/mockrtcstatsreport&quot;</a>
-					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="../modules/_twilio_rtc_stats_.html">&quot;twilio/rtc/stats&quot;</a>
-					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="../modules/_twilio_shims_eventtarget_.html">&quot;twilio/shims/eventtarget&quot;</a>
-					</li>
-					<li class="current tsd-kind-external-module tsd-is-external">
-						<a href="../modules/_twilio_shims_mediadevices_.html">&quot;twilio/shims/mediadevices&quot;</a>
-					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="../modules/_twilio_util_.html">&quot;twilio/util&quot;</a>
 					</li>
 					<li class=" tsd-kind-external-module tsd-is-external">
 						<a href="../modules/tools.html">Tools</a>
@@ -190,48 +136,15 @@
 				</ul>
 				<ul class="current">
 					<li class="current tsd-kind-class tsd-parent-kind-external-module tsd-is-external">
-						<a href="_twilio_shims_mediadevices_.mediadevicesshim.html" class="tsd-kind-icon">Media<wbr>Devices<wbr>Shim</a>
+						<a href="voice.mediadeviceinfoshim.html" class="tsd-kind-icon">Media<wbr>Device<wbr>Info<wbr>Shim</a>
 						<ul>
 							<li class=" tsd-kind-constructor tsd-parent-kind-class tsd-is-external">
-								<a href="_twilio_shims_mediadevices_.mediadevicesshim.html#constructor" class="tsd-kind-icon">constructor</a>
-							</li>
-							<li class=" tsd-kind-method tsd-parent-kind-class tsd-is-static tsd-is-external">
-								<a href="_twilio_shims_mediadevices_.mediadevicesshim.html#eventtarget" class="tsd-kind-icon">Event<wbr>Target</a>
+								<a href="voice.mediadeviceinfoshim.html#constructor" class="tsd-kind-icon">constructor</a>
 							</li>
 						</ul>
 					</li>
 				</ul>
 				<ul class="after-current">
-					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-external">
-						<a href="../modules/_twilio_shims_mediadevices_.html#eventtarget" class="tsd-kind-icon">Event<wbr>Target</a>
-					</li>
-					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-external">
-						<a href="../modules/_twilio_shims_mediadevices_.html#poll_interval_ms" class="tsd-kind-icon">POLL_<wbr>INTERVAL_<wbr>MS</a>
-					</li>
-					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-external">
-						<a href="../modules/_twilio_shims_mediadevices_.html#nativemediadevices" class="tsd-kind-icon">native<wbr>Media<wbr>Devices</a>
-					</li>
-					<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-is-external">
-						<a href="../modules/_twilio_shims_mediadevices_.html#deviceinfoshavechanged" class="tsd-kind-icon">device<wbr>Infos<wbr>Have<wbr>Changed</a>
-					</li>
-					<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-is-external">
-						<a href="../modules/_twilio_shims_mediadevices_.html#deviceshavechanged" class="tsd-kind-icon">devices<wbr>Have<wbr>Changed</a>
-					</li>
-					<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-is-external">
-						<a href="../modules/_twilio_shims_mediadevices_.html#haschangelisteners" class="tsd-kind-icon">has<wbr>Change<wbr>Listeners</a>
-					</li>
-					<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-is-private tsd-is-external">
-						<a href="../modules/_twilio_shims_mediadevices_.html#propertyhaschanged" class="tsd-kind-icon">property<wbr>Has<wbr>Changed</a>
-					</li>
-					<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-is-private tsd-is-external">
-						<a href="../modules/_twilio_shims_mediadevices_.html#reemitnativeevent" class="tsd-kind-icon">reemit<wbr>Native<wbr>Event</a>
-					</li>
-					<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-is-private tsd-is-external">
-						<a href="../modules/_twilio_shims_mediadevices_.html#sampledevices" class="tsd-kind-icon">sample<wbr>Devices</a>
-					</li>
-					<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-is-external">
-						<a href="../modules/_twilio_shims_mediadevices_.html#sortdevicesbyid" class="tsd-kind-icon">sort<wbr>Devices<wbr>ById</a>
-					</li>
 				</ul>
 			</nav>
 		</div>
