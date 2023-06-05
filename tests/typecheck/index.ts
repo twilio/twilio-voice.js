@@ -1,15 +1,13 @@
-import { Device } from '../../';
+import checkAudioHelper from './audiohelper';
+import checkCall from './call';
+import checkDevice from './device';
+import checkPreflight from './preflight';
+import checkTwilioError from './twilioerror';
 
 (async () => {
-  const device: Device = new Device('foo', {});
-
-  await device.register();
-
-  const call = await device.connect({
-    params: { To: 'foo' }
-  });
-
-  device.audio?.disconnect(false);
-  device.audio?.incoming(false);
-  device.audio?.outgoing(false);
-});
+  await checkAudioHelper();
+  await checkCall();
+  await checkDevice();
+  await checkPreflight();
+  await checkTwilioError();
+})();
