@@ -2,12 +2,12 @@ const root = global as any;
 let handlers = {};
 root.resetEvents = () => { handlers = {}; };
 root.window = {
-  navigator: { userAgent: '' },
-  removeEventListener: (name: string) => {delete (handlers as any)[name];},
-  addEventListener: (name:string, func: Function) => {(handlers as any)[name] = func;},
+  addEventListener: (name: string, func: Function) => { (handlers as any)[name] = func; },
   dispatchEvent: (name: string) => {
     (handlers as any)[name]();
-  }
+  },
+  navigator: { userAgent: '' },
+  removeEventListener: (name: string) => { delete (handlers as any)[name]; },
 };
 
 root.XMLHttpRequest = () => { };
@@ -40,19 +40,19 @@ root.AudioContext.prototype.createBufferSource = () => ({
   connect() { },
   disconnect() { },
   start() { },
-  stop() { }
+  stop() { },
 });
 root.AudioContext.prototype.createGain = () => ({
   connect() { },
   disconnect() { },
-  gain: { value: 1 }
+  gain: { value: 1 },
 });
 root.AudioContext.prototype.createMediaStreamSource = () => ({
   connect() { },
-  disconnect() { }
+  disconnect() { },
 });
 root.AudioContext.prototype.decodeAudioData = () => ({
-  stream: 'foo'
+  stream: 'foo',
 });
 
 root.MediaStreamTrack = () => { };
@@ -68,7 +68,7 @@ root.navigator = {
     enumerateDevices() { return Promise.resolve([]) },
   },
   platform: 'platform',
-  userAgent: 'userAgent'
+  userAgent: 'userAgent',
 };
 
 root.RTCPeerConnection = root.window.RTCPeerConnection = function() { };

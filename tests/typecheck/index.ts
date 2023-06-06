@@ -6,10 +6,10 @@ import { Device } from '../../';
   await device.register();
 
   const call = await device.connect({
-    params: { To: 'foo' }
+    params: { To: 'foo' },
   });
 
   device.audio?.disconnect(false);
   device.audio?.incoming(false);
   device.audio?.outgoing(false);
-});
+})();

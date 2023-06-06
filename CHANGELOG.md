@@ -1,3 +1,11 @@
+2.6.1 (In Progress)
+===================
+
+Changes
+-------
+
+- The SDK now supports `node` versions 16 and above. (VBLOCKS-1301)
+
 2.6.0 (In Progress)
 ===================
 

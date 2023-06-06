@@ -170,7 +170,7 @@ class StatsMonitor extends EventEmitter {
   /**
    * The setInterval id for fetching samples.
    */
-  private _sampleInterval: NodeJS.Timer;
+  private _sampleInterval?: NodeJS.Timer;
 
   /**
    * Keeps track of supplemental sample values.
@@ -232,9 +232,10 @@ class StatsMonitor extends EventEmitter {
    * @returns The current {@link StatsMonitor}.
    */
   disable(): this {
-    clearInterval(this._sampleInterval);
-    delete this._sampleInterval;
-
+    if (this._sampleInterval) {
+      clearInterval(this._sampleInterval);
+      delete this._sampleInterval;
+    }
     return this;
   }
 
