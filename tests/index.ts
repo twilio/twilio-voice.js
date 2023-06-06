@@ -84,6 +84,7 @@ require('./pstream');
 require('./sound');
 require('./sdp');
 
+require('./unit/audioplayer');
 require('./unit/asyncQueue');
 require('./unit/backoff');
 require('./unit/icecandidate');
