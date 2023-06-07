@@ -4,6 +4,7 @@
 Changes
 -------
 
+- The SDK now builds on NodeJS versions 16 and above without the `--legacy-peer-deps` flag.
 - Removed usage of NodeJS modules from the SDK and some dependencies. With this change, the SDK should now work with some of the latest frameworks that use the latest versions of bundlers such as Vite and Webpack.
 - Removed unnecessary files from the generated npm package.
 - Links to source maps are now included in the generated npm package.
