@@ -30,7 +30,7 @@ services:
       - /opt/app/node_modules
   integrationTests: # runs integration tets. Expects that sources are mounted.
     <<: *runtimeDefaults
-    command: bash -c "npm install --legacy-peer-deps && npm run build && ls -la /root && ls -la /root/.npm && npm run test:network"
+    command: bash -c "npm install && npm run build && ls -la /root && ls -la /root/.npm && npm run test:network"
   bash: # runs bash shell inside container. helpful for debugging
     <<: *runtimeDefaults
     command: bash
