@@ -18,11 +18,7 @@
     "rootDir": "lib",
     "outDir": "es5",
     "inlineSourceMap": true,
-    "strictNullChecks": true,
-    "types": [
-      "mocha",
-      "node"
-    ]
+    "strictNullChecks": true
   },
   "include": [
     "lib/**/*.ts"
