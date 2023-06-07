@@ -2,8 +2,7 @@
 /**
  * @packageDocumentation
  * @module Voice
- * @publicapi
- * @internal
+ * @internalapi
  */
 
 /**
