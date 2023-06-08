@@ -4,30 +4,19 @@
  * @internalapi
  */
 // @ts-nocheck
-import { XMLHttpRequest as XHR } from 'xmlhttprequest';
 
 function request(method, params, callback) {
-  const options = {};
-  options.XMLHttpRequest = options.XMLHttpRequest || XHR;
-  const xhr = new options.XMLHttpRequest();
+  const body = JSON.stringify(params.body || {});
+  const fetchUrl = options.fetch || fetch;
+  const headers = new Headers();
 
-  xhr.open(method, params.url, true);
-  xhr.onreadystatechange = function onreadystatechange() {
-    if (xhr.readyState !== 4) { return; }
+  params.headers = params.headers || [];
+  Object.entries(params.headers).forEach(([headerName, headerBody]) =>
+    headers.append(headerName, headerBody));
 
-    if (200 <= xhr.status && xhr.status < 300) {
-      callback(null, xhr.responseText);
-      return;
-    }
-
-    callback(new Error(xhr.responseText));
-  };
-  // tslint:disable-next-line
-  for (const headerName in params.headers) {
-    xhr.setRequestHeader(headerName, params.headers[headerName]);
-  }
-
-  xhr.send(JSON.stringify(params.body));
+  fetchUrl(params.url, { body, headers, method })
+    .then(response => response.text(), callback)
+    .then(responseText => callback(null, responseText), callback);
 }
 /**
  * Use XMLHttpRequest to get a network resource.
