@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "declaration": true,
+    "lib": ["es5", "es6", "es2016", "es2017.object", "dom"],
+    "moduleResolution": "node",
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "rootDir": "lib",
+    "inlineSourceMap": true,
+    "strictNullChecks": true
+  },
+  "include": [
+    "lib/**/*.ts"
+  ]
+}

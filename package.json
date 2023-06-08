@@ -3,6 +3,7 @@
   "version": "2.6.0-dev",
   "description": "Twilio's JavaScript Voice SDK",
   "main": "./es5/twilio.js",
+  "module": "./mjs/twilio.js",
   "types": "./es5/twilio.d.ts",
   "license": "Apache-2.0",
   "keywords": [
@@ -15,6 +16,16 @@
   "engines": {
     "node": ">= 12"
   },
+  "exports": {
+    "import": {
+      "default": "./mjs/twilio.js",
+      "types": "./mjs/twilio.d.ts"
+    },
+    "require": {
+      "default": "./es5/twilio.js",
+      "types": "./es5/twilio.d.ts"
+    }
+  },
   "repository": {
     "type": "git",
     "url": "git@github.com:twilio/twilio-voice.js.git"
@@ -26,9 +37,9 @@
     "build:dist": "node ./scripts/build.js ./lib/browser.js ./LICENSE.md ./dist/twilio.js",
     "build:dist-min": "uglifyjs ./dist/twilio.js -o ./dist/twilio.min.js --comments \"/^! twilio-voice.js/\" -b beautify=false,ascii_only=true",
     "build:release": "npm-run-all lint build test:es5 status",
-    "build:ts": "./node_modules/typescript/bin/tsc",
+    "build:ts": "./node_modules/typescript/bin/tsc && ./node_modules/typescript/bin/tsc --project tsconfig-mjs.json",
     "build:constants": "node ./scripts/constants.js",
-    "clean": "rimraf ./coverage ./dist ./es5",
+    "clean": "rimraf ./coverage ./dist ./es5 ./mjs",
     "coverage": "nyc ./node_modules/mocha/bin/mocha -r ts-node/register ./tests/index.ts",
     "coverage:check": "nyc check-coverage --lines 60 --branches 60 --functions 60",
     "docs:clean": "rimraf ./docs",
