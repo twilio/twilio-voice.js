@@ -7,14 +7,13 @@
 
 function request(method, params, callback) {
   const body = JSON.stringify(params.body || {});
-  const fetchUrl = options.fetch || fetch;
   const headers = new Headers();
 
   params.headers = params.headers || [];
   Object.entries(params.headers).forEach(([headerName, headerBody]) =>
     headers.append(headerName, headerBody));
 
-  fetchUrl(params.url, { body, headers, method })
+  fetch(params.url, { body, headers, method })
     .then(response => response.text(), callback)
     .then(responseText => callback(null, responseText), callback);
 }
