@@ -81,11 +81,14 @@
 					<h3>NPM</h3>
 				</a>
 				<p>We recommend using <code>npm</code> to add the Voice SDK as a dependency.</p>
-				<pre><code><span class="hljs-built_in">npm</span> install @twilio/voice-sdk --save</code></pre><p>Using this method, you can <code>import</code> the Voice SDK using ES Module or TypeScript syntax:</p>
-				<pre><code class="language-js"><span class="hljs-keyword">import</span> { Device } <span class="hljs-keyword">from</span> <span class="hljs-string">'@twilio/voice-sdk'</span>;
+				<pre><code><span class="hljs-built_in">npm</span> install @twilio/voice-sdk --save
+</code></pre>
+				<p>Using this method, you can <code>import</code> the Voice SDK using ES Module or TypeScript syntax:</p>
+				<pre><code class="language-js"><span class="hljs-keyword">import</span> { Device } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;@twilio/voice-sdk&#x27;</span>;
 </code></pre>
 				<p>Or using CommonJS:</p>
-				<pre><code class="language-js"><span class="hljs-keyword">const</span> Device = <span class="hljs-built_in">require</span>(<span class="hljs-string">'@twilio/voice-sdk'</span>).Device;</code></pre>
+				<pre><code class="language-js"><span class="hljs-keyword">const</span> Device = <span class="hljs-built_in">require</span>(<span class="hljs-string">&#x27;@twilio/voice-sdk&#x27;</span>).Device;
+</code></pre>
 				<a href="#cdn" id="cdn" style="color: inherit; text-decoration: none;">
 					<h3>CDN</h3>
 				</a>
@@ -104,54 +107,72 @@
 				</blockquote>
 				<p>Download either the <code>zip</code> or the <code>tar.gz</code> and then extract the files. For example, if you downloaded the
 				tarball for the <code>2.0.0</code> release, you could then extract the files with the <code>tar</code> command:</p>
-				<pre><code><span class="hljs-selector-tag">tar</span> <span class="hljs-selector-tag">-xvzf</span> <span class="hljs-selector-tag">twilio-voice</span><span class="hljs-selector-class">.js-2</span><span class="hljs-selector-class">.0</span><span class="hljs-selector-class">.0</span><span class="hljs-selector-class">.tar</span><span class="hljs-selector-class">.gz</span>
-<span class="hljs-selector-tag">cd</span> <span class="hljs-selector-tag">twilio-voice</span><span class="hljs-selector-class">.js-2</span><span class="hljs-selector-class">.0</span><span class="hljs-selector-class">.0</span></code></pre><p>Once you&#39;ve extracted the folder, the <code>twilio.js</code> and <code>twilio.min.js</code> files that
+				<pre><code><span class="hljs-attribute">tar</span> -xvzf twilio-voice.js-<span class="hljs-number">2</span>.<span class="hljs-number">0</span>.<span class="hljs-number">0</span>.tar.gz
+<span class="hljs-attribute">cd</span> twilio-voice.js-<span class="hljs-number">2</span>.<span class="hljs-number">0</span>.<span class="hljs-number">0</span>
+</code></pre>
+				<p>Once you&#39;ve extracted the folder, the <code>twilio.js</code> and <code>twilio.min.js</code> files that
 					you can include in your project will be in the <code>/dist</code> directory. <code>twilio.min.js</code> is the
 				minified version of the code.</p>
 				<p>You can copy either the <code>twilio.js</code> or the <code>twilio.min.js</code> file into your project and
 				then provide a link to it in your html. For example:</p>
-				<pre><code><span class="hljs-tag">&lt;<span class="hljs-name">script</span> <span class="hljs-attr">type</span>=<span class="hljs-string">"text/javascript"</span> <span class="hljs-attr">src</span>=<span class="hljs-string">"twilio.min.js"</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-name">script</span>&gt;</span></code></pre><p>Using this method, you can access the SDK through the browser global:</p>
-				<pre><code>const Device = Twilio.Device<span class="hljs-comment">;</span></code></pre>
+				<pre><code><span class="hljs-tag">&lt;<span class="hljs-name">script</span> <span class="hljs-attr">type</span>=<span class="hljs-string">&quot;text/javascript&quot;</span> <span class="hljs-attr">src</span>=<span class="hljs-string">&quot;twilio.min.js&quot;</span>&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-name">script</span>&gt;</span>
+</code></pre>
+				<p>Using this method, you can access the SDK through the browser global:</p>
+				<pre><code>const Device = Twilio.Device<span class="hljs-comment">;</span>
+</code></pre>
 				<a href="#testing" id="testing" style="color: inherit; text-decoration: none;">
 					<h2>Testing</h2>
 				</a>
 				<p>Running unit tests requires no setup aside from installation (above). You can run unit tests via:</p>
-				<pre><code>npm <span class="hljs-keyword">run</span><span class="bash"> <span class="hljs-built_in">test</span>:unit</span></code></pre><p>Integration tests require some set up:</p>
+				<pre><code>npm <span class="hljs-keyword">run</span><span class="bash"> <span class="hljs-built_in">test</span>:unit</span>
+</code></pre>
+				<p>Integration tests require some set up:</p>
 				<ol>
 					<li>If the account you want to use doesn&#39;t already have a TwiML app set up, create one using the
 					TwiML code below.</li>
 					<li>Copy config.example.yaml to config.yaml, replacing the placeholder information with valid credentials.</li>
 				</ol>
-				<pre><code class="language-xml"><span class="hljs-meta">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span>
+				<pre><code class="language-xml"><span class="hljs-meta">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span>
 <span class="hljs-tag">&lt;<span class="hljs-name">Response</span>&gt;</span>
   <span class="hljs-tag">&lt;<span class="hljs-name">Dial</span>&gt;</span>
     <span class="hljs-tag">&lt;<span class="hljs-name">Client</span>&gt;</span>
       <span class="hljs-tag">&lt;<span class="hljs-name">Identity</span>&gt;</span>{{To}}<span class="hljs-tag">&lt;/<span class="hljs-name">Identity</span>&gt;</span>
-      <span class="hljs-tag">&lt;<span class="hljs-name">Parameter</span> <span class="hljs-attr">name</span>=<span class="hljs-string">"duplicate"</span> <span class="hljs-attr">value</span>=<span class="hljs-string">"12345"</span> /&gt;</span>
-      <span class="hljs-tag">&lt;<span class="hljs-name">Parameter</span> <span class="hljs-attr">name</span>=<span class="hljs-string">"duplicate"</span> <span class="hljs-attr">value</span>=<span class="hljs-string">"123456"</span> /&gt;</span>
-      <span class="hljs-tag">&lt;<span class="hljs-name">Parameter</span> <span class="hljs-attr">name</span>=<span class="hljs-string">"custom + param"</span> <span class="hljs-attr">value</span>=<span class="hljs-string">"我不吃蛋"</span> /&gt;</span>
-      <span class="hljs-tag">&lt;<span class="hljs-name">Parameter</span> <span class="hljs-attr">name</span>=<span class="hljs-string">"foobar"</span> <span class="hljs-attr">value</span>=<span class="hljs-string">"some + value"</span> /&gt;</span>
-      <span class="hljs-tag">&lt;<span class="hljs-name">Parameter</span> <span class="hljs-attr">name</span>=<span class="hljs-string">"custom1"</span> <span class="hljs-attr">value</span>=<span class="hljs-string">"{{Custom1}}"</span> /&gt;</span>
-      <span class="hljs-tag">&lt;<span class="hljs-name">Parameter</span> <span class="hljs-attr">name</span>=<span class="hljs-string">"custom2"</span> <span class="hljs-attr">value</span>=<span class="hljs-string">"{{Custom2}}"</span> /&gt;</span>
-      <span class="hljs-tag">&lt;<span class="hljs-name">Parameter</span> <span class="hljs-attr">name</span>=<span class="hljs-string">"custom3"</span> <span class="hljs-attr">value</span>=<span class="hljs-string">"{{Custom3}}"</span> /&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">Parameter</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;duplicate&quot;</span> <span class="hljs-attr">value</span>=<span class="hljs-string">&quot;12345&quot;</span> /&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">Parameter</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;duplicate&quot;</span> <span class="hljs-attr">value</span>=<span class="hljs-string">&quot;123456&quot;</span> /&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">Parameter</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;custom + param&quot;</span> <span class="hljs-attr">value</span>=<span class="hljs-string">&quot;我不吃蛋&quot;</span> /&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">Parameter</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;foobar&quot;</span> <span class="hljs-attr">value</span>=<span class="hljs-string">&quot;some + value&quot;</span> /&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">Parameter</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;custom1&quot;</span> <span class="hljs-attr">value</span>=<span class="hljs-string">&quot;{{Custom1}}&quot;</span> /&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">Parameter</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;custom2&quot;</span> <span class="hljs-attr">value</span>=<span class="hljs-string">&quot;{{Custom2}}&quot;</span> /&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">Parameter</span> <span class="hljs-attr">name</span>=<span class="hljs-string">&quot;custom3&quot;</span> <span class="hljs-attr">value</span>=<span class="hljs-string">&quot;{{Custom3}}&quot;</span> /&gt;</span>
     <span class="hljs-tag">&lt;/<span class="hljs-name">Client</span>&gt;</span>
   <span class="hljs-tag">&lt;/<span class="hljs-name">Dial</span>&gt;</span>
-<span class="hljs-tag">&lt;/<span class="hljs-name">Response</span>&gt;</span></code></pre>
+<span class="hljs-tag">&lt;/<span class="hljs-name">Response</span>&gt;</span>
+</code></pre>
 				<p>Integration tests can be run via:</p>
-				<pre><code>npm <span class="hljs-keyword">run</span><span class="bash"> <span class="hljs-built_in">test</span>:integration</span></code></pre><p>These tests will run via karma, one at a time, in your system&#39;s default Chrome and then Firefox.</p>
+				<pre><code>npm <span class="hljs-keyword">run</span><span class="bash"> <span class="hljs-built_in">test</span>:integration</span>
+</code></pre>
+				<p>These tests will run via karma, one at a time, in your system&#39;s default Chrome and then Firefox.</p>
 				<p>Network tests have been split out into their own docker processes, and can be run via</p>
-				<pre><code>npm <span class="hljs-keyword">run</span><span class="bash"> <span class="hljs-built_in">test</span>:docker</span></code></pre>
+				<pre><code>npm <span class="hljs-keyword">run</span><span class="bash"> <span class="hljs-built_in">test</span>:docker</span>
+</code></pre>
 				<a href="#content-security-policy-csp" id="content-security-policy-csp" style="color: inherit; text-decoration: none;">
 					<h2>Content Security Policy (CSP)</h2>
 				</a>
 				<p>Use the following policy directives to enable <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP">CSP</a> that is compatible with twilio-voice.js.</p>
 				<pre><code>script-src http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span>
 media-src mediastream http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span>
-connect-src http<span class="hljs-variable">s:</span>//eventgw.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//voice-js.roaming.twilio.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span></code></pre><p>If you are providing a non-default value for <code>Device.ConnectOptions.edge</code> parameter, you need to add the Signaling URI <code>wss://voice-js.{edgeId}.twilio.com</code> in your <code>connect-src</code> directive where <code>edgeId</code> is the <code>Edge ID</code> as defined in this <a href="https://www.twilio.com/docs/global-infrastructure/edge-locations">page</a>. See examples below.</p>
+connect-src http<span class="hljs-variable">s:</span>//eventgw.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//voice-js.roaming.twilio.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span>
+</code></pre>
+				<p>If you are providing a non-default value for <code>Device.ConnectOptions.edge</code> parameter, you need to add the Signaling URI <code>wss://voice-js.{edgeId}.twilio.com</code> in your <code>connect-src</code> directive where <code>edgeId</code> is the <code>Edge ID</code> as defined in this <a href="https://www.twilio.com/docs/global-infrastructure/edge-locations">page</a>. See examples below.</p>
 				<p><strong>If <code>Device.ConnectOptions.edge</code> is <code>ashburn</code></strong></p>
-				<pre><code>connect-src http<span class="hljs-variable">s:</span>//eventgw.twilio.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//voice-js.ashburn.twilio.<span class="hljs-keyword">com</span></code></pre><p><strong>If <code>Device.ConnectOptions.edge</code> is <code>[&#39;ashburn&#39;, &#39;sydney&#39;, &#39;roaming&#39;]</code></strong></p>
-				<pre><code>connect-src http<span class="hljs-variable">s:</span>//eventgw.twilio.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//voice-js.ashburn.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//voice-js.sydney.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//voice-js.roaming.twilio.<span class="hljs-keyword">com</span></code></pre><p>If you are providing a home region grant into your <a href="https://www.twilio.com/docs/iam/access-tokens">Twilio access token</a>, you need to add the insights endpoint in your <code>connect-src</code> directive using <code>eventgw.{homeRegion}.twilio.com</code> format. Below is an example if your home region grant is <code>sg1</code>.</p>
-				<pre><code>connect-src http<span class="hljs-variable">s:</span>//eventgw.sg1.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//voice-js.roaming.twilio.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span></code></pre>
+				<pre><code>connect-src http<span class="hljs-variable">s:</span>//eventgw.twilio.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//voice-js.ashburn.twilio.<span class="hljs-keyword">com</span>
+</code></pre>
+				<p><strong>If <code>Device.ConnectOptions.edge</code> is <code>[&#39;ashburn&#39;, &#39;sydney&#39;, &#39;roaming&#39;]</code></strong></p>
+				<pre><code>connect-src http<span class="hljs-variable">s:</span>//eventgw.twilio.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//voice-js.ashburn.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//voice-js.sydney.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//voice-js.roaming.twilio.<span class="hljs-keyword">com</span>
+</code></pre>
+				<p>If you are providing a home region grant into your <a href="https://www.twilio.com/docs/iam/access-tokens">Twilio access token</a>, you need to add the insights endpoint in your <code>connect-src</code> directive using <code>eventgw.{homeRegion}.twilio.com</code> format. Below is an example if your home region grant is <code>sg1</code>.</p>
+				<pre><code>connect-src http<span class="hljs-variable">s:</span>//eventgw.sg1.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//voice-js.roaming.twilio.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span>
+</code></pre>
 				<a href="#license" id="license" style="color: inherit; text-decoration: none;">
 					<h2>License</h2>
 				</a>
@@ -167,20 +188,23 @@ connect-src http<span class="hljs-variable">s:</span>//eventgw.twilio.<span clas
 					<li class="label tsd-is-external">
 						<span>Internals</span>
 					</li>
-					<li class=" tsd-kind-external-module">
+					<li class=" tsd-kind-module">
 						<a href="modules/voice.html">Voice</a>
 					</li>
 					<li class="label tsd-is-external">
 						<span>Externals</span>
 					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="modules/_twilio_backoff_.html">&quot;twilio/backoff&quot;</a>
-					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="modules/_twilio_errors_index_.html">&quot;twilio/errors/index&quot;</a>
-					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
+					<li class=" tsd-kind-module tsd-is-external">
 						<a href="modules/tools.html">Tools</a>
+					</li>
+					<li class=" tsd-kind-module tsd-is-external">
+						<a href="modules/twilio.html">twilio</a>
+					</li>
+					<li class=" tsd-kind-namespace tsd-is-external">
+						<a href="modules/twilio_errors.html">twilio/errors</a>
+					</li>
+					<li class=" tsd-kind-module tsd-is-external">
+						<a href="modules/twilio_errors.html">twilio/errors</a>
 					</li>
 				</ul>
 			</nav>

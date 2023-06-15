@@ -106,7 +106,7 @@
 					<div class="tsd-signature tsd-kind-icon">codec<wbr>Preferences<span class="tsd-signature-symbol">:</span> <a href="../enums/voice.call.codec.html" class="tsd-signature-type">Codec</a><span class="tsd-signature-symbol">[]</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/6f5f3bd/lib/twilio/preflight/preflight.ts#L739">lib/twilio/preflight/preflight.ts:739</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/125cc8a/lib/twilio/preflight/preflight.ts#L739">lib/twilio/preflight/preflight.ts:739</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -127,7 +127,7 @@
 					<div class="tsd-signature tsd-kind-icon">edge<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">string</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/6f5f3bd/lib/twilio/preflight/preflight.ts#L748">lib/twilio/preflight/preflight.ts:748</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/125cc8a/lib/twilio/preflight/preflight.ts#L748">lib/twilio/preflight/preflight.ts:748</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -150,7 +150,7 @@
 					<div class="tsd-signature tsd-kind-icon">fake<wbr>Mic<wbr>Input<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">false</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">true</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/6f5f3bd/lib/twilio/preflight/preflight.ts#L756">lib/twilio/preflight/preflight.ts:756</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/125cc8a/lib/twilio/preflight/preflight.ts#L756">lib/twilio/preflight/preflight.ts:756</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -172,7 +172,7 @@
 					<div class="tsd-signature tsd-kind-icon">ice<wbr>Servers<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">RTCIceServer</span><span class="tsd-signature-symbol">[]</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/6f5f3bd/lib/twilio/preflight/preflight.ts#L796">lib/twilio/preflight/preflight.ts:796</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/125cc8a/lib/twilio/preflight/preflight.ts#L796">lib/twilio/preflight/preflight.ts:796</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -182,12 +182,12 @@
 						</div>
 						<p>The following example demonstrates how to use <a href="https://www.twilio.com/stun-turn">Twilio&#39;s Network Traversal Service</a>
 						to generate STUN/TURN credentials and how to specify a specific <a href="https://www.twilio.com/docs/global-infrastructure/edge-locations">edge location</a>.</p>
-						<pre><code class="language-ts"><span class="hljs-keyword">import</span> Client <span class="hljs-keyword">from</span> <span class="hljs-string">'twilio'</span>;
-<span class="hljs-keyword">import</span> { Device } <span class="hljs-keyword">from</span> <span class="hljs-string">'twilio-client'</span>;
+						<pre><code class="language-ts"><span class="hljs-keyword">import</span> Client <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;twilio&#x27;</span>;
+<span class="hljs-keyword">import</span> { Device } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;twilio-client&#x27;</span>;
 
 <span class="hljs-comment">// Generate the STUN and TURN server credentials with a ttl of 120 seconds</span>
 <span class="hljs-keyword">const</span> client = Client(twilioAccountSid, authToken);
-<span class="hljs-keyword">const</span> token = <span class="hljs-keyword">await</span> client.tokens.create({ ttl: <span class="hljs-number">120</span> });
+<span class="hljs-keyword">const</span> token = <span class="hljs-keyword">await</span> client.tokens.create({ <span class="hljs-attr">ttl</span>: <span class="hljs-number">120</span> });
 
 <span class="hljs-keyword">let</span> iceServers = token.iceServers;
 
@@ -195,8 +195,8 @@
 <span class="hljs-comment">// You can replace global with a specific edge name for each of the iceServer configuration.</span>
 iceServers = iceServers.map(<span class="hljs-function"><span class="hljs-params">config</span> =&gt;</span> {
   <span class="hljs-keyword">let</span> { url, urls, ...rest } = config;
-  url = url.replace(<span class="hljs-string">'global'</span>, <span class="hljs-string">'ashburn'</span>);
-  urls = urls.replace(<span class="hljs-string">'global'</span>, <span class="hljs-string">'ashburn'</span>);
+  url = url.replace(<span class="hljs-string">&#x27;global&#x27;</span>, <span class="hljs-string">&#x27;ashburn&#x27;</span>);
+  urls = urls.replace(<span class="hljs-string">&#x27;global&#x27;</span>, <span class="hljs-string">&#x27;ashburn&#x27;</span>);
 
   <span class="hljs-keyword">return</span> { url, urls, ...rest };
 });
@@ -205,9 +205,10 @@ iceServers = iceServers.map(<span class="hljs-function"><span class="hljs-params
 <span class="hljs-keyword">const</span> preflightTest = Device.runPreflight(token, { iceServers });
 
 <span class="hljs-comment">// Read from the report object to determine whether TURN is required to connect to media</span>
-preflightTest.on(<span class="hljs-string">'completed'</span>, <span class="hljs-function">(<span class="hljs-params">report</span>) =&gt;</span> {
+preflightTest.on(<span class="hljs-string">&#x27;completed&#x27;</span>, <span class="hljs-function">(<span class="hljs-params">report</span>) =&gt;</span> {
   <span class="hljs-built_in">console</span>.log(report.isTurnRequired);
-});</code></pre>
+});
+</code></pre>
 						<dl class="tsd-comment-tags">
 							<dt>default</dt>
 							<dd><p>null</p>
@@ -221,7 +222,7 @@ preflightTest.on(<span class="hljs-string">'completed'</span>, <span class="hljs
 					<div class="tsd-signature tsd-kind-icon">log<wbr>Level<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">string</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/6f5f3bd/lib/twilio/preflight/preflight.ts#L802">lib/twilio/preflight/preflight.ts:802</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/125cc8a/lib/twilio/preflight/preflight.ts#L802">lib/twilio/preflight/preflight.ts:802</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -241,7 +242,7 @@ preflightTest.on(<span class="hljs-string">'completed'</span>, <span class="hljs
 					<div class="tsd-signature tsd-kind-icon">signaling<wbr>Timeout<wbr>Ms<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/6f5f3bd/lib/twilio/preflight/preflight.ts#L808">lib/twilio/preflight/preflight.ts:808</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/125cc8a/lib/twilio/preflight/preflight.ts#L808">lib/twilio/preflight/preflight.ts:808</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -266,20 +267,23 @@ preflightTest.on(<span class="hljs-string">'completed'</span>, <span class="hljs
 					<li class="label tsd-is-external">
 						<span>Internals</span>
 					</li>
-					<li class="current tsd-kind-external-module">
+					<li class="current tsd-kind-module">
 						<a href="../modules/voice.html">Voice</a>
 					</li>
 					<li class="label tsd-is-external">
 						<span>Externals</span>
 					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="../modules/_twilio_backoff_.html">&quot;twilio/backoff&quot;</a>
-					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
-						<a href="../modules/_twilio_errors_index_.html">&quot;twilio/errors/index&quot;</a>
-					</li>
-					<li class=" tsd-kind-external-module tsd-is-external">
+					<li class=" tsd-kind-module tsd-is-external">
 						<a href="../modules/tools.html">Tools</a>
+					</li>
+					<li class=" tsd-kind-module tsd-is-external">
+						<a href="../modules/twilio.html">twilio</a>
+					</li>
+					<li class=" tsd-kind-namespace tsd-is-external">
+						<a href="../modules/twilio_errors.html">twilio/errors</a>
+					</li>
+					<li class=" tsd-kind-module tsd-is-external">
+						<a href="../modules/twilio_errors.html">twilio/errors</a>
 					</li>
 				</ul>
 			</nav>
@@ -287,7 +291,7 @@ preflightTest.on(<span class="hljs-string">'completed'</span>, <span class="hljs
 				<ul class="before-current">
 				</ul>
 				<ul class="current">
-					<li class="current tsd-kind-class tsd-parent-kind-external-module">
+					<li class="current tsd-kind-class tsd-parent-kind-module">
 						<a href="../classes/voice.preflighttest.html" class="tsd-kind-icon">Preflight<wbr>Test</a>
 						<ul>
 							<li class="current tsd-kind-interface tsd-parent-kind-class">
