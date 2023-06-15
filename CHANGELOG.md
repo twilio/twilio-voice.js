@@ -10,6 +10,7 @@ Changes
 - Links to source maps are now included in the generated npm package.
 - The `ws` package has been moved to `devDependencies`.
 - The SDK no longer depends on the `xmlhttprequest` npm package.
+- Migrated the `AudioPlayer` dependency and is now part of the SDK. This change fixes an issue where source maps are not properly loaded.
 
 2.5.0 (May 9, 2023)
 ===================
