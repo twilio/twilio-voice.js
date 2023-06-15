@@ -26,8 +26,7 @@ let output = `/* tslint:disable max-classes-per-file max-line-length */
 /**
  * @packageDocumentation
  * @module Voice
- * @publicapi
- * @internal
+ * @internalapi
  */
 
 /**
