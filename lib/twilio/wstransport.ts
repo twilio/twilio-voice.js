@@ -5,10 +5,11 @@
  */
 
 import { EventEmitter } from 'events';
-import * as WebSocket from 'ws';
 import Backoff from './backoff';
 import { SignalingErrors } from './errors';
 import Log from './log';
+
+const WebSocket = globalThis.WebSocket;
 
 const CONNECT_SUCCESS_TIMEOUT = 10000;
 const CONNECT_TIMEOUT = 5000;

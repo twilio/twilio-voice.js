@@ -1,6 +1,10 @@
+import * as WebSocket from 'ws';
+
 const root = global as any;
 let handlers = {};
+
 root.resetEvents = () => { handlers = {}; };
+root.WebSocket = WebSocket;
 root.window = {
   addEventListener: (name: string, func: Function) => { (handlers as any)[name] = func; },
   dispatchEvent: (name: string) => {
