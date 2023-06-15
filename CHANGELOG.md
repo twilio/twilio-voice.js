@@ -4,12 +4,12 @@
 Changes
 -------
 
-- The `ws` package has been moved to `devDependencies`.
-- The SDK no longer depends on the `xmlhttprequest` npm package.
 - The SDK now builds on NodeJS versions 16 and above without the `--legacy-peer-deps` flag.
 - Removed usage of NodeJS modules from the SDK and some dependencies. With this change, the SDK should now work with some of the latest frameworks that use the latest versions of bundlers such as Vite and Webpack.
 - Removed unnecessary files from the generated npm package.
 - Links to source maps are now included in the generated npm package.
+- The `ws` package has been moved to `devDependencies`.
+- The SDK no longer depends on the `xmlhttprequest` npm package.
 
 2.5.0 (May 9, 2023)
 ===================
