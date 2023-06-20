@@ -1,16 +1,16 @@
-2.6.0 (In Progress)
-===================
+2.6.0 (June 20, 2023)
+=====================
 
 Changes
 -------
 
 - The SDK now builds on NodeJS versions 16 and above without the `--legacy-peer-deps` flag.
 - Removed usage of NodeJS modules from the SDK and some dependencies. With this change, the SDK should now work with some of the latest frameworks that use the latest versions of bundlers such as Vite and Webpack.
+- The AudioPlayer dependency has been incorporated into the SDK as part of a migration. This change fixes an issue where source maps are not properly loaded.
 - Removed unnecessary files from the generated npm package.
 - Links to source maps are now included in the generated npm package.
 - The `ws` package has been moved to `devDependencies`.
 - The SDK no longer depends on the `xmlhttprequest` npm package.
-- Migrated the `AudioPlayer` dependency and is now part of the SDK. This change fixes an issue where source maps are not properly loaded.
 
 2.5.0 (May 9, 2023)
 ===================
