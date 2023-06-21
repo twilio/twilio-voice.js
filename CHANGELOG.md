@@ -1,3 +1,21 @@
+2.6.1 (In Progress)
+=====================
+
+Bug Fixes
+---------
+
+- Fixed an issue where custom dtmf sounds are not playing. With this release, custom dtmf sounds should now play when provided during device initialization.
+
+  ```ts
+  const device = new Device(token, {
+    sounds: {
+      dtmf8: 'http://mysite.com/8_button.mp3',
+      // Other custom sounds
+    },
+    // Other options
+  });
+  ```
+
 2.6.0 (June 20, 2023)
 =====================
 

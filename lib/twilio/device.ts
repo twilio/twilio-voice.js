@@ -961,6 +961,7 @@ class Device extends EventEmitter {
         this._removeCall(this._activeCall);
       },
       codecPreferences: this._options.codecPreferences,
+      customSounds: this._options.sounds,
       dialtonePlayer: Device._dialtonePlayer,
       dscp: this._options.dscp,
       forceAggressiveIceNomination: this._options.forceAggressiveIceNomination,

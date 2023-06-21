@@ -1158,25 +1158,72 @@ describe('Call', function() {
       sinon.assert.callCount(sender.insertDTMF, 3);
     });
 
-    it('should play the sound for each letter', () => {
-      const sender = { insertDTMF: sinon.spy() };
-      mediaHandler.getOrCreateDTMFSender = () => sender;
-      conn.sendDigits('123w456w#*w');
+    describe('when playing sound', () => {
+      const digits = '0123w456789w*#w';
+      let dialtonePlayer: any;
 
-      clock.tick(1 + 200);
-      sinon.assert.callCount(soundcache.get(Device.SoundName.Dtmf1).play, 1);
-      sinon.assert.callCount(soundcache.get(Device.SoundName.Dtmf2).play, 1);
-      sinon.assert.callCount(soundcache.get(Device.SoundName.Dtmf3).play, 0);
+      [{
+        name: 'dialtonePlayer',
+        getOptions: () => {
+          dialtonePlayer = { play: sinon.stub() };
+          options.dialtonePlayer = dialtonePlayer;
+          return options;
+        },
+        assert: (dtmf: string, digit: string) => {
+          sinon.assert.callCount(dialtonePlayer.play, digits.replace(/w/g, '').indexOf(digit) + 1);
+          sinon.assert.calledWithExactly(dialtonePlayer.play, dtmf);
+        },
+      },{
+        name: 'soundcache',
+        getOptions: () => options,
+        assert: (dtmf: string) => {
+          const playStub = soundcache.get(dtmf as Device.SoundName).play;
+          sinon.assert.callCount(playStub, 1);
+        },
+      },{
+        name: 'customSounds',
+        getOptions: () => {
+          dialtonePlayer = { play: sinon.stub() };
 
-      clock.tick(1 + (200 * 7) + (500 * 3));
-      sinon.assert.callCount(soundcache.get(Device.SoundName.Dtmf1).play, 1);
-      sinon.assert.callCount(soundcache.get(Device.SoundName.Dtmf2).play, 1);
-      sinon.assert.callCount(soundcache.get(Device.SoundName.Dtmf3).play, 1);
-      sinon.assert.callCount(soundcache.get(Device.SoundName.Dtmf4).play, 1);
-      sinon.assert.callCount(soundcache.get(Device.SoundName.Dtmf5).play, 1);
-      sinon.assert.callCount(soundcache.get(Device.SoundName.Dtmf6).play, 1);
-      sinon.assert.callCount(soundcache.get(Device.SoundName.DtmfS).play, 1);
-      sinon.assert.callCount(soundcache.get(Device.SoundName.DtmfH).play, 1);
+          return {
+            ...options,
+            dialtonePlayer,
+            customSounds: Object.values(Device.SoundName)
+              .filter(name => name.includes('dtmf'))
+              .reduce((customSounds, name) => {
+                customSounds[name] = name;
+                return customSounds;
+              }, {} as any)
+          };
+        },
+        assert: (dtmf: string, digit: string) => {
+          const playStub = soundcache.get(dtmf as Device.SoundName).play;
+          sinon.assert.callCount(playStub, 1);
+        },
+      }].forEach(({ name, assert, getOptions }) => {
+        it(`should play the sound for each letter using ${name}`, () => {
+          const o = getOptions();
+          conn = new Call(config, o);
+
+          const sender = { insertDTMF: sinon.spy() };
+          mediaHandler.getOrCreateDTMFSender = () => sender;
+          conn.sendDigits(digits);
+
+          clock.tick(1);
+          digits.split('').forEach((digit) => {
+            if (digit === 'w') {
+              clock.tick(200);
+              return;
+            }
+            let dtmf = `dtmf${digit}`;
+            if (dtmf === 'dtmf*') { dtmf = 'dtmfs'; }
+            if (dtmf === 'dtmf#') { dtmf = 'dtmfh'; }
+
+            assert(dtmf, digit);
+            clock.tick(200);
+          });
+        });
+      })
     });
 
     it('should call pstream.dtmf if connected', () => {
