@@ -68,6 +68,7 @@
     "@types/node": "13.1.8",
     "@types/sinon": "9.0.5",
     "@types/ws": "7.2.0",
+    "babel-plugin-transform-inline-environment-variables": "0.4.3",
     "browserify": "16.5.0",
     "buffer": "5.4.3",
     "envify": "4.1.0",
