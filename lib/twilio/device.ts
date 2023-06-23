@@ -963,6 +963,7 @@ class Device extends EventEmitter {
       codecPreferences: this._options.codecPreferences,
       dialtonePlayer: Device._dialtonePlayer,
       dscp: this._options.dscp,
+      // TODO(csantos): Remove forceAggressiveIceNomination option in 3.x
       forceAggressiveIceNomination: this._options.forceAggressiveIceNomination,
       getInputStream: (): MediaStream | null => this._options.fileInputStream || this._callInputStream,
       getSinkIds: (): string[] => this._callSinkIds,

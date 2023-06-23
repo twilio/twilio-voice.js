@@ -14,6 +14,11 @@ if (fs.existsSync(__dirname + '/config.yaml')) {
   process.env.AUTH_TOKEN = process.env.AUTH_TOKEN || creds.auth_token;
 }
 
+const testFiles = process.env.INTEGRATION_TEST_FILES ?
+  process.env.INTEGRATION_TEST_FILES.split(',') : ['tests/integration/*.ts'];
+
+console.log('Test Files:', testFiles);
+
 module.exports = function(config: any) {
   const supportedBrowsers: Record<string, string[]> = {
     chrome: ['ChromeWebRTC'],
@@ -41,7 +46,7 @@ module.exports = function(config: any) {
     '--autoplay-policy=no-user-gesture-required',
   ];
 
-  if (isDocker) {
+  if (process.env.HEADLESS === 'true' || isDocker) {
     firefoxFlags.push('-headless');
     chromeFlags.push(
       '--headless',
@@ -75,7 +80,7 @@ module.exports = function(config: any) {
     files: [
       'lib/twilio.ts',
       'lib/twilio/**/*.ts',
-      'tests/integration/*.ts',
+      ...testFiles,
     ],
     frameworks: ['mocha', 'karma-typescript'],
     karmaTypescriptConfig: {
@@ -95,7 +100,7 @@ module.exports = function(config: any) {
       },
       include: [
         'lib/**/*',
-        'tests/integration/**/*.ts',
+        ...testFiles,
       ],
       tsconfig: './tsconfig.json',
     },
