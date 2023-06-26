@@ -2,7 +2,6 @@
 
 var _ = require('lodash');
 var jwt = require('jsonwebtoken');
-var qs = require('querystring');
 
 /**
  * @constructor

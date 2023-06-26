@@ -1,5 +1,12 @@
 2.6.1 (In Progress)
-=====================
+===================
+
+Changes
+-------
+
+- Fixed some security vulnerabilities shown by `npm audit`.
+- Removed unused dependencies.
+- Replaced deprecated dependencies.
 
 Bug Fixes
 ---------

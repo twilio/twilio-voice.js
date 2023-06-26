@@ -27,7 +27,7 @@ import StatsMonitor from './statsMonitor';
 import { isChrome } from './util';
 import { generateVoiceEventSid } from './uuid';
 
-const { RELEASE_VERSION } = require('./constants');
+import { RELEASE_VERSION } from './constants';
 
 // Placeholders until we convert the respective files to TypeScript.
 /**
