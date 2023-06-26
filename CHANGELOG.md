@@ -4,7 +4,7 @@
 Bug Fixes
 ---------
 
-- Fixed an issue where custom dtmf sounds are not playing. With this release, custom dtmf sounds should now play when provided during device initialization.
+- Fixed an issue where custom DTMF sounds would not play. With this release, custom DTMF sounds should now play when configured during device initialization.
 
   ```ts
   const device = new Device(token, {
