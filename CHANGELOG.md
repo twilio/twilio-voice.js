@@ -1,3 +1,13 @@
+2.6.1 (in progress)
+===================
+
+Changes
+-------
+
+- Fixed some security vulnerabilities shown by `npm audit`.
+- Removed unused dependencies.
+- Replaced deprecated dependencies.
+
 2.6.0 (June 20, 2023)
 =====================
 
