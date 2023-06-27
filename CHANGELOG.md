@@ -1,3 +1,28 @@
+2.6.1 (In Progress)
+===================
+
+Changes
+-------
+
+- Fixed some security vulnerabilities shown by `npm audit`.
+- Removed unused dependencies.
+- Replaced deprecated dependencies.
+
+Bug Fixes
+---------
+
+- Fixed an issue where custom DTMF sounds would not play. With this release, custom DTMF sounds should now play when configured during device initialization.
+
+  ```ts
+  const device = new Device(token, {
+    sounds: {
+      dtmf8: 'http://mysite.com/8_button.mp3',
+      // Other custom sounds
+    },
+    // Other options
+  });
+  ```
+
 2.6.0 (June 20, 2023)
 =====================
 
