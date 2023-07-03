@@ -23,6 +23,8 @@ Bug Fixes
   });
   ```
 
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/178) where calling `device.updateOptions` would reset the `device.audio._enabledSounds` state.
+
 2.6.0 (June 20, 2023)
 =====================
 
