@@ -39,6 +39,11 @@ describe('Device', function() {
   const sounds: Partial<Record<Device.SoundName, any>> = { };
 
   const AudioHelper = (_updateSinkIds: Function, _updateInputStream: Function) => {
+    enabledSounds = {
+      [Device.SoundName.Disconnect]: true,
+      [Device.SoundName.Incoming]: true,
+      [Device.SoundName.Outgoing]: true,
+    };
     updateInputStream = _updateInputStream;
     updateSinkIds = _updateSinkIds;
     const audioHelper = createEmitterStub(require('../../lib/twilio/audiohelper').default);
@@ -68,11 +73,6 @@ describe('Device', function() {
   });
 
   beforeEach(() => {
-    enabledSounds = {
-      [Device.SoundName.Disconnect]: true,
-      [Device.SoundName.Incoming]: true,
-      [Device.SoundName.Outgoing]: true,
-    };
     pstream = null;
     publisher = null;
     clock = sinon.useFakeTimers(Date.now());
