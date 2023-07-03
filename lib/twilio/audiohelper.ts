@@ -98,6 +98,8 @@ class AudioHelper extends EventEmitter {
     [Device.SoundName.Outgoing]: true,
   };
 
+  get enabledSounds(): Record<Device.ToggleableSound, boolean> { return this._enabledSounds; }
+
   /**
    * The enumerateDevices method to use
    */
@@ -184,6 +186,10 @@ class AudioHelper extends EventEmitter {
 
     const isAudioContextSupported: boolean = !!(options.AudioContext || options.audioContext);
     const isEnumerationSupported: boolean = !!this._enumerateDevices;
+
+    if (options.enabledSounds) {
+      this._enabledSounds = options.enabledSounds;
+    }
 
     const isSetSinkSupported: boolean = typeof options.setSinkId === 'function';
     this.isOutputSelectionSupported = isEnumerationSupported && isSetSinkSupported;
@@ -708,6 +714,11 @@ namespace AudioHelper {
      * An existing AudioContext instance to use.
      */
     audioContext?: AudioContext;
+
+    /**
+     * Whether each sound is enabled.
+     */
+    enabledSounds?: Record<Device.ToggleableSound, boolean>;
 
     /**
      * Overrides the native MediaDevices.enumerateDevices API.
