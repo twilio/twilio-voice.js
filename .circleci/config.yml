@@ -126,6 +126,11 @@ jobs:
         type: string
       browser:
         type: string
+      build_label:
+        type: string
+      integration_test_files:
+        type: string
+        default: ""
     executor:
       name: docker-with-browser
       browser: <<parameters.browser>>
@@ -133,6 +138,8 @@ jobs:
     environment:
       BROWSER: <<parameters.browser>>
       BVER: <<parameters.bver>>
+      BUILD_LABEL: <<parameters.build_label>>
+      INTEGRATION_TEST_FILES: <<parameters.integration_test_files>>
     steps: [integration-tests]
   run-release:
     parameters:
@@ -168,6 +175,26 @@ jobs:
 # Workflows
 ###
 workflows:
+  healthcheck-workflow:
+    triggers:
+      - schedule:
+          cron: "0 * * * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - run-integration-tests:
+          name: Integration tests <<matrix.browser>> <<matrix.bver>>
+          context:
+            - dockerhub-pulls
+            - vblocks-js
+          matrix:
+            parameters:
+              browser: ["chrome"]
+              bver: ["stable"]
+              build_label: ["Healthcheck"]
+              integration_test_files: ["tests/integration/device.ts"]
   daily-build-workflow:
     triggers:
       - schedule:
@@ -182,7 +209,7 @@ workflows:
             - vblocks-js
           name: Build Checks
       - run-integration-tests:
-          name: Integration Tests <<matrix.browser>> <<matrix.bver>>
+          name: Integration tests <<matrix.browser>> <<matrix.bver>>
           context:
             - dockerhub-pulls
             - vblocks-js
@@ -190,6 +217,7 @@ workflows:
             parameters:
               browser: ["chrome", "firefox"]
               bver: ["beta", "unstable", "stable"]
+              build_label: ["Daily build"]
   pull-request-workflow:
     when:
         and:
@@ -201,7 +229,7 @@ workflows:
             - vblocks-js
           name: Build Checks
       - run-integration-tests:
-          name: Integration Tests <<matrix.browser>> <<matrix.bver>>
+          name: Integration tests <<matrix.browser>> <<matrix.bver>>
           context:
             - dockerhub-pulls
             - vblocks-js
@@ -209,6 +237,7 @@ workflows:
             parameters:
               browser: ["chrome", "firefox"]
               bver: ["beta", "unstable", "stable"]
+              build_label: ["Integration tests"]
       # NOTE(csantos): Will be addressed on a future epic
       # - run-network-tests:
       #     name: Network Tests <<matrix.browser>> <<matrix.bver>>
@@ -230,11 +259,12 @@ workflows:
           context:
             - dockerhub-pulls
             - vblocks-js
-          name: Integration Tests <<matrix.browser>> <<matrix.bver>>
+          name: Integration tests <<matrix.browser>> <<matrix.bver>>
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
               bver: ["beta", "unstable", "stable"]
+              build_label: ["Release build"]
       # NOTE(csantos): Will be addressed on a future epic
       # - run-network-tests:
       #     context:
@@ -255,13 +285,13 @@ workflows:
             - Build Checks
             # NOTE(mhuynh): Temporarily allow release without these tests passing
             # # Chrome integration tests
-            # - Integration Tests chrome beta
-            # - Integration Tests chrome unstable
-            # - Integration Tests chrome stable
+            # - Integration tests chrome beta
+            # - Integration tests chrome unstable
+            # - Integration tests chrome stable
             # # Firefox integration tests
-            # - Integration Tests firefox beta
-            # - Integration Tests firefox unstable
-            # - Integration Tests firefox stable
+            # - Integration tests firefox beta
+            # - Integration tests firefox unstable
+            # - Integration tests firefox stable
             # # Chrome network tests
             # - Network Tests chrome stable
             # # Firefox network tests
