@@ -98,8 +98,6 @@ class AudioHelper extends EventEmitter {
     [Device.SoundName.Outgoing]: true,
   };
 
-  get enabledSounds(): Record<Device.ToggleableSound, boolean> { return this._enabledSounds; }
-
   /**
    * The enumerateDevices method to use
    */
@@ -238,6 +236,14 @@ class AudioHelper extends EventEmitter {
     if (isEnumerationSupported) {
       this._initializeEnumeration();
     }
+  }
+
+  /**
+   * Current state of the enabled sounds
+   * @private
+   */
+  _getEnabledSounds(): Record<Device.ToggleableSound, boolean> {
+    return this._enabledSounds;
   }
 
   /**

@@ -1317,7 +1317,7 @@ class Device extends EventEmitter {
 
     if (this._audio) {
       this._log.info('Found existing audio helper; destroying...');
-      audioOptions.enabledSounds = this._audio.enabledSounds;
+      audioOptions.enabledSounds = this._audio._getEnabledSounds();
       this._destroyAudioHelper();
     }
 

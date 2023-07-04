@@ -49,6 +49,7 @@ describe('Device', function() {
     updateSinkIds = _updateSinkIds;
     const audioHelper = createEmitterStub(require('../../lib/twilio/audiohelper').default);
     audioHelper._enabledSounds = enabledSounds;
+    audioHelper._getEnabledSounds = () => enabledSounds;
     audioHelper.disconnect = () => enabledSounds[Device.SoundName.Disconnect];
     audioHelper.incoming = () => enabledSounds[Device.SoundName.Incoming];
     audioHelper.outgoing = () => enabledSounds[Device.SoundName.Outgoing];
