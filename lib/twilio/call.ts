@@ -27,7 +27,7 @@ import StatsMonitor from './statsMonitor';
 import { isChrome } from './util';
 import { generateVoiceEventSid } from './uuid';
 
-const { RELEASE_VERSION } = require('./constants');
+import { RELEASE_VERSION } from './constants';
 
 // Placeholders until we convert the respective files to TypeScript.
 /**
@@ -815,6 +815,7 @@ class Call extends EventEmitter {
       throw new InvalidArgumentError('Illegal character passed into sendDigits');
     }
 
+    const customSounds = this._options.customSounds || {};
     const sequence: string[] = [];
     digits.split('').forEach((digit: string) => {
       let dtmf = (digit !== 'w') ? `dtmf${digit}` : '';
@@ -823,22 +824,20 @@ class Call extends EventEmitter {
       sequence.push(dtmf);
     });
 
-    // Binds soundCache to be used in recursion until all digits have been played.
-    (function playNextDigit(soundCache, dialtonePlayer) {
-      const digit: string | undefined = sequence.shift();
-
+    const playNextDigit = () => {
+      const digit = sequence.shift() as Device.SoundName | undefined;
       if (digit) {
-        if (dialtonePlayer) {
-          dialtonePlayer.play(digit);
+        if (this._options.dialtonePlayer && !customSounds[digit]) {
+          this._options.dialtonePlayer.play(digit);
         } else {
-          soundCache.get(digit as Device.SoundName).play();
+          this._soundcache.get(digit).play();
         }
       }
-
       if (sequence.length) {
-        setTimeout(playNextDigit.bind(null, soundCache), 200);
+        setTimeout(() => playNextDigit(), 200);
       }
-    })(this._soundcache, this._options.dialtonePlayer);
+    };
+    playNextDigit();
 
     const dtmfSender = this._mediaHandler.getOrCreateDTMFSender();
 
@@ -1816,6 +1815,11 @@ namespace Call {
      * An ordered array of codec names, from most to least preferred.
      */
     codecPreferences?: Codec[];
+
+    /**
+     * A mapping of custom sound URLs by sound name.
+     */
+    customSounds?: Partial<Record<Device.SoundName, string>>;
 
     /**
      * A DialTone player, to play mock DTMF sounds.

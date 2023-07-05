@@ -1,6 +1,10 @@
+import * as WebSocket from 'ws';
+
 const root = global as any;
 let handlers = {};
+
 root.resetEvents = () => { handlers = {}; };
+root.WebSocket = WebSocket;
 root.window = {
   addEventListener: (name: string, func: Function) => { (handlers as any)[name] = func; },
   dispatchEvent: (name: string) => {
@@ -84,6 +88,7 @@ require('./pstream');
 require('./sound');
 require('./sdp');
 
+require('./unit/audioplayer');
 require('./unit/asyncQueue');
 require('./unit/backoff');
 require('./unit/icecandidate');

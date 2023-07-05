@@ -4,8 +4,8 @@
  * @internalapi
  */
 // @ts-nocheck
-import * as AudioPlayer from '@twilio/audioplayer';
 import { AsyncQueue } from './asyncQueue';
+import AudioPlayer from './audioplayer/audioplayer';
 import { InvalidArgumentError } from './errors';
 
 /**

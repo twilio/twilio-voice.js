@@ -10,7 +10,7 @@ const DURATION_PADDING = 3000;
 const EVENT_TIMEOUT = 30000;
 const MAX_TIMEOUT = 300000;
 
-describe.skip('Preflight Test', function() {
+describe('Preflight Test', function() {
   this.timeout(MAX_TIMEOUT);
 
   let callerIdentity: string;
@@ -269,7 +269,7 @@ describe.skip('Preflight Test', function() {
 
           (callerDevice as any).connectOverride = callerDevice.connect;
           callerDevice.connect = () => {
-            return (callerDevice as any).connectOverride({ To: receiverIdentity });
+            return (callerDevice as any).connectOverride({ params: { To: receiverIdentity } });
           };
         });
 
