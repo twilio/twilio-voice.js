@@ -13,6 +13,7 @@ import * as assert from 'assert';
 import { EventEmitter } from 'events';
 import { SinonFakeTimers, SinonSpy, SinonStubbedInstance } from 'sinon';
 import * as sinon from 'sinon';
+import AudioHelper from '../../lib/twilio/audiohelper';
 
 const root = global as any;
 
@@ -38,10 +39,17 @@ describe('Device', function() {
 
   const sounds: Partial<Record<Device.SoundName, any>> = { };
 
-  const AudioHelper = (_updateSinkIds: Function, _updateInputStream: Function) => {
+  const AudioHelper = (_updateSinkIds: Function, _updateInputStream: Function, getUserMedia: Function, options?: AudioHelper.Options) => {
+    enabledSounds = options?.enabledSounds || {
+      [Device.SoundName.Disconnect]: true,
+      [Device.SoundName.Incoming]: true,
+      [Device.SoundName.Outgoing]: true,
+    };
     updateInputStream = _updateInputStream;
     updateSinkIds = _updateSinkIds;
     const audioHelper = createEmitterStub(require('../../lib/twilio/audiohelper').default);
+    audioHelper._enabledSounds = enabledSounds;
+    audioHelper._getEnabledSounds = () => enabledSounds;
     audioHelper.disconnect = () => enabledSounds[Device.SoundName.Disconnect];
     audioHelper.incoming = () => enabledSounds[Device.SoundName.Incoming];
     audioHelper.outgoing = () => enabledSounds[Device.SoundName.Outgoing];
@@ -68,11 +76,6 @@ describe('Device', function() {
   });
 
   beforeEach(() => {
-    enabledSounds = {
-      [Device.SoundName.Disconnect]: true,
-      [Device.SoundName.Incoming]: true,
-      [Device.SoundName.Outgoing]: true,
-    };
     pstream = null;
     publisher = null;
     clock = sinon.useFakeTimers(Date.now());
@@ -245,6 +248,20 @@ describe('Device', function() {
           await device.connect();
           activeCall._direction = 'OUTGOING';
           activeCall.emit('accept');
+          sinon.assert.notCalled(spy.play);
+        });
+
+        it('should not play outgoing sound after accepted if disabled after calling updateOptions', async () => {
+          enabledSounds[Device.SoundName.Outgoing] = false;
+          // Force a new audio-helper instance to be recreated
+          // After updating the enabled sounds state
+          device.updateOptions();
+          const spy: any = { play: sinon.spy() };
+          device['_soundcache'].set(Device.SoundName.Outgoing, spy);
+          await device.connect();
+          activeCall._direction = 'OUTGOING';
+          activeCall.emit('accept');
+          // should fail
           sinon.assert.notCalled(spy.play);
         });
       });
