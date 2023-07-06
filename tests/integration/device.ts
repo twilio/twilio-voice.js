@@ -98,7 +98,9 @@ describe('Device', function() {
 
       const [expireTime, registeringTime] = await eventPromises;
       const diff = Math.abs(expireTime - registeringTime);
-      assert(diff < 500, `event time occurred too late; diff: ${diff}`);
+      // ttl returned from signaling, which we use to calculate the timeout,
+      // sometimes returns 1s less from the original ttl we provided. So let's account for that.
+      assert(diff < 2000, `event time occurred too late; diff: ${diff}`);
     });
   });
 
