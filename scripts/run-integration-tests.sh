@@ -12,4 +12,4 @@ function reportFailure() {
   exit 1
 }
 
-./node_modules/.bin/karma start $PWD/karma.conf.ts --log-level debug && echo "Integration tests passed" || reportFailure
+npm run test:integration && echo "Integration tests passed" || reportFailure

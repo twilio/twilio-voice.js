@@ -92,7 +92,7 @@ commands:
       - build
       - run:
           name: Running integration tests
-          command: npm run test:integration
+          command: chmod +x ./scripts/run-integration-tests.sh && ./scripts/run-integration-tests.sh
   network-tests:
     steps:
       - get-code
