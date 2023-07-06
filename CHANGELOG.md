@@ -1,3 +1,11 @@
+2.7.0 (In Progress)
+===================
+
+ECMAScript Module Support
+-------------------------
+
+Starting from this version, the SDK can now be imported as an [ECMAScript Module](https://nodejs.org/api/esm.html) (ESM) using the `import` keyword. The SDK can continue to be imported as a [CommonJS Module](https://nodejs.org/api/modules.html) using the `require` keyword.
+
 2.6.1 (In Progress)
 ===================
 
