@@ -41,7 +41,7 @@
     "start": "node server.js",
     "status": "git status",
     "test": "npm-run-all lint build test:unit test:es5 test:docker",
-    "test:docker": "chmod +x ./scripts/circleci-run-tests.sh && ./scripts/circleci-run-tests.sh",
+    "test:docker": "chmod +x ./scripts/run-docker-tests.sh && ./scripts/run-docker-tests.sh",
     "test:es5": "es-check es5 \"./es5/**/*.js\" ./dist/*.js",
     "test:framework:no-framework": "mocha tests/framework/no-framework.js",
     "test:framework:react:install": "cd ./tests/framework/react && rimraf ./node_modules package-lock.json && npm install",
