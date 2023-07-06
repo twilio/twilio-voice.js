@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Device } from 'twilio-client';
+import { Device } from '@twilio/voice-sdk';
 
 export default class App extends Component {
   constructor(props) {

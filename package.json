@@ -17,14 +17,8 @@
     "node": ">= 12"
   },
   "exports": {
-    "import": {
-      "default": "./mjs/twilio.js",
-      "types": "./mjs/twilio.d.ts"
-    },
-    "require": {
-      "default": "./es5/twilio.js",
-      "types": "./es5/twilio.d.ts"
-    }
+    "import": "./mjs/twilio.js",
+    "require": "./es5/twilio.js"
   },
   "repository": {
     "type": "git",

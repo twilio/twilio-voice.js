@@ -3,12 +3,12 @@
   "private": true,
   "devDependencies": {
     "react-scripts": "5.0.1",
-    "webpack": "^3.11.0"
+    "webpack": "5.88.1"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "twilio-client": "file:../../../"
+    "@twilio/voice-sdk": "file:../../..",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
   },
   "scripts": {
     "start": "react-scripts start",
