@@ -6,8 +6,8 @@ ECMAScript Module Support
 
 Starting from this version, the SDK can now be imported as an [ECMAScript Module](https://nodejs.org/api/esm.html) (ESM) using the `import` keyword. The SDK can continue to be imported as a [CommonJS Module](https://nodejs.org/api/modules.html) using the `require` keyword.
 
-2.6.1 (In Progress)
-===================
+2.6.1 (July 7, 2023)
+====================
 
 Changes
 -------
@@ -30,6 +30,8 @@ Bug Fixes
     // Other options
   });
   ```
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/178) where calling `device.updateOptions` would reset the `device.audio._enabledSounds` state.
 
 2.6.0 (June 20, 2023)
 =====================

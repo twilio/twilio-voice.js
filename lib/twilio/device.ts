@@ -1310,8 +1310,14 @@ class Device extends EventEmitter {
    * Set up an audio helper for usage by this {@link Device}.
    */
   private _setupAudioHelper(): void {
+    const audioOptions: AudioHelper.Options = {
+      audioContext: Device.audioContext,
+      enumerateDevices: this._options.enumerateDevices,
+    };
+
     if (this._audio) {
       this._log.info('Found existing audio helper; destroying...');
+      audioOptions.enabledSounds = this._audio._getEnabledSounds();
       this._destroyAudioHelper();
     }
 
@@ -1319,10 +1325,7 @@ class Device extends EventEmitter {
       this._updateSinkIds,
       this._updateInputStream,
       this._options.getUserMedia || getUserMedia,
-      {
-        audioContext: Device.audioContext,
-        enumerateDevices: this._options.enumerateDevices,
-      },
+      audioOptions,
     );
 
     this._audio.on('deviceChange', (lostActiveDevices: MediaDeviceInfo[]) => {
