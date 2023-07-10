@@ -48,6 +48,7 @@
     "test": "npm-run-all lint build test:unit test:es5 test:docker",
     "test:docker": "chmod +x ./scripts/run-docker-tests.sh && ./scripts/run-docker-tests.sh",
     "test:es5": "es-check es5 \"./es5/**/*.js\" ./dist/*.js",
+    "test:mjs": "es-check es6 \"./mjs/**/*.js\" --module",
     "test:framework:no-framework": "mocha tests/framework/no-framework.js",
     "test:framework:react:install": "cd ./tests/framework/react && rimraf ./node_modules package-lock.json && npm install",
     "test:framework:react:build": "cd ./tests/framework/react && npm run build",
