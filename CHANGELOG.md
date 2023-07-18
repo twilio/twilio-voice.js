@@ -1,10 +1,21 @@
 2.7.0 (In Progress)
 ===================
 
-ECMAScript Module Support
--------------------------
+ECMAScript Module Support (Preview)
+-----------------------------------
 
-Starting from this version, the SDK can now be imported as an [ECMAScript Module](https://nodejs.org/api/esm.html) (ESM).
+Starting from this version, you can now import the SDK as an [ECMAScript Module (ESM)](https://nodejs.org/api/esm.html) (ESM) as shown below.
+
+```ts
+import * as TwilioVoice from '@twilio/voice-sdk/mjs';
+```
+
+As of now, ESM support works with the following frameworks:
+
+- React + Webpack
+- Angular + Webpack
+
+If you are using some other framework, you can continue to import the SDK as a [CommonJS Module (CJS)](https://nodejs.org/api/modules.html) using the path `@twilio/voice-sdk`.
 
 2.6.1 (July 7, 2023)
 ====================
