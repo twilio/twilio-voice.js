@@ -7,7 +7,7 @@ ECMAScript Module Support (Preview)
 Starting from this version, you can now import the SDK as an [ECMAScript Module (ESM)](https://nodejs.org/api/esm.html) (ESM) as shown below.
 
 ```ts
-import * as TwilioVoice from '@twilio/voice-sdk/mjs';
+import * as TwilioVoice from '@twilio/voice-sdk/esm';
 ```
 
 As of now, ESM support works with the following frameworks:

@@ -6,7 +6,7 @@ config.yaml
 coverage
 dist
 es5
-mjs
+esm
 extension/token.js
 node_modules
 docs
