@@ -1,5 +1,19 @@
-2.6.1 (July 7, 2023)
+2.7.0 (In Progress)
 ===================
+
+ECMAScript Module Support
+-------------------------
+
+Currently, the SDK is imported as a [CommonJS Module (CJS)](https://nodejs.org/api/modules.html) using the root path `@twilio/voice-sdk`. With this release, the SDK contains an experimental feature that allows it to be imported as an [ECMAScript Module (ESM)](https://nodejs.org/api/esm.html) using the `@twilio/voice-sdk/esm` path. As this is an experimental feature, certain frameworks may not work such as [svelte](https://kit.svelte.dev/docs/introduction). ESM full support will be available in a future release and will become the default import behavior of the SDK.
+
+Example:
+
+```ts
+import { Device } from '@twilio/voice-sdk/esm';
+```
+
+2.6.1 (July 7, 2023)
+====================
 
 Changes
 -------
