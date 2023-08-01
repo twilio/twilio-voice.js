@@ -61,12 +61,12 @@ commands:
     steps:
       - get-code
       - restore_cache:
-          key: dependency-cache-{{ checksum "package.json" }}
+          key: v1-deps-{{ checksum "package.json" }}
       - run:
           name: Installing dependencies
           command: node -v && npm install
       - save_cache:
-          key: dependency-cache-{{ checksum "package.json" }}
+          key: v1-deps-{{ checksum "package.json" }}
           paths:
             - ./node_modules
   build:
