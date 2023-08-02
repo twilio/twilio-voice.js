@@ -4,8 +4,13 @@
  * @internalapi
  */
 
-import * as md5 from 'md5';
+import * as md5Lib from 'md5';
 import { NotSupportedError } from '../twilio/errors';
+
+// If imported as an ESM module, sometimes md5 is available by accessing
+// the "default" property of the imported library.
+// @ts-ignore
+const md5 = typeof md5Lib === 'function' ? md5Lib : md5Lib.default;
 
 function generateUuid(): string {
   if (typeof window !== 'object') {
