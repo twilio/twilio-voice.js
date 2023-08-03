@@ -1,5 +1,13 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.7.1 (August 3, 2023)
+======================
+
+Bug Fixes
+---------
+
+- Fixed an issue where `call.sendMessage()` API throws an error if the SDK is imported as an [ECMAScript Module (ESM)](https://nodejs.org/api/esm.html) using the `@twilio/voice-sdk/esm` path.
+
 2.7.0 (August 1, 2023)
 ======================
 
