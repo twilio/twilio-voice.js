@@ -129,6 +129,130 @@ export namespace ClientErrors {
       this.originalError = originalError;
     }
   }
+
+  export class NotFound extends TwilioError {
+    causes: string[] = [
+      'The outbound call was made to an invalid phone number.',
+      'The TwiML application sid is missing a Voice URL.',
+    ];
+    code: number = 31404;
+    description: string = 'Not Found (HTTP/SIP)';
+    explanation: string = 'The server has not found anything matching the request.';
+    name: string = 'NotFound';
+    solutions: string[] = [
+      'Ensure the phone number dialed is valid.',
+      'Ensure the TwiML application is configured correctly with a Voice URL link.',
+    ];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, ClientErrors.NotFound.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
+  export class TemporarilyUnavailable extends TwilioError {
+    causes: string[] = [];
+    code: number = 31480;
+    description: string = 'Temporarily Unavailable (SIP)';
+    explanation: string = 'The callee is currently unavailable.';
+    name: string = 'TemporarilyUnavailable';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, ClientErrors.TemporarilyUnavailable.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
+  export class BusyHere extends TwilioError {
+    causes: string[] = [];
+    code: number = 31486;
+    description: string = 'Busy Here (SIP)';
+    explanation: string = 'The callee is busy.';
+    name: string = 'BusyHere';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, ClientErrors.BusyHere.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+}
+
+export namespace SIPServerErrors {
+  export class Decline extends TwilioError {
+    causes: string[] = [];
+    code: number = 31603;
+    description: string = 'Decline (SIP)';
+    explanation: string = 'The callee does not wish to participate in the call.';
+    name: string = 'Decline';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, SIPServerErrors.Decline.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
 }
 
 export namespace GeneralErrors {
@@ -605,6 +729,10 @@ export const errorsByCode: ReadonlyMap<number, any> = new Map([
   [ 20104, AuthorizationErrors.AccessTokenExpired ],
   [ 20151, AuthorizationErrors.AuthenticationFailed ],
   [ 31400, ClientErrors.BadRequest ],
+  [ 31404, ClientErrors.NotFound ],
+  [ 31480, ClientErrors.TemporarilyUnavailable ],
+  [ 31486, ClientErrors.BusyHere ],
+  [ 31603, SIPServerErrors.Decline ],
   [ 31000, GeneralErrors.UnknownError ],
   [ 31005, GeneralErrors.ConnectionError ],
   [ 31008, GeneralErrors.CallCancelledError ],

@@ -8,8 +8,10 @@ import {
   ClientErrors,
   errorsByCode,
   GeneralErrors,
+  MalformedRequestErrors,
   MediaErrors,
   SignalingErrors,
+  SIPServerErrors,
   TwilioError,
   UserMediaErrors,
 } from './generated';
@@ -50,13 +52,23 @@ export function hasErrorByCode(code: number): boolean {
   return errorsByCode.has(code);
 }
 
-// All errors we want to throw or emit locally in the SDK need to be passed through here.
+/**
+ * All errors we want to throw or emit locally in the SDK need to be passed
+ * through here.
+ *
+ * They need to first be defined in the `USED_ERRORS` list. See:
+ * ```
+ * scripts/errors.js
+ * ```
+ */
 export {
   AuthorizationErrors,
   ClientErrors,
   GeneralErrors,
+  MalformedRequestErrors,
   MediaErrors,
   SignalingErrors,
+  SIPServerErrors,
   TwilioError,
   UserMediaErrors,
 };

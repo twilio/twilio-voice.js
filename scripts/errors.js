@@ -1,6 +1,13 @@
 const fs = require('fs');
 const VoiceErrors = require('@twilio/voice-errors');
 
+/**
+ * Ensure that the namespaces defined here are imported and exported from the
+ * generated file at:
+ * ```
+ * lib/twilio/errors/index.ts
+ * ```
+ */
 const USED_ERRORS = [
   'AuthorizationErrors.AccessTokenExpired',
   'AuthorizationErrors.AccessTokenInvalid',
@@ -8,6 +15,9 @@ const USED_ERRORS = [
   'AuthorizationErrors.PayloadSizeExceededError',
   'AuthorizationErrors.RateExceededError',
   'ClientErrors.BadRequest',
+  'ClientErrors.BusyHere',
+  'ClientErrors.NotFound',
+  'ClientErrors.TemporarilyUnavailable',
   'GeneralErrors.CallCancelledError',
   'GeneralErrors.ConnectionError',
   'GeneralErrors.TransportError',
@@ -18,6 +28,7 @@ const USED_ERRORS = [
   'MediaErrors.ConnectionError',
   'SignalingErrors.ConnectionDisconnected',
   'SignalingErrors.ConnectionError',
+  'SIPServerErrors.Decline',
   'UserMediaErrors.PermissionDeniedError',
   'UserMediaErrors.AcquisitionFailedError',
 ];
@@ -107,3 +118,7 @@ export const errorsByCode: ReadonlyMap<number, any> = new Map([
 Object.freeze(errorsByCode);\n`;
 
 fs.writeFileSync('./lib/twilio/errors/generated.ts', output, 'utf8');
+
+module.exports = {
+  USED_ERRORS,
+};
