@@ -1,5 +1,14 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.8.0 (In Progress)
+===================
+
+Changes
+-------
+
+- Adjusted error reporting from backend services. Signaling errors emitted by the `Device` should now be more descriptive. If your application logic relied on parsing generic error code `31005`, please consider reading through our API documentation and adjusting your application logic to anticipate a wider and more descriptive range of error codes.
+
+
 2.7.1 (August 3, 2023)
 ======================
 
