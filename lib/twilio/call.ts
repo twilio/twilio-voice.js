@@ -10,6 +10,8 @@ import Device from './device';
 import DialtonePlayer from './dialtonePlayer';
 import {
   GeneralErrors,
+  getErrorByCode,
+  hasErrorByCode,
   InvalidArgumentError,
   InvalidStateError,
   MediaErrors,
@@ -1204,7 +1206,10 @@ class Call extends EventEmitter {
 
     this._log.info('Received HANGUP from gateway');
     if (payload.error) {
-      const error = new GeneralErrors.ConnectionError('Error sent from gateway in HANGUP');
+      const code = payload.error.code;
+      const error = typeof code === 'number' && hasErrorByCode(code)
+        ? new (getErrorByCode(code))(payload.error.message)
+        : new GeneralErrors.ConnectionError('Error sent from gateway in HANGUP');
       this._log.error('Received an error from the gateway:', error);
       this.emit('error', error);
     }

@@ -6,8 +6,14 @@
 Changes
 -------
 
-- Adjusted error reporting from backend services. Signaling errors emitted by the `Device` should now be more descriptive. If your application logic relied on parsing generic error code `31005`, please consider reading through our API documentation and adjusting your application logic to anticipate a wider and more descriptive range of error codes.
-
+- Enhanced error reporting from backend services. Signaling errors emitted by `Device` and `Call` objects should now be more descriptive. If your application logic relied on parsing generic error code `31005`, please consider reading through our API documentation and adjusting your application logic to anticipate a wider and more descriptive range of error codes.
+  - Some new error codes included within this release are:
+    - **ClientErrors**
+      - NotFound: `31404`
+      - TemporarilyUnavailable: `31480`
+      - BusyHere: `31486`
+    - **SIPServerErrors**
+      - Decline: `31603`
 
 2.7.1 (August 3, 2023)
 ======================
