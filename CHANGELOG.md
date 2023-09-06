@@ -190,7 +190,7 @@ Bug Fixes
 - Use DOMException instead of DOMError, which has been deprecated
 - Removed npm util from the package, instead favoring native functions
 
-2.1.0 (December 16, 2021)
+2.1.0 (January 6, 2022)
 =========================
 
 New Features
