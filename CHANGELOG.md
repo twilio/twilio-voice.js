@@ -6,14 +6,14 @@
 Changes
 -------
 
-- Enhanced error reporting from backend services. Signaling errors emitted by `Device` and `Call` objects should now be more descriptive. If your application logic relied on parsing generic error code `31005`, please consider reading through our API documentation and adjusting your application logic to anticipate a wider and more descriptive range of error codes.
-  - Some new error codes included within this release are:
-    - **ClientErrors**
-      - NotFound: `31404`
-      - TemporarilyUnavailable: `31480`
-      - BusyHere: `31486`
-    - **SIPServerErrors**
-      - Decline: `31603`
+- Added new errors emitted by `Device` and `Call` objects. Previously, these errors were all part of a generic error code `31005`. With this new release, the following errors now have their own error codes. Please see this [page](https://www.twilio.com/docs/api/errors) for more details about each error.
+  - **ClientErrors**
+    - NotFound: `31404`
+    - TemporarilyUnavailable: `31480`
+    - BusyHere: `31486`
+  - **SIPServerErrors**
+    - Decline: `31603`
+*IMPORTANT: If your application currently relies on listening to the generic error code `31005` when any of the above errors happen, you need to update your error listeners to also listen for the new error codes.*
 
 2.7.1 (August 3, 2023)
 ======================
