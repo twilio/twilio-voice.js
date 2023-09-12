@@ -1637,7 +1637,7 @@ namespace Call {
    * which indicates that a call quality metric has returned to normal.
    *
    * For a full list of conditions that will raise a warning event, check the
-   * [Voice Insights SDK Events Reference](https://www.twilio.com/docs/deprecated-do-not-publish/insights/call-quality-events-twilio-client-sdk) page.
+   * [Voice Insights SDK Events Reference](https://www.twilio.com/docs/voice/voice-insights/api/call/details-sdk-call-quality-events) page.
    *
    * @param name - The name of the warning
    * @param data - An object containing data on the warning
