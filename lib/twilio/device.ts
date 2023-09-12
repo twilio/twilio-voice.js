@@ -1583,7 +1583,7 @@ namespace Device {
    * Emitted when the {@link Device}'s token is about to expire. Use DeviceOptions.refreshTokenMs
    * to set a custom warning time. Default is 10000 (10 seconds) prior to the token expiring.
    * @param device
-   * @example `device.on('tokenWillExpire', () => {
+   * @example `device.on('tokenWillExpire', device => {
    *   const token = getNewTokenViaAjax();
    *   device.updateToken(token);
    * })`
