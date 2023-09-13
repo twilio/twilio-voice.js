@@ -15,8 +15,8 @@ Twilio's Voice SDK allows you to add real-time voice and PSTN calling to your we
 * [Quickstart](https://www.twilio.com/docs/voice/client/javascript/quickstart)
 * [Changelog](https://github.com/twilio/twilio-voice.js/blob/master/CHANGELOG.md)
 
-### Technical Support
-Create a support ticket using your Twilio account if you need technical support.
+### Issues and Support
+Please checkout our [common issues](COMMON_ISSUES.md) page or file any issues you find here on Github. For general inquiries related to the Voice SDK you can file a support ticket. Please ensure that you are not sharing any [Personally Identifiable Information(PII)](https://www.twilio.com/docs/glossary/what-is-personally-identifiable-information-pii) or sensitive account information (API keys, credentials, etc.) when reporting an issue.
 
 Installation
 ------------
