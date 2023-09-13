@@ -1536,6 +1536,13 @@ class Device extends EventEmitter {
 
 namespace Device {
   /**
+   * Emitted when the {@link Device} has been destroyed.
+   * @example `device.on('destroyed', () => { })`
+   * @event
+   */
+  declare function destroyedEvent(): void;
+
+  /**
    * Emitted when the {@link Device} receives an error.
    * @param error
    * @example `device.on('error', call => { })`
@@ -1553,32 +1560,30 @@ namespace Device {
 
   /**
    * Emitted when the {@link Device} is unregistered.
-   * @param device
-   * @example `device.on('unregistered', device => { })`
+   * @example `device.on('unregistered', () => { })`
    * @event
    */
-  declare function unregisteredEvent(device: Device): void;
+  declare function unregisteredEvent(): void;
 
   /**
    * Emitted when the {@link Device} is registering.
-   * @param device
-   * @example `device.on('registering', device => { })`
+   * @example `device.on('registering', () => { })`
    * @event
    */
-  declare function registeringEvent(device: Device): void;
+  declare function registeringEvent(): void;
 
   /**
    * Emitted when the {@link Device} is registered.
-   * @param device
-   * @example `device.on('registered', device => { })`
+   * @example `device.on('registered', () => { })`
    * @event
    */
-  declare function registeredEvent(device: Device): void;
+  declare function registeredEvent(): void;
 
   /**
    * Emitted when the {@link Device}'s token is about to expire. Use DeviceOptions.refreshTokenMs
    * to set a custom warning time. Default is 10000 (10 seconds) prior to the token expiring.
-   * @example `device.on('tokenWillExpire', () => {
+   * @param device
+   * @example `device.on('tokenWillExpire', device => {
    *   const token = getNewTokenViaAjax();
    *   device.updateToken(token);
    * })`

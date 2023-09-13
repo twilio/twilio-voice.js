@@ -1,5 +1,17 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.7.2 (In Progress)
+===================
+
+Changes
+-------
+
+- Added missing documentation for the following events:
+  - `call.on('ringing', handler)`
+  - `call.on('warning', handler)`
+  - `call.on('warning-cleared', handler)`
+  - `device.on('destroyed', handler)`
+
 2.7.1 (August 3, 2023)
 ======================
 
