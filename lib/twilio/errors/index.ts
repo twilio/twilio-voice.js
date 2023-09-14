@@ -16,6 +16,42 @@ import {
   UserMediaErrors,
 } from './generated';
 
+/**
+ * NOTE(mhuynh): Replacing generic error codes with new (more specific) codes,
+ * is a breaking change. If an error code is found in this set, we only perform
+ * the transformation if the feature flag is enabled.
+ *
+ * With every major version bump, such that we are allowed to introduce breaking
+ * changes as per semver specification, this array should be cleared.
+ */
+const FEATURE_FLAG_ERROR_CODES: Set<number> = new Set([
+  31404,
+  31480,
+  31486,
+  31603,
+]);
+export function getErrorByFeatureFlagAndCode(
+  enableImprovedSignalingErrorPrecision: boolean,
+  errorCode: number,
+): typeof TwilioError | undefined {
+  if (typeof errorCode !== 'number') {
+    return;
+  }
+
+  if (!hasErrorByCode(errorCode)) {
+    return;
+  }
+
+  const shouldTransform = enableImprovedSignalingErrorPrecision
+    ? true
+    : !FEATURE_FLAG_ERROR_CODES.has(errorCode);
+  if (!shouldTransform) {
+    return;
+  }
+
+  return getErrorByCode(errorCode);
+}
+
 // Application errors that can be avoided by good app logic
 export class InvalidArgumentError extends Error {
   constructor(message?: string) {

@@ -10,8 +10,7 @@ import Device from './device';
 import DialtonePlayer from './dialtonePlayer';
 import {
   GeneralErrors,
-  getErrorByCode,
-  hasErrorByCode,
+  getErrorByFeatureFlagAndCode,
   InvalidArgumentError,
   InvalidStateError,
   MediaErrors,
@@ -249,6 +248,7 @@ class Call extends EventEmitter {
    */
   private _options: Call.Options = {
     MediaHandler: PeerConnection,
+    enableImprovedSignalingErrorPrecision: false,
     offerSdp: null,
     shouldPlayDisconnect: () => true,
     voiceEventSidGenerator: generateVoiceEventSid,
@@ -1207,9 +1207,15 @@ class Call extends EventEmitter {
     this._log.info('Received HANGUP from gateway');
     if (payload.error) {
       const code = payload.error.code;
-      const error = typeof code === 'number' && hasErrorByCode(code)
-        ? new (getErrorByCode(code))(payload.error.message)
-        : new GeneralErrors.ConnectionError('Error sent from gateway in HANGUP');
+      const errorConstructor = getErrorByFeatureFlagAndCode(
+        this._options.enableImprovedSignalingErrorPrecision,
+        code,
+      );
+      const error = typeof errorConstructor !== 'undefined'
+        ? new errorConstructor(payload.error.message)
+        : new GeneralErrors.ConnectionError(
+            'Error sent from gateway in HANGUP',
+          );
       this._log.error('Received an error from the gateway:', error);
       this.emit('error', error);
     }
@@ -1835,6 +1841,8 @@ namespace Call {
      * Whether or not to enable DSCP.
      */
     dscp?: boolean;
+
+    enableImprovedSignalingErrorPrecision: boolean;
 
     /**
      * Experimental feature.

@@ -14,8 +14,7 @@ import {
   AuthorizationErrors,
   ClientErrors,
   GeneralErrors,
-  getErrorByCode,
-  hasErrorByCode,
+  getErrorByFeatureFlagAndCode,
   InvalidArgumentError,
   InvalidStateError,
   NotSupportedError,
@@ -339,6 +338,7 @@ class Device extends EventEmitter {
     closeProtection: false,
     codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
     dscp: true,
+    enableImprovedSignalingErrorPrecision: false,
     forceAggressiveIceNomination: false,
     logLevel: LogLevels.ERROR,
     maxCallSignalingTimeoutMs: 0,
@@ -554,10 +554,15 @@ class Device extends EventEmitter {
       throw new InvalidStateError('A Call is already active');
     }
 
-    const activeCall = this._activeCall = await this._makeCall(options.params || { }, {
-      rtcConfiguration: options.rtcConfiguration,
-      voiceEventSidGenerator: this._options.voiceEventSidGenerator,
-    });
+    const activeCall = this._activeCall = await this._makeCall(
+      options.params || { },
+      {
+        enableImprovedSignalingErrorPrecision:
+          !!this._options.enableImprovedSignalingErrorPrecision,
+        rtcConfiguration: options.rtcConfiguration,
+        voiceEventSidGenerator: this._options.voiceEventSidGenerator,
+      },
+    );
 
     // Make sure any incoming calls are ignored
     this._calls.splice(0).forEach(call => call.ignore());
@@ -1164,8 +1169,14 @@ class Device extends EventEmitter {
         // Stop trying to register presence after token expires
         this._stopRegistrationTimer();
         twilioError = new AuthorizationErrors.AccessTokenExpired(originalError);
-      } else if (hasErrorByCode(code)) {
-        twilioError = new (getErrorByCode(code))(originalError);
+      } else {
+        const errorConstructor = getErrorByFeatureFlagAndCode(
+          !!this._options.enableImprovedSignalingErrorPrecision,
+          code,
+        );
+        if (typeof errorConstructor !== 'undefined') {
+          twilioError = new errorConstructor(originalError);
+        }
       }
     }
 
@@ -1198,12 +1209,17 @@ class Device extends EventEmitter {
 
     const customParameters = Object.assign({ }, queryToJson(callParameters.Params));
 
-    const call = await this._makeCall(customParameters, {
-      callParameters,
-      offerSdp: payload.sdp,
-      reconnectToken: payload.reconnect,
-      voiceEventSidGenerator: this._options.voiceEventSidGenerator,
-    });
+    const call = await this._makeCall(
+      customParameters,
+      {
+        callParameters,
+        enableImprovedSignalingErrorPrecision:
+          !!this._options.enableImprovedSignalingErrorPrecision,
+        offerSdp: payload.sdp,
+        reconnectToken: payload.reconnect,
+        voiceEventSidGenerator: this._options.voiceEventSidGenerator,
+      },
+    );
 
     this._calls.push(call);
 
@@ -1700,6 +1716,11 @@ namespace Device {
      * client relative to available edges.
      */
     edge?: string[] | string;
+
+    /**
+     * Granular error codes.
+     */
+    enableImprovedSignalingErrorPrecision?: boolean;
 
     /**
      * Overrides the native MediaDevices.enumerateDevices API.
