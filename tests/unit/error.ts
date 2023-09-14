@@ -68,5 +68,39 @@ describe('Errors', () => {
       const errorConstructor = (errors as any)[namespace][name];
       assert(typeof errorConstructor === 'function');
     }
-  })
+  });
+
+  describe('getErrorByFeatureFlagAndCode', () => {
+    it('should return a constructor when using the feature flag and the error is behind the flag', () => {
+      const errorConstructor = errors.getErrorByFeatureFlagAndCode(true, 31480);
+      if (typeof errorConstructor !== 'function') {
+        throw new Error('error constructor should be defined');
+      }
+      const error = new errorConstructor();
+      assert.equal(error.code, 31480);
+    });
+
+    it('should return undefined when not using the feature flag and the error is behind the flag', () => {
+      const errorConstructor = errors.getErrorByFeatureFlagAndCode(false, 31480);
+      assert.equal(typeof errorConstructor, 'undefined');
+    });
+
+    it('should return a constructor when using the feature flag and the error is not behind the flag', () => {
+      const errorConstructor = errors.getErrorByFeatureFlagAndCode(true, 31009);
+      if (typeof errorConstructor !== 'function') {
+        throw new Error('error constructor should be defined');
+      }
+      const error = new errorConstructor();
+      assert.equal(error.code, 31009);
+    });
+
+    it('should return a constructor when not using the feature flag and the error is not behind the flag', () => {
+      const errorConstructor = errors.getErrorByFeatureFlagAndCode(false, 31009);
+      if (typeof errorConstructor !== 'function') {
+        throw new Error('error constructor should be defined');
+      }
+      const error = new errorConstructor();
+      assert.equal(error.code, 31009);
+    });
+  });
 });

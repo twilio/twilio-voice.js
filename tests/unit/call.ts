@@ -85,6 +85,7 @@ describe('Call', function() {
     };
 
     options = {
+      enableImprovedSignalingErrorPrecision: false,
       MediaHandler,
       StatsMonitor,
       voiceEventSidGenerator,
@@ -380,7 +381,7 @@ describe('Call', function() {
       });
 
       it('should result in a `denied` error when `getUserMedia` does not allow the application to access the media', () => {
-        return new Promise(resolve => {
+        return new Promise<void>(resolve => {
           mediaHandler.openWithConstraints = () => {
             const p = Promise.reject({
               code: 0,
@@ -1009,7 +1010,7 @@ describe('Call', function() {
       sinon.assert.calledWith(publisher.info, 'feedback', 'received-none');
     });
 
-    Object.values(Call.FeedbackScore).forEach((score: Call.FeedbackScore) => {
+    Object.values(Call.FeedbackScore).forEach((score: any) => {
       Object.values(Call.FeedbackIssue).forEach((issue: Call.FeedbackIssue) => {
         it(`should call publisher.info with feedback received-none when called with ${score} and ${issue}`, () => {
           conn.postFeedback(score, issue);
@@ -1677,6 +1678,53 @@ describe('Call', function() {
           const rVal = callback.firstCall.args[0];
           assert.equal(rVal.code, 31005);
         });
+
+        describe('should transform an error if enableImprovedSignalingErrorPrecision is true', () => {
+          beforeEach(() => {
+            conn['_options'].enableImprovedSignalingErrorPrecision = true;
+          });
+
+          it('should pass the signaling error message', () => {
+            const cb = sinon.stub();
+            conn.on('error', cb);
+            pstream.emit('hangup', { callsid: 'CA123', error: {
+              code: 31480,
+              message: 'foobar',
+            }});
+            const rVal = cb.firstCall.args[0];
+            assert.equal(rVal.code, 31480);
+            assert.equal(rVal.message, 'TemporarilyUnavailable (31480): foobar');
+          })
+
+          it('should default the error message', () => {
+            const cb = sinon.stub();
+            conn.on('error', cb);
+            pstream.emit('hangup', { callsid: 'CA123', error: {
+              code: 31480,
+            }});
+            const rVal = cb.firstCall.args[0];
+            assert.equal(rVal.code, 31480);
+            assert.equal(
+              rVal.message,
+              'TemporarilyUnavailable (31480): The callee is currently unavailable.',
+            );
+          });
+        })
+
+        it('should not transform an error if enableImprovedSignalingErrorPrecision is false', () => {
+          conn['_options'].enableImprovedSignalingErrorPrecision = false;
+          const cb = sinon.stub();
+          conn.on('error', cb);
+          pstream.emit('hangup', { callsid: 'CA123', error: {
+            code: 31480,
+          }});
+          const rVal = cb.firstCall.args[0];
+          assert.equal(rVal.code, 31005);
+          assert.equal(
+            rVal.message,
+            'ConnectionError (31005): Error sent from gateway in HANGUP',
+          );
+        });
       });
 
       context('when callsid does not match', () => {
@@ -2036,7 +2084,7 @@ describe('Call', function() {
 
     context('after 10 samples have been emitted', () => {
       it('should call publisher.postMetrics with the samples', () => {
-        const samples = [];
+        const samples: any[] = [];
 
         for (let i = 0; i < 10; i++) {
           const sample = {...sampleData, ...audioData}
@@ -2049,7 +2097,7 @@ describe('Call', function() {
       });
 
       it('should publish correct volume levels', () => {
-        const samples = [];
+        const samples: any = [];
         const dataLength = 10;
 
         const convert = (internalValue: any) => (internalValue / 255) * 32767;

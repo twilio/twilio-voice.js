@@ -639,6 +639,29 @@ describe('Device', function() {
           sinon.assert.notCalled(pstream.register);
         });
 
+        it('should transform when enableImprovedSignalingErrorPrecision is true', async () => {
+          device.updateOptions({ enableImprovedSignalingErrorPrecision: true });
+          await registerDevice();
+          device.emit = sinon.spy();
+          pstream.emit('error', { error: { code: 31480 } });
+          sinon.assert.calledOnce(device.emit as sinon.SinonSpy);
+          sinon.assert.calledWith(device.emit as sinon.SinonSpy, 'error');
+          const errorObject = (device.emit as sinon.SinonSpy).getCall(0).args[1];
+          assert.equal('TemporarilyUnavailable', errorObject.name);
+          assert.equal(31480, errorObject.code);
+        });
+
+        it('should default when enableImprovedSignalingErrorPrecision is false', async () => {
+          device.updateOptions({ enableImprovedSignalingErrorPrecision: false });
+          await registerDevice();
+          device.emit = sinon.spy();
+          pstream.emit('error', { error: { code: 31480 } });
+          sinon.assert.calledOnce(device.emit as sinon.SinonSpy);
+          sinon.assert.calledWith(device.emit as sinon.SinonSpy, 'error');
+          const errorObject = (device.emit as sinon.SinonSpy).getCall(0).args[1];
+          console.error(errorObject);
+        });
+
         it('should emit Device.error if code is 31005', () => {
           device.emit = sinon.spy();
           pstream.emit('error', { error: { code: 31005 } });
@@ -783,7 +806,7 @@ describe('Device', function() {
           spyIncomingSound = { play: sinon.spy(), stop: sinon.spy() };
           device['_soundcache'].set(Device.SoundName.Incoming, spyIncomingSound);
 
-          const incomingPromise = new Promise(resolve =>
+          const incomingPromise = new Promise<void>(resolve =>
             device.once(Device.EventName.Incoming, () => {
               device.emit = sinon.spy();
               device.calls[0].parameters = { };
@@ -1181,7 +1204,7 @@ describe('Device', function() {
         it('should not create a stream', async () => {
           const setupSpy = device['_setupStream'] = sinon.spy(device['_setupStream']);
           device.updateOptions();
-          await new Promise(resolve => {
+          await new Promise<void>(resolve => {
             sinon.assert.notCalled(setupSpy);
             resolve();
           });
