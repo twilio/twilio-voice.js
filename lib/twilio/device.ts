@@ -939,7 +939,15 @@ class Device extends EventEmitter {
 
     const config: Call.Config = {
       audioHelper: this._audio,
-      getUserMedia: this._options.getUserMedia || getUserMedia,
+      getUserMedia: (...args) =>
+        (this._options.getUserMedia || getUserMedia)(...args)
+        .then((gumResponse: any) => {
+          this._audio?._updateAvailableDevices().catch(error => {
+            // Ignore error, we don't want to break the call flow
+            this._log.warn('Unable to updateAvailableDevices after gUM call', error);
+          });
+          return Promise.resolve(gumResponse);
+        }),
       isUnifiedPlanDefault: Device._isUnifiedPlanDefault,
       onIgnore: (): void => {
         this._soundcache.get(Device.SoundName.Incoming).stop();

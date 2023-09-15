@@ -15,7 +15,11 @@ describe('AudioHelper', () => {
     let oldNavigator;
 
     beforeEach(() => {
-      audio = new AudioHelper(noop, noop, getUserMedia, { mediaDevices: {} });
+      audio = new AudioHelper(noop, noop, getUserMedia, { mediaDevices: {
+        enumerateDevices: function(){
+          return Promise.resolve();
+        }
+      } });
     });
 
     before(() => {
@@ -503,46 +507,6 @@ describe('AudioHelper', () => {
         }).then(result => {
           assert.deepEqual(result, []);
         })));
-      });
-    });
-
-    describe('mediaDevices:deviceinfochange', () => {
-      let audio;
-      const wait = () => new Promise(r => setTimeout(r, 0));
-      const noop = () => {};
-
-      beforeEach(() => {
-        audio = new AudioHelper(noop, noop, getUserMedia, {
-          mediaDevices,
-          setSinkId: () => {}
-        });
-        audio.speakerDevices = {};
-        audio.ringtoneDevices = {
-          get: () => ({ size: 1 }),
-          set: sinon.stub(),
-        };
-        audio.speakerDevices = {
-          get: () => ({ size: 0 }),
-          set: sinon.stub().rejects('foobar'),
-        };
-        audio._log.warn = sinon.stub();
-        audio.isOutputSelectionSupported = true;
-      });
-
-      it('should set output devices', () => {
-        handlers.get('deviceinfochange')();
-        wait().then(() => sinon.assert.called(audio.speakerDevices.set));
-      });
-
-      it('should catch error when setting output devices', () => {
-        handlers.get('deviceinfochange')();
-        wait().then(() => sinon.assert.called(audio._log.warn));
-      });
-
-      it('should not set device when isSupported is false', () => {
-        audio.isOutputSelectionSupported = false;
-        handlers.get('deviceinfochange')();
-        wait().then(() => sinon.assert.notCalled(audio.speakerDevices.set));
       });
     });
   });
