@@ -8,7 +8,6 @@ import { InvalidArgumentError, NotSupportedError } from './errors';
 import Log from './log';
 import OutputDeviceCollection from './outputdevicecollection';
 import MediaDeviceInfoShim from './shims/mediadeviceinfo';
-import getMediaDevicesInstance from './shims/mediadevices';
 import { average, difference, isFirefox } from './util';
 
 /**
@@ -176,11 +175,11 @@ class AudioHelper extends EventEmitter {
     }, options);
 
     this._getUserMedia = getUserMedia;
-    this._mediaDevices = options.mediaDevices || getMediaDevicesInstance() as AudioHelper.MediaDevicesLike;
+    this._mediaDevices = options.mediaDevices || navigator.mediaDevices;
     this._onActiveInputChanged = onActiveInputChanged;
     this._enumerateDevices = typeof options.enumerateDevices === 'function'
       ? options.enumerateDevices
-      : this._mediaDevices && this._mediaDevices.enumerateDevices;
+      : this._mediaDevices && this._mediaDevices.enumerateDevices.bind(this._mediaDevices);
 
     const isAudioContextSupported: boolean = !!(options.AudioContext || options.audioContext);
     const isEnumerationSupported: boolean = !!this._enumerateDevices;
@@ -308,8 +307,39 @@ class AudioHelper extends EventEmitter {
 
     if (this._mediaDevices.removeEventListener) {
       this._mediaDevices.removeEventListener('devicechange', this._updateAvailableDevices);
-      this._mediaDevices.removeEventListener('deviceinfochange', this._updateAvailableDevices);
     }
+  }
+
+  /**
+   * Update the available input and output devices
+   * @private
+   */
+  _updateAvailableDevices = (): Promise<void> => {
+    if (!this._mediaDevices || !this._enumerateDevices) {
+      return Promise.reject('Enumeration not supported');
+    }
+
+    return this._enumerateDevices().then((devices: MediaDeviceInfo[]) => {
+      this._updateDevices(devices.filter((d: MediaDeviceInfo) => d.kind === 'audiooutput'),
+        this.availableOutputDevices,
+        this._removeLostOutput);
+
+      this._updateDevices(devices.filter((d: MediaDeviceInfo) => d.kind === 'audioinput'),
+        this.availableInputDevices,
+        this._removeLostInput);
+
+      const defaultDevice = this.availableOutputDevices.get('default')
+        || Array.from(this.availableOutputDevices.values())[0];
+
+      [this.speakerDevices, this.ringtoneDevices].forEach(outputDevices => {
+        if (!outputDevices.get().size && this.availableOutputDevices.size && this.isOutputSelectionSupported) {
+          outputDevices.set(defaultDevice.deviceId)
+            .catch((reason) => {
+              this._log.warn(`Unable to set audio output devices. ${reason}`);
+            });
+        }
+      });
+    });
   }
 
   /**
@@ -426,7 +456,6 @@ class AudioHelper extends EventEmitter {
 
     if (this._mediaDevices.addEventListener) {
       this._mediaDevices.addEventListener('devicechange', this._updateAvailableDevices);
-      this._mediaDevices.addEventListener('deviceinfochange', this._updateAvailableDevices);
     }
 
     this._updateAvailableDevices().then(() => {
@@ -543,37 +572,6 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Update the available input and output devices
-   */
-  private _updateAvailableDevices = (): Promise<void> => {
-    if (!this._mediaDevices || !this._enumerateDevices) {
-      return Promise.reject('Enumeration not supported');
-    }
-
-    return this._enumerateDevices().then((devices: MediaDeviceInfo[]) => {
-      this._updateDevices(devices.filter((d: MediaDeviceInfo) => d.kind === 'audiooutput'),
-        this.availableOutputDevices,
-        this._removeLostOutput);
-
-      this._updateDevices(devices.filter((d: MediaDeviceInfo) => d.kind === 'audioinput'),
-        this.availableInputDevices,
-        this._removeLostInput);
-
-      const defaultDevice = this.availableOutputDevices.get('default')
-        || Array.from(this.availableOutputDevices.values())[0];
-
-      [this.speakerDevices, this.ringtoneDevices].forEach(outputDevices => {
-        if (!outputDevices.get().size && this.availableOutputDevices.size && this.isOutputSelectionSupported) {
-          outputDevices.set(defaultDevice.deviceId)
-            .catch((reason) => {
-              this._log.warn(`Unable to set audio output devices. ${reason}`);
-            });
-        }
-      });
-    });
-  }
-
-  /**
    * Update a set of devices.
    * @param updatedDevices - An updated list of available Devices
    * @param availableDevices - The previous list of available Devices
@@ -680,7 +678,6 @@ namespace AudioHelper {
    * that were lost as a result of this deviceChange event.
    * @example `device.audio.on('deviceChange', lostActiveDevices => { })`
    * @event
-   * @private
    */
   declare function deviceChangeEvent(lostActiveDevices: MediaDeviceInfo[]): void;
 

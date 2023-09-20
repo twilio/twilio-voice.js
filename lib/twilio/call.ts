@@ -669,6 +669,10 @@ class Call extends EventEmitter {
         data: { audioConstraints },
       }, this);
 
+      if (this._options.onGetUserMedia) {
+        this._options.onGetUserMedia();
+      }
+
       connect();
     }, (error: Record<string, any>) => {
       let twilioError;
@@ -1913,6 +1917,11 @@ namespace Call {
      * The offer SDP, if this is an incoming call.
      */
     offerSdp?: string | null;
+
+    /**
+     * Called after a successful getUserMedia call
+     */
+    onGetUserMedia?: () => void;
 
     /**
      * Whether this is a preflight call or not
