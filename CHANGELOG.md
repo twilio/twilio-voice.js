@@ -6,7 +6,7 @@
 Changes
 -------
 
-- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/197) where audio in Chrome browser is choppy when another application is using the audio devices.
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/197) where audio in the Chrome browser is choppy when another application is also using the audio devices.
 - Added missing documentation for the following events:
   - `call.on('ringing', handler)`
   - `call.on('warning', handler)`
