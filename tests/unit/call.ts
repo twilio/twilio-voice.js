@@ -399,12 +399,14 @@ describe('Call', function() {
     });
 
     context('when getInputStream is present and succeeds', () => {
-      let getInputStream;
+      let getInputStream: any;
+      let onGetUserMedia: any;
       let wait: Promise<any>;
 
       beforeEach(() => {
+        onGetUserMedia = sinon.stub();
         getInputStream = sinon.spy(() => 'foo');
-        Object.assign(options, { getInputStream });
+        Object.assign(options, { getInputStream, onGetUserMedia });
         conn = new Call(config, options);
 
         mediaHandler.setInputTracksFromStream = sinon.spy(() => {
@@ -423,6 +425,13 @@ describe('Call', function() {
         conn.accept();
         return wait.then(() => {
           sinon.assert.calledWith(publisher.info, 'get-user-media', 'succeeded');
+        });
+      });
+
+      it('should call onGetUserMedia callback', () => {
+        conn.accept();
+        return wait.then(() => {
+          sinon.assert.calledWith(onGetUserMedia);
         });
       });
 

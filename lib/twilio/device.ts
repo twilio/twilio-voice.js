@@ -939,15 +939,7 @@ class Device extends EventEmitter {
 
     const config: Call.Config = {
       audioHelper: this._audio,
-      getUserMedia: (...args) =>
-        (this._options.getUserMedia || getUserMedia)(...args)
-        .then((gumResponse: any) => {
-          this._audio?._updateAvailableDevices().catch(error => {
-            // Ignore error, we don't want to break the call flow
-            this._log.warn('Unable to updateAvailableDevices after gUM call', error);
-          });
-          return Promise.resolve(gumResponse);
-        }),
+      getUserMedia: this._options.getUserMedia || getUserMedia,
       isUnifiedPlanDefault: Device._isUnifiedPlanDefault,
       onIgnore: (): void => {
         this._soundcache.get(Device.SoundName.Incoming).stop();
@@ -977,6 +969,7 @@ class Device extends EventEmitter {
       getInputStream: (): MediaStream | null => this._options.fileInputStream || this._callInputStream,
       getSinkIds: (): string[] => this._callSinkIds,
       maxAverageBitrate: this._options.maxAverageBitrate,
+      onGetUserMedia: () => this._onGetUserMedia(),
       preflight: this._options.preflight,
       rtcConstraints: this._options.rtcConstraints,
       shouldPlayDisconnect: () => this._audio?.disconnect(),
@@ -1097,9 +1090,19 @@ class Device extends EventEmitter {
   }
 
   /**
+   * Called after a successful getUserMedia call
+   */
+  private _onGetUserMedia = () => {
+    this._audio?._updateAvailableDevices().catch(error => {
+      // Ignore error, we don't want to break the call flow
+      this._log.warn('Unable to updateAvailableDevices after gUM call', error);
+    });
+  }
+
+  /**
    * Called when a 'close' event is received from the signaling stream.
    */
-   private _onSignalingClose = () => {
+  private _onSignalingClose = () => {
     this._stream = null;
     this._streamConnectedPromise = null;
   }

@@ -24,7 +24,6 @@ const ClientCapability = require('twilio').jwt.ClientCapability;
 describe('Device', function() {
   let activeCall: any;
   let audioHelper: any;
-  let callConfig: any;
   let clock: SinonFakeTimers;
   let connectOptions: Record<string, any> | undefined;
   let device: Device;
@@ -58,8 +57,7 @@ describe('Device', function() {
     audioHelper.outgoing = () => enabledSounds[Device.SoundName.Outgoing];
     return audioHelper;
   };
-  const Call = (_config?: any, _connectOptions?: Record<string, any>) => {
-    callConfig = _config;
+  const Call = (_?: any, _connectOptions?: Record<string, any>) => {
     connectOptions = _connectOptions;
     return activeCall = createEmitterStub(require('../../lib/twilio/call').default);
   };
@@ -203,7 +201,7 @@ describe('Device', function() {
       describe('.connect(params?, audioConstraints?, iceServers?)', () => {
         it('should update device list after a getUserMediaCall', async () => {
           await device.connect();
-          await callConfig.getUserMedia();
+          connectOptions!.onGetUserMedia();
           sinon.assert.calledOnce(updateAvailableDevicesStub);
         });
 
