@@ -84,6 +84,7 @@
 						<section class="tsd-index-section ">
 							<h3>Events</h3>
 							<ul class="tsd-index-list">
+								<li class="tsd-kind-event tsd-parent-kind-class tsd-is-static"><a href="voice.audiohelper.html#devicechangeevent" class="tsd-kind-icon">device<wbr>Change<wbr>Event</a></li>
 								<li class="tsd-kind-event tsd-parent-kind-class tsd-is-static"><a href="voice.audiohelper.html#inputvolumeevent" class="tsd-kind-icon">input<wbr>Volume<wbr>Event</a></li>
 							</ul>
 						</section>
@@ -141,6 +142,43 @@
 			<section class="tsd-panel-group tsd-member-group ">
 				<h2>Events</h2>
 				<section class="tsd-panel tsd-member tsd-kind-event tsd-parent-kind-class tsd-is-static">
+					<a name="devicechangeevent" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagStatic">Static</span> device<wbr>Change<wbr>Event</h3>
+					<ul class="tsd-signatures tsd-kind-event tsd-parent-kind-class tsd-is-static">
+						<li class="tsd-signature tsd-kind-icon">device<wbr>Change<wbr>Event<span class="tsd-signature-symbol">(</span>lostActiveDevices<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">MediaDeviceInfo</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L682">lib/twilio/audiohelper.ts:682</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Emitted when the available set of Devices changes.</p>
+								</div>
+								<dl class="tsd-comment-tags">
+									<dt>example</dt>
+									<dd><p><code>device.audio.on(&#39;deviceChange&#39;, lostActiveDevices =&gt; { })</code></p>
+									</dd>
+								</dl>
+							</div>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>lostActiveDevices: <span class="tsd-signature-type">MediaDeviceInfo</span><span class="tsd-signature-symbol">[]</span></h5>
+									<div class="tsd-comment tsd-typography">
+										<p>An array containing any Devices that were previously active
+										that were lost as a result of this deviceChange event.</p>
+									</div>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-event tsd-parent-kind-class tsd-is-static">
 					<a name="inputvolumeevent" class="tsd-anchor"></a>
 					<h3><span class="tsd-flag ts-flagStatic">Static</span> input<wbr>Volume<wbr>Event</h3>
 					<ul class="tsd-signatures tsd-kind-event tsd-parent-kind-class tsd-is-static">
@@ -150,7 +188,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L696">lib/twilio/audiohelper.ts:696</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L693">lib/twilio/audiohelper.ts:693</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -188,7 +226,7 @@
 					<div class="tsd-signature tsd-kind-icon">available<wbr>Input<wbr>Devices<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Map</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">MediaDeviceInfo</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol"> = new Map()</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L36">lib/twilio/audiohelper.ts:36</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L35">lib/twilio/audiohelper.ts:35</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -203,7 +241,7 @@
 					<div class="tsd-signature tsd-kind-icon">available<wbr>Output<wbr>Devices<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Map</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">, </span><span class="tsd-signature-type">MediaDeviceInfo</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol"> = new Map()</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L41">lib/twilio/audiohelper.ts:41</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L40">lib/twilio/audiohelper.ts:40</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -218,7 +256,7 @@
 					<div class="tsd-signature tsd-kind-icon">is<wbr>Output<wbr>Selection<wbr>Supported<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L58">lib/twilio/audiohelper.ts:58</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L57">lib/twilio/audiohelper.ts:57</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -234,7 +272,7 @@
 					<div class="tsd-signature tsd-kind-icon">is<wbr>Volume<wbr>Supported<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L64">lib/twilio/audiohelper.ts:64</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L63">lib/twilio/audiohelper.ts:63</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -250,7 +288,7 @@
 					<div class="tsd-signature tsd-kind-icon">ringtone<wbr>Devices<span class="tsd-signature-symbol">:</span> <a href="voice.outputdevicecollection.html" class="tsd-signature-type">OutputDeviceCollection</a></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L72">lib/twilio/audiohelper.ts:72</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L71">lib/twilio/audiohelper.ts:71</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -268,7 +306,7 @@
 					<div class="tsd-signature tsd-kind-icon">speaker<wbr>Devices<span class="tsd-signature-symbol">:</span> <a href="voice.outputdevicecollection.html" class="tsd-signature-type">OutputDeviceCollection</a></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L80">lib/twilio/audiohelper.ts:80</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L79">lib/twilio/audiohelper.ts:79</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -303,7 +341,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L31">lib/twilio/audiohelper.ts:31</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L30">lib/twilio/audiohelper.ts:30</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -328,7 +366,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L47">lib/twilio/audiohelper.ts:47</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L46">lib/twilio/audiohelper.ts:46</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -354,7 +392,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L52">lib/twilio/audiohelper.ts:52</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L51">lib/twilio/audiohelper.ts:51</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -427,7 +465,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L321">lib/twilio/audiohelper.ts:321</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L351">lib/twilio/audiohelper.ts:351</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -523,7 +561,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L331">lib/twilio/audiohelper.ts:331</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L361">lib/twilio/audiohelper.ts:361</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -739,7 +777,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L341">lib/twilio/audiohelper.ts:341</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L371">lib/twilio/audiohelper.ts:371</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -955,7 +993,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L352">lib/twilio/audiohelper.ts:352</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L382">lib/twilio/audiohelper.ts:382</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -989,7 +1027,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L366">lib/twilio/audiohelper.ts:366</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L396">lib/twilio/audiohelper.ts:396</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -1045,7 +1083,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L380">lib/twilio/audiohelper.ts:380</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L410">lib/twilio/audiohelper.ts:410</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -1069,7 +1107,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/229aaa60/lib/twilio/audiohelper.ts#L391">lib/twilio/audiohelper.ts:391</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/0beb4142/lib/twilio/audiohelper.ts#L421">lib/twilio/audiohelper.ts:421</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -1153,6 +1191,9 @@
 					<li class="current tsd-kind-class tsd-parent-kind-module">
 						<a href="voice.audiohelper.html" class="tsd-kind-icon">Audio<wbr>Helper</a>
 						<ul>
+							<li class=" tsd-kind-event tsd-parent-kind-class tsd-is-static">
+								<a href="voice.audiohelper.html#devicechangeevent" class="tsd-kind-icon">device<wbr>Change<wbr>Event</a>
+							</li>
 							<li class=" tsd-kind-event tsd-parent-kind-class tsd-is-static">
 								<a href="voice.audiohelper.html#inputvolumeevent" class="tsd-kind-icon">input<wbr>Volume<wbr>Event</a>
 							</li>
