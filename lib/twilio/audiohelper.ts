@@ -417,7 +417,7 @@ class AudioHelper extends EventEmitter {
     }
 
     this._processor = null;
-  };
+  }
 
   /**
    * Set the MediaTrackConstraints to be applied on every getUserMedia call for new input
