@@ -939,7 +939,6 @@ class Device extends EventEmitter {
 
     const config: Call.Config = {
       audioHelper: this._audio,
-      getUserMedia: this._options.getUserMedia || getUserMedia,
       isUnifiedPlanDefault: Device._isUnifiedPlanDefault,
       onIgnore: (): void => {
         this._soundcache.get(Device.SoundName.Incoming).stop();
@@ -969,7 +968,6 @@ class Device extends EventEmitter {
       getInputStream: (): MediaStream | null => this._options.fileInputStream || this._callInputStream,
       getSinkIds: (): string[] => this._callSinkIds,
       maxAverageBitrate: this._options.maxAverageBitrate,
-      onGetUserMedia: () => this._onGetUserMedia(),
       preflight: this._options.preflight,
       rtcConstraints: this._options.rtcConstraints,
       shouldPlayDisconnect: () => this._audio?.disconnect(),
@@ -1087,16 +1085,6 @@ class Device extends EventEmitter {
     if (!this._calls.length) {
       this._soundcache.get(Device.SoundName.Incoming).stop();
     }
-  }
-
-  /**
-   * Called after a successful getUserMedia call
-   */
-  private _onGetUserMedia = () => {
-    this._audio?._updateAvailableDevices().catch(error => {
-      // Ignore error, we don't want to break the call flow
-      this._log.warn('Unable to updateAvailableDevices after gUM call', error);
-    });
   }
 
   /**

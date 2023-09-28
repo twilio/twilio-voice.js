@@ -29,13 +29,13 @@ const VOLUME_INTERVAL_MS = 50;
  * @return {PeerConnection}
  * @constructor
  */
-function PeerConnection(audioHelper, pstream, getUserMedia, options) {
-  if (!audioHelper || !pstream || !getUserMedia) {
-    throw new InvalidArgumentError('Audiohelper, pstream and getUserMedia are required arguments');
+function PeerConnection(audioHelper, pstream, options) {
+  if (!audioHelper || !pstream) {
+    throw new InvalidArgumentError('Audiohelper, and pstream are required arguments');
   }
 
   if (!(this instanceof PeerConnection)) {
-    return new PeerConnection(audioHelper, pstream, getUserMedia, options);
+    return new PeerConnection(audioHelper, pstream, options);
   }
 
   this._log = Log.getInstance();
@@ -68,7 +68,6 @@ function PeerConnection(audioHelper, pstream, getUserMedia, options) {
   this.status = 'connecting';
   this.callSid = null;
   this.isMuted = false;
-  this.getUserMedia = getUserMedia;
 
   const AudioContext = typeof window !== 'undefined'
     && (window.AudioContext || window.webkitAudioContext);
@@ -78,6 +77,7 @@ function PeerConnection(audioHelper, pstream, getUserMedia, options) {
   // after 6 instances an exception is thrown. Refer https://www.w3.org/2011/audio/track/issues/3.
   // In order to get around it, we are re-using the Device's AudioContext.
   this._audioContext = AudioContext && audioHelper._audioContext;
+  this._audioHelper = audioHelper;
   this._hasIceCandidates = false;
   this._hasIceGatheringFailures = false;
   this._iceGatheringTimeoutId = null;
@@ -115,7 +115,7 @@ PeerConnection.prototype.uri = function() {
  * @param {MediaStreamConstraints} constraints
  */
 PeerConnection.prototype.openWithConstraints = function(constraints) {
-  return this.getUserMedia({ audio: constraints })
+  return this._audioHelper._maybeGetProcessedStream({ audio: constraints })
     .then(this._setInputTracksFromStream.bind(this, false));
 };
 

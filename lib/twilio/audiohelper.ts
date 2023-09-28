@@ -47,7 +47,7 @@ class AudioHelper extends EventEmitter {
   get inputDevice(): MediaDeviceInfo | null { return this._inputDevice; }
 
   /**
-   * The current input stream.
+   * The current input stream coming from the microphone device.
    */
   get inputStream(): MediaStream | null { return this._inputStream; }
 
@@ -114,7 +114,7 @@ class AudioHelper extends EventEmitter {
   private _inputDevice: MediaDeviceInfo | null = null;
 
   /**
-   * The current input stream.
+   * The current input stream coming from the microphone device.
    */
   private _inputStream: MediaStream | null = null;
 
@@ -249,6 +249,23 @@ class AudioHelper extends EventEmitter {
    */
   _getEnabledSounds(): Record<Device.ToggleableSound, boolean> {
     return this._enabledSounds;
+  }
+
+  /**
+   * Get processed stream, if it exists. Else, return the current input stream.
+   * If no input stream is detected, a new stream is created using the provided constraints.
+   * @private
+   */
+  _maybeGetProcessedStream(constraints: MediaStreamConstraints): Promise<MediaStream> {
+    return this._getUserMedia(constraints).then((stream: MediaStream) => {
+      // Ensures deviceId's and labels are populated after the gUM call
+      // by calling enumerateDevices
+      this._updateAvailableDevices().catch(error => {
+        // Ignore error, we don't want to break the call flow
+        this._log.warn('Unable to updateAvailableDevices after gUM call', error);
+      });
+      return stream;
+    });
   }
 
   /**
