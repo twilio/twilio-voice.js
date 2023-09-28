@@ -379,6 +379,7 @@ PeerConnection.prototype._setInputTracksForUnifiedPlan = function(shouldClone, n
 
     return this._sender.replaceTrack(newStream.getAudioTracks()[0]).then(() => {
       this._updateInputStreamSource(newStream);
+      this.stream = shouldClone ? cloneStream(newStream) : newStream;
       return getStreamPromise();
     });
   }
