@@ -117,7 +117,7 @@
     "ws": "7.4.6"
   },
   "dependencies": {
-    "@twilio/voice-errors": "1.3.1",
+    "@twilio/voice-errors": "1.4.0",
     "@types/md5": "2.3.2",
     "events": "3.3.0",
     "loglevel": "1.6.7",
