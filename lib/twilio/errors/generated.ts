@@ -100,6 +100,41 @@ export namespace AuthorizationErrors {
   }
 }
 
+export namespace SignatureValidationErrors {
+  export class AccessTokenSignatureValidationFailed extends TwilioError {
+    causes: string[] = [
+      'The access token has an invalid Account SID, API Key, or API Key Secret.',
+    ];
+    code: number = 31202;
+    description: string = 'Signature validation failed.';
+    explanation: string = 'The provided access token failed signature validation.';
+    name: string = 'AccessTokenSignatureValidationFailed';
+    solutions: string[] = [
+      'Ensure the Account SID, API Key, and API Key Secret are valid when generating your access token.',
+    ];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, SignatureValidationErrors.AccessTokenSignatureValidationFailed.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+}
+
 export namespace ClientErrors {
   export class BadRequest extends TwilioError {
     causes: string[] = [];
@@ -285,6 +320,93 @@ export namespace GeneralErrors {
     }
   }
 
+  export class ApplicationNotFoundError extends TwilioError {
+    causes: string[] = [];
+    code: number = 31001;
+    description: string = 'Application Not Found';
+    explanation: string = '';
+    name: string = 'ApplicationNotFoundError';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, GeneralErrors.ApplicationNotFoundError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
+  export class ConnectionDeclinedError extends TwilioError {
+    causes: string[] = [];
+    code: number = 31002;
+    description: string = 'Connection Declined';
+    explanation: string = '';
+    name: string = 'ConnectionDeclinedError';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, GeneralErrors.ConnectionDeclinedError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
+  export class ConnectionTimeoutError extends TwilioError {
+    causes: string[] = [];
+    code: number = 31003;
+    description: string = 'Connection Timeout';
+    explanation: string = 'The server could not produce a response within a suitable amount of time.';
+    name: string = 'ConnectionTimeoutError';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, GeneralErrors.ConnectionTimeoutError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
   export class ConnectionError extends TwilioError {
     causes: string[] = [];
     code: number = 31005;
@@ -408,9 +530,303 @@ export namespace MalformedRequestErrors {
       this.originalError = originalError;
     }
   }
+
+  export class MissingParameterArrayError extends TwilioError {
+    causes: string[] = [];
+    code: number = 31101;
+    description: string = 'Missing parameter array in request';
+    explanation: string = '';
+    name: string = 'MissingParameterArrayError';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, MalformedRequestErrors.MissingParameterArrayError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
+  export class AuthorizationTokenMissingError extends TwilioError {
+    causes: string[] = [];
+    code: number = 31102;
+    description: string = 'Authorization token missing in request.';
+    explanation: string = '';
+    name: string = 'AuthorizationTokenMissingError';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, MalformedRequestErrors.AuthorizationTokenMissingError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
+  export class MaxParameterLengthExceededError extends TwilioError {
+    causes: string[] = [];
+    code: number = 31103;
+    description: string = 'Maximum parameter length has been exceeded.';
+    explanation: string = 'Length of parameters cannot exceed MAX_PARAM_LENGTH.';
+    name: string = 'MaxParameterLengthExceededError';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, MalformedRequestErrors.MaxParameterLengthExceededError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
+  export class InvalidBridgeTokenError extends TwilioError {
+    causes: string[] = [];
+    code: number = 31104;
+    description: string = 'Invalid bridge token';
+    explanation: string = '';
+    name: string = 'InvalidBridgeTokenError';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, MalformedRequestErrors.InvalidBridgeTokenError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
+  export class InvalidClientNameError extends TwilioError {
+    causes: string[] = [
+      'Client name contains invalid characters.',
+    ];
+    code: number = 31105;
+    description: string = 'Invalid client name';
+    explanation: string = 'Client name should not contain control, space, delims, or unwise characters.';
+    name: string = 'InvalidClientNameError';
+    solutions: string[] = [
+      'Make sure that client name does not contain any of the invalid characters.',
+    ];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, MalformedRequestErrors.InvalidClientNameError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
+  export class ReconnectParameterInvalidError extends TwilioError {
+    causes: string[] = [];
+    code: number = 31107;
+    description: string = 'The reconnect parameter is invalid';
+    explanation: string = '';
+    name: string = 'ReconnectParameterInvalidError';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, MalformedRequestErrors.ReconnectParameterInvalidError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
 }
 
 export namespace AuthorizationErrors {
+  export class AuthorizationError extends TwilioError {
+    causes: string[] = [];
+    code: number = 31201;
+    description: string = 'Authorization error';
+    explanation: string = 'The request requires user authentication. The server understood the request, but is refusing to fulfill it.';
+    name: string = 'AuthorizationError';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, AuthorizationErrors.AuthorizationError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
+  export class NoValidAccountError extends TwilioError {
+    causes: string[] = [];
+    code: number = 31203;
+    description: string = 'No valid account';
+    explanation: string = '';
+    name: string = 'NoValidAccountError';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, AuthorizationErrors.NoValidAccountError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
+  export class InvalidJWTTokenError extends TwilioError {
+    causes: string[] = [];
+    code: number = 31204;
+    description: string = 'Invalid JWT token';
+    explanation: string = '';
+    name: string = 'InvalidJWTTokenError';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, AuthorizationErrors.InvalidJWTTokenError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
+  export class JWTTokenExpiredError extends TwilioError {
+    causes: string[] = [];
+    code: number = 31205;
+    description: string = 'JWT token expired';
+    explanation: string = '';
+    name: string = 'JWTTokenExpiredError';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, AuthorizationErrors.JWTTokenExpiredError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
   export class RateExceededError extends TwilioError {
     causes: string[] = [
       'Rate limit exceeded.',
@@ -430,6 +846,35 @@ export namespace AuthorizationErrors {
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, AuthorizationErrors.RateExceededError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
+  export class JWTTokenExpirationTooLongError extends TwilioError {
+    causes: string[] = [];
+    code: number = 31207;
+    description: string = 'JWT token expiration too long';
+    explanation: string = '';
+    name: string = 'JWTTokenExpirationTooLongError';
+    solutions: string[] = [];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, AuthorizationErrors.JWTTokenExpirationTooLongError.prototype);
 
       const message: string = typeof messageOrError === 'string'
         ? messageOrError
@@ -728,17 +1173,32 @@ export const errorsByCode: ReadonlyMap<number, any> = new Map([
   [ 20101, AuthorizationErrors.AccessTokenInvalid ],
   [ 20104, AuthorizationErrors.AccessTokenExpired ],
   [ 20151, AuthorizationErrors.AuthenticationFailed ],
+  [ 31202, SignatureValidationErrors.AccessTokenSignatureValidationFailed ],
   [ 31400, ClientErrors.BadRequest ],
   [ 31404, ClientErrors.NotFound ],
   [ 31480, ClientErrors.TemporarilyUnavailable ],
   [ 31486, ClientErrors.BusyHere ],
   [ 31603, SIPServerErrors.Decline ],
   [ 31000, GeneralErrors.UnknownError ],
+  [ 31001, GeneralErrors.ApplicationNotFoundError ],
+  [ 31002, GeneralErrors.ConnectionDeclinedError ],
+  [ 31003, GeneralErrors.ConnectionTimeoutError ],
   [ 31005, GeneralErrors.ConnectionError ],
   [ 31008, GeneralErrors.CallCancelledError ],
   [ 31009, GeneralErrors.TransportError ],
   [ 31100, MalformedRequestErrors.MalformedRequestError ],
+  [ 31101, MalformedRequestErrors.MissingParameterArrayError ],
+  [ 31102, MalformedRequestErrors.AuthorizationTokenMissingError ],
+  [ 31103, MalformedRequestErrors.MaxParameterLengthExceededError ],
+  [ 31104, MalformedRequestErrors.InvalidBridgeTokenError ],
+  [ 31105, MalformedRequestErrors.InvalidClientNameError ],
+  [ 31107, MalformedRequestErrors.ReconnectParameterInvalidError ],
+  [ 31201, AuthorizationErrors.AuthorizationError ],
+  [ 31203, AuthorizationErrors.NoValidAccountError ],
+  [ 31204, AuthorizationErrors.InvalidJWTTokenError ],
+  [ 31205, AuthorizationErrors.JWTTokenExpiredError ],
   [ 31206, AuthorizationErrors.RateExceededError ],
+  [ 31207, AuthorizationErrors.JWTTokenExpirationTooLongError ],
   [ 31209, AuthorizationErrors.PayloadSizeExceededError ],
   [ 31401, UserMediaErrors.PermissionDeniedError ],
   [ 31402, UserMediaErrors.AcquisitionFailedError ],
