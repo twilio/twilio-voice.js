@@ -349,8 +349,9 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Adds an {@link AudioProcessor} object which will receive
-   * the input audio stream before sending to Twilio.
+   * Adds an AudioProcessor object.
+   * The AudioHelper will route the input audio stream through the processor
+   * before sending the audio stream to Twilio.
    *
    * Only one {@link AudioProcessor} can be added at this time.
    * @param processor
