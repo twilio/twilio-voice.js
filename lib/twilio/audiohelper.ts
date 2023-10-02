@@ -349,13 +349,8 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Adds an {@link AudioProcessor}. If an {@link AudioProcessor} exists in the
-   * {@link AudioHelper}, the {@link AudioHelper} routes the input audio stream
-   * to the {@link AudioProcessor}.
-   *
-   * The {@link AudioHelper} guarantees that this audio stream is always
-   * the active input audio stream and will automatically
-   * update whenever the user's preference changes.
+   * Adds an {@link AudioProcessor} object which will receive
+   * the input audio stream before sending to Twilio.
    *
    * Only one {@link AudioProcessor} can be added at this time.
    * @param processor
@@ -365,13 +360,16 @@ class AudioHelper extends EventEmitter {
       throw new NotSupportedError('Adding multiple AudioProcessors is not supported at this time.');
     }
 
-    if (!processor) {
+    if (typeof processor !== 'object' || processor === null) {
       throw new InvalidArgumentError('Missing AudioProcessor argument.');
     }
 
-    if (typeof processor.createProcessedStream !== 'function' ||
-    typeof processor.destroyProcessedStream !== 'function') {
-      throw new InvalidArgumentError('Missing createProcessedStream or destroyProcessedStream.');
+    if (typeof processor.createProcessedStream !== 'function') {
+      throw new InvalidArgumentError('Missing createProcessedStream() method.');
+    }
+
+    if (typeof processor.destroyProcessedStream !== 'function') {
+      throw new InvalidArgumentError('Missing destroyProcessedStream() method.');
     }
 
     this._processor = processor;
