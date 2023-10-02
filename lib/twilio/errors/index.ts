@@ -26,9 +26,39 @@ import {
  * changes as per semver specification, this array should be cleared.
  */
 const FEATURE_FLAG_ERROR_CODES: Set<number> = new Set([
+  /**
+   * 310XX Errors
+   */
+  31001,
+  31002,
+  31003,
+  /**
+   * 311XX Errors
+   */
+  31101,
+  31102,
+  31103,
+  31104,
+  31105,
+  31107,
+  /**
+   * 312XX Errors
+   */
+  31201,
+  31202,
+  31203,
+  31204,
+  31205,
+  31207,
+  /**
+   * 314XX Errors
+   */
   31404,
   31480,
   31486,
+  /**
+   * 316XX Errors
+   */
   31603,
 ]);
 export function getErrorByFeatureFlagAndCode(
