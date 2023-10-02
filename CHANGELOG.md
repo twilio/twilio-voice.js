@@ -3,8 +3,8 @@
 2.8.0 (In Progress)
 ===================
 
-Changes
--------
+New Features
+------------
 
 - Added new errors emitted by `Device` and `Call` objects. Previously, these errors were all part of a generic error code `31005`. With this new release, the following errors now have their own error codes. Please see this [page](https://www.twilio.com/docs/api/errors) for more details about each error.
   - **ClientErrors**
@@ -14,6 +14,19 @@ Changes
   - **SIPServerErrors**
     - Decline: `31603`
 *IMPORTANT: If your application currently relies on listening to the generic error code `31005` when any of the above errors happen, you need to update your error listeners to also listen for the new error codes.*
+
+2.7.2 (September 21, 2023)
+=========================
+
+Changes
+-------
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/197) where audio in the Chrome browser is choppy when another application is also using the audio devices.
+- Added missing documentation for the following events:
+  - `call.on('ringing', handler)`
+  - `call.on('warning', handler)`
+  - `call.on('warning-cleared', handler)`
+  - `device.on('destroyed', handler)`
 
 2.7.1 (August 3, 2023)
 ======================
@@ -205,7 +218,7 @@ Bug Fixes
 - Use DOMException instead of DOMError, which has been deprecated
 - Removed npm util from the package, instead favoring native functions
 
-2.1.0 (December 16, 2021)
+2.1.0 (January 6, 2022)
 =========================
 
 New Features

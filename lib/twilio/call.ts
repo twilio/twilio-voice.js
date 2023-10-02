@@ -671,6 +671,10 @@ class Call extends EventEmitter {
         data: { audioConstraints },
       }, this);
 
+      if (this._options.onGetUserMedia) {
+        this._options.onGetUserMedia();
+      }
+
       connect();
     }, (error: Record<string, any>) => {
       let twilioError;
@@ -1607,6 +1611,29 @@ namespace Call {
   declare function rejectEvent(): void;
 
   /**
+   * Emitted when the {@link Call} has entered the `ringing` state.
+   * When using the Dial verb with `answerOnBridge=true`, the ringing state will begin when
+   * the callee has been notified of the call and will transition into open after the callee accepts the call,
+   * or closed if the call is rejected or cancelled.
+   * @param hasEarlyMedia - Denotes whether there is early media available from the callee.
+   * If `true`, the Client SDK will automatically play the early media. Sometimes this is ringing,
+   * other times it may be an important message about the call. If `false`, there is no remote media to play,
+   * so the application may want to play its own outgoing ringtone sound.
+   * @example `call.on('ringing', hasEarlyMedia => { })`
+   * @event
+   */
+  declare function ringingEvent(hasEarlyMedia: boolean): void;
+
+  /**
+   * Emitted when the {@link Call} gets a webrtc sample object.
+   * This event is published every second.
+   * @param sample
+   * @example `call.on('sample', sample => { })`
+   * @event
+   */
+  declare function sampleEvent(sample: RTCSample): void;
+
+  /**
    * Emitted every 50ms with the current input and output volumes, as a percentage of maximum
    * volume, between -100dB and -30dB. Represented by a floating point number.
    * @param inputVolume - A floating point number between 0.0 and 1.0 inclusive.
@@ -1617,13 +1644,32 @@ namespace Call {
   declare function volumeEvent(inputVolume: number, outputVolume: number): void;
 
   /**
-   * Emitted when the {@link Call} gets a webrtc sample object.
-   * This event is published every second.
-   * @param sample
-   * @example `call.on('sample', sample => { })`
+   * Emitted when the SDK detects a drop in call quality or other conditions that may indicate
+   * the user is having trouble with the call. You can implement callbacks on these events to
+   * alert the user of an issue.
+   *
+   * To alert the user that an issue has been resolved, you can listen for the `warning-cleared` event,
+   * which indicates that a call quality metric has returned to normal.
+   *
+   * For a full list of conditions that will raise a warning event, check the
+   * [Voice Insights SDK Events Reference](https://www.twilio.com/docs/voice/voice-insights/api/call/details-sdk-call-quality-events) page.
+   *
+   * @param name - The name of the warning
+   * @param data - An object containing data on the warning
+   * @example `call.on('warning', (name, data) => { })`
    * @event
    */
-  declare function sampleEvent(sample: RTCSample): void;
+  declare function warningEvent(name: string, data: any): void;
+
+  /**
+   * Emitted when a call quality metric has returned to normal.
+   * You can listen for this event to update the user when a call quality issue has been resolved.
+   *
+   * @param name - The name of the warning
+   * @example `call.on('warning-cleared', name => { })`
+   * @event
+   */
+  declare function warningClearedEvent(name: string): void;
 
   /**
    * Possible states of the {@link Call}.
@@ -1884,6 +1930,11 @@ namespace Call {
      * The offer SDP, if this is an incoming call.
      */
     offerSdp?: string | null;
+
+    /**
+     * Called after a successful getUserMedia call
+     */
+    onGetUserMedia?: () => void;
 
     /**
      * Whether this is a preflight call or not
