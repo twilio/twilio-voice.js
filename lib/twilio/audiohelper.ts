@@ -3,6 +3,7 @@
  * @module Voice
  */
 import { EventEmitter } from 'events';
+import AudioProcessor from './audioprocessor';
 import Device from './device';
 import { InvalidArgumentError, NotSupportedError } from './errors';
 import Log from './log';
@@ -146,6 +147,11 @@ class AudioHelper extends EventEmitter {
    * Called with the new input stream when the active input is changed.
    */
   private _onActiveInputChanged: (stream: MediaStream | null) => Promise<void>;
+
+  /**
+   * Internal reference to the added AudioProcessor
+   */
+  private _processor: AudioProcessor | null;
 
   /**
    * A record of unknown devices (Devices without labels)
@@ -343,6 +349,34 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
+   * Adds an AudioProcessor object.
+   * The AudioHelper will route the input audio stream through the processor
+   * before sending the audio stream to Twilio.
+   *
+   * Only one {@link AudioProcessor} can be added at this time.
+   * @param processor
+   */
+  addProcessor(processor: AudioProcessor): void {
+    if (this._processor) {
+      throw new NotSupportedError('Adding multiple AudioProcessors is not supported at this time.');
+    }
+
+    if (typeof processor !== 'object' || processor === null) {
+      throw new InvalidArgumentError('Missing AudioProcessor argument.');
+    }
+
+    if (typeof processor.createProcessedStream !== 'function') {
+      throw new InvalidArgumentError('Missing createProcessedStream() method.');
+    }
+
+    if (typeof processor.destroyProcessedStream !== 'function') {
+      throw new InvalidArgumentError('Missing destroyProcessedStream() method.');
+    }
+
+    this._processor = processor;
+  }
+
+  /**
    * Enable or disable the disconnect sound.
    * @param doEnable Passing `true` will enable the sound and `false` will disable the sound.
    * Not passing this parameter will not alter the enable-status of the sound.
@@ -370,6 +404,18 @@ class AudioHelper extends EventEmitter {
    */
   outgoing(doEnable?: boolean): boolean {
     return this._maybeEnableSound(Device.SoundName.Outgoing, doEnable);
+  }
+
+  /**
+   * Removes an AudioProcessor.
+   * @param processor
+   */
+  removeProcessor(processor: AudioProcessor): void {
+    if (this._processor !== processor) {
+      throw new InvalidArgumentError('Cannot remove an AudioProcessor that has not been previously added.');
+    }
+
+    this._processor = null;
   }
 
   /**
