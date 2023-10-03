@@ -10,7 +10,7 @@ import Device from './device';
 import DialtonePlayer from './dialtonePlayer';
 import {
   GeneralErrors,
-  getErrorByFeatureFlagAndCode,
+  getPreciseSignalingErrorByCode,
   InvalidArgumentError,
   InvalidStateError,
   MediaErrors,
@@ -1211,7 +1211,7 @@ class Call extends EventEmitter {
     this._log.info('Received HANGUP from gateway');
     if (payload.error) {
       const code = payload.error.code;
-      const errorConstructor = getErrorByFeatureFlagAndCode(
+      const errorConstructor = getPreciseSignalingErrorByCode(
         this._options.enableImprovedSignalingErrorPrecision,
         code,
       );

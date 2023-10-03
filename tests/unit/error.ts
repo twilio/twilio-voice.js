@@ -72,7 +72,7 @@ describe('Errors', () => {
 
   describe('getErrorByFeatureFlagAndCode', () => {
     it('should return a constructor when using the feature flag and the error is behind the flag', () => {
-      const errorConstructor = errors.getErrorByFeatureFlagAndCode(true, 31480);
+      const errorConstructor = errors.getPreciseSignalingErrorByCode(true, 31480);
       if (typeof errorConstructor !== 'function') {
         throw new Error('error constructor should be defined');
       }
@@ -81,12 +81,12 @@ describe('Errors', () => {
     });
 
     it('should return undefined when not using the feature flag and the error is behind the flag', () => {
-      const errorConstructor = errors.getErrorByFeatureFlagAndCode(false, 31480);
+      const errorConstructor = errors.getPreciseSignalingErrorByCode(false, 31480);
       assert.equal(typeof errorConstructor, 'undefined');
     });
 
     it('should return a constructor when using the feature flag and the error is not behind the flag', () => {
-      const errorConstructor = errors.getErrorByFeatureFlagAndCode(true, 31009);
+      const errorConstructor = errors.getPreciseSignalingErrorByCode(true, 31009);
       if (typeof errorConstructor !== 'function') {
         throw new Error('error constructor should be defined');
       }
@@ -95,7 +95,7 @@ describe('Errors', () => {
     });
 
     it('should return a constructor when not using the feature flag and the error is not behind the flag', () => {
-      const errorConstructor = errors.getErrorByFeatureFlagAndCode(false, 31009);
+      const errorConstructor = errors.getPreciseSignalingErrorByCode(false, 31009);
       if (typeof errorConstructor !== 'function') {
         throw new Error('error constructor should be defined');
       }

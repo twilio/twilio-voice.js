@@ -14,7 +14,7 @@ import {
   AuthorizationErrors,
   ClientErrors,
   GeneralErrors,
-  getErrorByFeatureFlagAndCode,
+  getPreciseSignalingErrorByCode,
   InvalidArgumentError,
   InvalidStateError,
   NotSupportedError,
@@ -1181,7 +1181,7 @@ class Device extends EventEmitter {
         this._stopRegistrationTimer();
         twilioError = new AuthorizationErrors.AccessTokenExpired(originalError);
       } else {
-        const errorConstructor = getErrorByFeatureFlagAndCode(
+        const errorConstructor = getPreciseSignalingErrorByCode(
           !!this._options.enableImprovedSignalingErrorPrecision,
           code,
         );

@@ -24,8 +24,10 @@ import {
  *
  * With every major version bump, such that we are allowed to introduce breaking
  * changes as per semver specification, this array should be cleared.
+ *
+ * TODO: [VBLOCKS-2295] Remove this in 3.x
  */
-const FEATURE_FLAG_ERROR_CODES: Set<number> = new Set([
+const PRECISE_SIGNALING_ERROR_CODES: Set<number> = new Set([
   /**
    * 310XX Errors
    */
@@ -61,7 +63,7 @@ const FEATURE_FLAG_ERROR_CODES: Set<number> = new Set([
    */
   31603,
 ]);
-export function getErrorByFeatureFlagAndCode(
+export function getPreciseSignalingErrorByCode(
   enableImprovedSignalingErrorPrecision: boolean,
   errorCode: number,
 ): typeof TwilioError | undefined {
@@ -75,7 +77,7 @@ export function getErrorByFeatureFlagAndCode(
 
   const shouldTransform = enableImprovedSignalingErrorPrecision
     ? true
-    : !FEATURE_FLAG_ERROR_CODES.has(errorCode);
+    : !PRECISE_SIGNALING_ERROR_CODES.has(errorCode);
   if (!shouldTransform) {
     return;
   }
