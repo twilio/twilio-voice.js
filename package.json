@@ -1,6 +1,6 @@
 {
   "name": "@twilio/voice-sdk",
-  "version": "2.8.0-dev",
+  "version": "2.8.0-rc1",
   "description": "Twilio's JavaScript Voice SDK",
   "main": "./es5/twilio.js",
   "module": "./esm/index.js",
