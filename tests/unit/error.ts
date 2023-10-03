@@ -70,7 +70,7 @@ describe('Errors', () => {
     }
   });
 
-  describe('getErrorByFeatureFlagAndCode', () => {
+  describe('getPreciseSignalingErrorByCode', () => {
     it('should return a constructor when using the feature flag and the error is behind the flag', () => {
       const errorConstructor = errors.getPreciseSignalingErrorByCode(true, 31480);
       if (typeof errorConstructor !== 'function') {
