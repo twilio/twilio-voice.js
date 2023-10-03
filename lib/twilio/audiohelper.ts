@@ -252,23 +252,6 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Get processed stream, if it exists. Else, return the current input stream.
-   * If no input stream is detected, a new stream is created using the provided constraints.
-   * @private
-   */
-  _maybeGetProcessedStream(constraints: MediaStreamConstraints): Promise<MediaStream> {
-    return this._getUserMedia(constraints).then((stream: MediaStream) => {
-      // Ensures deviceId's and labels are populated after the gUM call
-      // by calling enumerateDevices
-      this._updateAvailableDevices().catch(error => {
-        // Ignore error, we don't want to break the call flow
-        this._log.warn('Unable to updateAvailableDevices after gUM call', error);
-      });
-      return stream;
-    });
-  }
-
-  /**
    * Start polling volume if it's supported and there's an input stream to poll.
    * @private
    */
@@ -317,6 +300,22 @@ class AudioHelper extends EventEmitter {
     }
 
     this._isPollingInputVolume = false;
+  }
+
+  /**
+   * Call getUserMedia with specified constraints
+   * @private
+   */
+  _openWithConstraints(constraints: MediaStreamConstraints): Promise<MediaStream> {
+    return this._openInputAudio(constraints).then((stream: MediaStream) => {
+      // Ensures deviceId's and labels are populated after the gUM call
+      // by calling enumerateDevices
+      this._updateAvailableDevices().catch(error => {
+        // Ignore error, we don't want to break the call flow
+        this._log.warn('Unable to updateAvailableDevices after gUM call', error);
+      });
+      return stream;
+    });
   }
 
   /**
@@ -547,6 +546,26 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
+   * Call getUserMedia and update internal references
+   */
+  private _openInputAudio(constraints: MediaStreamConstraints): Promise<MediaStream> {
+    return this._getUserMedia(constraints).then((stream: MediaStream) => {
+      let device = Array.from(this.availableInputDevices.values())[0];
+      const deviceId = stream.getAudioTracks()[0].getSettings().deviceId;
+
+      if (deviceId) {
+        device = this.availableInputDevices.get(deviceId) || device;
+      }
+
+      this._inputDevice = device;
+      this._replaceStream(stream);
+      this._maybeStartPollingVolume();
+
+      return stream;
+    });
+  }
+
+  /**
    * Remove an input device from inputs
    * @param lostDevice
    * @returns Whether the device was active
@@ -625,13 +644,7 @@ class AudioHelper extends EventEmitter {
     }
 
     const constraints = { audio: Object.assign({ deviceId: { exact: deviceId } }, this.audioConstraints) };
-    return this._getUserMedia(constraints).then((stream: MediaStream) => {
-      return this._onActiveInputChanged(stream).then(() => {
-        this._replaceStream(stream);
-        this._inputDevice = device;
-        this._maybeStartPollingVolume();
-      });
-    });
+    return this._openInputAudio(constraints).then((stream: MediaStream) => this._onActiveInputChanged(stream));
   }
 
   /**
