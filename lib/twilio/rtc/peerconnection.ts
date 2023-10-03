@@ -207,24 +207,14 @@ PeerConnection.prototype._startPollingVolume = function() {
   }, VOLUME_INTERVAL_MS);
 };
 
-PeerConnection.prototype._stopStream = function _stopStream(stream) {
+PeerConnection.prototype._stopStream = function _stopStream() {
   // We shouldn't stop the tracks if they were not created inside
   //   this PeerConnection.
   if (!this._shouldManageStream) {
     return;
   }
 
-  if (typeof MediaStreamTrack.prototype.stop === 'function') {
-    const audioTracks = typeof stream.getAudioTracks === 'function'
-      ? stream.getAudioTracks() : stream.audioTracks;
-    audioTracks.forEach(track => {
-      track.stop();
-    });
-  } else {
-    // NOTE(mroberts): This is just a fallback to any ancient browsers that may
-    // not implement MediaStreamTrack.stop.
-    stream.stop();
-  }
+  this._audioHelper._stopDefaultInputDeviceStream();
 };
 
 /**
@@ -310,7 +300,7 @@ PeerConnection.prototype._setInputTracksForPlanB = function(shouldClone, newStre
     //   as of Chrome 61. https://bugs.chromium.org/p/chromium/issues/detail?id=770908
     this.stream = shouldClone ? cloneStream(newStream) : newStream;
   } else {
-    this._stopStream(localStream);
+    this._stopStream();
 
     removeStream(this.version.pc, localStream);
     localStream.getAudioTracks().forEach(localStream.removeTrack, localStream);
@@ -370,7 +360,7 @@ PeerConnection.prototype._setInputTracksForUnifiedPlan = function(shouldClone, n
     // If the call was started with gUM, and we are now replacing that track with an
     // external stream's tracks, we should stop the old managed track.
     if (this._shouldManageStream) {
-      this._stopStream(localStream);
+      this._stopStream();
     }
 
     if (!this._sender) {
@@ -980,7 +970,7 @@ PeerConnection.prototype.close = function() {
   }
   if (this.stream) {
     this.mute(false);
-    this._stopStream(this.stream);
+    this._stopStream();
   }
   this.stream = null;
   this._removeReconnectionListeners();

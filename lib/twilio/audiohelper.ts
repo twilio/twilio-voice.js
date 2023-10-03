@@ -90,6 +90,14 @@ class AudioHelper extends EventEmitter {
   private _audioContext?: AudioContext;
 
   /**
+   * The audio stream of the default device.
+   * This is populated when _openDefaultDeviceWithConstraints is called,
+   * See _inputStream for differences.
+   * TODO: Combine these two workflows (3.x?)
+   */
+  private _defaultInputDeviceStream: MediaStream | null = null;
+
+  /**
    * Whether each sound is enabled.
    */
   private _enabledSounds: Record<Device.ToggleableSound, boolean> = {
@@ -115,6 +123,10 @@ class AudioHelper extends EventEmitter {
 
   /**
    * The current input stream coming from the microphone device.
+   * This is populated when the setInputDevice is called, meaning,
+   * the end user manually selected it, which is different than
+   * the defaultInputDeviceStream.
+   * TODO: Combine these two workflows (3.x?)
    */
   private _inputStream: MediaStream | null = null;
 
@@ -314,8 +326,20 @@ class AudioHelper extends EventEmitter {
         // Ignore error, we don't want to break the call flow
         this._log.warn('Unable to updateAvailableDevices after gUM call', error);
       });
+      this._defaultInputDeviceStream = stream;
       return stream;
     });
+  }
+
+  /**
+   * Stop the default audio stream
+   * @private
+   */
+  _stopDefaultInputDeviceStream(): void {
+    if (this._defaultInputDeviceStream) {
+      this._defaultInputDeviceStream.getTracks().forEach(track => track.stop());
+      this._defaultInputDeviceStream = null;
+    }
   }
 
   /**
