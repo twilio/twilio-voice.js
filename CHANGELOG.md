@@ -6,14 +6,68 @@
 New Features
 ------------
 
-- Added new errors emitted by `Device` and `Call` objects. Previously, these errors were all part of a generic error code `31005`. With this new release, the following errors now have their own error codes. Please see this [page](https://www.twilio.com/docs/api/errors) for more details about each error.
-  - **ClientErrors**
-    - NotFound: `31404`
-    - TemporarilyUnavailable: `31480`
-    - BusyHere: `31486`
-  - **SIPServerErrors**
-    - Decline: `31603`
-*IMPORTANT: If your application currently relies on listening to the generic error code `31005` when any of the above errors happen, you need to update your error listeners to also listen for the new error codes.*
+- Added a new feature flag `enableImprovedSignalingErrorPrecision` to enhance the precision of errors emitted by `Device` and `Call` objects.
+
+  ```ts
+  const token = ...;
+  const device = new Device(token, {
+    enableImprovedSignalingErrorPrecision: true,
+  });
+  ```
+
+  The default value of this option is `false`.
+
+  When this flag is enabled, some errors that would have been described with a generic error code are now described with a more precise error code. With this feature, the following errors now have their own error codes. Please see this [page](https://www.twilio.com/docs/api/errors) for more details about each error.
+
+  - Device Error Changes
+
+    ```ts
+    const device = new Device(token, {
+      enableImprovedSignalingErrorPrecision: true,
+    });
+    device.on('error', (deviceError) => {
+      // the following table describes how deviceError will change with this feature flag
+    });
+    ```
+
+    | Device Error Name | Device Error Code with Feature Flag Enabled | Device Error Code with Feature Flag Disabled |
+    | --- | --- | --- |
+    | `GeneralErrors.ApplicationNotFoundError` | `31001` | `53000` |
+    | `GeneralErrors.ConnectionDeclinedError` | `31002` | `53000` |
+    | `GeneralErrors.ConnectionTimeoutError` | `31003` | `53000` |
+    | `MalformedRequestErrors.MissingParameterArrayError` | `31101` | `53000` |
+    | `MalformedRequestErrors.AuthorizationTokenMissingError` | `31102` | `53000` |
+    | `MalformedRequestErrors.MaxParameterLengthExceededError` | `31103` | `53000` |
+    | `MalformedRequestErrors.InvalidBridgeTokenError` | `31104` | `53000` |
+    | `MalformedRequestErrors.InvalidClientNameError` | `31105` | `53000` |
+    | `MalformedRequestErrors.ReconnectParameterInvalidError` | `31107` | `53000` |
+    | `SignatureValidationErrors.AccessTokenSignatureValidationFailed` | `31202` | `53000` |
+    | `AuthorizationErrors.NoValidAccountError` | `31203` | `53000` |
+    | `AuthorizationErrors.JWTTokenExpirationTooLongError` | `31207` | `53000` |
+    | `ClientErrors.NotFound` | `31404` | `53000` |
+    | `ClientErrors.TemporarilyUnavilable` | `31480` | `53000` |
+    | `ClientErrors.BusyHere` | `31486` | `53000` |
+    | `SIPServerErrors.Decline` | `31603` | `53000` |
+
+  - Call Error Changes
+
+    ```ts
+    const device = new Device(token, {
+      enableImprovedSignalingErrorPrecision: true,
+    });
+    const call = device.connect(...);
+    call.on('error', (callError) => {
+      // the following table describes how callError will change with this feature flag
+    });
+    ```
+
+    | Call Error Name | Call Error Code with Feature Flag Enabled | Call Error Code with Feature Flag Disabled |
+    | --- | --- | --- |
+    | `GeneralErrors.ConnectionDeclinedError` | `31002` | `31005` |
+    | `AuthorizationErrors.InvalidJWTTokenError` | `31204` | `31005` |
+    | `AuthorizationErrors.JWTTokenExpiredError` | `31205` | `31005` |
+
+  _**IMPORTANT:** If your application logic currently relies on listening to the generic error code `53000` or `31005`, and you opt into enabling the feature flag, then your applicaton logic needs to be updated to anticipate the new error code when any of the above errors happen!_
 
 2.7.2 (September 21, 2023)
 =========================
