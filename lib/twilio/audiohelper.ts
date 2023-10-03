@@ -306,7 +306,7 @@ class AudioHelper extends EventEmitter {
    * Call getUserMedia with specified constraints
    * @private
    */
-  _openWithConstraints(constraints: MediaStreamConstraints): Promise<MediaStream> {
+  _openDefaultDeviceWithConstraints(constraints: MediaStreamConstraints): Promise<MediaStream> {
     return this._getUserMedia(constraints).then((stream: MediaStream) => {
       // Ensures deviceId's and labels are populated after the gUM call
       // by calling enumerateDevices

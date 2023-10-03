@@ -662,7 +662,7 @@ class Call extends EventEmitter {
 
     const promise = inputStream
       ? this._mediaHandler.setInputTracksFromStream(inputStream)
-      : this._mediaHandler.openWithConstraints(audioConstraints);
+      : this._mediaHandler.openDefaultDeviceWithConstraints(audioConstraints);
 
     promise.then(() => {
       this._publisher.info('get-user-media', 'succeeded', {

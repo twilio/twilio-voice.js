@@ -114,8 +114,8 @@ PeerConnection.prototype.uri = function() {
  *   and will therefore be managed and destroyed internally.
  * @param {MediaStreamConstraints} constraints
  */
-PeerConnection.prototype.openWithConstraints = function(constraints) {
-  return this._audioHelper._openWithConstraints(constraints)
+PeerConnection.prototype.openDefaultDeviceWithConstraints = function(constraints) {
+  return this._audioHelper._openDefaultDeviceWithConstraints(constraints)
     .then(this._setInputTracksFromStream.bind(this, false));
 };
 
@@ -396,7 +396,7 @@ PeerConnection.prototype._onInputDevicesChanged = function() {
   // We only want to act if we manage the stream in PeerConnection (It was created
   // here, rather than passed in.)
   if (activeInputWasLost && this._shouldManageStream) {
-    this.openWithConstraints({ audio: true });
+    this.openDefaultDeviceWithConstraints({ audio: true });
   }
 };
 
