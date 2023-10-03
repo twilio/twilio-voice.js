@@ -332,15 +332,7 @@ class AudioHelper extends EventEmitter {
         this._log.warn('Unable to updateAvailableDevices after gUM call', error);
       });
       this._defaultInputDeviceStream = stream;
-
-      if (this._processor) {
-        return this._processor.createProcessedStream(stream).then((processedStream: MediaStream) => {
-          this._processedStream = processedStream;
-          return this._processedStream;
-        });
-      }
-
-      return this._defaultInputDeviceStream;
+      return this._maybeCreateProcessedStream(stream);
     });
   }
 
@@ -353,13 +345,7 @@ class AudioHelper extends EventEmitter {
       this._defaultInputDeviceStream.getTracks().forEach(track => track.stop());
       this._defaultInputDeviceStream = null;
     }
-
-    if (this._processor && this._processedStream) {
-      const processedStream = this._processedStream;
-      this._processedStream.getTracks().forEach(track => track.stop());
-      this._processedStream = null;
-      this._processor.destroyProcessedStream(processedStream);
-    }
+    this._destroyProcessedStream();
   }
 
   /**
@@ -545,6 +531,18 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
+   * Destroys processed stream and update references
+   */
+  private _destroyProcessedStream() {
+    if (this._processor && this._processedStream) {
+      const processedStream = this._processedStream;
+      this._processedStream.getTracks().forEach(track => track.stop());
+      this._processedStream = null;
+      this._processor.destroyProcessedStream(processedStream);
+    }
+  }
+
+  /**
    * Get the index of an un-labeled Device.
    * @param mediaDeviceInfo
    * @returns The index of the passed MediaDeviceInfo
@@ -584,6 +582,19 @@ class AudioHelper extends EventEmitter {
         this._log.warn(`Warning: Unable to set audio output devices. ${reason}`);
       });
     });
+  }
+
+  /**
+   * Route input stream to the processor if it exists
+   */
+  private _maybeCreateProcessedStream(stream: MediaStream): Promise<MediaStream> {
+    if (this._processor) {
+      return this._processor.createProcessedStream(stream).then((processedStream: MediaStream) => {
+        this._processedStream = processedStream;
+        return this._processedStream;
+      });
+    }
+    return Promise.resolve(stream);
   }
 
   /**
