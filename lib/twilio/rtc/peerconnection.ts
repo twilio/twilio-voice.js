@@ -388,16 +388,16 @@ PeerConnection.prototype._setInputTracksForUnifiedPlan = function(shouldClone, n
 };
 
 PeerConnection.prototype._onInputDevicesChanged = function() {
-  // if (!this.stream) { return; }
+  if (!this.stream) { return; }
 
-  // // If all of our active tracks are ended, then our active input was lost
-  // const activeInputWasLost = this.stream.getAudioTracks().every(track => track.readyState === 'ended');
+  // If all of our active tracks are ended, then our active input was lost
+  const activeInputWasLost = this.stream.getAudioTracks().every(track => track.readyState === 'ended');
 
-  // // We only want to act if we manage the stream in PeerConnection (It was created
-  // // here, rather than passed in.)
-  // if (activeInputWasLost && this._shouldManageStream) {
-  //   this.openWithConstraints({ audio: true });
-  // }
+  // We only want to act if we manage the stream in PeerConnection (It was created
+  // here, rather than passed in.)
+  if (activeInputWasLost && this._shouldManageStream) {
+    this.openWithConstraints({ audio: true });
+  }
 };
 
 PeerConnection.prototype._onIceGatheringFailure = function(type) {
