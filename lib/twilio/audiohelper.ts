@@ -161,6 +161,11 @@ class AudioHelper extends EventEmitter {
   private _onActiveInputChanged: (stream: MediaStream | null) => Promise<void>;
 
   /**
+   * Internal reference to the processed stream
+   */
+  private _processedStream: MediaStream | null = null;
+
+  /**
    * Internal reference to the added AudioProcessor
    */
   private _processor: AudioProcessor | null;
@@ -327,7 +332,15 @@ class AudioHelper extends EventEmitter {
         this._log.warn('Unable to updateAvailableDevices after gUM call', error);
       });
       this._defaultInputDeviceStream = stream;
-      return stream;
+
+      if (this._processor) {
+        return this._processor.createProcessedStream(stream).then((processedStream: MediaStream) => {
+          this._processedStream = processedStream;
+          return this._processedStream;
+        });
+      }
+
+      return this._defaultInputDeviceStream;
     });
   }
 
@@ -339,6 +352,13 @@ class AudioHelper extends EventEmitter {
     if (this._defaultInputDeviceStream) {
       this._defaultInputDeviceStream.getTracks().forEach(track => track.stop());
       this._defaultInputDeviceStream = null;
+    }
+
+    if (this._processor && this._processedStream) {
+      const processedStream = this._processedStream;
+      this._processedStream.getTracks().forEach(track => track.stop());
+      this._processedStream = null;
+      this._processor.destroyProcessedStream(processedStream);
     }
   }
 
