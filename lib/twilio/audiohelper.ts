@@ -409,9 +409,12 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Adds an AudioProcessor object.
+   * Adds an {@link AudioProcessor} object.
    * The AudioHelper will route the input audio stream through the processor
    * before sending the audio stream to Twilio.
+   *
+   * The {@link AudioProcessor} will take into effect on the next call
+   * or when the input device is changed.
    *
    * Only one {@link AudioProcessor} can be added at this time.
    * @param processor
@@ -467,10 +470,17 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Removes an AudioProcessor.
+   * Removes an {@link AudioProcessor}.
+   * This takes into effect on the next call
+   * or when the input device is changed.
+   *
    * @param processor
    */
   removeProcessor(processor: AudioProcessor): void {
+    if (typeof processor !== 'object' || processor === null) {
+      throw new InvalidArgumentError('Missing AudioProcessor argument.');
+    }
+
     if (this._processor !== processor) {
       throw new InvalidArgumentError('Cannot remove an AudioProcessor that has not been previously added.');
     }
