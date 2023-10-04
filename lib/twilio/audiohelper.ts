@@ -421,6 +421,7 @@ class AudioHelper extends EventEmitter {
     }
 
     this._processor = processor;
+    this._restartStreams();
   }
 
   /**
@@ -469,7 +470,9 @@ class AudioHelper extends EventEmitter {
       throw new InvalidArgumentError('Cannot remove an AudioProcessor that has not been previously added.');
     }
 
+    this._destroyProcessedStream();
     this._processor = null;
+    this._restartStreams();
   }
 
   /**
@@ -653,6 +656,17 @@ class AudioHelper extends EventEmitter {
     }
 
     this._selectedInputDeviceStream = stream;
+  }
+
+  /**
+   * Restart the active streams
+   */
+  private _restartStreams(): Promise<void> {
+    if (this.inputDevice && this._selectedInputDeviceStream) {
+      return this._setInputDevice(this.inputDevice.deviceId, true);
+    }
+
+    return Promise.resolve();
   }
 
   /**
