@@ -666,6 +666,12 @@ class AudioHelper extends EventEmitter {
       return this._setInputDevice(this.inputDevice.deviceId, true);
     }
 
+    if (this._defaultInputDeviceStream) {
+      const defaultDevice = this.availableInputDevices.get('default')
+      || Array.from(this.availableInputDevices.values())[0];
+      return this._setInputDevice(defaultDevice.deviceId, true);
+    }
+
     return Promise.resolve();
   }
 
