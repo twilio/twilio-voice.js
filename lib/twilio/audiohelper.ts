@@ -400,9 +400,6 @@ class AudioHelper extends EventEmitter {
    * The AudioHelper will route the input audio stream through the processor
    * before sending the audio stream to Twilio.
    *
-   * The {@link AudioProcessor} will take into effect on the next call
-   * or when the input device is changed.
-   *
    * Only one {@link AudioProcessor} can be added at this time.
    * @param processor
    */
@@ -497,12 +494,7 @@ class AudioHelper extends EventEmitter {
    *   input device with.
    */
   setInputDevice(deviceId: string): Promise<void> {
-    return !isFirefox()
-      ? this._setInputDevice(deviceId, false)
-      : Promise.reject(new NotSupportedError('Firefox does not currently support opening multiple ' +
-        'audio input tracks simultaneously, even across different tabs. As a result, ' +
-        'Device.audio.setInputDevice is disabled on Firefox until support is added.\n' +
-        'Related BugZilla thread: https://bugzilla.mozilla.org/show_bug.cgi?id=1299324'));
+    return this._setInputDevice(deviceId, false);
   }
 
   /**
