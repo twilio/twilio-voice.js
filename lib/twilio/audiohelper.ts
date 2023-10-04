@@ -47,9 +47,10 @@ class AudioHelper extends EventEmitter {
   get inputDevice(): MediaDeviceInfo | null { return this._inputDevice; }
 
   /**
-   * The current input stream coming from the microphone device.
+   * The current input stream coming from the microphone device or
+   * the processed audio stream if there is an {@link AudioProcessor}.
    */
-  get inputStream(): MediaStream | null { return this._inputStream; }
+  get inputStream(): MediaStream | null { return this._processedStream || this._selectedInputDeviceStream; }
 
   /**
    * False if the browser does not support `HTMLAudioElement.setSinkId()` or
@@ -92,7 +93,7 @@ class AudioHelper extends EventEmitter {
   /**
    * The audio stream of the default device.
    * This is populated when _openDefaultDeviceWithConstraints is called,
-   * See _inputStream for differences.
+   * See _selectedInputDeviceStream for differences.
    * TODO: Combine these two workflows (3.x?)
    */
   private _defaultInputDeviceStream: MediaStream | null = null;
@@ -120,15 +121,6 @@ class AudioHelper extends EventEmitter {
    * The current input device.
    */
   private _inputDevice: MediaDeviceInfo | null = null;
-
-  /**
-   * The current input stream coming from the microphone device.
-   * This is populated when the setInputDevice is called, meaning,
-   * the end user manually selected it, which is different than
-   * the defaultInputDeviceStream.
-   * TODO: Combine these two workflows (3.x?)
-   */
-  private _inputStream: MediaStream | null = null;
 
   /**
    * An AnalyserNode to use for input volume.
@@ -169,6 +161,15 @@ class AudioHelper extends EventEmitter {
    * Internal reference to the added AudioProcessor
    */
   private _processor: AudioProcessor | null;
+
+  /**
+   * The selected input stream coming from the microphone device.
+   * This is populated when the setInputDevice is called, meaning,
+   * the end user manually selected it, which is different than
+   * the defaultInputDeviceStream.
+   * TODO: Combine these two workflows (3.x?)
+   */
+  private _selectedInputDeviceStream: MediaStream | null = null;
 
   /**
    * A record of unknown devices (Devices without labels)
@@ -273,7 +274,7 @@ class AudioHelper extends EventEmitter {
    * @private
    */
   _maybeStartPollingVolume(): void {
-    if (!this.isVolumeSupported || !this._inputStream) { return; }
+    if (!this.isVolumeSupported || !this.inputStream) { return; }
 
     this._updateVolumeSource();
 
@@ -307,7 +308,7 @@ class AudioHelper extends EventEmitter {
   _maybeStopPollingVolume(): void {
     if (!this.isVolumeSupported) { return; }
 
-    if (!this._isPollingInputVolume || (this._inputStream && this.listenerCount('inputVolume'))) {
+    if (!this._isPollingInputVolume || (this.inputStream && this.listenerCount('inputVolume'))) {
       return;
     }
 
@@ -344,8 +345,8 @@ class AudioHelper extends EventEmitter {
     if (this._defaultInputDeviceStream) {
       this._defaultInputDeviceStream.getTracks().forEach(track => track.stop());
       this._defaultInputDeviceStream = null;
+      this._destroyProcessedStream();
     }
-    this._destroyProcessedStream();
   }
 
   /**
@@ -523,6 +524,8 @@ class AudioHelper extends EventEmitter {
   unsetInputDevice(): Promise<void> {
     if (!this.inputDevice) { return Promise.resolve(); }
 
+    this._destroyProcessedStream();
+
     return this._onActiveInputChanged(null).then(() => {
       this._replaceStream(null);
       this._inputDevice = null;
@@ -620,6 +623,7 @@ class AudioHelper extends EventEmitter {
       return false;
     }
 
+    this._destroyProcessedStream();
     this._replaceStream(null);
     this._inputDevice = null;
     this._maybeStopPollingVolume();
@@ -650,13 +654,13 @@ class AudioHelper extends EventEmitter {
    * @param stream - The new stream
    */
   private _replaceStream(stream: MediaStream | null): void {
-    if (this._inputStream) {
-      this._inputStream.getTracks().forEach(track => {
+    if (this._selectedInputDeviceStream) {
+      this._selectedInputDeviceStream.getTracks().forEach(track => {
         track.stop();
       });
     }
 
-    this._inputStream = stream;
+    this._selectedInputDeviceStream = stream;
   }
 
   /**
@@ -676,24 +680,32 @@ class AudioHelper extends EventEmitter {
       return Promise.reject(new InvalidArgumentError(`Device not found: ${deviceId}`));
     }
 
-    if (this._inputDevice && this._inputDevice.deviceId === deviceId && this._inputStream) {
+    if (this._inputDevice && this._inputDevice.deviceId === deviceId && this._selectedInputDeviceStream) {
       if (!forceGetUserMedia) {
         return Promise.resolve();
       }
 
       // If the currently active track is still in readyState `live`, gUM may return the same track
       // rather than returning a fresh track.
-      this._inputStream.getTracks().forEach(track => {
+      this._selectedInputDeviceStream.getTracks().forEach(track => {
         track.stop();
       });
     }
 
+    // Release the default device in case it was created previously
+    this._stopDefaultInputDeviceStream();
+
     const constraints = { audio: Object.assign({ deviceId: { exact: deviceId } }, this.audioConstraints) };
-    return this._getUserMedia(constraints).then((stream: MediaStream) => {
-      return this._onActiveInputChanged(stream).then(() => {
-        this._replaceStream(stream);
-        this._inputDevice = device;
-        this._maybeStartPollingVolume();
+    return this._getUserMedia(constraints).then((originalStream: MediaStream) => {
+
+      this._destroyProcessedStream();
+
+      return this._maybeCreateProcessedStream(originalStream).then((newStream) =>{
+        return this._onActiveInputChanged(newStream).then(() => {
+          this._replaceStream(originalStream);
+          this._inputDevice = device;
+          this._maybeStartPollingVolume();
+        });
       });
     });
   }
@@ -755,7 +767,7 @@ class AudioHelper extends EventEmitter {
    * input stream.
    */
   private _updateVolumeSource(): void {
-    if (!this._inputStream || !this._audioContext || !this._inputVolumeAnalyser) {
+    if (!this.inputStream || !this._audioContext || !this._inputVolumeAnalyser) {
       return;
     }
 
@@ -764,7 +776,7 @@ class AudioHelper extends EventEmitter {
     }
 
     try {
-      this._inputVolumeSource = this._audioContext.createMediaStreamSource(this._inputStream);
+      this._inputVolumeSource = this._audioContext.createMediaStreamSource(this.inputStream);
       this._inputVolumeSource.connect(this._inputVolumeAnalyser);
     } catch (ex) {
       this._log.warn('Unable to update volume source', ex);
