@@ -1,5 +1,15 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.7.3 (in progress)
+===================
+
+Bug Fixes
+---------
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/163) where, sometimes a TypeError is raised while handling an incoming call under the following circumstances:
+  - Network interruptions
+  - updating the token before accepting the call
+
 2.7.2 (September 21, 2023)
 =========================
 

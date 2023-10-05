@@ -1759,6 +1759,42 @@ describe('Call', function() {
       });
     });
 
+    describe('pstream.connected event', () => {
+      [true, false].forEach(doesMediaHandlerVersionExist => {
+        ['foo', undefined].forEach(signalingReconnectToken => {
+          describe(`when mediaHandler.version ${
+            doesMediaHandlerVersionExist ? 'exists' : 'does not exist'
+          } and signaling reconnect token ${
+            signalingReconnectToken ? 'exists' : 'does not exist'
+          }`, () => {
+            beforeEach(async () => {
+              conn = new Call(config, Object.assign(options, { callParameters: { CallSid: 'CA1234' } }));
+              conn.accept();
+              await clock.tickAsync(0);
+              if (!doesMediaHandlerVersionExist) {
+                mediaHandler.version = null;
+              }
+              if (signalingReconnectToken) {
+                // @ts-ignore
+                conn._signalingReconnectToken = signalingReconnectToken;
+              }
+              pstream.emit('connected');
+            });
+
+            it(`should ${
+              doesMediaHandlerVersionExist && signalingReconnectToken ? '' : 'not '
+            }call pstream.reconnect()`, async () => {
+              if (doesMediaHandlerVersionExist && signalingReconnectToken) {
+                sinon.assert.calledWith(pstream.reconnect, mediaHandler.version.getSDP(), 'CA1234', signalingReconnectToken);
+              } else {
+                sinon.assert.notCalled(pstream.reconnect);
+              }
+            });
+          });
+        });
+      });
+    });
+
     describe('pstream.answer event', () => {
       let pStreamAnswerPayload: any;
 
