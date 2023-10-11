@@ -37,7 +37,7 @@ describe('Call', function() {
       callback = cb;
       rtcConfig = d;
     });
-    mediaHandler.openWithConstraints = sinon.spy(() => Promise.resolve());
+    mediaHandler.openDefaultDeviceWithConstraints = sinon.spy(() => Promise.resolve());
     mediaHandler.stream = Symbol('stream');
     mediaHandler._remoteStream = Symbol('_remoteStream');
     mediaHandler.isMuted = Symbol('isMuted');
@@ -354,9 +354,9 @@ describe('Call', function() {
           assert.equal(conn.status(), state);
         });
 
-        it('should not call mediaHandler.openWithConstraints', () => {
+        it('should not call mediaHandler.openDefaultDeviceWithConstraints', () => {
           conn.accept();
-          sinon.assert.notCalled(mediaHandler.openWithConstraints);
+          sinon.assert.notCalled(mediaHandler.openDefaultDeviceWithConstraints);
         });
       });
     });
@@ -367,21 +367,21 @@ describe('Call', function() {
     });
 
     context('when getInputStream is not present', () => {
-      it('should call mediaHandler.openWithConstraints with rtcConstraints if passed', () => {
+      it('should call mediaHandler.openDefaultDeviceWithConstraints with rtcConstraints if passed', () => {
         conn.accept({ rtcConstraints: { audio: { foo: 'bar' } as MediaTrackConstraints } });
-        sinon.assert.calledWith(mediaHandler.openWithConstraints, { foo: 'bar' });
+        sinon.assert.calledWith(mediaHandler.openDefaultDeviceWithConstraints, { foo: 'bar' });
       });
 
-      it('should call mediaHandler.openWithConstraints with options.audioConstraints if no args', () => {
+      it('should call mediaHandler.openDefaultDeviceWithConstraints with options.audioConstraints if no args', () => {
         Object.assign(options, { rtcConstraints: { audio: { bar: 'baz' } } });
         conn = new Call(config, options);
         conn.accept();
-        sinon.assert.calledWith(mediaHandler.openWithConstraints, { bar: 'baz' });
+        sinon.assert.calledWith(mediaHandler.openDefaultDeviceWithConstraints, { bar: 'baz' });
       });
 
       it('should result in a `denied` error when `getUserMedia` does not allow the application to access the media', () => {
         return new Promise(resolve => {
-          mediaHandler.openWithConstraints = () => {
+          mediaHandler.openDefaultDeviceWithConstraints = () => {
             const p = Promise.reject({
               code: 0,
               name: 'NotAllowedError',

@@ -132,8 +132,8 @@ describe('PeerConnection', () => {
     });
   });
 
-  context('PeerConnection.prototype.openWithConstraints', () => {
-    const METHOD = PeerConnection.prototype.openWithConstraints;
+  context('PeerConnection.prototype.openDefaultDeviceWithConstraints', () => {
+    const METHOD = PeerConnection.prototype.openDefaultDeviceWithConstraints;
     const USER_MEDIA_RESULT = 'getUserMedia';
     const INPUT_TRACKS_FROM_STREAM = '_setInputTracksFromStream';
     const EXPECTED_ERROR = new Error(USER_MEDIA_RESULT);

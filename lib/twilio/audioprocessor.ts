@@ -5,6 +5,8 @@
 
 /**
  * Represents an AudioProcessor object that receives an audio stream for processing.
+ * AudioProcessors can be added using {@link AudioHelper.addProcessor}.
+ * The {@link AudioHelper} can be accessed using the {@link Device.audio} property.
  * @publicapi
  */
 interface AudioProcessor {
