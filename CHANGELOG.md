@@ -69,6 +69,16 @@ New Features
 
   _**IMPORTANT:** If your application logic currently relies on listening to the generic error code `53000` or `31005`, and you opt into enabling the feature flag, then your applicaton logic needs to be updated to anticipate the new error code when any of the above errors happen._
 
+2.7.3 (October 6, 2023)
+======================
+
+Bug Fixes
+---------
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/163) where, sometimes a TypeError is raised while handling an incoming call under the following circumstances:
+  - Network interruptions
+  - updating the token before accepting the call
+
 2.7.2 (September 21, 2023)
 =========================
 

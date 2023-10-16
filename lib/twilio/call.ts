@@ -1175,7 +1175,7 @@ class Call extends EventEmitter {
    */
   private _onConnected = (): void => {
     this._log.info('Received connected from pstream');
-    if (this._signalingReconnectToken) {
+    if (this._signalingReconnectToken && this._mediaHandler.version) {
       this._pstream.reconnect(
         this._mediaHandler.version.getSDP(),
         this.parameters.CallSid,
