@@ -82,6 +82,10 @@ Bug Fixes
 2.7.2 (September 21, 2023)
 =========================
 
+_Updated November 1, 2023_
+
+_We have identified an issue on Chromium-based browsers running on MacOS 14 (Sonoma) where the audio deteriorates during a call. This issue happens due to the excessive calls to MediaDevices: enumerateDevices() API. With this release, the SDK calls this API only when necessary to avoid audio deterioration._
+
 Changes
 -------
 
