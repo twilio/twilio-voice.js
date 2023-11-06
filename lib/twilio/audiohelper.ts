@@ -4,6 +4,7 @@
  */
 import { EventEmitter } from 'events';
 import AudioProcessor from './audioprocessor';
+import { AudioProcessorEventObserver } from './audioprocessoreventobserver';
 import Device from './device';
 import { InvalidArgumentError, NotSupportedError } from './errors';
 import Log from './log';
@@ -89,6 +90,11 @@ class AudioHelper extends EventEmitter {
    * An AudioContext to use.
    */
   private _audioContext?: AudioContext;
+
+  /**
+   * The AudioProcessorEventObserver instance to use
+   */
+  private _audioProcessorEventObserver: AudioProcessorEventObserver;
 
   /**
    * The audio stream of the default device.
@@ -184,12 +190,10 @@ class AudioHelper extends EventEmitter {
    * @private
    * @param onActiveOutputsChanged - A callback to be called when the user changes the active output devices.
    * @param onActiveInputChanged - A callback to be called when the user changes the active input device.
-   * @param getUserMedia - The getUserMedia method to use.
    * @param [options]
    */
   constructor(onActiveOutputsChanged: (type: 'ringtone' | 'speaker', outputIds: string[]) => Promise<void>,
               onActiveInputChanged: (stream: MediaStream | null) => Promise<void>,
-              getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>,
               options?: AudioHelper.Options) {
     super();
 
@@ -198,7 +202,9 @@ class AudioHelper extends EventEmitter {
       setSinkId: typeof HTMLAudioElement !== 'undefined' && (HTMLAudioElement.prototype as any).setSinkId,
     }, options);
 
-    this._getUserMedia = getUserMedia;
+    this._updateUserOptions(options);
+
+    this._audioProcessorEventObserver = options.audioProcessorEventObserver;
     this._mediaDevices = options.mediaDevices || navigator.mediaDevices;
     this._onActiveInputChanged = onActiveInputChanged;
     this._enumerateDevices = typeof options.enumerateDevices === 'function'
@@ -262,11 +268,16 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Current state of the enabled sounds
+   * Destroy this AudioHelper instance
    * @private
    */
-  _getEnabledSounds(): Record<Device.ToggleableSound, boolean> {
-    return this._enabledSounds;
+  _destroy(): void {
+    this._stopDefaultInputDeviceStream();
+    this._stopSelectedInputDeviceStream();
+    this._destroyProcessedStream();
+    this._maybeStopPollingVolume();
+    this.removeAllListeners();
+    this._unbind();
   }
 
   /**
@@ -400,6 +411,19 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
+   * Update AudioHelper options that can be changed by the user
+   * @private
+   */
+  _updateUserOptions(options: AudioHelper.Options): void {
+    if (typeof options.enumerateDevices === 'function') {
+      this._enumerateDevices = options.enumerateDevices;
+    }
+    if (typeof options.getUserMedia === 'function') {
+      this._getUserMedia = options.getUserMedia;
+    }
+  }
+
+  /**
    * Adds an {@link AudioProcessor} object.
    * The AudioHelper will route the input audio stream through the processor
    * before sending the audio stream to Twilio.
@@ -427,6 +451,7 @@ class AudioHelper extends EventEmitter {
     this._log.debug('Adding processor');
     this._processor = processor;
     this._restartStreams();
+    this._audioProcessorEventObserver.emit('add');
   }
 
   /**
@@ -478,6 +503,7 @@ class AudioHelper extends EventEmitter {
     this._destroyProcessedStream();
     this._processor = null;
     this._restartStreams();
+    this._audioProcessorEventObserver.emit('remove');
   }
 
   /**
@@ -543,6 +569,7 @@ class AudioHelper extends EventEmitter {
       this._processedStream.getTracks().forEach(track => track.stop());
       this._processedStream = null;
       this._processor.destroyProcessedStream(processedStream);
+      this._audioProcessorEventObserver.emit('destroy');
     }
   }
 
@@ -596,6 +623,7 @@ class AudioHelper extends EventEmitter {
       this._log.debug('Creating processed stream');
       return this._processor.createProcessedStream(stream).then((processedStream: MediaStream) => {
         this._processedStream = processedStream;
+        this._audioProcessorEventObserver.emit('create');
         return this._processedStream;
       });
     }
@@ -659,9 +687,7 @@ class AudioHelper extends EventEmitter {
     this._log.debug('Replacing with new stream.');
     if (this._selectedInputDeviceStream) {
       this._log.debug('Old stream detected. Stopping tracks.');
-      this._selectedInputDeviceStream.getTracks().forEach(track => {
-        track.stop();
-      });
+      this._stopSelectedInputDeviceStream();
     }
 
     this._selectedInputDeviceStream = stream;
@@ -714,9 +740,7 @@ class AudioHelper extends EventEmitter {
       // If the currently active track is still in readyState `live`, gUM may return the same track
       // rather than returning a fresh track.
       this._log.debug('Same track detected on setInputDevice, stopping old tracks.');
-      this._selectedInputDeviceStream.getTracks().forEach(track => {
-        track.stop();
-      });
+      this._stopSelectedInputDeviceStream();
     }
 
     // Release the default device in case it was created previously
@@ -737,6 +761,16 @@ class AudioHelper extends EventEmitter {
         });
       });
     });
+  }
+
+  /**
+   * Stop the selected audio stream
+   */
+  private _stopSelectedInputDeviceStream(): void {
+    if (this._selectedInputDeviceStream) {
+      this._log.debug('Stopping selected device stream');
+      this._selectedInputDeviceStream.getTracks().forEach(track => track.stop());
+    }
   }
 
   /**
@@ -887,6 +921,11 @@ namespace AudioHelper {
     audioContext?: AudioContext;
 
     /**
+     * AudioProcessorEventObserver to use
+     */
+    audioProcessorEventObserver: AudioProcessorEventObserver,
+
+    /**
      * Whether each sound is enabled.
      */
     enabledSounds?: Record<Device.ToggleableSound, boolean>;
@@ -895,6 +934,11 @@ namespace AudioHelper {
      * Overrides the native MediaDevices.enumerateDevices API.
      */
     enumerateDevices?: any;
+
+    /**
+     * The getUserMedia method to use
+     */
+    getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>,
 
     /**
      * A custom MediaDevices instance to use.
