@@ -1,23 +1,49 @@
 const fs = require('fs');
 const VoiceErrors = require('@twilio/voice-errors');
 
+/**
+ * Ensure that the namespaces defined here are imported and exported from the
+ * generated file at:
+ * ```
+ * lib/twilio/errors/index.ts
+ * ```
+ */
 const USED_ERRORS = [
   'AuthorizationErrors.AccessTokenExpired',
   'AuthorizationErrors.AccessTokenInvalid',
   'AuthorizationErrors.AuthenticationFailed',
+  'AuthorizationErrors.AuthorizationError',
+  'AuthorizationErrors.InvalidJWTTokenError',
+  'AuthorizationErrors.JWTTokenExpirationTooLongError',
+  'AuthorizationErrors.JWTTokenExpiredError',
+  'AuthorizationErrors.NoValidAccountError',
   'AuthorizationErrors.PayloadSizeExceededError',
   'AuthorizationErrors.RateExceededError',
   'ClientErrors.BadRequest',
+  'ClientErrors.BusyHere',
+  'ClientErrors.NotFound',
+  'ClientErrors.TemporarilyUnavailable',
+  'GeneralErrors.ApplicationNotFoundError',
   'GeneralErrors.CallCancelledError',
   'GeneralErrors.ConnectionError',
+  'GeneralErrors.ConnectionDeclinedError',
+  'GeneralErrors.ConnectionTimeoutError',
   'GeneralErrors.TransportError',
   'GeneralErrors.UnknownError',
+  'MalformedRequestErrors.AuthorizationTokenMissingError',
+  'MalformedRequestErrors.InvalidBridgeTokenError',
+  'MalformedRequestErrors.InvalidClientNameError',
   'MalformedRequestErrors.MalformedRequestError',
+  'MalformedRequestErrors.MaxParameterLengthExceededError',
+  'MalformedRequestErrors.MissingParameterArrayError',
+  'MalformedRequestErrors.ReconnectParameterInvalidError',
   'MediaErrors.ClientLocalDescFailed',
   'MediaErrors.ClientRemoteDescFailed',
   'MediaErrors.ConnectionError',
   'SignalingErrors.ConnectionDisconnected',
   'SignalingErrors.ConnectionError',
+  'SignatureValidationErrors.AccessTokenSignatureValidationFailed',
+  'SIPServerErrors.Decline',
   'UserMediaErrors.PermissionDeniedError',
   'UserMediaErrors.AcquisitionFailedError',
 ];
@@ -107,3 +133,7 @@ export const errorsByCode: ReadonlyMap<number, any> = new Map([
 Object.freeze(errorsByCode);\n`;
 
 fs.writeFileSync('./lib/twilio/errors/generated.ts', output, 'utf8');
+
+module.exports = {
+  USED_ERRORS,
+};

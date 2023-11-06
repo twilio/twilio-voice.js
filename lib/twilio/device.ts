@@ -14,8 +14,7 @@ import {
   AuthorizationErrors,
   ClientErrors,
   GeneralErrors,
-  getErrorByCode,
-  hasErrorByCode,
+  getPreciseSignalingErrorByCode,
   InvalidArgumentError,
   InvalidStateError,
   NotSupportedError,
@@ -339,6 +338,7 @@ class Device extends EventEmitter {
     closeProtection: false,
     codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
     dscp: true,
+    enableImprovedSignalingErrorPrecision: false,
     forceAggressiveIceNomination: false,
     logLevel: LogLevels.ERROR,
     maxCallSignalingTimeoutMs: 0,
@@ -554,10 +554,15 @@ class Device extends EventEmitter {
       throw new InvalidStateError('A Call is already active');
     }
 
-    const activeCall = this._activeCall = await this._makeCall(options.params || { }, {
-      rtcConfiguration: options.rtcConfiguration,
-      voiceEventSidGenerator: this._options.voiceEventSidGenerator,
-    });
+    const activeCall = this._activeCall = await this._makeCall(
+      options.params || { },
+      {
+        enableImprovedSignalingErrorPrecision:
+          !!this._options.enableImprovedSignalingErrorPrecision,
+        rtcConfiguration: options.rtcConfiguration,
+        voiceEventSidGenerator: this._options.voiceEventSidGenerator,
+      },
+    );
 
     // Make sure any incoming calls are ignored
     this._calls.splice(0).forEach(call => call.ignore());
@@ -1163,8 +1168,14 @@ class Device extends EventEmitter {
         // Stop trying to register presence after token expires
         this._stopRegistrationTimer();
         twilioError = new AuthorizationErrors.AccessTokenExpired(originalError);
-      } else if (hasErrorByCode(code)) {
-        twilioError = new (getErrorByCode(code))(originalError);
+      } else {
+        const errorConstructor = getPreciseSignalingErrorByCode(
+          !!this._options.enableImprovedSignalingErrorPrecision,
+          code,
+        );
+        if (typeof errorConstructor !== 'undefined') {
+          twilioError = new errorConstructor(originalError);
+        }
       }
     }
 
@@ -1197,12 +1208,17 @@ class Device extends EventEmitter {
 
     const customParameters = Object.assign({ }, queryToJson(callParameters.Params));
 
-    const call = await this._makeCall(customParameters, {
-      callParameters,
-      offerSdp: payload.sdp,
-      reconnectToken: payload.reconnect,
-      voiceEventSidGenerator: this._options.voiceEventSidGenerator,
-    });
+    const call = await this._makeCall(
+      customParameters,
+      {
+        callParameters,
+        enableImprovedSignalingErrorPrecision:
+          !!this._options.enableImprovedSignalingErrorPrecision,
+        offerSdp: payload.sdp,
+        reconnectToken: payload.reconnect,
+        voiceEventSidGenerator: this._options.voiceEventSidGenerator,
+      },
+    );
 
     this._calls.push(call);
 
@@ -1704,6 +1720,71 @@ namespace Device {
      * client relative to available edges.
      */
     edge?: string[] | string;
+
+    /**
+     * Enhance the precision of errors emitted by `Device` and `Call` objects.
+     *
+     * The default value of this option is `false`.
+     *
+     * When this flag is enabled, some errors that would have been described
+     * with a generic error code, namely `53000` and `31005`, are now described
+     * with a more precise error code. With this feature, the following errors
+     * now have their own error codes. Please see this
+     * [page](https://www.twilio.com/docs/api/errors) for more details about
+     * each error.
+     *
+     * - Device Error Changes
+     *
+     * @example
+     * ```ts
+     * const device = new Device(token, {
+     *   enableImprovedSignalingErrorPrecision: true,
+     * });
+     * device.on('error', (deviceError) => {
+     *   // the following table describes how deviceError will change with this feature flag
+     * });
+     * ```
+     *
+     * | Device Error Name | Device Error Code with Feature Flag Enabled | Device Error Code with Feature Flag Disabled |
+     * | --- | --- | --- |
+     * | `GeneralErrors.ApplicationNotFoundError` | `31001` | `53000` |
+     * | `GeneralErrors.ConnectionDeclinedError` | `31002` | `53000` |
+     * | `GeneralErrors.ConnectionTimeoutError` | `31003` | `53000` |
+     * | `MalformedRequestErrors.MissingParameterArrayError` | `31101` | `53000` |
+     * | `MalformedRequestErrors.AuthorizationTokenMissingError` | `31102` | `53000` |
+     * | `MalformedRequestErrors.MaxParameterLengthExceededError` | `31103` | `53000` |
+     * | `MalformedRequestErrors.InvalidBridgeTokenError` | `31104` | `53000` |
+     * | `MalformedRequestErrors.InvalidClientNameError` | `31105` | `53000` |
+     * | `MalformedRequestErrors.ReconnectParameterInvalidError` | `31107` | `53000` |
+     * | `SignatureValidationErrors.AccessTokenSignatureValidationFailed` | `31202` | `53000` |
+     * | `AuthorizationErrors.NoValidAccountError` | `31203` | `53000` |
+     * | `AuthorizationErrors.JWTTokenExpirationTooLongError` | `31207` | `53000` |
+     * | `ClientErrors.NotFound` | `31404` | `53000` |
+     * | `ClientErrors.TemporarilyUnavilable` | `31480` | `53000` |
+     * | `ClientErrors.BusyHere` | `31486` | `53000` |
+     * | `SIPServerErrors.Decline` | `31603` | `53000` |
+     *
+     * - Call Error Changes
+     *
+     * @example
+     * ```ts
+     * const device = new Device(token, {
+     *   enableImprovedSignalingErrorPrecision: true,
+     * });
+     * const call = device.connect(...);
+     * call.on('error', (callError) => {
+     *   // the following table describes how callError will change with this feature flag
+     * });
+     * ```
+     *
+     * | Call Error Name | Call Error Code with Feature Flag Enabled | Call Error Code with Feature Flag Disabled |
+     * | --- | --- | --- |
+     * | `GeneralErrors.ConnectionDeclinedError` | `31002` | `31005` |
+     * | `AuthorizationErrors.InvalidJWTTokenError` | `31204` | `31005` |
+     * | `AuthorizationErrors.JWTTokenExpiredError` | `31205` | `31005` |
+     *
+     */
+    enableImprovedSignalingErrorPrecision?: boolean;
 
     /**
      * Overrides the native MediaDevices.enumerateDevices API.
