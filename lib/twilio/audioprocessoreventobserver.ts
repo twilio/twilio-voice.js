@@ -15,7 +15,7 @@ import Log from './log';
 export class AudioProcessorEventObserver extends EventEmitter {
 
   private _log: Log = Log.getInstance();
-  
+
   constructor() {
     super();
     this._log.debug('Creating AudioProcessorEventObserver instance');

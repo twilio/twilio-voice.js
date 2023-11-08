@@ -923,7 +923,7 @@ namespace AudioHelper {
     /**
      * AudioProcessorEventObserver to use
      */
-    audioProcessorEventObserver: AudioProcessorEventObserver,
+    audioProcessorEventObserver: AudioProcessorEventObserver;
 
     /**
      * Whether each sound is enabled.
@@ -938,7 +938,7 @@ namespace AudioHelper {
     /**
      * The getUserMedia method to use
      */
-    getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>,
+    getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
 
     /**
      * A custom MediaDevices instance to use.
