@@ -199,12 +199,6 @@ describe('Device', function() {
       });
 
       describe('.connect(params?, audioConstraints?, iceServers?)', () => {
-        it('should update device list after a getUserMediaCall', async () => {
-          await device.connect();
-          connectOptions!.onGetUserMedia();
-          sinon.assert.calledOnce(updateAvailableDevicesStub);
-        });
-
         it('should reject if there is already an active call', async () => {
           await device.connect();
           await assert.rejects(() => device.connect(), /A Call is already active/);
@@ -279,6 +273,20 @@ describe('Device', function() {
         it('should destroy .stream if one exists', () => {
           device.destroy();
           sinon.assert.calledOnce(pstream.destroy);
+        });
+
+        it('should destroy audio helper', () => {
+          const stub = sinon.stub();
+          device['_audio']!['_destroy'] = stub;
+          device.destroy();
+          sinon.assert.calledOnce(stub);
+        });
+
+        it('should destroy audioProcessorEventObserver', () => {
+          const stub = sinon.stub();
+          device['_audioProcessorEventObserver']!.destroy = stub;
+          device.destroy();
+          sinon.assert.calledOnce(stub);
         });
 
         it('should stop sending registrations', () => {
@@ -1404,10 +1412,30 @@ describe('Device', function() {
           });
 
           describe('._setupAudioHelper()', () => {
-            it('should destroy an existing audio helper', () => {
-              const spy = device['_destroyAudioHelper'] = sinon.spy(device['_destroyAudioHelper']);
+            it('should create audioProcessorEventObserver once', () => {
+              const audioProcessorEventObserver = device['_audioProcessorEventObserver'];
               device['_setupAudioHelper']();
-              sinon.assert.calledOnce(spy);
+              assert.strictEqual(device['_audioProcessorEventObserver'], audioProcessorEventObserver);
+            });
+
+            it('should create audioHelper once', () => {
+              const audio = device['_audio'];
+              device['_setupAudioHelper']();
+              assert.strictEqual(device['_audio'], audio);
+            });
+
+            it('should update audioHelper options', () => {
+              const stub = sinon.stub();
+              device['_audio']!['_updateUserOptions'] = stub;
+              device['_options'].enumerateDevices = 'foo';
+              device['_options'].getUserMedia = 'bar';
+              device['_setupAudioHelper']();
+              sinon.assert.calledWith(stub, {
+                audioContext: Device.audioContext,
+                audioProcessorEventObserver: device['_audioProcessorEventObserver'],
+                enumerateDevices: 'foo',
+                getUserMedia: 'bar',
+              })
             });
           });
 
