@@ -15,7 +15,6 @@ describe('Call', function() {
   let clock: SinonFakeTimers;
   let config: Call.Config;
   let conn: Call;
-  let getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
   let mediaHandler: any;
   let monitor: any;
   let onIgnore: any;
@@ -57,7 +56,6 @@ describe('Call', function() {
     clock = sinon.useFakeTimers(Date.now());
 
     audioHelper = createEmitterStub(require('../../lib/twilio/audiohelper').default);
-    getUserMedia = sinon.spy(() => Promise.resolve(new MediaStream()));
     onIgnore = sinon.spy();
     pstream = createEmitterStub(require('../../lib/twilio/pstream').default);
     publisher = createEmitterStub(require('../../lib/twilio/eventpublisher').default);
@@ -400,13 +398,11 @@ describe('Call', function() {
 
     context('when getInputStream is present and succeeds', () => {
       let getInputStream: any;
-      let onGetUserMedia: any;
       let wait: Promise<any>;
 
       beforeEach(() => {
-        onGetUserMedia = sinon.stub();
         getInputStream = sinon.spy(() => 'foo');
-        Object.assign(options, { getInputStream, onGetUserMedia });
+        Object.assign(options, { getInputStream });
         conn = new Call(config, options);
 
         mediaHandler.setInputTracksFromStream = sinon.spy(() => {
@@ -425,13 +421,6 @@ describe('Call', function() {
         conn.accept();
         return wait.then(() => {
           sinon.assert.calledWith(publisher.info, 'get-user-media', 'succeeded');
-        });
-      });
-
-      it('should call onGetUserMedia callback', () => {
-        conn.accept();
-        return wait.then(() => {
-          sinon.assert.calledWith(onGetUserMedia);
         });
       });
 

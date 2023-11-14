@@ -431,7 +431,7 @@ class AudioHelper extends EventEmitter {
    * Only one {@link AudioProcessor} can be added at this time.
    * @param processor
    */
-  addProcessor(processor: AudioProcessor): void {
+  addProcessor(processor: AudioProcessor): Promise<void> {
     if (this._processor) {
       throw new NotSupportedError('Adding multiple AudioProcessors is not supported at this time.');
     }
@@ -450,8 +450,8 @@ class AudioHelper extends EventEmitter {
 
     this._log.debug('Adding processor');
     this._processor = processor;
-    this._restartStreams();
     this._audioProcessorEventObserver.emit('add');
+    return this._restartStreams();
   }
 
   /**
@@ -491,7 +491,7 @@ class AudioHelper extends EventEmitter {
    *
    * @param processor
    */
-  removeProcessor(processor: AudioProcessor): void {
+  removeProcessor(processor: AudioProcessor): Promise<void> {
     if (typeof processor !== 'object' || processor === null) {
       throw new InvalidArgumentError('Missing AudioProcessor argument.');
     }
@@ -502,8 +502,8 @@ class AudioHelper extends EventEmitter {
 
     this._destroyProcessedStream();
     this._processor = null;
-    this._restartStreams();
     this._audioProcessorEventObserver.emit('remove');
+    return this._restartStreams();
   }
 
   /**

@@ -1,4 +1,13 @@
-import { Device } from '../../';
+import { AudioProcessor, Device } from '../../';
+
+class MyCustomAudioProcessor {
+  createProcessedStream(stream: MediaStream): Promise<MediaStream> {
+    return Promise.resolve(new MediaStream());
+  }
+  destroyProcessedStream(stream: MediaStream): Promise<void> {
+    return Promise.resolve();
+  }
+}
 
 const checkAudioHelper = async () => {
   const device: Device = new Device('foo', {});
@@ -35,6 +44,10 @@ const checkAudioHelper = async () => {
   await audio.setInputDevice('foo');
   await audio.unsetAudioConstraints();
   await audio.unsetInputDevice();
+
+  const processor = new MyCustomAudioProcessor();
+  audio.addProcessor(processor);
+  audio.removeProcessor(processor);
 };
 
 export default checkAudioHelper;

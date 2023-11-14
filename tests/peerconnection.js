@@ -134,7 +134,7 @@ describe('PeerConnection', () => {
 
   context('PeerConnection.prototype.openDefaultDeviceWithConstraints', () => {
     const METHOD = PeerConnection.prototype.openDefaultDeviceWithConstraints;
-    const USER_MEDIA_RESULT = 'getUserMedia';
+    const USER_MEDIA_RESULT = 'foobar';
     const INPUT_TRACKS_FROM_STREAM = '_setInputTracksFromStream';
     const EXPECTED_ERROR = new Error(USER_MEDIA_RESULT);
 
@@ -144,29 +144,27 @@ describe('PeerConnection', () => {
     beforeEach(() => {
       context = {
         _setInputTracksFromStream: sinon.stub().returns(Promise.resolve(INPUT_TRACKS_FROM_STREAM)),
-        getUserMedia: sinon.stub().returns(Promise.resolve(USER_MEDIA_RESULT))
+        _audioHelper: { _openDefaultDeviceWithConstraints: sinon.stub().returns(Promise.resolve(USER_MEDIA_RESULT)) }
       };
       toTest = METHOD.bind(context);
     });
 
-    it('Should resolve when getUserMedia, _setInputTracksFromStream resolves', done => {
+    it('Should resolve when _setInputTracksFromStream resolves', done => {
       toTest({not: 'is random'}).then(stream => {
         assert(context._setInputTracksFromStream.calledOn(context));
         assert(context._setInputTracksFromStream.calledWithExactly(false, USER_MEDIA_RESULT));
-        assert(context.getUserMedia.calledOn(context));
-        assert(context.getUserMedia.calledWithExactly({audio: {not: 'is random'}}));
-        assert(context.getUserMedia.calledBefore(context._setInputTracksFromStream));
+        assert(context._audioHelper._openDefaultDeviceWithConstraints.calledWithExactly({not: 'is random'}));
+        assert(context._audioHelper._openDefaultDeviceWithConstraints.calledBefore(context._setInputTracksFromStream));
         assert.deepStrictEqual(INPUT_TRACKS_FROM_STREAM, stream);
       }).then(done).catch(done);
     });
 
-    it('Should reject when getUserMedia rejects', done => {
-      context.getUserMedia.returns(Promise.reject(EXPECTED_ERROR));
+    it('Should reject when openDefaultDeviceWithConstraints rejects', done => {
+      context._audioHelper._openDefaultDeviceWithConstraints.returns(Promise.reject(EXPECTED_ERROR));
       toTest('constraints').catch(aError => {
         assert.equal(aError.message, EXPECTED_ERROR.message);
         assert.equal(context._setInputTracksFromStream.called, false);
-        assert(context.getUserMedia.calledOn(context));
-        assert(context.getUserMedia.calledWithExactly({audio: 'constraints'}));
+        assert(context._audioHelper._openDefaultDeviceWithConstraints.calledWithExactly('constraints'));
       }).then(done).catch(done);
     });
 
@@ -176,8 +174,7 @@ describe('PeerConnection', () => {
         assert.equal(aError.message, EXPECTED_ERROR.message);
         assert(context._setInputTracksFromStream.calledOn(context));
         assert(context._setInputTracksFromStream.calledWithExactly(false, USER_MEDIA_RESULT));
-        assert(context.getUserMedia.calledOn(context));
-        assert(context.getUserMedia.calledWithExactly({audio: undefined}));
+        assert(context._audioHelper._openDefaultDeviceWithConstraints.calledWithExactly(undefined));
       }).then(done).catch(done);
     });
 
@@ -219,6 +216,7 @@ describe('PeerConnection', () => {
   context('PeerConnection.prototype._setInputTracksForUnifiedPlan', () => {
     const METHOD = PeerConnection.prototype._setInputTracksForUnifiedPlan;
     const STREAM = { id: 1 };
+    const NEW_STREAM = { getAudioTracks: () => ['foo'], id: 2 };
 
     let context = null;
     let toTest = null;
@@ -240,10 +238,10 @@ describe('PeerConnection', () => {
         return cb();
       }})
 
-      toTest(false, { getAudioTracks: () => ['foo'] }).then((result) => {
+      toTest(false, NEW_STREAM).then((result) => {
         assert(context._updateInputStreamSource.calledOnce);
         assert(replaceTrackCb.calledOnce);
-        assert.strictEqual(result.id, STREAM.id);
+        assert.strictEqual(result.id, NEW_STREAM.id);
       }).then(done).catch(done);
     });
   });
@@ -304,7 +302,6 @@ describe('PeerConnection', () => {
       assert(context._mediaStreamSource.disconnect.calledWithExactly());
       assert(context._stopStream.calledOnce);
       assert(context.mute.calledWithExactly(false));
-      assert(context._stopStream.calledWithExactly(stream));
       assert(context._removeReconnectionListeners.calledOnce);
       assert(pc.close.calledOnce);
       assert(pc.close.calledWithExactly());
@@ -407,7 +404,6 @@ describe('PeerConnection', () => {
       assert.strictEqual(context.version, false);
       assert.strictEqual(context.status, 'closed');
       assert(context._stopStream.calledOnce);
-      assert(context._stopStream.calledWithExactly(stream));
     });
 
     it('Should stop everything what is available with stream and _shouldManaageStream as false', () => {
@@ -424,7 +420,6 @@ describe('PeerConnection', () => {
       assert.strictEqual(context.stream, null);
       assert.strictEqual(context.version, false);
       assert.strictEqual(context.status, 'closed');
-      assert(context._stopStream.calledWithExactly(stream));
     });
 
     it('Should stop everything what is available with version', () => {
@@ -2144,42 +2139,28 @@ describe('PeerConnection', () => {
 
     let toTest = null;
     let context = null;
-    let stream = null;
+    let stub = null
 
     beforeEach(() => {
-      stream = {
-        stop: sinon.stub()
-      };
+      stub = sinon.stub();
       context = {
-        _getAudioTracks: sinon.stub().throws(new Error('Override this')),
-        _canStopMediaStreamTrack: sinon.stub()
+        _audioHelper: {
+          _stopDefaultInputDeviceStream: stub
+        }
       };
       toTest = METHOD.bind(context);
     });
 
-    xit('Should stop all tracks for specific stream with getAudioTracks', () => {
-      const track1 = {stop: sinon.stub()};
-      const track2 = {stop: sinon.stub()};
-      context._canStopMediaStreamTrack.returns(true);
-      context._getAudioTracks.returns([track1, track2]);
-
-      assert.equal(toTest(stream), undefined);
-      assert(track1.stop.calledWithExactly());
-      assert(track2.stop.calledWithExactly());
-      assert(context._getAudioTracks.calledWithExactly(stream));
+    it('should stop default stream', () => {
+      context._shouldManageStream = true;
+      toTest();
+      sinon.assert.calledOnce(stub);
     });
 
-    it('Should stop stream when media track stop returns false', () => {
-      context._canStopMediaStreamTrack.returns(false);
-
-      assert.equal(toTest(stream), undefined);
-      assert.equal(context._getAudioTracks.called, false);
-    });
-
-    it('should do nothing if _shouldManaageStream is false', () => {
-      context._shouldManaageStream = false;
-      assert.equal(toTest(stream), undefined);
-      assert.equal(context._getAudioTracks.called, false);
+    it('should do nothing if _shouldManageStream is false', () => {
+      context._shouldManageStream = false;
+      toTest();
+      sinon.assert.notCalled(stub);
     });
   });
 
