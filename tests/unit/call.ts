@@ -15,7 +15,6 @@ describe('Call', function() {
   let clock: SinonFakeTimers;
   let config: Call.Config;
   let conn: Call;
-  let getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
   let mediaHandler: any;
   let monitor: any;
   let onIgnore: any;
@@ -37,7 +36,7 @@ describe('Call', function() {
       callback = cb;
       rtcConfig = d;
     });
-    mediaHandler.openWithConstraints = sinon.spy(() => Promise.resolve());
+    mediaHandler.openDefaultDeviceWithConstraints = sinon.spy(() => Promise.resolve());
     mediaHandler.stream = Symbol('stream');
     mediaHandler._remoteStream = Symbol('_remoteStream');
     mediaHandler.isMuted = Symbol('isMuted');
@@ -57,7 +56,6 @@ describe('Call', function() {
     clock = sinon.useFakeTimers(Date.now());
 
     audioHelper = createEmitterStub(require('../../lib/twilio/audiohelper').default);
-    getUserMedia = sinon.spy(() => Promise.resolve(new MediaStream()));
     onIgnore = sinon.spy();
     pstream = createEmitterStub(require('../../lib/twilio/pstream').default);
     publisher = createEmitterStub(require('../../lib/twilio/eventpublisher').default);
@@ -76,7 +74,6 @@ describe('Call', function() {
 
     config = {
       audioHelper,
-      getUserMedia,
       isUnifiedPlanDefault: false,
       onIgnore,
       publisher,
@@ -355,9 +352,9 @@ describe('Call', function() {
           assert.equal(conn.status(), state);
         });
 
-        it('should not call mediaHandler.openWithConstraints', () => {
+        it('should not call mediaHandler.openDefaultDeviceWithConstraints', () => {
           conn.accept();
-          sinon.assert.notCalled(mediaHandler.openWithConstraints);
+          sinon.assert.notCalled(mediaHandler.openDefaultDeviceWithConstraints);
         });
       });
     });
@@ -368,21 +365,21 @@ describe('Call', function() {
     });
 
     context('when getInputStream is not present', () => {
-      it('should call mediaHandler.openWithConstraints with rtcConstraints if passed', () => {
+      it('should call mediaHandler.openDefaultDeviceWithConstraints with rtcConstraints if passed', () => {
         conn.accept({ rtcConstraints: { audio: { foo: 'bar' } as MediaTrackConstraints } });
-        sinon.assert.calledWith(mediaHandler.openWithConstraints, { foo: 'bar' });
+        sinon.assert.calledWith(mediaHandler.openDefaultDeviceWithConstraints, { foo: 'bar' });
       });
 
-      it('should call mediaHandler.openWithConstraints with options.audioConstraints if no args', () => {
+      it('should call mediaHandler.openDefaultDeviceWithConstraints with options.audioConstraints if no args', () => {
         Object.assign(options, { rtcConstraints: { audio: { bar: 'baz' } } });
         conn = new Call(config, options);
         conn.accept();
-        sinon.assert.calledWith(mediaHandler.openWithConstraints, { bar: 'baz' });
+        sinon.assert.calledWith(mediaHandler.openDefaultDeviceWithConstraints, { bar: 'baz' });
       });
 
       it('should result in a `denied` error when `getUserMedia` does not allow the application to access the media', () => {
         return new Promise<void>(resolve => {
-          mediaHandler.openWithConstraints = () => {
+          mediaHandler.openDefaultDeviceWithConstraints = () => {
             const p = Promise.reject({
               code: 0,
               name: 'NotAllowedError',
@@ -401,13 +398,11 @@ describe('Call', function() {
 
     context('when getInputStream is present and succeeds', () => {
       let getInputStream: any;
-      let onGetUserMedia: any;
       let wait: Promise<any>;
 
       beforeEach(() => {
-        onGetUserMedia = sinon.stub();
         getInputStream = sinon.spy(() => 'foo');
-        Object.assign(options, { getInputStream, onGetUserMedia });
+        Object.assign(options, { getInputStream });
         conn = new Call(config, options);
 
         mediaHandler.setInputTracksFromStream = sinon.spy(() => {
@@ -426,13 +421,6 @@ describe('Call', function() {
         conn.accept();
         return wait.then(() => {
           sinon.assert.calledWith(publisher.info, 'get-user-media', 'succeeded');
-        });
-      });
-
-      it('should call onGetUserMedia callback', () => {
-        conn.accept();
-        return wait.then(() => {
-          sinon.assert.calledWith(onGetUserMedia);
         });
       });
 

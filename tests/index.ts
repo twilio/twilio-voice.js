@@ -89,6 +89,7 @@ require('./sound');
 require('./sdp');
 
 require('./unit/audioplayer');
+require('./unit/audioprocessoreventobserver');
 require('./unit/asyncQueue');
 require('./unit/backoff');
 require('./unit/icecandidate');

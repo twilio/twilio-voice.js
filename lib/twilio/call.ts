@@ -379,7 +379,7 @@ class Call extends EventEmitter {
     });
 
     this._mediaHandler = new (this._options.MediaHandler)
-      (config.audioHelper, config.pstream, config.getUserMedia, {
+      (config.audioHelper, config.pstream, {
         RTCPeerConnection: this._options.RTCPeerConnection,
         codecPreferences: this._options.codecPreferences,
         dscp: this._options.dscp,
@@ -664,16 +664,12 @@ class Call extends EventEmitter {
 
     const promise = inputStream
       ? this._mediaHandler.setInputTracksFromStream(inputStream)
-      : this._mediaHandler.openWithConstraints(audioConstraints);
+      : this._mediaHandler.openDefaultDeviceWithConstraints(audioConstraints);
 
     promise.then(() => {
       this._publisher.info('get-user-media', 'succeeded', {
         data: { audioConstraints },
       }, this);
-
-      if (this._options.onGetUserMedia) {
-        this._options.onGetUserMedia();
-      }
 
       connect();
     }, (error: Record<string, any>) => {
@@ -1794,11 +1790,6 @@ namespace Call {
     audioHelper: IAudioHelper;
 
     /**
-     * A method to use for getUserMedia.
-     */
-    getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
-
-    /**
      * Whether or not the browser uses unified-plan SDP by default.
      */
     isUnifiedPlanDefault: boolean;
@@ -1930,11 +1921,6 @@ namespace Call {
      * The offer SDP, if this is an incoming call.
      */
     offerSdp?: string | null;
-
-    /**
-     * Called after a successful getUserMedia call
-     */
-    onGetUserMedia?: () => void;
 
     /**
      * Whether this is a preflight call or not

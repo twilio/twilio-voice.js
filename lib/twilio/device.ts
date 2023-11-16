@@ -7,6 +7,7 @@
 import { EventEmitter } from 'events';
 import { levels as LogLevels, LogLevelDesc } from 'loglevel';
 import AudioHelper from './audiohelper';
+import { AudioProcessorEventObserver } from './audioprocessoreventobserver';
 import Call from './call';
 import * as C from './constants';
 import DialtonePlayer from './dialtonePlayer';
@@ -299,6 +300,11 @@ class Device extends EventEmitter {
   private _audio: AudioHelper | null = null;
 
   /**
+   * The AudioProcessorEventObserver instance to use
+   */
+  private _audioProcessorEventObserver: AudioProcessorEventObserver | null = null;
+
+  /**
    * {@link Device._confirmClose} bound to the specific {@link Device} instance.
    */
   private _boundConfirmClose: typeof Device.prototype._confirmClose;
@@ -589,13 +595,10 @@ class Device extends EventEmitter {
     this.disconnectAll();
     this._stopRegistrationTimer();
 
-    if (this._audio) {
-      this._audio._unbind();
-    }
-
     this._destroyStream();
     this._destroyPublisher();
     this._destroyAudioHelper();
+    this._audioProcessorEventObserver?.destroy();
 
     if (this._networkInformation && typeof this._networkInformation.removeEventListener === 'function') {
       this._networkInformation.removeEventListener('change', this._publishNetworkChange);
@@ -887,8 +890,7 @@ class Device extends EventEmitter {
    */
   private _destroyAudioHelper() {
     if (!this._audio) { return; }
-
-    this._audio.removeAllListeners();
+    this._audio._destroy();
     this._audio = null;
   }
 
@@ -944,7 +946,6 @@ class Device extends EventEmitter {
 
     const config: Call.Config = {
       audioHelper: this._audio,
-      getUserMedia: this._options.getUserMedia || getUserMedia,
       isUnifiedPlanDefault: Device._isUnifiedPlanDefault,
       onIgnore: (): void => {
         this._soundcache.get(Device.SoundName.Incoming).stop();
@@ -974,7 +975,6 @@ class Device extends EventEmitter {
       getInputStream: (): MediaStream | null => this._options.fileInputStream || this._callInputStream,
       getSinkIds: (): string[] => this._callSinkIds,
       maxAverageBitrate: this._options.maxAverageBitrate,
-      onGetUserMedia: () => this._onGetUserMedia(),
       preflight: this._options.preflight,
       rtcConstraints: this._options.rtcConstraints,
       shouldPlayDisconnect: () => this._audio?.disconnect(),
@@ -1092,16 +1092,6 @@ class Device extends EventEmitter {
     if (!this._calls.length) {
       this._soundcache.get(Device.SoundName.Incoming).stop();
     }
-  }
-
-  /**
-   * Called after a successful getUserMedia call
-   */
-  private _onGetUserMedia = () => {
-    this._audio?._updateAvailableDevices().catch(error => {
-      // Ignore error, we don't want to break the call flow
-      this._log.warn('Unable to updateAvailableDevices after gUM call', error);
-    });
   }
 
   /**
@@ -1337,21 +1327,29 @@ class Device extends EventEmitter {
    * Set up an audio helper for usage by this {@link Device}.
    */
   private _setupAudioHelper(): void {
+    if (!this._audioProcessorEventObserver) {
+      this._audioProcessorEventObserver = new AudioProcessorEventObserver();
+      this._audioProcessorEventObserver.on('event', ({ name, group }) => {
+        this._publisher.info(group, name, {}, this._activeCall);
+      });
+    }
+
     const audioOptions: AudioHelper.Options = {
       audioContext: Device.audioContext,
+      audioProcessorEventObserver: this._audioProcessorEventObserver,
       enumerateDevices: this._options.enumerateDevices,
+      getUserMedia: this._options.getUserMedia || getUserMedia,
     };
 
     if (this._audio) {
-      this._log.info('Found existing audio helper; destroying...');
-      audioOptions.enabledSounds = this._audio._getEnabledSounds();
-      this._destroyAudioHelper();
+      this._log.info('Found existing audio helper; updating options...');
+      this._audio._updateUserOptions(audioOptions);
+      return;
     }
 
     this._audio = new (this._options.AudioHelper || AudioHelper)(
       this._updateSinkIds,
       this._updateInputStream,
-      this._options.getUserMedia || getUserMedia,
       audioOptions,
     );
 
