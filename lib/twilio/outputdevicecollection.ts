@@ -4,6 +4,7 @@
  */
 import { SOUNDS_BASE_URL } from './constants';
 import { InvalidArgumentError, InvalidStateError, NotSupportedError } from './errors';
+import Log from './log';
 const DEFAULT_TEST_SOUND_URL = `${SOUNDS_BASE_URL}/outgoing.mp3`;
 
 /**
@@ -15,6 +16,11 @@ export default class OutputDeviceCollection {
    * The currently active output devices.
    */
   private _activeDevices: Set<MediaDeviceInfo> = new Set();
+
+  /**
+   * An instance of Logger to use.
+   */
+  private _log: Log = new Log('OutputDeviceCollection');
 
   /**
    * @private
@@ -32,6 +38,7 @@ export default class OutputDeviceCollection {
    * @returns whether the device was present before it was deleted
    */
   delete(device: MediaDeviceInfo): boolean {
+    this._log.debug('.delete', device);
     const wasDeleted: boolean = !!(this._activeDevices.delete(device));
 
     const defaultDevice: MediaDeviceInfo = this._availableDevices.get('default')
@@ -63,6 +70,7 @@ export default class OutputDeviceCollection {
    * or no IDs are passed.
    */
   set(deviceIdOrIds: string | string[]): Promise<void> {
+    this._log.debug('.set', deviceIdOrIds);
     if (!this._isSupported) {
       return Promise.reject(new NotSupportedError('This browser does not support audio output selection'));
     }
