@@ -1,5 +1,23 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.9.0 (November 28, 2023)
+=========================
+
+New Features
+------------
+
+### Audio Processor APIs
+
+The SDK now includes Audio Processor APIs, enabling access to raw audio input and the ability to modify audio data before sending it to Twilio. With this new feature, the following use cases can now be easily achieved on the client side:
+
+- Background noise removal using a noise cancellation library of your choice
+- Music playback when putting the call on hold
+- Audio filters
+- AI audio classification
+- ... and more!
+
+Please visit this [page](https://twilio.github.io/twilio-voice.js/interfaces/voice.audioprocessor.html) for more details about the Audio Processor APIs.
+
 2.8.0 (October 16, 2023)
 =======================
 
