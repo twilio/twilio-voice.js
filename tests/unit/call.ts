@@ -1446,6 +1446,19 @@ describe('Call', function() {
             sinon.assert.calledWith(conn.mute as SinonSpy, false);
           });
 
+          context('when this call is muted', () => {
+            beforeEach(() => {
+              mediaHandler.isMuted = true;
+            });
+
+            it(`should call call.mute(true)`, () => {
+              conn.mute = sinon.spy();
+              mediaHandler.onopen();
+              sinon.assert.calledWith(conn.mute as SinonSpy, true);
+            });
+          })
+
+
           context('when this call is answered', () => {
             beforeEach(() => {
               mediaHandler.status = 'open';
