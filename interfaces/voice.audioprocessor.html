@@ -60,10 +60,67 @@
 			<section class="tsd-panel tsd-comment">
 				<div class="tsd-comment tsd-typography">
 					<div class="lead">
-						<p>Represents an AudioProcessor object that receives an audio stream for processing.
-							AudioProcessors can be added using <a href="../classes/voice.audiohelper.html#addprocessor">AudioHelper.addProcessor</a>.
-						The <a href="../classes/voice.audiohelper.html">AudioHelper</a> can be accessed using the <a href="../classes/voice.device.html#audio">Device.audio</a> property.</p>
+						<p>An AudioProcessor can be added to the SDK, providing access to the audio input stream
+							and the ability to process or analyze the stream before sending it to Twilio.
+							To add the processor, you must implement the AudioProcessor interface and use
+							<a href="../classes/voice.audiohelper.html#addprocessor">AudioHelper.addProcessor</a>. You can use <a href="../classes/voice.audiohelper.html#removeprocessor">AudioHelper.removeProcessor</a> to remove it.
+							Use cases include the following:</br>
+							</br>&nbsp;&nbsp;&bull; Background noise removal using a noise cancellation library of your choice
+							</br>&nbsp;&nbsp;&bull; Music playback when putting the call on hold
+							</br>&nbsp;&nbsp;&bull; Audio filters
+							</br>&nbsp;&nbsp;&bull; AI audio classification
+						</br>&nbsp;&nbsp;&bull; ... and more!</p>
 					</div>
+					<p>The following example demonstrates how to utilize AudioProcessor APIs to use background music
+					for local audio instead of using a microphone.</p>
+					<pre><code class="language-ts"><span class="hljs-keyword">import</span> { AudioProcessor, Device } <span class="hljs-keyword">from</span> <span class="hljs-string">&#x27;@twilio/voice-sdk&#x27;</span>;
+
+<span class="hljs-keyword">let</span> audioContext;
+
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">BackgroundAudioProcessor</span> <span class="hljs-title">implements</span> <span class="hljs-title">AudioProcessor</span> </span>{
+
+ <span class="hljs-keyword">private</span> audioContext: AudioContext;
+ <span class="hljs-keyword">private</span> background: MediaElementAudioSourceNode;
+ <span class="hljs-keyword">private</span> destination: MediaStreamAudioDestinationNode;
+
+ <span class="hljs-function"><span class="hljs-title">constructor</span>(<span class="hljs-params"></span>)</span> {
+   <span class="hljs-keyword">if</span> (!audioContext) {
+     audioContext = <span class="hljs-keyword">new</span> AudioContext();
+   }
+   <span class="hljs-built_in">this</span>.audioContext = audioContext;
+ }
+
+ <span class="hljs-keyword">async</span> createProcessedStream(stream: MediaStream): <span class="hljs-built_in">Promise</span>&lt;MediaStream&gt; {
+   <span class="hljs-comment">// Create the source node</span>
+   <span class="hljs-keyword">const</span> audioEl = <span class="hljs-keyword">new</span> Audio(<span class="hljs-string">&#x27;/background.mp3&#x27;</span>);
+   audioEl.addEventListener(<span class="hljs-string">&#x27;canplaythrough&#x27;</span>, <span class="hljs-function">() =&gt;</span> audioEl.play());
+   <span class="hljs-built_in">this</span>.background = <span class="hljs-built_in">this</span>.audioContext.createMediaElementSource(audioEl);
+
+   <span class="hljs-comment">// Create the destination node and connect the source node</span>
+   <span class="hljs-built_in">this</span>.destination = <span class="hljs-built_in">this</span>.audioContext.createMediaStreamDestination();
+   <span class="hljs-built_in">this</span>.background.connect(<span class="hljs-built_in">this</span>.destination);
+
+   <span class="hljs-comment">// Return the resulting MediaStream</span>
+   <span class="hljs-keyword">return</span> <span class="hljs-built_in">this</span>.destination.stream;
+ }
+
+ <span class="hljs-keyword">async</span> destroyProcessedStream(stream: MediaStream): <span class="hljs-built_in">Promise</span>&lt;<span class="hljs-built_in">void</span>&gt; {
+   <span class="hljs-comment">// Cleanup</span>
+   <span class="hljs-built_in">this</span>.background.disconnect();
+   <span class="hljs-built_in">this</span>.destination.disconnect();
+ }
+}
+<span class="hljs-comment">// Construct a device object, passing your own token and desired options</span>
+<span class="hljs-keyword">const</span> device = <span class="hljs-keyword">new</span> Device(token, options);
+
+<span class="hljs-comment">// Construct the AudioProcessor</span>
+<span class="hljs-keyword">const</span> processor = <span class="hljs-keyword">new</span> BackgroundAudioProcessor();
+
+<span class="hljs-comment">// Add the processor</span>
+<span class="hljs-keyword">await</span> device.audio.addProcessor(processor);
+<span class="hljs-comment">// Or remove it later</span>
+<span class="hljs-comment">// await device.audio.removeProcessor(processor);</span>
+</code></pre>
 				</div>
 			</section>
 			<section class="tsd-panel tsd-hierarchy">
@@ -100,14 +157,12 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a4591ecc/lib/twilio/audioprocessor.ts#L22">lib/twilio/audioprocessor.ts:22</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/25967bbc/lib/twilio/audioprocessor.ts#L83">lib/twilio/audioprocessor.ts:83</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
 								<div class="lead">
-									<p>Called whenever the active input audio stream is updated
-										and is ready for processing such as adding audio filters
-										or removing background noise.
+									<p>Called by the SDK whenever the active input audio stream is updated.
 									Use this method to initiate your audio processing pipeline.</p>
 								</div>
 							</div>
@@ -116,12 +171,15 @@
 								<li>
 									<h5>stream: <span class="tsd-signature-type">MediaStream</span></h5>
 									<div class="tsd-comment tsd-typography">
-										<p>The input audio stream.</p>
+										<p>The current input audio stream.
+											This is the MediaStream object from the input device such as a microphone.
+											You can process or analyze this stream and create a new stream that you
+										can send over to Twilio.</p>
 									</div>
 								</li>
 							</ul>
 							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">MediaStream</span><span class="tsd-signature-symbol">&gt;</span></h4>
-							<p>The modified input audio stream after applying filters.</p>
+							<p>The resulting audio stream after processing or analyzing the original input stream.</p>
 						</li>
 					</ul>
 				</section>
@@ -135,23 +193,25 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/a4591ecc/lib/twilio/audioprocessor.ts#L33">lib/twilio/audioprocessor.ts:33</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/25967bbc/lib/twilio/audioprocessor.ts#L97">lib/twilio/audioprocessor.ts:97</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
 								<div class="lead">
-									<p>Called after the processed stream has been destroyed.
-										This happens whenever the current input stream is updated.
-										Use this method to run any necessary teardown routines
-									needed by your audio processing pipeline.</p>
+									<p>Called by the SDK after the original input audio stream and the processed stream has been destroyed.
+										The stream is considered destroyed when all of its tracks are stopped and its
+									references in the SDK are removed.</p>
 								</div>
+								<p>This method is called whenever the current input stream is updated.
+									Use this method to run any necessary teardown routines
+								needed by your audio processing pipeline.</p>
 							</div>
 							<h4 class="tsd-parameters-title">Parameters</h4>
 							<ul class="tsd-parameters">
 								<li>
 									<h5>stream: <span class="tsd-signature-type">MediaStream</span></h5>
 									<div class="tsd-comment tsd-typography">
-										<p>The torn down processed audio stream.</p>
+										<p>The destroyed processed audio stream.</p>
 									</div>
 								</li>
 							</ul>
