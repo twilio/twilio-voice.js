@@ -424,12 +424,14 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Adds an {@link AudioProcessor} object.
-   * The AudioHelper will route the input audio stream through the processor
-   * before sending the audio stream to Twilio.
+   * Adds an {@link AudioProcessor} object. Once added, the AudioHelper will route
+   * the input audio stream through the processor before sending the audio
+   * stream to Twilio. Only one AudioProcessor can be added at this time.
    *
-   * Only one {@link AudioProcessor} can be added at this time.
-   * @param processor
+   * See the {@link AudioProcessor} interface for an example.
+   *
+   * @param processor The AudioProcessor to add.
+   * @returns
    */
   addProcessor(processor: AudioProcessor): Promise<void> {
     if (this._processor) {
@@ -485,11 +487,11 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Removes an {@link AudioProcessor}.
-   * This takes into effect on the next call
-   * or when the input device is changed.
+   * Removes an {@link AudioProcessor}. Once removed, the AudioHelper will start using
+   * the audio stream from the selected input device for existing or future calls.
    *
-   * @param processor
+   * @param processor The AudioProcessor to remove.
+   * @returns
    */
   removeProcessor(processor: AudioProcessor): Promise<void> {
     if (typeof processor !== 'object' || processor === null) {
