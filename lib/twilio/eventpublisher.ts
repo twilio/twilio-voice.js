@@ -5,8 +5,8 @@
  */
 // @ts-nocheck
 import { EventEmitter } from 'events';
-import request from './request';
 import Log from './log';
+import request from './request';
 
 /**
  * Builds Endpoint Analytics (EA) event payloads and sends them to
@@ -104,7 +104,7 @@ EventPublisher.prototype._post = function _post(endpointName, level, group, name
       this._log.debug('Publishing cancelled. Missing connection object');
     } else {
       this._log.debug('Publishing cancelled. Missing connection info', JSON.stringify({
-        parameters: connection.parameters, outboundConnectionId: connection.outboundConnectionId
+        outboundConnectionId: connection.outboundConnectionId, parameters: connection.parameters,
       }));
     }
     return Promise.resolve();
@@ -126,10 +126,12 @@ EventPublisher.prototype._post = function _post(endpointName, level, group, name
     event.publisher_metadata = this.metadata;
   }
 
-  endpointName === 'EndpointEvents' && this._log.debug(
-    'Publishing insights',
-    JSON.stringify({ endpointName, event, force, host: this._host }),
-  );
+  if (endpointName === 'EndpointEvents') {
+    this._log.debug(
+      'Publishing insights',
+      JSON.stringify({ endpointName, event, force, host: this._host }),
+    );
+  }
 
   const requestParams = {
     body: event,
