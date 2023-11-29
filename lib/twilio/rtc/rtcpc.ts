@@ -37,7 +37,7 @@ function RTCPC(options) {
 }
 
 RTCPC.prototype.create = function(rtcConstraints, rtcConfiguration) {
-  this.log = Log.getInstance();
+  this.log = new Log('RTCPC');
   this.pc = new this.RTCPeerConnection(rtcConfiguration, rtcConstraints);
 };
 RTCPC.prototype.createModernConstraints = c => {

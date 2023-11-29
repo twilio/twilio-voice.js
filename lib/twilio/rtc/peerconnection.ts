@@ -38,7 +38,7 @@ function PeerConnection(audioHelper, pstream, options) {
     return new PeerConnection(audioHelper, pstream, options);
   }
 
-  this._log = Log.getInstance();
+  this._log = new Log('PeerConnection');
 
   function noop() {
     this._log.warn('Unexpected noop call in peerconnection');
@@ -423,12 +423,12 @@ PeerConnection.prototype._onMediaConnectionStateChange = function(newState) {
       break;
     case 'disconnected':
       message = 'ICE liveliness check failed. May be having trouble connecting to Twilio';
-      this._log.info(message);
+      this._log.warn(message);
       this.ondisconnected(message);
       break;
     case 'failed':
       message = 'Connection with Twilio was interrupted.';
-      this._log.info(message);
+      this._log.warn(message);
       this.onfailed(message);
       break;
   }
@@ -847,7 +847,7 @@ PeerConnection.prototype.iceRestart = function() {
       if (!payload.sdp || this.version.pc.signalingState !== 'have-local-offer') {
         const message = 'Invalid state or param during ICE Restart:'
           + `hasSdp:${!!payload.sdp}, signalingState:${this.version.pc.signalingState}`;
-        this._log.info(message);
+        this._log.warn(message);
         return;
       }
 
@@ -856,7 +856,7 @@ PeerConnection.prototype.iceRestart = function() {
       if (this.status !== 'closed') {
         this.version.processAnswer(this.codecPreferences, sdp, null, err => {
           const message = err && err.message ? err.message : err;
-          this._log.info(`Failed to process answer during ICE Restart. Error: ${message}`);
+          this._log.error(`Failed to process answer during ICE Restart. Error: ${message}`);
         });
       }
     };
@@ -872,7 +872,7 @@ PeerConnection.prototype.iceRestart = function() {
 
   }).catch((err) => {
     const message = err && err.message ? err.message : err;
-    this._log.info(`Failed to createOffer during ICE Restart. Error: ${message}`);
+    this._log.error(`Failed to createOffer during ICE Restart. Error: ${message}`);
     // CreateOffer failures doesn't transition ice state to failed
     // We need trigger it so it can be picked up by retries
     this.onfailed(message);
@@ -1039,7 +1039,7 @@ PeerConnection.prototype.getOrCreateDTMFSender = function getOrCreateDTMFSender(
   const self = this;
   const pc = this.version.pc;
   if (!pc) {
-    this._log.info('No RTCPeerConnection available to call createDTMFSender on');
+    this._log.warn('No RTCPeerConnection available to call createDTMFSender on');
     return null;
   }
 
@@ -1059,7 +1059,7 @@ PeerConnection.prototype.getOrCreateDTMFSender = function getOrCreateDTMFSender(
     })[0];
 
     if (!track) {
-      this._log.info('No local audio MediaStreamTrack available on the RTCPeerConnection to pass to createDTMFSender');
+      this._log.warn('No local audio MediaStreamTrack available on the RTCPeerConnection to pass to createDTMFSender');
       return null;
     }
 

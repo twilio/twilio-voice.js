@@ -149,7 +149,7 @@ export default class WSTransport extends EventEmitter {
   /**
    * An instance of Logger to use.
    */
-  private _log: Log = Log.getInstance();
+  private _log: Log = new Log('WSTransport');
 
   /**
    * Options after missing values are defaulted.
@@ -250,7 +250,7 @@ export default class WSTransport extends EventEmitter {
       this._socket.send(message);
     } catch (e) {
       // Some unknown error occurred. Reset the socket to get a fresh session.
-      this._log.info('Error while sending message:', e.message);
+      this._log.error('Error while sending message:', e.message);
       this._closeSocket();
       return false;
     }
@@ -347,7 +347,7 @@ export default class WSTransport extends EventEmitter {
     try {
       this._socket = new this._options.WebSocket(this._connectedUri);
     } catch (e) {
-      this._log.info('Could not connect to endpoint:', e.message);
+      this._log.error('Could not connect to endpoint:', e.message);
       this._close();
       this.emit('error', {
         code: 31000,
@@ -386,7 +386,7 @@ export default class WSTransport extends EventEmitter {
    * Called in response to WebSocket#close event.
    */
   private _onSocketClose = (event: CloseEvent): void => {
-    this._log.info(`Received websocket close event code: ${event.code}. Reason: ${event.reason}`);
+    this._log.error(`Received websocket close event code: ${event.code}. Reason: ${event.reason}`);
     // 1006: Abnormal close. When the server is unreacheable
     // 1015: TLS Handshake error
     if (event.code === 1006 || event.code === 1015) {
@@ -427,7 +427,7 @@ export default class WSTransport extends EventEmitter {
    * Called in response to WebSocket#error event.
    */
   private _onSocketError = (err: Error): void => {
-    this._log.info(`WebSocket received error: ${err.message}`);
+    this._log.error(`WebSocket received error: ${err.message}`);
     this.emit('error', {
       code: 31000,
       message: err.message || 'WSTransport socket error',
