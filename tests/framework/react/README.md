@@ -1,7 +1,7 @@
 twiliojs-react
 ==================
 
-This is the Test Application for ensuring that twilio-client.js works with React.
+This is the Test Application for ensuring that twilio-voice.js works with React.
 The project was created with `create-react-app`, and then further reduced to the
 bare essentials.
 
