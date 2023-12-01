@@ -5,6 +5,7 @@
  */
 // @ts-nocheck
 import { EventEmitter } from 'events';
+import Log from './log';
 import request from './request';
 
 /**
@@ -58,7 +59,7 @@ class EventPublisher extends EventEmitter {
         get() { return isEnabled; },
         set(_isEnabled) { isEnabled = _isEnabled; },
       },
-      _log: { value: options.log },
+      _log: { value: new Log('EventPublisher') },
       _request: { value: options.request || request, writable: true },
       _token: { value: token, writable: true },
       isEnabled: {
@@ -94,10 +95,18 @@ class EventPublisher extends EventEmitter {
  */
 EventPublisher.prototype._post = function _post(endpointName, level, group, name, payload, connection, force) {
   if ((!this.isEnabled && !force) || !this._host) {
+    this._log.debug('Publishing cancelled', JSON.stringify({ isEnabled: this.isEnabled, force, host: this._host }));
     return Promise.resolve();
   }
 
   if (!connection || ((!connection.parameters || !connection.parameters.CallSid) && !connection.outboundConnectionId)) {
+    if (!connection) {
+      this._log.debug('Publishing cancelled. Missing connection object');
+    } else {
+      this._log.debug('Publishing cancelled. Missing connection info', JSON.stringify({
+        outboundConnectionId: connection.outboundConnectionId, parameters: connection.parameters,
+      }));
+    }
     return Promise.resolve();
   }
 
@@ -115,6 +124,13 @@ EventPublisher.prototype._post = function _post(endpointName, level, group, name
 
   if (this.metadata) {
     event.publisher_metadata = this.metadata;
+  }
+
+  if (endpointName === 'EndpointEvents') {
+    this._log.debug(
+      'Publishing insights',
+      JSON.stringify({ endpointName, event, force, host: this._host }),
+    );
   }
 
   const requestParams = {
@@ -136,7 +152,7 @@ EventPublisher.prototype._post = function _post(endpointName, level, group, name
       }
     });
   }).catch(e => {
-    this._log.warn(`Unable to post ${group} ${name} event to Insights. Received error: ${e}`);
+    this._log.error(`Unable to post ${group} ${name} event to Insights. Received error: ${e}`);
   });
 };
 

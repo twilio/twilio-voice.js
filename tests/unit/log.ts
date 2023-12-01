@@ -6,47 +6,55 @@ const packageName = require('../../package.json').name;
 
 describe('Log', () => {
   let options: any;
+  let logA: any;
+  let logB: any;
   let _log: any;
 
-  beforeEach(() => {
-    _log = {
-      debug: sinon.stub(),
-      error: sinon.stub(),
-      info: sinon.stub(),
-      setDefaultLevel: sinon.stub(),
-      warn: sinon.stub(),
-    };
-    options = {LogLevelModule: { getLogger :sinon.stub().returns(_log)}};
+  before(() => {
+    (Log as any).loglevelInstance = null;
+    _log = {};
   });
-  describe('constructor', () => {
-    it('should return the same instance when using getInstance', () => {
-      assert.equal(Log.getInstance(), Log.getInstance());
-    });
 
-    it('should initialize using correct package name', () => {
-      const log = new Log(options);
+  beforeEach(() => {
+    _log.debug = sinon.stub();
+    _log.error = sinon.stub();
+    _log.info = sinon.stub();
+    _log.setDefaultLevel = sinon.stub();
+    _log.warn = sinon.stub();
+    options = {LogLevelModule: { getLogger :sinon.stub().returns(_log)}};
+    logA = new Log('foo', options);
+    logB = new Log('bar', options);
+  });
+
+  describe('constructor', () => {
+    it('should return the same loglevel instance with correct package name', () => {
       sinon.assert.calledWith(options.LogLevelModule.getLogger, packageName);
+      sinon.assert.calledOnce(options.LogLevelModule.getLogger);
     });
   });
 
   describe('after init', () => {
-    let log: Log;
     let args: any;
 
     beforeEach(() => {
-      log = new Log(options);
       args = ['foo', { bar: 'baz' }];
     });
 
     it('should call loglevel.setDefaultLevel', () => {
-      log.setDefaultLevel(Log.levels.DEBUG);
-      sinon.assert.calledWithExactly(_log.setDefaultLevel, Log.levels.DEBUG);
+      logA.setDefaultLevel(Log.levels.DEBUG);
+      logB.setDefaultLevel(Log.levels.INFO);
+      sinon.assert.calledTwice(_log.setDefaultLevel);
+      assert.deepStrictEqual(_log.setDefaultLevel.args[0], [Log.levels.DEBUG]);
+      assert.deepStrictEqual(_log.setDefaultLevel.args[1], [Log.levels.INFO]);
     });
 
     ['debug', 'error', 'info', 'warn'].forEach(methodName => {
       it(`should call loglevel ${methodName} method`, () => {
-        (log as any)[methodName](...args);
-        sinon.assert.calledWithExactly.apply(sinon.assert, [_log[methodName], ...args]);
+        (logA as any)[methodName](...args);
+        (logB as any)[methodName](...args);
+        sinon.assert.calledTwice(_log[methodName]);
+        assert.deepStrictEqual(_log[methodName].args[0], ['[TwilioVoice][foo]', ...args]);
+        assert.deepStrictEqual(_log[methodName].args[1], ['[TwilioVoice][bar]', ...args]);
       });
     });
   });

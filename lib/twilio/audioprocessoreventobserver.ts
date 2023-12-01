@@ -14,11 +14,11 @@ import Log from './log';
  */
 export class AudioProcessorEventObserver extends EventEmitter {
 
-  private _log: Log = Log.getInstance();
+  private _log: Log = new Log('AudioProcessorEventObserver');
 
   constructor() {
     super();
-    this._log.debug('Creating AudioProcessorEventObserver instance');
+    this._log.info('Creating AudioProcessorEventObserver instance');
     this.on('add', () => this._reEmitEvent('add'));
     this.on('remove', () => this._reEmitEvent('remove'));
     this.on('create', () => this._reEmitEvent('create-processed-stream'));
@@ -30,7 +30,7 @@ export class AudioProcessorEventObserver extends EventEmitter {
   }
 
   private _reEmitEvent(name: string): void {
-    this._log.debug(`AudioProcessor:${name}`);
+    this._log.info(`AudioProcessor:${name}`);
     this.emit('event', { name, group: 'audio-processor' });
   }
 }

@@ -146,7 +146,7 @@ class AudioHelper extends EventEmitter {
   /**
    * An instance of Logger to use.
    */
-  private _log: Log = Log.getInstance();
+  private _log: Log = new Log('AudioHelper');
 
   /**
    * The MediaDevices instance to use.
@@ -336,10 +336,10 @@ class AudioHelper extends EventEmitter {
    * @private
    */
   _openDefaultDeviceWithConstraints(constraints: MediaStreamConstraints): Promise<MediaStream> {
-    this._log.debug('Opening default device with constraints', constraints);
+    this._log.info('Opening default device with constraints', constraints);
     return this._getUserMedia(constraints).then((stream: MediaStream) => {
 
-      this._log.debug('Opened default device. Updating available devices.');
+      this._log.info('Opened default device. Updating available devices.');
       // Ensures deviceId's and labels are populated after the gUM call
       // by calling enumerateDevices
       this._updateAvailableDevices().catch(error => {
@@ -357,7 +357,7 @@ class AudioHelper extends EventEmitter {
    */
   _stopDefaultInputDeviceStream(): void {
     if (this._defaultInputDeviceStream) {
-      this._log.debug('stopping default device stream');
+      this._log.info('stopping default device stream');
       this._defaultInputDeviceStream.getTracks().forEach(track => track.stop());
       this._defaultInputDeviceStream = null;
       this._destroyProcessedStream();
@@ -434,6 +434,8 @@ class AudioHelper extends EventEmitter {
    * @returns
    */
   addProcessor(processor: AudioProcessor): Promise<void> {
+    this._log.debug('.addProcessor');
+
     if (this._processor) {
       throw new NotSupportedError('Adding multiple AudioProcessors is not supported at this time.');
     }
@@ -450,7 +452,6 @@ class AudioHelper extends EventEmitter {
       throw new InvalidArgumentError('Missing destroyProcessedStream() method.');
     }
 
-    this._log.debug('Adding processor');
     this._processor = processor;
     this._audioProcessorEventObserver.emit('add');
     return this._restartStreams();
@@ -463,6 +464,7 @@ class AudioHelper extends EventEmitter {
    * @returns The enable-status of the sound.
    */
   disconnect(doEnable?: boolean): boolean {
+    this._log.debug('.disconnect', doEnable);
     return this._maybeEnableSound(Device.SoundName.Disconnect, doEnable);
   }
 
@@ -473,6 +475,7 @@ class AudioHelper extends EventEmitter {
    * @returns The enable-status of the sound.
    */
   incoming(doEnable?: boolean): boolean {
+    this._log.debug('.incoming', doEnable);
     return this._maybeEnableSound(Device.SoundName.Incoming, doEnable);
   }
 
@@ -483,6 +486,7 @@ class AudioHelper extends EventEmitter {
    * @returns The enable-status of the sound.
    */
   outgoing(doEnable?: boolean): boolean {
+    this._log.debug('.outgoing', doEnable);
     return this._maybeEnableSound(Device.SoundName.Outgoing, doEnable);
   }
 
@@ -494,6 +498,8 @@ class AudioHelper extends EventEmitter {
    * @returns
    */
   removeProcessor(processor: AudioProcessor): Promise<void> {
+    this._log.debug('.removeProcessor');
+
     if (typeof processor !== 'object' || processor === null) {
       throw new InvalidArgumentError('Missing AudioProcessor argument.');
     }
@@ -516,6 +522,7 @@ class AudioHelper extends EventEmitter {
    * @param audioConstraints - The MediaTrackConstraints to apply.
    */
   setAudioConstraints(audioConstraints: MediaTrackConstraints): Promise<void> {
+    this._log.debug('.setAudioConstraints', audioConstraints);
     this._audioConstraints = Object.assign({ }, audioConstraints);
     delete this._audioConstraints.deviceId;
 
@@ -530,6 +537,7 @@ class AudioHelper extends EventEmitter {
    *   input device with.
    */
   setInputDevice(deviceId: string): Promise<void> {
+    this._log.debug('.setInputDevice', deviceId);
     return this._setInputDevice(deviceId, false);
   }
 
@@ -539,6 +547,7 @@ class AudioHelper extends EventEmitter {
    * or immediately if no input device is set.
    */
   unsetAudioConstraints(): Promise<void> {
+    this._log.debug('.unsetAudioConstraints');
     this._audioConstraints = null;
     return this.inputDevice
       ? this._setInputDevice(this.inputDevice.deviceId, true)
@@ -550,6 +559,7 @@ class AudioHelper extends EventEmitter {
    *   will not allow removal of the input device during a live call.
    */
   unsetInputDevice(): Promise<void> {
+    this._log.debug('.unsetInputDevice', this.inputDevice);
     if (!this.inputDevice) { return Promise.resolve(); }
 
     this._destroyProcessedStream();
@@ -566,7 +576,7 @@ class AudioHelper extends EventEmitter {
    */
   private _destroyProcessedStream() {
     if (this._processor && this._processedStream) {
-      this._log.debug('destroying processed stream');
+      this._log.info('destroying processed stream');
       const processedStream = this._processedStream;
       this._processedStream.getTracks().forEach(track => track.stop());
       this._processedStream = null;
@@ -622,7 +632,7 @@ class AudioHelper extends EventEmitter {
    */
   private _maybeCreateProcessedStream(stream: MediaStream): Promise<MediaStream> {
     if (this._processor) {
-      this._log.debug('Creating processed stream');
+      this._log.info('Creating processed stream');
       return this._processor.createProcessedStream(stream).then((processedStream: MediaStream) => {
         this._processedStream = processedStream;
         this._audioProcessorEventObserver.emit('create');
@@ -686,9 +696,9 @@ class AudioHelper extends EventEmitter {
    * @param stream - The new stream
    */
   private _replaceStream(stream: MediaStream | null): void {
-    this._log.debug('Replacing with new stream.');
+    this._log.info('Replacing with new stream.');
     if (this._selectedInputDeviceStream) {
-      this._log.debug('Old stream detected. Stopping tracks.');
+      this._log.info('Old stream detected. Stopping tracks.');
       this._stopSelectedInputDeviceStream();
     }
 
@@ -700,7 +710,7 @@ class AudioHelper extends EventEmitter {
    */
   private _restartStreams(): Promise<void> {
     if (this.inputDevice && this._selectedInputDeviceStream) {
-      this._log.debug('Restarting selected input device');
+      this._log.info('Restarting selected input device');
       return this._setInputDevice(this.inputDevice.deviceId, true);
     }
 
@@ -708,7 +718,7 @@ class AudioHelper extends EventEmitter {
       const defaultDevice = this.availableInputDevices.get('default')
       || Array.from(this.availableInputDevices.values())[0];
 
-      this._log.debug('Restarting default input device, now becoming selected.');
+      this._log.info('Restarting default input device, now becoming selected.');
       return this._setInputDevice(defaultDevice.deviceId, true);
     }
 
@@ -732,7 +742,7 @@ class AudioHelper extends EventEmitter {
       return Promise.reject(new InvalidArgumentError(`Device not found: ${deviceId}`));
     }
 
-    this._log.debug('Setting input device. ID: ' + deviceId);
+    this._log.info('Setting input device. ID: ' + deviceId);
 
     if (this._inputDevice && this._inputDevice.deviceId === deviceId && this._selectedInputDeviceStream) {
       if (!forceGetUserMedia) {
@@ -741,7 +751,7 @@ class AudioHelper extends EventEmitter {
 
       // If the currently active track is still in readyState `live`, gUM may return the same track
       // rather than returning a fresh track.
-      this._log.debug('Same track detected on setInputDevice, stopping old tracks.');
+      this._log.info('Same track detected on setInputDevice, stopping old tracks.');
       this._stopSelectedInputDeviceStream();
     }
 
@@ -749,13 +759,13 @@ class AudioHelper extends EventEmitter {
     this._stopDefaultInputDeviceStream();
 
     const constraints = { audio: Object.assign({ deviceId: { exact: deviceId } }, this.audioConstraints) };
-    this._log.debug('setInputDevice: getting new tracks.');
+    this._log.info('setInputDevice: getting new tracks.');
     return this._getUserMedia(constraints).then((originalStream: MediaStream) => {
 
       this._destroyProcessedStream();
 
       return this._maybeCreateProcessedStream(originalStream).then((newStream) => {
-        this._log.debug('setInputDevice: invoking _onActiveInputChanged.');
+        this._log.info('setInputDevice: invoking _onActiveInputChanged.');
         return this._onActiveInputChanged(newStream).then(() => {
           this._replaceStream(originalStream);
           this._inputDevice = device;
@@ -770,7 +780,7 @@ class AudioHelper extends EventEmitter {
    */
   private _stopSelectedInputDeviceStream(): void {
     if (this._selectedInputDeviceStream) {
-      this._log.debug('Stopping selected device stream');
+      this._log.info('Stopping selected device stream');
       this._selectedInputDeviceStream.getTracks().forEach(track => track.stop());
     }
   }
@@ -822,7 +832,7 @@ class AudioHelper extends EventEmitter {
           tracks of the active device (default) have not gone stale.`);
         this._setInputDevice(this.inputDevice.deviceId, true);
       }
-
+      this._log.debug('#deviceChange', lostActiveDevices);
       this.emit('deviceChange', lostActiveDevices);
     }
   }

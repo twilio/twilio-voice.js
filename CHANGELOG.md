@@ -1,5 +1,14 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.10.0 (In Progress)
+====================
+
+Changes
+-------
+
+- Added tags to logs
+- Added more debug statements
+
 2.9.0 (November 28, 2023)
 =========================
 

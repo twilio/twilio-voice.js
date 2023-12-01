@@ -4,6 +4,7 @@ const EventPublisher = require('../lib/twilio/eventpublisher').default;
 
 describe('EventPublisher', () => {
   let publisher;
+  let log;
 
   before(() => {
     const options = {
@@ -20,6 +21,10 @@ describe('EventPublisher', () => {
     };
 
     publisher = new EventPublisher('test', 'sometoken', options);
+  });
+
+  beforeEach(() => {
+    log = { debug: sinon.stub() };
   });
 
   describe('constructor', () => {
@@ -50,6 +55,7 @@ describe('EventPublisher', () => {
       mock = {
         _defaultPayload() { return { }; },
         _host: 'foo',
+        _log: log,
         _post: EventPublisher.prototype._post,
         _request: { post: sinon.spy((a, cb) => { cb(); }) },
         token: 'abc123'
@@ -78,6 +84,7 @@ describe('EventPublisher', () => {
       beforeEach(() => {
         mock = {
           _defaultPayload() { return { }; },
+          _log: log,
           _post: EventPublisher.prototype._post,
           _request: { post: sinon.spy((a, cb) => { cb(); }) },
           token: 'abc123'

@@ -19,8 +19,9 @@ export interface LogOptions {
 }
 
 /**
- * {@link Log} provides logging features throught the sdk using loglevel module
+ * {@link Log} provides logging features throughout the sdk using loglevel module
  * See https://github.com/pimterry/loglevel for documentation
+ * @private
  */
 class Log {
   /**
@@ -29,20 +30,27 @@ class Log {
   static levels: LogLevelModule.LogLevel = LogLevelModule.levels;
 
   /**
-   * Create the logger singleton instance if it doesn't exists
-   * @returns The singleton {@link Log} instance
+   * Return the `loglevel` instance maintained internally.
+   * @param [options] - Optional settings
+   * @returns The `loglevel` instance.
    */
-  static getInstance(): Log {
-    if (!Log.instance) {
-      Log.instance = new Log();
+  static getLogLevelInstance(options?: LogOptions): LogLevelModule.Logger {
+    if (!Log.loglevelInstance) {
+      try {
+        Log.loglevelInstance = (options && options.LogLevelModule ? options.LogLevelModule : LogLevelModule).getLogger(PACKAGE_NAME);
+      } catch {
+        // tslint:disable-next-line
+        console.warn('Cannot create custom logger');
+        Log.loglevelInstance = console as any;
+      }
     }
-    return Log.instance;
+    return Log.loglevelInstance;
   }
 
   /**
-   * The logger singleton instance
+   * The loglevel singleton instance
    */
-  private static instance: Log;
+  private static loglevelInstance: LogLevelModule.Logger;
 
   /**
    * The loglevel logger instance that will be used in this {@link Log}
@@ -50,17 +58,18 @@ class Log {
   private _log: LogLevelModule.Logger;
 
   /**
+   * Prefix to use for this log instance
+   */
+  private _prefix: string;
+
+  /**
    * @constructor
+   * @param [tag] - tag name for the logs
    * @param [options] - Optional settings
    */
-  constructor(options?: LogOptions) {
-    try {
-      this._log = (options && options.LogLevelModule ? options.LogLevelModule : LogLevelModule).getLogger(PACKAGE_NAME);
-    } catch {
-      // tslint:disable-next-line
-      console.warn('Cannot create custom logger');
-      this._log = console as any;
-    }
+  constructor(tag: string, options?: LogOptions) {
+    this._log = Log.getLogLevelInstance(options);
+    this._prefix = `[TwilioVoice][${tag}]`;
   }
 
   /**
@@ -68,7 +77,7 @@ class Log {
    * @param args - Any number of arguments to be passed to loglevel.debug
    */
   debug(...args: any[]): void {
-    this._log.debug(...args);
+    this._log.debug(this._prefix, ...args);
   }
 
   /**
@@ -76,15 +85,7 @@ class Log {
    * @param args - Any number of arguments to be passed to loglevel.error
    */
   error(...args: any[]): void {
-    this._log.error(...args);
-  }
-
-  /**
-   * Return the `loglevel` instance maintained internally.
-   * @returns The `loglevel` instance.
-   */
-  getLogLevelInstance(): LogLevelModule.Logger {
-    return this._log;
+    this._log.error(this._prefix, ...args);
   }
 
   /**
@@ -92,7 +93,7 @@ class Log {
    * @param args - Any number of arguments to be passed to loglevel.info
    */
   info(...args: any[]): void {
-    this._log.info(...args);
+    this._log.info(this._prefix, ...args);
   }
 
   /**
@@ -112,10 +113,10 @@ class Log {
    * @param args - Any number of arguments to be passed to loglevel.warn
    */
   warn(...args: any[]): void {
-    this._log.warn(...args);
+    this._log.warn(this._prefix, ...args);
   }
 }
 
-export const Logger = Log.getInstance().getLogLevelInstance();
+export const Logger = Log.getLogLevelInstance();
 
 export default Log;

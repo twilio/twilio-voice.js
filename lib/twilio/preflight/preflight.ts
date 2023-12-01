@@ -13,6 +13,7 @@ import {
   SignalingErrors,
   TwilioError,
 } from '../errors';
+import Log from '../log';
 import { RTCSampleTotals } from '../rtc/sample';
 import RTCSample from '../rtc/sample';
 import { getRTCIceCandidateStatsReport } from '../rtc/stats';
@@ -126,6 +127,11 @@ export class PreflightTest extends EventEmitter {
   private _latestSample: RTCSample | undefined;
 
   /**
+   * An instance of Logger to use.
+   */
+  private _log: Log = new Log('PreflightTest');
+
+  /**
    * Network related timing measurements for this test
    */
   private _networkTiming: NetworkTiming = {};
@@ -196,12 +202,43 @@ export class PreflightTest extends EventEmitter {
       fileInputStream: this._options.fakeMicInput ?
         this._getStreamFromFile() : undefined,
     });
+
+    // Device sets the loglevel so start logging after initializing the device.
+    // Then selectively log options that users can modify.
+    const userOptions = [
+      'codecPreferences',
+      'edge',
+      'fakeMicInput',
+      'logLevel',
+      'signalingTimeoutMs',
+    ];
+    const userOptionOverrides = [
+      'audioContext',
+      'deviceFactory',
+      'fileInputStream',
+      'getRTCIceCandidateStatsReport',
+      'iceServers',
+      'rtcConfiguration',
+    ];
+    if (typeof options === 'object') {
+      const toLog: any = { ...options };
+      Object.keys(toLog).forEach((key: string) => {
+        if (!userOptions.includes(key) && !userOptionOverrides.includes(key)) {
+          delete toLog[key];
+        }
+        if (userOptionOverrides.includes(key)) {
+          toLog[key] = true;
+        }
+      });
+      this._log.debug('.constructor', JSON.stringify(toLog));
+    }
   }
 
   /**
    * Stops the current test and raises a failed event.
    */
   stop(): void {
+    this._log.debug('.stop');
     const error = new GeneralErrors.CallCancelledError();
     if (this._device) {
       this._device.once(Device.EventName.Unregistered, () => this._onFailed(error));
@@ -220,6 +257,7 @@ export class PreflightTest extends EventEmitter {
       warning.rtcWarning = rtcWarning;
     }
     this._warnings.push(warning);
+    this._log.debug(`#${PreflightTest.Events.Warning}`, JSON.stringify(warning));
     this.emit(PreflightTest.Events.Warning, warning);
   }
 
@@ -435,6 +473,7 @@ export class PreflightTest extends EventEmitter {
     this._releaseHandlers();
     this._endTime = Date.now();
     this._status = PreflightTest.Status.Failed;
+    this._log.debug(`#${PreflightTest.Events.Failed}`, error);
     this.emit(PreflightTest.Events.Failed, error);
   }
 
@@ -458,6 +497,7 @@ export class PreflightTest extends EventEmitter {
       this._endTime = Date.now();
       this._status = PreflightTest.Status.Completed;
       this._report = this._getReport();
+      this._log.debug(`#${PreflightTest.Events.Completed}`, JSON.stringify(this._report));
       this.emit(PreflightTest.Events.Completed, this._report);
     }, 10);
   }
@@ -494,6 +534,7 @@ export class PreflightTest extends EventEmitter {
     call.once('accept', () => {
       this._callSid = call['_mediaHandler'].callSid;
       this._status = PreflightTest.Status.Connected;
+      this._log.debug(`#${PreflightTest.Events.Connected}`);
       this.emit(PreflightTest.Events.Connected);
     });
 
@@ -507,6 +548,7 @@ export class PreflightTest extends EventEmitter {
 
       this._latestSample = sample;
       this._samples.push(sample);
+      this._log.debug(`#${PreflightTest.Events.Sample}`, JSON.stringify(sample));
       this.emit(PreflightTest.Events.Sample, sample);
     });
 

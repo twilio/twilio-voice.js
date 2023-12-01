@@ -5,6 +5,17 @@ const PeerConnection = require('./../lib/twilio/rtc/peerconnection').default;
 const root = global;
 
 describe('PeerConnection', () => {
+  let log;
+
+  beforeEach(() => {
+    log = {
+      debug: sinon.stub(),
+      error: sinon.stub(),
+      info: sinon.stub(),
+      warn: sinon.stub(),
+    };
+  });
+
   context('PeerConnection.prototype._setInputTracksFromStream', () => {
     const METHOD = PeerConnection.prototype._setInputTracksFromStream;
     const ERROR_STREAM_NOT_NULL = 'Can not set input stream to null while in a call';
@@ -678,7 +689,7 @@ describe('PeerConnection', () => {
       context = {
         callSid: CALLSID,
         codecPreferences: ['opus'],
-        _log: { info: sinon.stub() },
+        _log: log,
         onerror: sinon.stub(),
         options,
         pstream,
@@ -1156,7 +1167,7 @@ describe('PeerConnection', () => {
         transport = { state: 'new' };
         context = {
           getRTCDtlsTransport: sinon.stub().returns(transport),
-          _log: { info: sinon.stub() },
+          _log: log,
           ondtlstransportstatechange: sinon.stub(),
         };
         toTest = METHOD.bind(context);
@@ -1185,7 +1196,7 @@ describe('PeerConnection', () => {
         transport = { state: 'new' };
         context = {
           getRTCDtlsTransport: sinon.stub().returns(transport),
-          _log: { info: sinon.stub() },
+          _log: log,
           ondtlstransportstatechange: sinon.stub(),
         };
         METHOD.call(context);
@@ -1226,7 +1237,7 @@ describe('PeerConnection', () => {
       context = {
         version,
         options: {},
-        _log: { info: sinon.stub() },
+        _log: log,
         onfailed: sinon.stub(),
         onopen: sinon.stub(),
         onicecandidate: sinon.stub(),
@@ -1445,7 +1456,7 @@ describe('PeerConnection', () => {
       context = {
         _iceState: 'new',
         _stopIceGatheringTimeout: sinon.stub(),
-        _log: { info: sinon.stub() },
+        _log: log,
         onconnected: sinon.stub(),
         onreconnected: sinon.stub(),
         ondisconnected: sinon.stub(),
@@ -1918,7 +1929,7 @@ describe('PeerConnection', () => {
       pc.outputs.set(MASTER_ID, output);
       context = {
         _disableOutput: sinon.stub(),
-        _log: { info: sinon.stub() }
+        _log: log,
       };
       toTest = METHOD.bind(context, pc, MASTER_ID);
     });
@@ -2067,7 +2078,7 @@ describe('PeerConnection', () => {
         version: {
           pc
         },
-        _log: { info: sinon.stub() }
+        _log: log,
       };
       toTest = METHOD.bind(context);
     });
@@ -2087,7 +2098,7 @@ describe('PeerConnection', () => {
       context.version.pc = false;
       assert.deepStrictEqual(toTest(), null);
       assert.equal(context._getAudioTracks.called, false);
-      assert(context._log.info.calledWith('No RTCPeerConnection available to call createDTMFSender on'));
+      assert(context._log.warn.calledWith('No RTCPeerConnection available to call createDTMFSender on'));
     });
 
     xit('Should return null and set dtmf unsupported true when createDTMFSender is not a function', () => {

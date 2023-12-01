@@ -58,7 +58,7 @@ class PStream extends EventEmitter {
     this._handleTransportMessage = this._handleTransportMessage.bind(this);
     this._handleTransportOpen = this._handleTransportOpen.bind(this);
 
-    this._log = Log.getInstance();
+    this._log = new Log('PStream');
 
     // NOTE(mroberts): EventEmitter requires that we catch all errors.
     this.on('error', () => {
