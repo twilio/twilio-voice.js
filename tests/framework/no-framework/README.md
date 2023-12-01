@@ -1,7 +1,7 @@
 twilio-client-no-framework
 =========================
 
-This is the Test Application for ensuring that twilio-client.js works without any
+This is the Test Application for ensuring that twilio-voice.js works without any
 Test Framework.
 
 Usage

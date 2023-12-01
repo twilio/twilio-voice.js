@@ -5,7 +5,7 @@ Having an issue with twilio.js?  Review this list of common issues to determine 
 or not your issue is known or a workaround is available. Please also take a look at the
 [CHANGELOG.md](CHANGELOG.md) to see if your issue is known for a particular
 release. If your issue hasn't been reported, consider submitting
-[a new issue](https://github.com/twilio/twilio-client.js/issues/new).
+[a new issue](https://github.com/twilio/twilio-voice.js/issues/new).
 
 Working around the browsers' autoplay policy
 --------------------------------------------
@@ -53,12 +53,12 @@ Aggressive Browser Extensions and Plugins
 -----------------------------------------
 
 Some browser extensions and plugins will disable WebRTC APIs, causing
-twilio-client.js to fail. Examples of such plugins include
+twilio-voice.js to fail. Examples of such plugins include
 
 * uBlockOrigin-Extra
 * WebRTC Leak Prevent
 * Easy WebRTC Block
 
-These are unsupported and likely to break twilio-client.js. If you are having
-trouble with twilio-client.js, ensure these are not running.
+These are unsupported and likely to break twilio-voice.js. If you are having
+trouble with twilio-voice.js, ensure these are not running.
 
