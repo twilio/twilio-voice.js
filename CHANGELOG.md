@@ -3,11 +3,16 @@
 2.10.0 (In Progress)
 ====================
 
-Changes
--------
+Improvements
+------------
 
-- Added tags to logs
-- Added more debug statements
+- Added tags to client logs for easier filtering
+- Added log statements to API calls and events for debugging purposes
+
+Bug Fixes
+---------
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/33) where updating token after signaling connection has gone offline causes an Invalid State error.
 
 2.9.0 (November 28, 2023)
 =========================
