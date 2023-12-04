@@ -547,6 +547,22 @@ describe('Device', function() {
           sinon.assert.calledOnce(spy);
         });
 
+        it('should note attempt a re-register twice', async () => {
+          await registerDevice();
+
+          const spy = device.register = sinon.spy(device.register);
+          pstream.emit('offline');
+          await clock.tickAsync(0);
+
+          // Register manually. This is usually triggered when token is also updated
+          await registerDevice();
+
+          pstream.emit('connected', { region: 'EU_IRELAND' });
+          await clock.tickAsync(0);
+
+          sinon.assert.calledOnce(spy);
+        });
+
         it('should update the preferred uri', () => {
           pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
           assert.equal(device['_preferredURI'], ['wss://voice-js.dublin.twilio.com/signal']);
