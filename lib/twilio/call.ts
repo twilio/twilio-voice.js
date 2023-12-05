@@ -517,7 +517,7 @@ class Call extends EventEmitter {
       if (this._status === Call.State.Open || this._status === Call.State.Reconnecting) {
         return;
       } else if (this._status === Call.State.Ringing || this._status === Call.State.Connecting) {
-        this.mute(false);
+        this.mute(this._mediaHandler.isMuted);
         this._mediaStatus = Call.State.Open;
         this._maybeTransitionToOpen();
       } else {

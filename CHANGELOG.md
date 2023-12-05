@@ -14,6 +14,7 @@ Bug Fixes
 
 - Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/33) where updating token after signaling connection has gone offline causes an Invalid State error.
 - Fixed an issue where `Device.Options.logLevel` is only accepting a `number` type. With this release, `strings` are now also allowed. See [Device.Options.logLevel](https://twilio.github.io/twilio-voice.js/interfaces/voice.device.options.html#loglevel) for a list of possible values.
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/pull/218#issuecomment-1832496953) where `call.mute()` does not have an effect while the `call.status()` is either `ringing` or `connecting`. Thank you @zyzmoz for your [contribution](https://github.com/twilio/twilio-voice.js/pull/218);
 
 2.9.0 (November 28, 2023)
 =========================
