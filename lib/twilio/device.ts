@@ -676,6 +676,7 @@ class Device extends EventEmitter {
       );
     }
 
+    this._shouldReRegister = false;
     this._setState(Device.State.Registering);
 
     const stream = await (this._streamConnectedPromise || this._setupStream());
