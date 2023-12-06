@@ -555,7 +555,7 @@ describe('Device', function() {
           sinon.assert.calledOnce(spy);
         });
 
-        it('should note attempt a re-register twice', async () => {
+        it('should not attempt a re-register twice', async () => {
           await registerDevice();
 
           const spy = device.register = sinon.spy(device.register);
