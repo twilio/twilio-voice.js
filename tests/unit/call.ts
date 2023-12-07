@@ -39,7 +39,7 @@ describe('Call', function() {
     mediaHandler.openDefaultDeviceWithConstraints = sinon.spy(() => Promise.resolve());
     mediaHandler.stream = Symbol('stream');
     mediaHandler._remoteStream = Symbol('_remoteStream');
-    mediaHandler.isMuted = Symbol('isMuted');
+    mediaHandler.isMuted = false;
     mediaHandler.mute = sinon.spy((shouldMute: boolean) => { mediaHandler.isMuted = shouldMute; });
     mediaHandler.version = {pc: {}, getSDP: () =>
       'a=rtpmap:1337 opus/48000/2\na=rtpmap:0 PCMU/8000\na=fmtp:0\na=fmtp:1337 maxaveragebitrate=12000'};
@@ -1444,6 +1444,13 @@ describe('Call', function() {
             conn.mute = sinon.spy();
             mediaHandler.onopen();
             sinon.assert.calledWith(conn.mute as SinonSpy, false);
+          });
+
+          it(`should call call.mute(true)`, () => {
+            conn.mute = sinon.spy();
+            mediaHandler.isMuted = true;
+            mediaHandler.onopen();
+            sinon.assert.calledWith(conn.mute as SinonSpy, true);
           });
 
           context('when this call is answered', () => {
