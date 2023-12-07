@@ -1888,10 +1888,11 @@ namespace Device {
      * Sets the log level.
      *
      * Possible values include any of the following numbers:
-     * 0 = trace, 1 = debug, 2 = info, 3 = warn, 4 = error, 5 = silent
+     * <br/>0 = trace, 1 = debug, 2 = info, 3 = warn, 4 = error, 5 = silent
      *
      * Or any of the following strings:
-     * 'trace', 'debug', 'info', 'warn', 'error', 'silent'
+     * <br/>'trace', 'debug', 'info', 'warn', 'error', 'silent'
+     * <br/>'TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'SILENT'
      */
     logLevel?: LogLevelDesc;
 
