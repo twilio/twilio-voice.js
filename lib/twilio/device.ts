@@ -1428,7 +1428,10 @@ class Device extends EventEmitter {
    * Setup logger's loglevel
    */
   private _setupLoglevel(logLevel?: LogLevelDesc): void {
-    const level = typeof logLevel === 'number' ? logLevel : LogLevels.ERROR;
+    const level = typeof logLevel === 'number' ||
+      typeof logLevel === 'string' ?
+      logLevel : LogLevels.ERROR;
+
     this._log.setDefaultLevel(level);
     this._log.info('Set logger default level to', level);
   }
@@ -1882,7 +1885,14 @@ namespace Device {
     getUserMedia?: any;
 
     /**
-     * Log level.
+     * Sets the log level.
+     *
+     * Possible values include any of the following numbers:
+     * <br/>0 = trace, 1 = debug, 2 = info, 3 = warn, 4 = error, 5 = silent
+     *
+     * Or any of the following strings:
+     * <br/>'trace', 'debug', 'info', 'warn', 'error', 'silent'
+     * <br/>'TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'SILENT'
      */
     logLevel?: LogLevelDesc;
 

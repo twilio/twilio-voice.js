@@ -489,10 +489,18 @@ describe('Device', function() {
           });
 
           Object.entries(LogLevels).forEach(([level, number]) => {
-            it(`should set log level to '${level}'`, () => {
+            level = level.toLowerCase();
+
+            it(`should set log level to '${number}'`, () => {
               device['_log'].setDefaultLevel = setDefaultLevelStub;
               device.updateOptions({ logLevel: number });
               sinon.assert.calledWith(setDefaultLevelStub, number);
+            });
+
+            it(`should set log level to '${level}'`, () => {
+              device['_log'].setDefaultLevel = setDefaultLevelStub;
+              device.updateOptions({ logLevel: level as any });
+              sinon.assert.calledWith(setDefaultLevelStub, level);
             });
           });
         });
