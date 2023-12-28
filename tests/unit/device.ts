@@ -348,7 +348,45 @@ describe('Device', function() {
           await clock.tickAsync(30000 + 1);
           sinon.assert.calledTwice(pstream.register);
         });
+
+        it('should throw an error if the websocket is closed', async () => {
+          device['_streamConnectedPromise'] = null;
+
+          const _setupStream = device['_setupStream'].bind(device)
+          device['_setupStream'] = sinon.spy(async () => {
+            const setupPromise = _setupStream();
+            pstream.emit('close');
+            await setupPromise;
+          });
+
+          await assert.rejects(() => registerDevice(), /The socket was closed before it could be connected/);
+        });
+
+        it('should throw an error if the device failed to register because of the WebSocket being closed', async () => {
+          device['_streamConnectedPromise'] = null;
+
+          const _setupStream = device['_setupStream'].bind(device)
+          device['_setupStream'] = sinon.spy(async () => {
+            const setupPromise = _setupStream();
+            pstream.emit('connected', { region: 'EU_IRELAND' });
+            pstream.emit('close');
+            await setupPromise;
+          });
+
+          await assert.rejects(() => registerDevice(), /Failed to register device because the socket is closed/);
+        })
       });
+
+      describe('._setupStream()', () => {
+        it('should throw an error if the websocket is closed', async () => {
+          setupStream = async () => {
+            const setupPromise = device['_setupStream']();
+            pstream.emit('close');
+            await setupPromise;
+          };
+          await assert.rejects(() => setupStream(), /The socket was closed before it could be connected/);
+        })
+      })
 
       describe('._sendPresence(presence)', () => {
         beforeEach(() => setupStream());
