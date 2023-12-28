@@ -662,10 +662,14 @@ class Device extends EventEmitter {
 
     this._setState(Device.State.Registering);
 
-    const stream = await (this._streamConnectedPromise || this._setupStream());
-    const streamReadyPromise = new Promise(resolve => {
+    const streamReadyPromise = new Promise((resolve, reject) => {
       this.once(Device.State.Registered, resolve);
+      this.once(Device.State.Unregistered, () => {
+        reject(new Error('Failed to register device because the socket is closed'));
+      });
     });
+
+    await (this._streamConnectedPromise || this._setupStream());
     await this._sendPresence(true);
     await streamReadyPromise;
   }
@@ -1405,11 +1409,15 @@ class Device extends EventEmitter {
     this._stream.addListener('offline', this._onSignalingOffline);
     this._stream.addListener('ready', this._onSignalingReady);
 
-    return this._streamConnectedPromise = new Promise<IPStream>(resolve =>
+    return this._streamConnectedPromise = new Promise<IPStream>((resolve, reject) => {
       this._stream.once('connected', () => {
         resolve(this._stream);
-      }),
-    );
+      });
+
+      this._stream.once('close', () => {
+        reject(new Error('The socket was closed before it could be connected'));
+      });
+    });
   }
 
   /**
