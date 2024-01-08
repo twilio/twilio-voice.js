@@ -40,6 +40,7 @@ import Sound from './sound';
 import {
   isLegacyEdge,
   isUnifiedPlanDefault,
+  promisifyEvents,
   queryToJson,
 } from './util';
 import { generateVoiceEventSid } from './uuid';
@@ -679,12 +680,9 @@ class Device extends EventEmitter {
     this._shouldReRegister = false;
     this._setState(Device.State.Registering);
 
-    const stream = await (this._streamConnectedPromise || this._setupStream());
-    const streamReadyPromise = new Promise(resolve => {
-      this.once(Device.State.Registered, resolve);
-    });
+    await (this._streamConnectedPromise || this._setupStream());
     await this._sendPresence(true);
-    await streamReadyPromise;
+    await promisifyEvents(this, Device.State.Registered, Device.State.Unregistered);
   }
 
   /**
@@ -1501,11 +1499,8 @@ class Device extends EventEmitter {
     this._stream.addListener('offline', this._onSignalingOffline);
     this._stream.addListener('ready', this._onSignalingReady);
 
-    return this._streamConnectedPromise = new Promise<IPStream>(resolve =>
-      this._stream.once('connected', () => {
-        resolve(this._stream);
-      }),
-    );
+    return this._streamConnectedPromise =
+      promisifyEvents(this._stream, 'connected', 'close').then(() => this._stream);
   }
 
   /**
