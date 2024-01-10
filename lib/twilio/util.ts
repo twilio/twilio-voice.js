@@ -144,6 +144,25 @@ function flatMap(list, mapFn) {
   }, []);
 }
 
+/**
+ * Converts an EventEmitter's events into a promise and automatically
+ * cleans up handlers once the promise is resolved or rejected.
+ */
+function promisifyEvents(emitter, resolveEventName, rejectEventName) {
+  return new Promise((resolve, reject) => {
+    function resolveHandler() {
+      emitter.removeListener(rejectEventName, rejectHandler);
+      resolve();
+    }
+    function rejectHandler() {
+      emitter.removeListener(resolveEventName, resolveHandler);
+      reject();
+    }
+    emitter.once(resolveEventName, resolveHandler);
+    emitter.once(rejectEventName, rejectHandler);
+  });
+}
+
 const Exception = TwilioException;
 
 export {
@@ -158,4 +177,5 @@ export {
   isUnifiedPlanDefault,
   queryToJson,
   flatMap,
+  promisifyEvents,
 };

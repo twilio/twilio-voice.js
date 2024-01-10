@@ -1,5 +1,6 @@
 const assert = require('assert');
 const sinon = require('sinon');
+const { EventEmitter } = require('events');
 
 const util = require('../lib/twilio/util');
 
@@ -223,6 +224,39 @@ describe('Util', () => {
         assert.equal(true, util.isUnifiedPlanDefault(window, navigator, PeerConnection, RTCRtpTransceiver));
         sinon.assert.calledOnce(PeerConnection.prototype.close);
       });
+    });
+  });
+
+  describe('promisifyEvents', () => {
+    const resolveEventName = 'foo';
+    const rejectEventName = 'bar';
+    const { promisifyEvents } = util;
+    let emitter;
+
+    beforeEach(() => {
+      emitter = new EventEmitter();
+    });
+
+    it('should resolve', async () => {
+      setTimeout(() => emitter.emit(resolveEventName));
+      await promisifyEvents(emitter, resolveEventName, rejectEventName);
+    });
+
+    it('should reject', async () => {
+      setTimeout(() => emitter.emit(rejectEventName));
+      await assert.rejects(() => promisifyEvents(emitter, resolveEventName, rejectEventName));
+    });
+
+    it('should clear reject handler', async () => {
+      setTimeout(() => emitter.emit(resolveEventName));
+      await promisifyEvents(emitter, resolveEventName, rejectEventName);
+      assert.strictEqual(emitter.eventNames().length, 0);
+    });
+
+    it('should clear resolve handler', async () => {
+      setTimeout(() => emitter.emit(rejectEventName));
+      await promisifyEvents(emitter, resolveEventName, rejectEventName).catch(() => {});
+      assert.strictEqual(emitter.eventNames().length, 0);
     });
   });
 });
