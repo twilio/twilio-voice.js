@@ -12,6 +12,9 @@ describe('AudioProcessorEventObserver', () => {
   });
 
   [{
+    eventName: 'enabled',
+    reEmittedName: 'enabled',
+  },{
     eventName: 'add',
     reEmittedName: 'add',
   },{
