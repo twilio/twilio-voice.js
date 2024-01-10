@@ -66,6 +66,11 @@ class AudioHelper extends EventEmitter {
   isVolumeSupported: boolean;
 
   /**
+   * The processed stream if an {@link AudioProcessor} was previously added.
+   */
+  get processedStream(): MediaStream | null { return this._processedStream; }
+
+  /**
    * The current set of output devices that incoming ringtone audio is routed through.
    * These are the sounds that may play while the user is away from the machine or not wearing
    * their headset. It is important that this audio is heard. If all specified
