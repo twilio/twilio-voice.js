@@ -7,6 +7,7 @@ Bug Fixes
 ---------
 
 - Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/231) where `device.register()` does not return a promise rejection when the WebSocket fails to connect. Thank you @kamalbennani for your [contribution](https://github.com/twilio/twilio-voice.js/pull/232).
+- Fixed an issue where audio processor insights events are not generated if there is an existing processed stream at the start of a call.
 
 2.10.0 (January 5, 2024)
 ========================

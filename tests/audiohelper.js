@@ -590,6 +590,19 @@ describe('AudioHelper', () => {
       });
     });
 
+    describe('.processedStream', () => {
+      it('should return the processed stream', async () => {
+        await audio.addProcessor(processor);
+        await audio.setInputDevice('input');
+        assert.strictEqual(audio.processedStream.id, 'processedstream');
+      });
+
+      it('should return null', async () => {
+        await audio.setInputDevice('input');
+        assert.strictEqual(audio.processedStream, null);
+      });
+    });
+
     ['disconnect', 'incoming', 'outgoing'].forEach(soundName => {
       describe(`.${soundName}`, () => {
         let testFn;

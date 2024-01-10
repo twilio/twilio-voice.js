@@ -937,6 +937,23 @@ describe('Device', function() {
             device.calls[0].emit("disconnect");
             sinon.assert.calledOnce(spyIncomingSound.stop);
           });
+
+          it('should emit audio processor enabled event if a processedStream exists', async () => {
+            device['_audio']!['_processedStream'] = 'foo' as any;
+            const callback = sinon.stub();
+            device['_audioProcessorEventObserver']!.on('enabled', callback);
+            const call = device.calls[0];
+            call.emit('accept');
+            sinon.assert.calledOnce(callback);
+          });
+
+          it('should not emit audio processor enabled event if a processedStream does not exists', async () => {
+            const callback = sinon.stub();
+            device['_audioProcessorEventObserver']!.on('enabled', callback);
+            const call = device.calls[0];
+            call.emit('accept');
+            sinon.assert.notCalled(callback);
+          });
         });
 
         describe('on call.error', () => {

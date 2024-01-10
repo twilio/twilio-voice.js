@@ -24,6 +24,7 @@ const checkAudioHelper = async () => {
   const audioConstraints: MediaTrackConstraints | null = audio.audioConstraints;
   const inputDevice: MediaDeviceInfo | null = audio.inputDevice;
   const inputStream: MediaStream | null = audio.inputStream;
+  const processedStream: MediaStream | null = audio.processedStream;
 
   [audio.ringtoneDevices, audio.speakerDevices].forEach(deviceCollection => {
     let d: Set<MediaDeviceInfo> = deviceCollection.get();

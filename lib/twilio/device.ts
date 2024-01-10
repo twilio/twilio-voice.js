@@ -1070,6 +1070,10 @@ class Device extends EventEmitter {
       }
 
       this._publisher.info('settings', 'edge', data, call);
+
+      if (this._audio?.processedStream) {
+        this._audioProcessorEventObserver?.emit('enabled');
+      }
     });
 
     call.addListener('error', (error: TwilioError) => {

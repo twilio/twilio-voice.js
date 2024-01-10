@@ -19,6 +19,7 @@ export class AudioProcessorEventObserver extends EventEmitter {
   constructor() {
     super();
     this._log.info('Creating AudioProcessorEventObserver instance');
+    this.on('enabled', () => this._reEmitEvent('enabled'));
     this.on('add', () => this._reEmitEvent('add'));
     this.on('remove', () => this._reEmitEvent('remove'));
     this.on('create', () => this._reEmitEvent('create-processed-stream'));
