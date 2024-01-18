@@ -36,9 +36,9 @@ function RTCPC(options) {
   }
 }
 
-RTCPC.prototype.create = function(rtcConstraints, rtcConfiguration) {
+RTCPC.prototype.create = function(rtcConfiguration) {
   this.log = new Log('RTCPC');
-  this.pc = new this.RTCPeerConnection(rtcConfiguration, rtcConstraints);
+  this.pc = new this.RTCPeerConnection(rtcConfiguration);
 };
 RTCPC.prototype.createModernConstraints = c => {
   // createOffer differs between Chrome 23 and Chrome 24+.

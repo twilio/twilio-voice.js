@@ -772,13 +772,6 @@ class Device extends EventEmitter {
 
     this._setupLoglevel(this._options.logLevel);
 
-    if (this._options.dscp) {
-      if (!this._options.rtcConstraints) {
-        this._options.rtcConstraints = { };
-      }
-      (this._options.rtcConstraints as any).optional = [{ googDscp: true }];
-    }
-
     for (const name of Object.keys(Device._defaultSounds)) {
       const soundDef: ISoundDefinition = Device._defaultSounds[name];
 
