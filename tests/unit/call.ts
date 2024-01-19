@@ -32,9 +32,9 @@ describe('Call', function() {
     mediaHandler.setInputTracksFromStream = sinon.spy((rejectCode?: number) => {
       return rejectCode ? Promise.reject({ code: rejectCode }) : Promise.resolve();
     });
-    mediaHandler.answerIncomingCall = sinon.spy((a: any, b: any, c: any, d: RTCConfiguration, cb: Function) => {
+    mediaHandler.answerIncomingCall = sinon.spy((a: any, b: any, c: RTCConfiguration, cb: Function) => {
       callback = cb;
-      rtcConfig = d;
+      rtcConfig = c;
     });
     mediaHandler.openDefaultDeviceWithConstraints = sinon.spy(() => Promise.resolve());
     mediaHandler.stream = Symbol('stream');
@@ -367,14 +367,14 @@ describe('Call', function() {
     context('when getInputStream is not present', () => {
       it('should call mediaHandler.openDefaultDeviceWithConstraints with rtcConstraints if passed', () => {
         conn.accept({ rtcConstraints: { audio: { foo: 'bar' } as MediaTrackConstraints } });
-        sinon.assert.calledWith(mediaHandler.openDefaultDeviceWithConstraints, { foo: 'bar' });
+        sinon.assert.calledWith(mediaHandler.openDefaultDeviceWithConstraints, { audio: { foo: 'bar' } });
       });
 
       it('should call mediaHandler.openDefaultDeviceWithConstraints with options.audioConstraints if no args', () => {
         Object.assign(options, { rtcConstraints: { audio: { bar: 'baz' } } });
         conn = new Call(config, options);
         conn.accept();
-        sinon.assert.calledWith(mediaHandler.openDefaultDeviceWithConstraints, { bar: 'baz' });
+        sinon.assert.calledWith(mediaHandler.openDefaultDeviceWithConstraints, { audio: { bar: 'baz' } });
       });
 
       it('should result in a `denied` error when `getUserMedia` does not allow the application to access the media', () => {
@@ -457,7 +457,7 @@ describe('Call', function() {
           };
           conn.accept({ rtcConfiguration });
           return wait.then(() => {
-            assert.deepEqual(mediaHandler.answerIncomingCall.args[0][3], rtcConfiguration);
+            assert.deepEqual(mediaHandler.answerIncomingCall.args[0][2], rtcConfiguration);
           });
         });
 
@@ -520,7 +520,7 @@ describe('Call', function() {
             return p;
           });
 
-          mediaHandler.makeOutgoingCall = sinon.spy((a: any, b: any, c: any, d: any, e: any, _callback: Function) => {
+          mediaHandler.makeOutgoingCall = sinon.spy((a: any, b: any, c: any, d: any, _callback: Function) => {
             callback = _callback;
           });
         });
@@ -540,7 +540,7 @@ describe('Call', function() {
           };
           conn.accept({ rtcConfiguration });
           return wait.then(() => {
-            assert.deepEqual(mediaHandler.makeOutgoingCall.args[0][4], rtcConfiguration);
+            assert.deepEqual(mediaHandler.makeOutgoingCall.args[0][3], rtcConfiguration);
           });
         });
 

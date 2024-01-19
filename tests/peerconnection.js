@@ -471,7 +471,6 @@ describe('PeerConnection', () => {
     const EXPECTED_ERROR = {info: {code: 31000, message: 'Error creating the answer: error message'}};
     const eCallSid = 'callSid';
     const eSDP = 'sdp';
-    const eConstraints = 'rtcConstraints';
     const eIceServers = 'iceServers';
 
     let context = null;
@@ -504,7 +503,6 @@ describe('PeerConnection', () => {
         context,
         eCallSid,
         eSDP,
-        eConstraints,
         eIceServers,
         callback
       );
@@ -513,7 +511,7 @@ describe('PeerConnection', () => {
     it('Should not call processSDP when failed to initialize streams', () => {
       context._initializeMediaStream.returns(false);
       toTest();
-      assert(context._initializeMediaStream.calledWithExactly(eConstraints, eIceServers));
+      assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert.equal(version.processSDP.called, false);
     });
 
@@ -531,7 +529,7 @@ describe('PeerConnection', () => {
       context._initializeMediaStream.returns(true);
       version.processSDP.callsArgWith(4);
       toTest();
-      assert(context._initializeMediaStream.calledWithExactly(eConstraints, eIceServers));
+      assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.processSDP.calledOnce);
       assert(version.processSDP.calledWithExactly(undefined, undefined, eSDP, {audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
@@ -545,7 +543,7 @@ describe('PeerConnection', () => {
       version.processSDP.callsArgWith(4);
       context.status = false;
       toTest();
-      assert(context._initializeMediaStream.calledWithExactly(eConstraints, eIceServers));
+      assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(context.pstream.answer.calledWithExactly(sdp1, eCallSid));
       assert(context.pstream.answer.calledOn(context.pstream));
       assert(version.processSDP.calledOnce);
@@ -565,7 +563,7 @@ describe('PeerConnection', () => {
       context._initializeMediaStream.returns(true);
       version.processSDP.callsArgWith(5, error);
       toTest();
-      assert(context._initializeMediaStream.calledWithExactly(eConstraints, eIceServers));
+      assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.processSDP.calledOnce);
       assert(context.onerror.calledWithMatch(expectedError));
 
@@ -583,7 +581,7 @@ describe('PeerConnection', () => {
       context._initializeMediaStream.returns(true);
       version.processSDP.callsArgWith(5, 'error message');
       toTest();
-      assert(context._initializeMediaStream.calledWithExactly(eConstraints, eIceServers));
+      assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.processSDP.calledOnce);
       assert(context.onerror.calledWithMatch(EXPECTED_ERROR));
 
@@ -785,7 +783,6 @@ describe('PeerConnection', () => {
 
     const eParams = 'params';
     const eCallSid = 'callSid';
-    const eConstraints = 'rtcConstraints';
     const eIceServers = 'iceServers';
     const eIss = 'this is iss';
     const eSDP = 'sdp';
@@ -828,7 +825,6 @@ describe('PeerConnection', () => {
         'token',
         eParams,
         eCallSid,
-        eConstraints,
         eIceServers,
         callback,
       );
@@ -837,13 +833,13 @@ describe('PeerConnection', () => {
     it('Should not call createOffer when failed to initialize streams', () => {
       context._initializeMediaStream.returns(false);
       toTest();
-      assert(context._initializeMediaStream.calledWithExactly(eConstraints, eIceServers));
+      assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert.equal(version.createOffer.called, false);
     });
 
     it('Should call createOffer when succeeded to initialize streams', () => {
       toTest();
-      assert(context._initializeMediaStream.calledWithExactly(eConstraints, eIceServers));
+      assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.createOffer.calledOnce);
       assert(version.createOffer.calledWithExactly(undefined, undefined, {audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
@@ -853,7 +849,7 @@ describe('PeerConnection', () => {
     it('Should call onOfferSuccess and do nothting when createOffer calls success callback and status is closed', () => {
       version.createOffer.callsArg(3);
       toTest();
-      assert(context._initializeMediaStream.calledWithExactly(eConstraints, eIceServers));
+      assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.createOffer.calledOnce);
       assert(version.createOffer.calledWithExactly(undefined, undefined, {audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
@@ -866,7 +862,7 @@ describe('PeerConnection', () => {
       context.status = 'not closed';
       version.createOffer.callsArg(3);
       toTest();
-      assert(context._initializeMediaStream.calledWithExactly(eConstraints, eIceServers));
+      assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.createOffer.calledOnce);
       assert(version.createOffer.calledWithExactly(undefined, undefined, {audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
@@ -883,7 +879,7 @@ describe('PeerConnection', () => {
       context.status = NOT_CLOSED;
       version.createOffer.callsArg(3);
       toTest();
-      assert(context._initializeMediaStream.calledWithExactly(eConstraints, eIceServers));
+      assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.createOffer.calledOnce);
       assert(version.createOffer.calledWithExactly(undefined, undefined, {audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
@@ -1004,7 +1000,6 @@ describe('PeerConnection', () => {
 
   context('PeerConnection.prototype._initializeMediaStream', () => {
     const METHOD = PeerConnection.prototype._initializeMediaStream;
-    const CONSTRAINTS = {audio: true, video: false};
     const ICE_SERVERS = {SERVER_ONE: 1, SERVER_TWO: 2};
     const STATUS_OPEN = 'open';
     const STATUS_NOT_OPEN = 'not open';
@@ -1028,7 +1023,7 @@ describe('PeerConnection', () => {
         _setupPeerConnection: sinon.stub(),
         _setupChannel: sinon.stub()
       };
-      toTest = METHOD.bind(context, CONSTRAINTS, ICE_SERVERS);
+      toTest = METHOD.bind(context, ICE_SERVERS);
     });
 
     it('Should return false when status is open', () => {
@@ -1056,7 +1051,7 @@ describe('PeerConnection', () => {
 
     it('Should call setup peer connection and return true when status is not open and pstream status is not disconnected', () => {
       assert.strictEqual(toTest(), true);
-      assert(context._setupPeerConnection.calledWithExactly(CONSTRAINTS, ICE_SERVERS));
+      assert(context._setupPeerConnection.calledWithExactly(ICE_SERVERS));
       assert(context._setupChannel.calledWithExactly());
       assert(context._setupPeerConnection.calledBefore(context._setupChannel));
       assert.equal(context.onerror.called, false);
@@ -2177,7 +2172,6 @@ describe('PeerConnection', () => {
 
   context('PeerConnection.prototype._setupPeerConnection', () => {
     const METHOD = PeerConnection.prototype._setupPeerConnection;
-    const CONSTRAINTS = {audio: 'boolean'};
     const ICE_SERVERS = {many: 'ice', servers: 'here'};
     const STREAM = 'stream';
     const MESSAGE = 'error message';
@@ -2223,7 +2217,7 @@ describe('PeerConnection', () => {
         _fallbackOnAddTrack: sinon.stub(),
         _startPollingVolume: sinon.stub(),
       };
-      toTest = METHOD.bind(context, CONSTRAINTS, ICE_SERVERS);
+      toTest = METHOD.bind(context, ICE_SERVERS);
     });
 
     it('Should create new version everytime', () => {
@@ -2233,7 +2227,7 @@ describe('PeerConnection', () => {
 
     it('Should set callback on version pc onaddstream when create and addstream do not throw error', () => {
       assert.deepStrictEqual(toTest(), new rtcpcFactory());
-      assert(versionCreate.calledWithExactly(CONSTRAINTS, ICE_SERVERS));
+      assert(versionCreate.calledWithExactly(ICE_SERVERS));
       assert(versionPc.addStream.calledWithExactly(STREAM));
       assert.equal(typeof versionPc.onaddstream, 'function');
     });
@@ -2241,7 +2235,7 @@ describe('PeerConnection', () => {
     it('Should not create onaddstream callback function when version create throws error', () => {
       versionCreate.throws(ERROR);
       assert.throws(toTest, Error, MESSAGE);
-      assert(versionCreate.calledWithExactly(CONSTRAINTS, ICE_SERVERS));
+      assert(versionCreate.calledWithExactly(ICE_SERVERS));
       assert.equal(versionPc.addStream.called, false);
       assert.equal(typeof versionPc.onaddstream, 'undefined');
     });
@@ -2249,7 +2243,7 @@ describe('PeerConnection', () => {
     it('Should not create onaddstream callback function when pc addstream throws error', () => {
       versionPc.addStream.throws(ERROR);
       assert.throws(toTest, Error, MESSAGE);
-      assert(versionCreate.calledWithExactly(CONSTRAINTS, ICE_SERVERS));
+      assert(versionCreate.calledWithExactly(ICE_SERVERS));
       assert(versionPc.addStream.calledWithExactly(STREAM));
       assert.equal(typeof versionPc.onaddstream, 'undefined');
     });
@@ -2298,7 +2292,7 @@ describe('PeerConnection', () => {
           }),
           util: { average: () => {} },
         };
-        PeerConnection.prototype._setupPeerConnection.call(context, CONSTRAINTS, ICE_SERVERS);
+        PeerConnection.prototype._setupPeerConnection.call(context, ICE_SERVERS);
         versionPc.onaddstream({stream: STREAM});
       });
 
