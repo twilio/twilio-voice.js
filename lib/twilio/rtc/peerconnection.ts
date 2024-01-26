@@ -550,7 +550,9 @@ PeerConnection.prototype._reassignMasterOutput = function reassignMasterOutput(p
   pc.outputs.delete(masterId);
 
   const self = this;
-  const idToReplace = Array.from(pc.outputs.keys())[0] || 'default';
+  const activeDevice = Array.from(pc.outputs.keys())[0];
+  // The audio device key could also be '' on Chrome if no media device permissions are allowed
+  const idToReplace = activeDevice !== null && activeDevice !== undefined ? activeDevice : 'default';
   return masterOutput.audio.setSinkId(idToReplace).then(() => {
     self._disableOutput(pc, idToReplace);
 
@@ -586,7 +588,9 @@ PeerConnection.prototype._onAddTrack = function onAddTrack(pc, stream) {
   audio.play();
 
   // Assign the initial master audio element to a random active output device
-  const deviceId = Array.from(pc.outputs.keys())[0] || 'default';
+  const activeDevice = Array.from(pc.outputs.keys())[0];
+  // The audio device key could also be '' on Chrome if no media device permissions are allowed
+  const deviceId = activeDevice !== null && activeDevice !== undefined ? activeDevice : 'default';
   pc._masterAudioDeviceId = deviceId;
   pc.outputs.set(deviceId, { audio });
 
