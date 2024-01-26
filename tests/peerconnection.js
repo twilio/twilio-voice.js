@@ -1959,6 +1959,23 @@ describe('PeerConnection', () => {
       }).then(done).catch(done);
     });
 
+    it('Should call setSinkId with \'\' if empty string is first device', done => {
+      output.audio.setSinkId.returns(Promise.resolve());
+      pc.outputs.delete('a');
+      pc.outputs.delete('b');
+      pc.outputs.delete('c');
+      pc.outputs.set('', '1');
+      toTest().then(() => {
+        assert(pc.outputs.has(''));
+        assert.equal(pc.outputs.has(MASTER_ID), false);
+        assert(output.audio.setSinkId.calledWithExactly(''));
+        assert(context._disableOutput.calledWithExactly(pc, ''));
+        assert.deepStrictEqual(pc.outputs.get(''), output);
+        assert.deepStrictEqual(pc._masterAudioDeviceId, '');
+        assert(output.audio.setSinkId.calledBefore(context._disableOutput));
+      }).then(done).catch(done);
+    });
+
     it('Should add back pc output when setSinkId rejects', () => {
       output.audio.setSinkId.returns(Promise.reject(ERROR));
       return toTest().then(() => {
