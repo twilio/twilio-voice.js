@@ -12,6 +12,9 @@ import WSTransport from './wstransport';
 
 const PSTREAM_VERSION = '1.6';
 
+// In seconds
+const MAX_RECONNECT_TIMEOUT_ALLOWED = 30;
+
 /**
  * Constructor for PStream objects.
  *
@@ -179,10 +182,21 @@ PStream.prototype.toString = () => '[Twilio.PStream instance]';
 PStream.prototype.setToken = function(token) {
   this._log.info('Setting token and publishing listen');
   this.token = token;
+
+  let reconnectTimeout = 0;
+  const t = this.options.maxPreferredDurationMs;
+  this._log.info(`maxPreferredDurationMs:${t}`);
+  if (typeof t === 'number' && t >= 0) {
+    reconnectTimeout = Math.min(Math.ceil(t / 1000), MAX_RECONNECT_TIMEOUT_ALLOWED);
+  }
+
+  this._log.info(`reconnectTimeout:${reconnectTimeout}`);
   const payload = {
     browserinfo: getBrowserInfo(),
+    reconnectTimeout,
     token,
   };
+
   this._publish('listen', payload);
 };
 

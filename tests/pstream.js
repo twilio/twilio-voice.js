@@ -8,6 +8,7 @@ const TransportFactory = require('./mock/WSTransport');
 const EXPECTED_PSTREAM_VERSION = '1.6';
 
 describe('PStream', () => {
+  const maxPreferredDurationMs = 20000;
   let WSTransportFactorySpy;
   let token;
   let uris;
@@ -18,6 +19,7 @@ describe('PStream', () => {
     WSTransportFactorySpy = sinon.spy(TransportFactory);
     options = {
       TransportFactory: WSTransportFactorySpy,
+      maxPreferredDurationMs,
     };
     token = 'foo';
     uris = ['wss://foo.bar/signal'];
@@ -43,6 +45,37 @@ describe('PStream', () => {
         const transportOptions = WSTransportFactorySpy.getCall(0).args[1];
         assert(typeof transportOptions === 'object' && transportOptions !== null);
         assert(transportOptions[optionKey] === optionValue);
+      });
+    });
+
+    describe('reconnectTimeout', () => {
+      [{
+        maxPreferredDurationMs: 30000,
+        reconnectTimeout: 30,
+      },{
+        maxPreferredDurationMs: 10000,
+        reconnectTimeout: 10,
+      },{
+        maxPreferredDurationMs: 0,
+        reconnectTimeout: 0,
+      },{
+        maxPreferredDurationMs: 'foo',
+        reconnectTimeout: 0,
+      },{
+        maxPreferredDurationMs: undefined,
+        reconnectTimeout: 0,
+      },{
+        maxPreferredDurationMs: -123,
+        reconnectTimeout: 0,
+      },{
+        maxPreferredDurationMs: 40000,
+        reconnectTimeout: 30,
+      }].forEach(({maxPreferredDurationMs, reconnectTimeout}) => {
+        it(`should set reconnectTimeout to ${reconnectTimeout} if maxPreferredDurationMs is ${maxPreferredDurationMs}`, () => {
+          setupPStream({ maxPreferredDurationMs });
+          pstream.setToken('foobar');
+          assert.strictEqual(JSON.parse(pstream.transport.send.args[0][0]).payload.reconnectTimeout, reconnectTimeout);
+        });
       });
     });
   });
@@ -78,6 +111,7 @@ describe('PStream', () => {
             plugin: 'rtc',
             v: RELEASE_VERSION,
           },
+          reconnectTimeout: 20,
           token: 'foo',
         },
         type: 'listen',
@@ -241,6 +275,7 @@ describe('PStream', () => {
             plugin: 'rtc',
             v: RELEASE_VERSION,
           },
+          reconnectTimeout: 20,
           token: 'foobar',
         },
         type: 'listen',
