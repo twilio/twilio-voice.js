@@ -298,14 +298,16 @@ describe('Device', function() {
           sinon.assert.notCalled(pstream.register);
         });
 
-        it('should disconnect all calls', () => {
+        it('should disconnect and reject all calls', () => {
           const disconnect = sinon.spy();
+          const reject = sinon.spy();
           (device as any)['_calls'] = [
-            { disconnect },
-            { disconnect },
+            { disconnect, reject },
+            { disconnect, reject },
           ];
           device.destroy();
           sinon.assert.calledTwice(disconnect);
+          sinon.assert.calledTwice(reject);
         });
 
         it('should disconnect active call', async () => {

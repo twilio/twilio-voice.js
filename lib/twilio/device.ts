@@ -599,6 +599,11 @@ class Device extends EventEmitter {
    */
   destroy(): void {
     this._log.debug('.destroy');
+
+    this._log.debug('Rejecting any incoming calls');
+    const calls = this._calls.slice(0);
+    calls.forEach((call: Call) => call.reject());
+
     this.disconnectAll();
     this._stopRegistrationTimer();
 
