@@ -7,6 +7,7 @@ Bug Fixes
 ---------
 
 - Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/67) where an error is thrown when `rtcConstraints` parameter is provided.
+- Fixed an issue ([#118](https://github.com/twilio/twilio-voice.js/issues/118), [#210](https://github.com/twilio/twilio-voice.js/issues/210)) where certain calls are not ended right away after a page refresh.
 
 2.10.1 (January 12, 2024)
 =========================
