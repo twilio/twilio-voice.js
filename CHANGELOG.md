@@ -1,7 +1,15 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
-2.10.1 (In Progress)
+2.10.2 (In Progress)
 ====================
+
+Bug Fixes
+---------
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/67) where an error is thrown when `rtcConstraints` parameter is provided.
+
+2.10.1 (January 12, 2024)
+=========================
 
 Bug Fixes
 ---------

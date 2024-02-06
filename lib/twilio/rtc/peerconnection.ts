@@ -644,10 +644,10 @@ PeerConnection.prototype._setEncodingParameters = function(enableDscp) {
   this._sender.setParameters(params);
 };
 
-PeerConnection.prototype._setupPeerConnection = function(rtcConstraints, rtcConfiguration) {
+PeerConnection.prototype._setupPeerConnection = function(rtcConfiguration) {
   const self = this;
   const version = new (this.options.rtcpcFactory || RTCPC)({ RTCPeerConnection: this.options.RTCPeerConnection });
-  version.create(rtcConstraints, rtcConfiguration);
+  version.create(rtcConfiguration);
   addStream(version.pc, this.stream);
 
   const eventName = 'ontrack' in version.pc
@@ -764,7 +764,7 @@ PeerConnection.prototype._setupChannel = function() {
     this._onMediaConnectionStateChange(pc.iceConnectionState);
   };
 };
-PeerConnection.prototype._initializeMediaStream = function(rtcConstraints, rtcConfiguration) {
+PeerConnection.prototype._initializeMediaStream = function(rtcConfiguration) {
   // if mediastream already open then do nothing
   if (this.status === 'open') {
     return false;
@@ -778,7 +778,7 @@ PeerConnection.prototype._initializeMediaStream = function(rtcConstraints, rtcCo
     this.close();
     return false;
   }
-  this.version = this._setupPeerConnection(rtcConstraints, rtcConfiguration);
+  this.version = this._setupPeerConnection(rtcConfiguration);
   this._setupChannel();
   return true;
 };
@@ -879,8 +879,8 @@ PeerConnection.prototype.iceRestart = function() {
   });
 };
 
-PeerConnection.prototype.makeOutgoingCall = function(token, params, callsid, rtcConstraints, rtcConfiguration, onMediaStarted) {
-  if (!this._initializeMediaStream(rtcConstraints, rtcConfiguration)) {
+PeerConnection.prototype.makeOutgoingCall = function(token, params, callsid, rtcConfiguration, onMediaStarted) {
+  if (!this._initializeMediaStream(rtcConfiguration)) {
     return;
   }
 
@@ -932,8 +932,8 @@ PeerConnection.prototype.makeOutgoingCall = function(token, params, callsid, rtc
 
   this.version.createOffer(this.options.maxAverageBitrate, this.codecPreferences, { audio: true }, onOfferSuccess, onOfferError);
 };
-PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConstraints, rtcConfiguration, onMediaStarted) {
-  if (!this._initializeMediaStream(rtcConstraints, rtcConfiguration)) {
+PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfiguration, onMediaStarted) {
+  if (!this._initializeMediaStream(rtcConfiguration)) {
     return;
   }
   sdp = this._maybeSetIceAggressiveNomination(sdp);

@@ -602,7 +602,9 @@ class Call extends EventEmitter {
     options = options || { };
     const rtcConfiguration = options.rtcConfiguration || this._options.rtcConfiguration;
     const rtcConstraints = options.rtcConstraints || this._options.rtcConstraints || { };
-    const audioConstraints = rtcConstraints.audio || { audio: true };
+    const audioConstraints = {
+      audio: typeof rtcConstraints.audio !== 'undefined' ? rtcConstraints.audio : true,
+    };
 
     this._status = Call.State.Connecting;
 
@@ -650,14 +652,14 @@ class Call extends EventEmitter {
       if (this._direction === Call.CallDirection.Incoming) {
         this._isAnswered = true;
         this._pstream.on('answer', this._onAnswer);
-        this._mediaHandler.answerIncomingCall(this.parameters.CallSid, this._options.offerSdp,
-          rtcConstraints, rtcConfiguration, onAnswer);
+        this._mediaHandler.answerIncomingCall(this.parameters.CallSid,
+          this._options.offerSdp, rtcConfiguration, onAnswer);
       } else {
         const params = Array.from(this.customParameters.entries()).map(pair =>
          `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
         this._pstream.on('answer', this._onAnswer);
-        this._mediaHandler.makeOutgoingCall(this._pstream.token, params, this.outboundConnectionId,
-          rtcConstraints, rtcConfiguration, onAnswer);
+        this._mediaHandler.makeOutgoingCall(this._pstream.token, params,
+          this.outboundConnectionId, rtcConfiguration, onAnswer);
       }
     };
 
