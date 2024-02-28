@@ -12,7 +12,7 @@ config.example.yaml
 config.yaml
 coverage
 docs
-extension
+extensions
 karma.conf.ts
 karma.network.conf.ts
 node_modules
