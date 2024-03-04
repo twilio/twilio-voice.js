@@ -37,7 +37,6 @@ describe('PStream', () => {
     }
 
     Object.entries({
-      backoffMaxMs: 42,
       maxPreferredDurationMs: 42,
     }).forEach(([optionKey, optionValue]) => {
       it(`should propagate ${optionKey} to wstransport`, () => {

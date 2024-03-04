@@ -5,9 +5,9 @@
  */
 // @ts-nocheck
 import { EventEmitter } from 'events';
-import * as C from './constants';
-import { GeneralErrors, SignalingErrors } from './errors';
-import Log from './log';
+import * as C from '../constants';
+import { GeneralErrors, SignalingErrors } from '../errors';
+import Log from '../log';
 import WSTransport from './wstransport';
 
 const PSTREAM_VERSION = '1.6';
@@ -15,28 +15,9 @@ const PSTREAM_VERSION = '1.6';
 // In seconds
 const MAX_RECONNECT_TIMEOUT_ALLOWED = 30;
 
-/**
- * Constructor for PStream objects.
- *
- * @exports PStream as Twilio.PStream
- * @memberOf Twilio
- * @borrows EventEmitter#addListener as #addListener
- * @borrows EventEmitter#removeListener as #removeListener
- * @borrows EventEmitter#emit as #emit
- * @borrows EventEmitter#hasListener as #hasListener
- * @constructor
- * @param {string} token The Twilio capabilities JWT
- * @param {string[]} uris An array of PStream endpoint URIs
- * @param {object} [options]
- * @config {boolean} [options.backoffMaxMs=20000] Enable debugging
- */
 class PStream extends EventEmitter {
   constructor(token, uris, options) {
     super();
-
-    if (!(this instanceof PStream)) {
-      return new PStream(token, uris, options);
-    }
     const defaults = {
       TransportFactory: WSTransport,
     };
@@ -68,21 +49,6 @@ class PStream extends EventEmitter {
       this._log.warn('Unexpected error handled in pstream');
     });
 
-    /*
-     *events used by device
-     *'invite',
-     *'ready',
-     *'error',
-     *'offline',
-     *
-     *'cancel',
-     *'presence',
-     *'roster',
-     *'answer',
-     *'candidate',
-     *'hangup'
-     */
-
     const self = this;
 
     this.addListener('ready', () => {
@@ -99,7 +65,6 @@ class PStream extends EventEmitter {
     });
 
     this.transport = new this.options.TransportFactory(this._uris, {
-      backoffMaxMs: this.options.backoffMaxMs,
       maxPreferredDurationMs: this.options.maxPreferredDurationMs,
     });
 
@@ -200,13 +165,7 @@ PStream.prototype.setToken = function(token) {
   this._publish('listen', payload);
 };
 
-PStream.prototype.sendMessage = function(
-  callsid,
-  content,
-  contenttype = 'application/json',
-  messagetype,
-  voiceeventsid,
-) {
+PStream.prototype.sendMessage = function(callsid, content, contenttype = 'application/json', messagetype, voiceeventsid) {
   const payload = {
     callsid,
     content,

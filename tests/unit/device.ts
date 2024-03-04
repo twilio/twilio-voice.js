@@ -1331,7 +1331,6 @@ describe('Device', function() {
             token,
             ['wss://foo/signal'],
             {
-              backoffMaxMs: undefined,
               maxPreferredDurationMs: 0,
             },
           );
@@ -1344,7 +1343,6 @@ describe('Device', function() {
             token,
             ['wss://foo/signal', 'wss://bar/signal'],
             {
-              backoffMaxMs: undefined,
               maxPreferredDurationMs: 0,
             },
           );
@@ -1358,7 +1356,6 @@ describe('Device', function() {
           token,
           ['wss://voice-js.roaming.twilio.com/signal'],
           {
-            backoffMaxMs: undefined,
             maxPreferredDurationMs: 0,
           },
         );
@@ -1371,7 +1368,6 @@ describe('Device', function() {
           token,
           ['wss://voice-js.singapore.twilio.com/signal'],
           {
-            backoffMaxMs: undefined,
             maxPreferredDurationMs: 0,
           },
         );
@@ -1387,7 +1383,6 @@ describe('Device', function() {
             'wss://voice-js.sydney.twilio.com/signal',
           ],
           {
-            backoffMaxMs: undefined,
             maxPreferredDurationMs: 0,
           },
         );
@@ -1400,7 +1395,6 @@ describe('Device', function() {
           token,
           ['wss://voice-js.roaming.twilio.com/signal'],
           {
-            backoffMaxMs: undefined,
             maxPreferredDurationMs: 5,
           },
         );

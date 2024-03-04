@@ -24,7 +24,7 @@ import {
 import Publisher from './eventpublisher';
 import Log from './log';
 import { PreflightTest } from './preflight/preflight';
-import PStream from './pstream';
+import PStream from './signaling/pstream';
 import {
   createEventGatewayURI,
   createSignalingEndpointURL,
@@ -76,12 +76,6 @@ export interface IExtendedDeviceOptions extends Device.Options {
    * Custom {@link AudioHelper} constructor
    */
   AudioHelper?: typeof AudioHelper;
-
-  /**
-   * The max amount of time in milliseconds to allow stream (re)-connect
-   * backoffs.
-   */
-  backoffMaxMs?: number;
 
   /**
    * Custom {@link Call} constructor
@@ -469,7 +463,7 @@ class Device extends EventEmitter {
     super();
 
     // Setup loglevel asap to avoid missed logs
-    this._setupLoglevel(options.logLevel);
+    this._log.setDefaultLevel(options.logLevel);
     this._logOptions('constructor', options);
 
     this.updateToken(token);
@@ -771,11 +765,12 @@ class Device extends EventEmitter {
       }
     }
 
+    // TODO: isBusy is always false (hasActiveCall) in signaling, update it
     if (this.isBusy && hasChunderURIsChanged) {
       throw new InvalidStateError('Cannot change Edge while on an active Call');
     }
 
-    this._setupLoglevel(this._options.logLevel);
+    this._log.setDefaultLevel(this._options.logLevel);
 
     for (const name of Object.keys(Device._defaultSounds)) {
       const soundDef: ISoundDefinition = Device._defaultSounds[name];
@@ -819,6 +814,7 @@ class Device extends EventEmitter {
    */
   updateToken(token: string) {
     this._log.debug('.updateToken');
+
     if (this.state === Device.State.Destroyed) {
       throw new InvalidStateError(
         `Attempt to "updateToken" when device is in state "${this.state}".`,
@@ -835,6 +831,7 @@ class Device extends EventEmitter {
       this._stream.setToken(this._token);
     }
 
+    // TODO: not moved
     if (this._publisher) {
       this._publisher.setToken(this._token);
     }
@@ -1162,7 +1159,7 @@ class Device extends EventEmitter {
     this._edge = payload.edge || regionToEdge[region as Region] || payload.region;
     this._region = region || payload.region;
     this._home = payload.home;
-    this._publisher?.setHost(createEventGatewayURI(payload.home));
+    this._publisher?.setHost(createEventGatewayURI(payload.home)); // TODO: not moved
 
     if (payload.token) {
       this._identity = payload.token.identity;
@@ -1241,7 +1238,7 @@ class Device extends EventEmitter {
 
     this._log.error('Received error: ', twilioError);
     this._log.debug('#error', originalError);
-    this.emit(Device.EventName.Error, twilioError, call);
+    this.emit(Device.EventName.Error, twilioError, call); // TODO: call object is moved as callsid
   }
 
   /**
@@ -1259,6 +1256,8 @@ class Device extends EventEmitter {
       this.emit(Device.EventName.Error, new ClientErrors.BadRequest('Malformed invite from gateway'));
       return;
     }
+
+    // TODO: rebuild this from signaling module
 
     const callParameters = payload.parameters || { };
     callParameters.CallSid = callParameters.CallSid || payload.callsid;
@@ -1425,18 +1424,6 @@ class Device extends EventEmitter {
   }
 
   /**
-   * Setup logger's loglevel
-   */
-  private _setupLoglevel(logLevel?: LogLevelDesc): void {
-    const level = typeof logLevel === 'number' ||
-      typeof logLevel === 'string' ?
-      logLevel : LogLevels.ERROR;
-
-    this._log.setDefaultLevel(level);
-    this._log.info('Set logger default level to', level);
-  }
-
-  /**
    * Create and set a publisher for the {@link Device} to use.
    */
   private _setupPublisher(): IPublisher {
@@ -1489,7 +1476,6 @@ class Device extends EventEmitter {
       this.token,
       this._chunderURIs,
       {
-        backoffMaxMs: this._options.backoffMaxMs,
         maxPreferredDurationMs: this._options.maxCallSignalingTimeoutMs,
       },
     );

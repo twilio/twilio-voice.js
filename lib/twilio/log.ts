@@ -99,13 +99,18 @@ class Log {
   /**
    * Set a default log level to disable all logging below the given level
    */
-  setDefaultLevel(level: LogLevelModule.LogLevelDesc): void {
+  setDefaultLevel(level?: LogLevelModule.LogLevelDesc): void {
+    level = typeof level === 'number' ||
+      typeof level === 'string' ?
+      level : Log.levels.ERROR;
+
     if (this._log.setDefaultLevel) {
       this._log.setDefaultLevel(level);
     } else {
       // tslint:disable-next-line
       console.warn('Logger cannot setDefaultLevel');
     }
+    this.info('Set logger default level to', level);
   }
 
   /**

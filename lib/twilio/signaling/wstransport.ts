@@ -5,9 +5,9 @@
  */
 
 import { EventEmitter } from 'events';
-import Backoff from './backoff';
-import { SignalingErrors } from './errors';
-import Log from './log';
+import Backoff from '../backoff';
+import { SignalingErrors } from '../errors';
+import Log from '../log';
 
 const WebSocket = globalThis.WebSocket;
 
