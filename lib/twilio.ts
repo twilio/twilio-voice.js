@@ -9,7 +9,4 @@ import * as TwilioError from './twilio/errors';
 import { Logger } from './twilio/log';
 import { PreflightTest } from './twilio/preflight/preflight';
 
-// TODO: Remove
-import Signaling from './twilio/signaling/signaling';
-
-export { AudioProcessor, Call, Device, PreflightTest, Logger, Signaling, TwilioError };
+export { AudioProcessor, Call, Device, PreflightTest, Logger, TwilioError };

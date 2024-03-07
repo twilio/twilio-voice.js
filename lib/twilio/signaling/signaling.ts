@@ -95,6 +95,19 @@ class Signaling extends EventEmitter {
     this._pstreamConnectedPromise = null;
   }
 
+  private _emitSignalingEventAndMessage(name: Signaling.Events, ...params: any[]) {
+    this.emit(name, ...params);
+
+    // TODO, re-emit in device with the same params as publicly documented
+    this._emitSignalingMessage({ type: 'event', payload: { name, params }});
+  }
+
+  private _emitSignalingMessage(message: Signaling.Message) {
+    const msgStr = JSON.stringify(message);
+    this._log.debug(`#${Signaling.Events.SignalingMessage}`, msgStr);
+    this.emit(Signaling.Events.SignalingMessage, msgStr);
+  }
+
   private _onPStreamClose = () => {
     this._log.debug('VSP close');
     this._pstream = null;
@@ -117,8 +130,8 @@ class Signaling extends EventEmitter {
         const ttlMs: number = payload.token.ttl * 1000;
         const timeoutMs: number = Math.max(0, ttlMs - this._options.tokenRefreshMs);
         this._tokenWillExpireTimeout = setTimeout(() => {
-          this._log.debug('#tokenWillExpire');
-          this.emit('tokenWillExpire', this);
+          this._log.debug(`#${Signaling.Events.TokenWillExpire}`);
+          this._emitSignalingEventAndMessage(Signaling.Events.TokenWillExpire);
           if (this._tokenWillExpireTimeout) {
             clearTimeout(this._tokenWillExpireTimeout);
             this._tokenWillExpireTimeout = null;
@@ -185,9 +198,9 @@ class Signaling extends EventEmitter {
     }
 
     this._log.error('Received error: ', twilioError);
-    this._log.debug('#error', originalError);
+    this._log.debug(`#${Signaling.Events.Error}`, originalError);
     // TODO: Device should emit call object instead of callsid
-    this.emit(Signaling.Events.Error, twilioError, callsid);
+    this._emitSignalingEventAndMessage(Signaling.Events.Error, twilioError, callsid);
   }
 
   private _onPStreamInvite = (payload: Record<string, any>) => {
@@ -199,8 +212,8 @@ class Signaling extends EventEmitter {
     }
 
     if (!payload.callsid || !payload.sdp) {
-      this._log.debug('#error', payload);
-      this.emit(Signaling.Events.Error, new ClientErrors.BadRequest('Malformed invite from gateway'));
+      this._log.debug(`#${Signaling.Events.Error}`, payload);
+      this._emitSignalingEventAndMessage(Signaling.Events.Error, new ClientErrors.BadRequest('Malformed invite from gateway'));
       return;
     }
 
@@ -248,7 +261,7 @@ class Signaling extends EventEmitter {
     this._state = state;
     const name = this._stateEventMapping[state];
     this._log.debug(`#${name}`);
-    this.emit(name);
+    this._emitSignalingEventAndMessage(name);
   }
 
   private _setupPStream(): Promise<IPStream> {
@@ -301,6 +314,50 @@ class Signaling extends EventEmitter {
     await (this._pstreamConnectedPromise || this._setupPStream());
     await this._sendPresence(true);
     await promisifyEvents(this, Signaling.State.Registered, Signaling.State.Unregistered);
+  }
+
+  async unregister(): Promise<void> {
+    this._log.debug('.unregister');
+    if (this._state !== Signaling.State.Registered) {
+      throw new InvalidStateError(
+        `Attempt to unregister when signaling is in state "${this._state}". ` +
+        `Must be "${Signaling.State.Registered}".`,
+      );
+    }
+
+    this._shouldReRegister = false;
+
+    const pstream = await this._pstreamConnectedPromise;
+    const pstreamOfflinePromise = new Promise(resolve => {
+      pstream.on('offline', resolve);
+    });
+    await this._sendPresence(false);
+    await pstreamOfflinePromise;
+  }
+
+  async sendSignalingMessage(message: string) {
+    this._log.debug('.sendSignalingMessage', message);
+    let messageObj: Signaling.Message;
+    try {
+      messageObj = JSON.parse(message);
+    } catch {
+      const msg = 'Unable to parse signaling message';
+      this._log.error(msg);
+      throw new Error(msg);
+    }
+    const { id, payload: { name, params = [] } } = messageObj;
+    const self = this as any;
+    // TODO: handle exceptions/errors
+    let result = self[name](...params);
+    if (typeof result === 'object' && typeof result.then === 'function') {
+      // TODO: handle rejection
+      result = await result;
+    }
+    this._emitSignalingMessage({ id, type: 'method', payload: { name, result }});
+  }
+
+  destroy() {
+    // TODO
   }
 
   updateOptions(options: Signaling.Options) {
@@ -357,10 +414,6 @@ class Signaling extends EventEmitter {
       this._pstream.setToken(this._token);
     }
   }
-
-  get state(): Signaling.State {
-    return this._state;
-  }
 }
 
 namespace Signaling {
@@ -371,6 +424,18 @@ namespace Signaling {
     Unregistered = 'unregistered',
     Registering = 'registering',
     Registered = 'registered',
+    SignalingMessage = 'signalingMessage',
+    TokenWillExpire = 'tokenWillExpire',
+  }
+
+  export interface Message {
+    id?: number;
+    type: 'event' | 'method';
+    payload: {
+      name: string;
+      params?: any[];
+      result?: any;
+    }
   }
 
   export interface Options {
