@@ -12,10 +12,8 @@ import Call from './call';
 import * as C from './constants';
 import DialtonePlayer from './dialtonePlayer';
 import {
-  AuthorizationErrors,
   ClientErrors,
-  GeneralErrors,
-  getPreciseSignalingErrorByCode,
+  getTwilioError,
   InvalidArgumentError,
   InvalidStateError,
   NotSupportedError,
@@ -24,15 +22,11 @@ import {
 import Publisher from './eventpublisher';
 import Log from './log';
 import { PreflightTest } from './preflight/preflight';
-import PStream from './signaling/pstream';
+import Signaling from './signaling/signaling';
+import SignalingProxy from './signaling/proxy';
 import {
   createEventGatewayURI,
-  createSignalingEndpointURL,
   Edge,
-  getChunderURIs,
-  getRegionShortcode,
-  Region,
-  regionToEdge,
 } from './regions';
 import * as rtc from './rtc';
 import getUserMedia from './rtc/getusermedia';
@@ -49,17 +43,12 @@ import { generateVoiceEventSid } from './uuid';
 /**
  * @private
  */
-export type IPStream = any;
-/**
- * @private
- */
 export type IPublisher = any;
 /**
  * @private
  */
 export type ISound = any;
 
-const REGISTRATION_INTERVAL = 30000;
 const RINGTONE_PLAY_TIMEOUT = 2000;
 const PUBLISHER_PRODUCT_NAME = 'twilio-js-sdk';
 const INVALID_TOKEN_MESSAGE = 'Parameter "token" must be of type "string".';
@@ -114,9 +103,9 @@ export interface IExtendedDeviceOptions extends Device.Options {
   preflight?: boolean;
 
   /**
-   * Custom PStream constructor
+   * Custom SignalingProxy constructor
    */
-  PStream?: IPStream;
+  SignalingProxy?: typeof SignalingProxy;
 
   /**
    * Custom Publisher constructor
@@ -327,11 +316,6 @@ class Device extends EventEmitter {
   private _callSinkIds: string[] = ['default'];
 
   /**
-   * The list of chunder URIs that will be passed to PStream
-   */
-  private _chunderURIs: string[] = [];
-
-  /**
    * Default options used by {@link Device}.
    */
   private readonly _defaultOptions: IExtendedDeviceOptions = {
@@ -339,6 +323,7 @@ class Device extends EventEmitter {
     closeProtection: false,
     codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
     dscp: true,
+    enableExternalSignaling: false,
     enableImprovedSignalingErrorPrecision: false,
     forceAggressiveIceNomination: false,
     logLevel: LogLevels.ERROR,
@@ -348,6 +333,11 @@ class Device extends EventEmitter {
     tokenRefreshMs: 10000,
     voiceEventSidGenerator: generateVoiceEventSid,
   };
+
+  /**
+   * Use internal signaling object if enableExternalSignaling is false.
+   */
+  private _defaultSignaling: Signaling | null = null;
 
   /**
    * The name of the edge the {@link Device} is connected to.
@@ -367,7 +357,7 @@ class Device extends EventEmitter {
   /**
    * Whether SDK is run as a browser extension
    */
-  private _isBrowserExtension: boolean;
+  private _isBrowserExtension: boolean = false;
 
   /**
    * An instance of Logger to use.
@@ -396,22 +386,26 @@ class Device extends EventEmitter {
   private _publisher: IPublisher | null = null;
 
   /**
-   * The region the {@link Device} is connected to.
+   * The full region name the {@link Device} is connected to 
    */
   private _region: string | null = null;
 
   /**
-   * A timeout ID for a setTimeout schedule to re-register the {@link Device}.
+   * The region the {@link Device} is connected to.
    */
-  private _regTimer: NodeJS.Timer | null = null;
+  private _regionShortCode: string | null = null;
 
   /**
-   * Boolean representing whether or not the {@link Device} was registered when
-   * receiving a signaling `offline`. Determines if the {@link Device} attempts
-   * a `re-register` once signaling is re-established when receiving a
-   * `connected` event from the stream.
+   * The Signaling used for this device. We are using the proxy and not the original
+   * signaling object to allow for external signaling mechanism.
+   * See Device.Options.enableExternalSignaling for details.
    */
-  private _shouldReRegister: boolean = false;
+  private _signaling: SignalingProxy | null = null;
+
+  /**
+   * A promise that will resolve when Signaling is in connected status.
+   */
+  private _signalingConnectedPromise: Promise<SignalingProxy> | null = null;
 
   /**
    * A Map of Sounds to play.
@@ -434,24 +428,9 @@ class Device extends EventEmitter {
   };
 
   /**
-   * The Signaling stream.
-   */
-  private _stream: IPStream | null = null;
-
-  /**
-   * A promise that will resolve when the Signaling stream is ready.
-   */
-  private _streamConnectedPromise: Promise<IPStream> | null = null;
-
-  /**
    * The JWT string currently being used to authenticate this {@link Device}.
    */
   private _token: string;
-
-  /**
-   * A timeout to track when the current AccessToken will expire.
-   */
-  private _tokenWillExpireTimeout: NodeJS.Timer | null = null;
 
   /**
    * Construct a {@link Device} instance. The {@link Device} can be registered
@@ -461,6 +440,7 @@ class Device extends EventEmitter {
    */
   constructor(token: string, options: Device.Options = { }) {
     super();
+    const root: any = globalThis as any || {};
 
     // Setup loglevel asap to avoid missed logs
     this._log.setDefaultLevel(options.logLevel);
@@ -478,7 +458,7 @@ class Device extends EventEmitter {
     }
 
     if (!Device.isSupported && (options as IExtendedDeviceOptions).ignoreBrowserSupport) {
-      if (window && window.location && window.location.protocol === 'http:') {
+      if (root.location && root.location.protocol === 'http:') {
         throw new NotSupportedError(`twilio.js wasn't able to find WebRTC browser support. \
           This is most likely because this page is served over http rather than https, \
           which does not support WebRTC in many browsers. Please load this page over https and \
@@ -491,20 +471,16 @@ class Device extends EventEmitter {
         Twilio Support at <help@twilio.com>.`);
     }
 
-    if (window) {
-      const root: any = window as any;
-      const browser: any = root.msBrowser || root.browser || root.chrome;
-
-      this._isBrowserExtension = (!!browser && !!browser.runtime && !!browser.runtime.id)
-        || (!!root.safari && !!root.safari.extension);
-    }
+    const browser: any = root.msBrowser || root.browser || root.chrome;
+    this._isBrowserExtension = (!!browser && !!browser.runtime && !!browser.runtime.id)
+      || (!!root.safari && !!root.safari.extension);
 
     if (this._isBrowserExtension) {
-      this._log.info('Running as browser extension.');
+      this._log.debug('Running as browser extension.');
     }
 
-    if (navigator) {
-      const n = navigator as any;
+    if (root.navigator) {
+      const n = root.navigator as any;
       this._networkInformation = n.connection
         || n.mozConnection
         || n.webkitConnection;
@@ -554,7 +530,9 @@ class Device extends EventEmitter {
    */
   async connect(options: Device.ConnectOptions = { }): Promise<Call> {
     this._log.debug('.connect', JSON.stringify(options && options.params || {}), options);
-    this._throwIfDestroyed();
+    if (this.state === Device.State.Destroyed) {
+      throw new InvalidStateError('Device has been destroyed.');
+    }
 
     if (this._activeCall) {
       throw new InvalidStateError('A Call is already active');
@@ -569,6 +547,8 @@ class Device extends EventEmitter {
         voiceEventSidGenerator: this._options.voiceEventSidGenerator,
       },
     );
+
+    await this._signaling?.setHasActiveCall(true);
 
     // Make sure any incoming calls are ignored
     this._calls.splice(0).forEach(call => call.ignore());
@@ -599,9 +579,7 @@ class Device extends EventEmitter {
     calls.forEach((call: Call) => call.reject());
 
     this.disconnectAll();
-    this._stopRegistrationTimer();
-
-    this._destroyStream();
+    this._destroySignaling();
     this._destroyPublisher();
     this._destroyAudioHelper();
     this._audioProcessorEventObserver?.destroy();
@@ -665,26 +643,6 @@ class Device extends EventEmitter {
   }
 
   /**
-   * Register the `Device` to the Twilio backend, allowing it to receive calls.
-   */
-  async register(): Promise<void> {
-    this._log.debug('.register');
-    if (this.state !== Device.State.Unregistered) {
-      throw new InvalidStateError(
-        `Attempt to register when device is in state "${this.state}". ` +
-        `Must be "${Device.State.Unregistered}".`,
-      );
-    }
-
-    this._shouldReRegister = false;
-    this._setState(Device.State.Registering);
-
-    await (this._streamConnectedPromise || this._setupStream());
-    await this._sendPresence(true);
-    await promisifyEvents(this, Device.State.Registered, Device.State.Unregistered);
-  }
-
-  /**
    * Get the state of this {@link Device} instance
    */
   get state(): Device.State {
@@ -707,26 +665,42 @@ class Device extends EventEmitter {
   }
 
   /**
+   * Register the `Device` to the Twilio backend, allowing it to receive calls.
+   */
+  async register(): Promise<void> {
+    this._log.debug('.register');
+    if (this._state !== Device.State.Unregistered) {
+      throw new InvalidStateError(
+        `Attempt to register when Device is in state "${this._state}". ` +
+        `Must be "${Device.State.Unregistered}".`,
+      );
+    }
+    this._setState(Device.State.Registering);
+    await (this._signalingConnectedPromise || this._setupSignaling());
+    if (this._signaling) {
+      return this._signaling.register();
+    }
+    this._log.warn('.register called without signaling');
+    return Promise.reject();
+  }
+
+  /**
    * Unregister the `Device` to the Twilio backend, disallowing it to receive
    * calls.
    */
   async unregister(): Promise<void> {
     this._log.debug('.unregister');
-    if (this.state !== Device.State.Registered) {
+    if (this._state !== Device.State.Registered) {
       throw new InvalidStateError(
-        `Attempt to unregister when device is in state "${this.state}". ` +
+        `Attempt to unregister when Device is in state "${this._state}". ` +
         `Must be "${Device.State.Registered}".`,
       );
     }
-
-    this._shouldReRegister = false;
-
-    const stream = await this._streamConnectedPromise;
-    const streamOfflinePromise = new Promise(resolve => {
-      stream.on('offline', resolve);
-    });
-    await this._sendPresence(false);
-    await streamOfflinePromise;
+    if (this._signaling) {
+      return this._signaling.unregister();
+    }
+    this._log.warn('.unregister called without signaling');
+    return Promise.reject();
   }
 
   /**
@@ -740,36 +714,7 @@ class Device extends EventEmitter {
         `Attempt to "updateOptions" when device is in state "${this.state}".`,
       );
     }
-
     this._options = { ...this._defaultOptions, ...this._options, ...options };
-
-    const originalChunderURIs: Set<string> = new Set(this._chunderURIs);
-
-    const chunderw = typeof this._options.chunderw === 'string'
-      ? [this._options.chunderw]
-      : Array.isArray(this._options.chunderw) && this._options.chunderw;
-
-    const newChunderURIs = this._chunderURIs = (
-      chunderw || getChunderURIs(this._options.edge)
-    ).map(createSignalingEndpointURL);
-
-    let hasChunderURIsChanged =
-      originalChunderURIs.size !== newChunderURIs.length;
-
-    if (!hasChunderURIsChanged) {
-      for (const uri of newChunderURIs) {
-        if (!originalChunderURIs.has(uri)) {
-          hasChunderURIsChanged = true;
-          break;
-        }
-      }
-    }
-
-    // TODO: isBusy is always false (hasActiveCall) in signaling, update it
-    if (this.isBusy && hasChunderURIsChanged) {
-      throw new InvalidStateError('Cannot change Edge while on an active Call');
-    }
-
     this._log.setDefaultLevel(this._options.logLevel);
 
     for (const name of Object.keys(Device._defaultSounds)) {
@@ -791,8 +736,16 @@ class Device extends EventEmitter {
     this._setupAudioHelper();
     this._setupPublisher();
 
-    if (hasChunderURIsChanged && this._streamConnectedPromise) {
-      this._setupStream();
+    if (this._signaling) {
+      this._signaling.updateOptions({ 
+        edge: this._options.edge,
+        enableImprovedSignalingErrorPrecision: this._options.enableImprovedSignalingErrorPrecision,
+        logLevel: this._options.logLevel,
+        maxCallSignalingTimeoutMs: this._options.maxCallSignalingTimeoutMs,
+        tokenRefreshMs: this._options.tokenRefreshMs,
+      });
+    } else {
+      this._log.debug('.updateOptions called without signaling');
     }
 
     // Setup close protection and make sure we clean up ongoing calls on unload.
@@ -815,23 +768,22 @@ class Device extends EventEmitter {
   updateToken(token: string) {
     this._log.debug('.updateToken');
 
+    // WARNING: These checks are duplicated in Signaling.updateToken
+    // Combine once we start getting more of these
     if (this.state === Device.State.Destroyed) {
       throw new InvalidStateError(
         `Attempt to "updateToken" when device is in state "${this.state}".`,
       );
     }
-
     if (typeof token !== 'string') {
       throw new InvalidArgumentError(INVALID_TOKEN_MESSAGE);
     }
-
+  
     this._token = token;
-
-    if (this._stream) {
-      this._stream.setToken(this._token);
+    if (this._signaling) {
+      this._signaling.updateToken(this._token);
     }
 
-    // TODO: not moved
     if (this._publisher) {
       this._publisher.setToken(this._token);
     }
@@ -880,8 +832,7 @@ class Device extends EventEmitter {
       payload.direction = call.direction;
     }
 
-    setIfDefined('gateway', this._stream && this._stream.gateway);
-    setIfDefined('region', this._stream && this._stream.region);
+    setIfDefined('region', this._region);
 
     return payload;
   }
@@ -906,24 +857,31 @@ class Device extends EventEmitter {
   }
 
   /**
-   * Destroy the connection to the signaling server.
+   * Destroy signaling
    */
-  private _destroyStream() {
-    if (this._stream) {
-      this._stream.removeListener('close', this._onSignalingClose);
-      this._stream.removeListener('connected', this._onSignalingConnected);
-      this._stream.removeListener('error', this._onSignalingError);
-      this._stream.removeListener('invite', this._onSignalingInvite);
-      this._stream.removeListener('offline', this._onSignalingOffline);
-      this._stream.removeListener('ready', this._onSignalingReady);
+  private _destroySignaling() {
+    if (this._defaultSignaling) {
+      this._defaultSignaling.removeListener(Signaling.EventName.SignalingMessage, this._onDefaultSignalingMessage);
+      this._defaultSignaling.destroy();
+      this._defaultSignaling = null;
+    }
 
-      this._stream.destroy();
-      this._stream = null;
+    if (this._signaling) {
+      this._signaling.removeListener(Signaling.EventName.SignalingMessage, this._onSignalingMessage);
+      this._signaling.removeListener(Signaling.InternalEventName.Close, this._onSignalingClose);
+      this._signaling.removeListener(Signaling.InternalEventName.Connected, this._onSignalingConnected);
+      this._signaling.removeListener(Signaling.InternalEventName.Error, this._onSignalingError);
+      this._signaling.removeListener(Signaling.InternalEventName.Invite, this._onSignalingInvite);
+      this._signaling.removeListener(Signaling.InternalEventName.Offline, this._onSignalingOffline);
+      this._signaling.removeListener(Signaling.InternalEventName.Ready, this._onSignalingReady);
+      this._signaling.removeListener(Signaling.EventName.TokenWillExpire, this._onTokenWillExpire);
+      // No need to invoke this._signaling.destroy() here since the signaling proxy won't really
+      // emit the message. We already removed the handler and called the _defaultSignaling.destroy() directly
+      this._signaling = null;
     }
 
     this._onSignalingOffline();
-
-    this._streamConnectedPromise = null;
+    this._signalingConnectedPromise = null;
   }
 
   /**
@@ -933,6 +891,47 @@ class Device extends EventEmitter {
   private _findCall(callSid: string): Call | null {
     return this._calls.find(call => call.parameters.CallSid === callSid
       || call.outboundConnectionId === callSid) || null;
+  }
+
+  private async _handleCallInvite(payload: Record<string, any>) {
+    const wasBusy = !!this._activeCall;
+    if (wasBusy && !this._options.allowIncomingWhileBusy) {
+      this._log.debug('Device busy; ignoring incoming invite', payload);
+      return;
+    }
+
+    const call = await this._makeCall(
+      Object.assign({ }, queryToJson(payload.parameters.Params)),
+      {
+        callParameters: payload.parameters,
+        enableImprovedSignalingErrorPrecision:
+          !!this._options.enableImprovedSignalingErrorPrecision,
+        offerSdp: payload.sdp,
+        reconnectToken: payload.reconnect,
+        voiceEventSidGenerator: this._options.voiceEventSidGenerator,
+      },
+    );
+
+    this._calls.push(call);
+
+    call.once('accept', () => {
+      this._soundcache.get(Device.SoundName.Incoming).stop();
+      this._publishNetworkChange();
+    });
+
+    const play = (this._audio?.incoming() && !wasBusy)
+      ? () => this._soundcache.get(Device.SoundName.Incoming).play()
+      : () => Promise.resolve();
+
+    this._showIncomingCall(call, play);
+  }
+
+  private _handleCallInvites(callInvites?: Record<string, any>[]) {
+    if (!callInvites || !callInvites.length) {
+      this._log.warn('_handleCallInvites without any invites');
+      return;
+    }
+    callInvites.forEach((payload) => setTimeout(() => this._handleCallInvite(payload)));
   }
 
   /**
@@ -995,7 +994,7 @@ class Device extends EventEmitter {
       onIgnore: (): void => {
         this._soundcache.get(Device.SoundName.Incoming).stop();
       },
-      pstream: await (this._streamConnectedPromise || this._setupStream()),
+      signaling: await (this._signalingConnectedPromise || this._setupSignaling()),
       publisher: this._publisher,
       soundcache: this._soundcache,
     };
@@ -1003,13 +1002,13 @@ class Device extends EventEmitter {
     options = Object.assign({
       MediaStream: this._options.MediaStream || rtc.PeerConnection,
       RTCPeerConnection: this._options.RTCPeerConnection,
-      beforeAccept: (currentCall: Call) => {
+      beforeAccept: async (currentCall: Call) => {
         if (!this._activeCall || this._activeCall === currentCall) {
           return;
         }
 
         this._activeCall.disconnect();
-        this._removeCall(this._activeCall);
+        await this._removeCall(this._activeCall);
       },
       codecPreferences: this._options.codecPreferences,
       customSounds: this._options.sounds,
@@ -1028,12 +1027,12 @@ class Device extends EventEmitter {
     }, options);
 
     const maybeUnsetPreferredUri = () => {
-      if (!this._stream) {
-        this._log.warn('UnsetPreferredUri called without a stream');
+      if (!this._signaling) {
+        this._log.warn('UnsetPreferredUri called without a signaling');
         return;
       }
       if (this._activeCall === null && this._calls.length === 0) {
-        this._stream.updatePreferredURI(null);
+        this._signaling.updatePreferredURI(null);
       }
     };
 
@@ -1045,10 +1044,13 @@ class Device extends EventEmitter {
       getUserMedia: !!this._options.getUserMedia,
     }, call);
 
-    call.once('accept', () => {
-      this._stream.updatePreferredURI(this._preferredURI);
-      this._removeCall(call);
+    call.once('accept', async () => {
+      if (this._signaling) {
+        this._signaling.updatePreferredURI(this._preferredURI);
+      }
+      await this._removeCall(call);
       this._activeCall = call;
+      await this._signaling?.setHasActiveCall(true);
       if (this._audio) {
         this._audio._maybeStartPollingVolume();
       }
@@ -1057,7 +1059,7 @@ class Device extends EventEmitter {
         this._soundcache.get(Device.SoundName.Outgoing).play();
       }
 
-      const data: any = { edge: this._edge || this._region };
+      const data: any = { edge: this._edge || this._regionShortCode };
       if (this._options.edge) {
         data['selected_edge'] = Array.isArray(this._options.edge)
           ? this._options.edge
@@ -1071,9 +1073,9 @@ class Device extends EventEmitter {
       }
     });
 
-    call.addListener('error', (error: TwilioError) => {
+    call.addListener('error', async (error: TwilioError) => {
       if (call.status() === 'closed') {
-        this._removeCall(call);
+        await this._removeCall(call);
         maybeUnsetPreferredUri();
       }
       if (this._audio) {
@@ -1082,9 +1084,9 @@ class Device extends EventEmitter {
       this._maybeStopIncomingSound();
     });
 
-    call.once('cancel', () => {
+    call.once('cancel', async () => {
       this._log.info(`Canceled: ${call.parameters.CallSid}`);
-      this._removeCall(call);
+      await this._removeCall(call);
       maybeUnsetPreferredUri();
       if (this._audio) {
         this._audio._maybeStopPollingVolume();
@@ -1092,38 +1094,38 @@ class Device extends EventEmitter {
       this._maybeStopIncomingSound();
     });
 
-    call.once('disconnect', () => {
+    call.once('disconnect', async () => {
       if (this._audio) {
         this._audio._maybeStopPollingVolume();
       }
-      this._removeCall(call);
+      await this._removeCall(call);
       maybeUnsetPreferredUri();
       /**
        * NOTE(kamalbennani): We need to stop the incoming sound when the call is
        * disconnected right after the user has accepted the call (activeCall.accept()), and before
-       * the call has been fully connected (i.e. before the `pstream.answer` event)
+       * the call has been fully connected (i.e. before the `signaling.answer` event)
        */
       this._maybeStopIncomingSound();
     });
 
-    call.once('reject', () => {
+    call.once('reject', async () => {
       this._log.info(`Rejected: ${call.parameters.CallSid}`);
       if (this._audio) {
         this._audio._maybeStopPollingVolume();
       }
-      this._removeCall(call);
+      await this._removeCall(call);
       maybeUnsetPreferredUri();
       this._maybeStopIncomingSound();
     });
 
-    call.on('transportClose', () => {
+    call.on('transportClose', async () => {
       if (call.status() !== Call.State.Pending) {
         return;
       }
       if (this._audio) {
         this._audio._maybeStopPollingVolume();
       }
-      this._removeCall(call);
+      await this._removeCall(call);
       /**
        * NOTE(mhuynh): We don't want to call `maybeUnsetPreferredUri` because
        * a `transportClose` will happen during signaling reconnection.
@@ -1143,164 +1145,75 @@ class Device extends EventEmitter {
     }
   }
 
+  private _onDefaultSignalingMessage = (message: string) => {
+    if (this._signaling) {
+      this._signaling.sendSignalingMessage(message);
+    } else {
+      this._log.warn('_onDefaultSignalingMessage raised without _signaling object');
+    }
+  }
+
+  private _onSignalingMessage = (message: string) => {
+    if (this._defaultSignaling) {
+      this._defaultSignaling.sendSignalingMessage(message);
+    } else {
+      this._log.warn('_onSignalingMessage raised without _defaultSignaling object');
+    }
+  }
+
   /**
    * Called when a 'close' event is received from the signaling stream.
    */
   private _onSignalingClose = () => {
-    this._stream = null;
-    this._streamConnectedPromise = null;
+    this._signaling = null;
+    this._signalingConnectedPromise = null;
   }
 
   /**
    * Called when a 'connected' event is received from the signaling stream.
    */
   private _onSignalingConnected = (payload: Record<string, any>) => {
-    const region = getRegionShortcode(payload.region);
-    this._edge = payload.edge || regionToEdge[region as Region] || payload.region;
-    this._region = region || payload.region;
+    this._edge = payload.edge;
     this._home = payload.home;
-    this._publisher?.setHost(createEventGatewayURI(payload.home)); // TODO: not moved
-
-    if (payload.token) {
-      this._identity = payload.token.identity;
-      if (
-        typeof payload.token.ttl === 'number' &&
-        typeof this._options.tokenRefreshMs === 'number'
-      ) {
-        const ttlMs: number = payload.token.ttl * 1000;
-        const timeoutMs: number = Math.max(0, ttlMs - this._options.tokenRefreshMs);
-        this._tokenWillExpireTimeout = setTimeout(() => {
-          this._log.debug('#tokenWillExpire');
-          this.emit('tokenWillExpire', this);
-          if (this._tokenWillExpireTimeout) {
-            clearTimeout(this._tokenWillExpireTimeout);
-            this._tokenWillExpireTimeout = null;
-          }
-        }, timeoutMs);
-      }
-    }
-
-    const preferredURIs = getChunderURIs(this._edge as Edge);
-    if (preferredURIs.length > 0) {
-      const [preferredURI] = preferredURIs;
-      this._preferredURI = createSignalingEndpointURL(preferredURI);
-    } else {
-      this._log.warn('Could not parse a preferred URI from the stream#connected event.');
-    }
-
-    // The signaling stream emits a `connected` event after reconnection, if the
-    // device was registered before this, then register again.
-    if (this._shouldReRegister) {
-      this.register();
-    }
+    this._identity = payload.identity;
+    this._preferredURI = payload.preferredURI;
+    this._region = payload.region;
+    this._regionShortCode = payload.regionShortCode
+    this._publisher?.setHost(createEventGatewayURI(this._home!));
   }
 
   /**
    * Called when an 'error' event is received from the signaling stream.
    */
   private _onSignalingError = (payload: Record<string, any>) => {
-    if (typeof payload !== 'object') { return; }
-
-    const { error: originalError, callsid } = payload;
-
-    if (typeof originalError !== 'object') { return; }
-
+    const { callsid, code, message } = payload;
     const call: Call | undefined =
       (typeof callsid === 'string' && this._findCall(callsid)) || undefined;
 
-    const { code, message: customMessage } = originalError;
-    let { twilioError } = originalError;
-
-    if (typeof code === 'number') {
-      if (code === 31201) {
-        twilioError = new AuthorizationErrors.AuthenticationFailed(originalError);
-      } else if (code === 31204) {
-        twilioError = new AuthorizationErrors.AccessTokenInvalid(originalError);
-      } else if (code === 31205) {
-        // Stop trying to register presence after token expires
-        this._stopRegistrationTimer();
-        twilioError = new AuthorizationErrors.AccessTokenExpired(originalError);
-      } else {
-        const errorConstructor = getPreciseSignalingErrorByCode(
-          !!this._options.enableImprovedSignalingErrorPrecision,
-          code,
-        );
-        if (typeof errorConstructor !== 'undefined') {
-          twilioError = new errorConstructor(originalError);
-        }
-      }
-    }
-
-    if (!twilioError) {
-      this._log.error('Unknown signaling error: ', originalError);
-      twilioError = new GeneralErrors.UnknownError(customMessage, originalError);
-    }
-
-    this._log.error('Received error: ', twilioError);
-    this._log.debug('#error', originalError);
-    this.emit(Device.EventName.Error, twilioError, call); // TODO: call object is moved as callsid
+    const twilioError = getTwilioError(!!this._options.enableImprovedSignalingErrorPrecision, code, message);
+    this._log.debug(`#${Device.EventName.Error}`, twilioError);
+    this.emit(
+      Device.EventName.Error,
+      twilioError,
+      call
+    );
   }
 
   /**
    * Called when an 'invite' event is received from the signaling stream.
    */
-  private _onSignalingInvite = async (payload: Record<string, any>) => {
-    const wasBusy = !!this._activeCall;
-    if (wasBusy && !this._options.allowIncomingWhileBusy) {
-      this._log.info('Device busy; ignoring incoming invite');
-      return;
-    }
-
-    if (!payload.callsid || !payload.sdp) {
-      this._log.debug('#error', payload);
-      this.emit(Device.EventName.Error, new ClientErrors.BadRequest('Malformed invite from gateway'));
-      return;
-    }
-
-    // TODO: rebuild this from signaling module
-
-    const callParameters = payload.parameters || { };
-    callParameters.CallSid = callParameters.CallSid || payload.callsid;
-
-    const customParameters = Object.assign({ }, queryToJson(callParameters.Params));
-
-    const call = await this._makeCall(
-      customParameters,
-      {
-        callParameters,
-        enableImprovedSignalingErrorPrecision:
-          !!this._options.enableImprovedSignalingErrorPrecision,
-        offerSdp: payload.sdp,
-        reconnectToken: payload.reconnect,
-        voiceEventSidGenerator: this._options.voiceEventSidGenerator,
-      },
-    );
-
-    this._calls.push(call);
-
-    call.once('accept', () => {
-      this._soundcache.get(Device.SoundName.Incoming).stop();
-      this._publishNetworkChange();
-    });
-
-    const play = (this._audio?.incoming() && !wasBusy)
-      ? () => this._soundcache.get(Device.SoundName.Incoming).play()
-      : () => Promise.resolve();
-
-    this._showIncomingCall(call, play);
+  private _onSignalingInvite = async () => {
+    this._handleCallInvites(await this._signaling?.retrieveCallInvites());
   }
 
   /**
    * Called when an 'offline' event is received from the signaling stream.
    */
   private _onSignalingOffline = () => {
-    this._log.info('Stream is offline');
-
+    this._log.info('Signaling is offline');
     this._edge = null;
     this._region = null;
-
-    this._shouldReRegister = this.state !== Device.State.Unregistered;
-
+    this._regionShortCode = null;
     this._setState(Device.State.Unregistered);
   }
 
@@ -1308,9 +1221,13 @@ class Device extends EventEmitter {
    * Called when a 'ready' event is received from the signaling stream.
    */
   private _onSignalingReady = () => {
-    this._log.info('Stream is ready');
-
+    this._log.info('Signaling is ready');
     this._setState(Device.State.Registered);
+  }
+
+  private _onTokenWillExpire = () => {
+    this._log.debug(`#${Device.EventName.TokenWillExpire}`);
+    this.emit(Device.EventName.TokenWillExpire, this);
   }
 
   /**
@@ -1336,9 +1253,10 @@ class Device extends EventEmitter {
    * Remove a {@link Call} from device.calls by reference
    * @param call
    */
-  private _removeCall(call: Call): void {
+  private async _removeCall(call: Call): Promise<void> {
     if (this._activeCall === call) {
       this._activeCall = null;
+      await this._signaling?.setHasActiveCall(false);
     }
 
     for (let i = this._calls.length - 1; i >= 0; i--) {
@@ -1349,26 +1267,10 @@ class Device extends EventEmitter {
   }
 
   /**
-   * Register with the signaling server.
-   */
-  private async _sendPresence(presence: boolean): Promise<void> {
-    const stream = await this._streamConnectedPromise;
-
-    if (!stream) { return; }
-
-    stream.register({ audio: presence });
-    if (presence) {
-      this._startRegistrationTimer();
-    } else {
-      this._stopRegistrationTimer();
-    }
-  }
-
-  /**
    * Helper function that sets and emits the state of the device.
    * @param state The new state of the device.
    */
-   private _setState(state: Device.State): void {
+  private _setState(state: Device.State): void {
     if (state === this.state) {
       return;
     }
@@ -1463,32 +1365,39 @@ class Device extends EventEmitter {
 
   /**
    * Set up the connection to the signaling server. Tears down an existing
-   * stream if called while a stream exists.
+   * signaling if called while a signaling exists.
    */
-  private _setupStream(): Promise<IPStream> {
-    if (this._stream) {
-      this._log.info('Found existing stream; destroying...');
-      this._destroyStream();
+  private _setupSignaling(): Promise<SignalingProxy> {
+    if (this._signaling) {
+      this._log.info('Found existing signaling; destroying...');
+      this._destroySignaling();
     }
 
-    this._log.info('Setting up VSP');
-    this._stream = new (this._options.PStream || PStream)(
-      this.token,
-      this._chunderURIs,
-      {
-        maxPreferredDurationMs: this._options.maxCallSignalingTimeoutMs,
-      },
-    );
+    this._log.info('Setting up Signaling');
+    this._signaling = new (this._options.SignalingProxy || SignalingProxy)();
+    this._defaultSignaling = new Signaling(this._token, {
+      edge: this._options.edge,
+      enableImprovedSignalingErrorPrecision: this._options.enableImprovedSignalingErrorPrecision,
+      logLevel: this._options.logLevel,
+      maxCallSignalingTimeoutMs: this._options.maxCallSignalingTimeoutMs,
+      tokenRefreshMs: this._options.tokenRefreshMs,
+    });
+    this._defaultSignaling.addListener(Signaling.EventName.SignalingMessage, this._onDefaultSignalingMessage);
+    this._signaling.addListener(Signaling.EventName.SignalingMessage, this._onSignalingMessage);
 
-    this._stream.addListener('close', this._onSignalingClose);
-    this._stream.addListener('connected', this._onSignalingConnected);
-    this._stream.addListener('error', this._onSignalingError);
-    this._stream.addListener('invite', this._onSignalingInvite);
-    this._stream.addListener('offline', this._onSignalingOffline);
-    this._stream.addListener('ready', this._onSignalingReady);
+    this._signaling.addListener(Signaling.InternalEventName.Close, this._onSignalingClose);
+    this._signaling.addListener(Signaling.InternalEventName.Connected, this._onSignalingConnected);
+    this._signaling.addListener(Signaling.InternalEventName.Error, this._onSignalingError);
+    this._signaling.addListener(Signaling.InternalEventName.Invite, this._onSignalingInvite);
+    this._signaling.addListener(Signaling.InternalEventName.Offline, this._onSignalingOffline);
+    this._signaling.addListener(Signaling.InternalEventName.Ready, this._onSignalingReady);
+    this._signaling.addListener(Signaling.EventName.TokenWillExpire, this._onTokenWillExpire);
 
-    return this._streamConnectedPromise =
-      promisifyEvents(this._stream, 'connected', 'close').then(() => this._stream);
+    return this._signalingConnectedPromise = promisifyEvents(
+      this._signaling,
+      Signaling.InternalEventName.Connected,
+      Signaling.InternalEventName.Close
+    ).then(() => this._signaling!);
   }
 
   /**
@@ -1516,34 +1425,6 @@ class Device extends EventEmitter {
       }));
       this.emit(Device.EventName.Incoming, call);
     });
-  }
-
-  /**
-   * Set a timeout to send another register message to the signaling server.
-   */
-  private _startRegistrationTimer(): void {
-    this._stopRegistrationTimer();
-    this._regTimer = setTimeout(() => {
-      this._sendPresence(true);
-    }, REGISTRATION_INTERVAL);
-  }
-
-  /**
-   * Stop sending registration messages to the signaling server.
-   */
-  private _stopRegistrationTimer(): void {
-    if (this._regTimer) {
-      clearTimeout(this._regTimer);
-    }
-  }
-
-  /**
-   * Throw an error if the {@link Device} is destroyed.
-   */
-  private _throwIfDestroyed(): void {
-    if (this.state === Device.State.Destroyed) {
-      throw new InvalidStateError('Device has been destroyed.');
-    }
   }
 
   /**
@@ -1785,6 +1666,11 @@ namespace Device {
      * client relative to available edges.
      */
     edge?: string[] | string;
+
+    /**
+     * TODO: implement logic, document and name up for debate
+     */
+    enableExternalSignaling?: boolean;
 
     /**
      * Enhance the precision of errors emitted by `Device` and `Call` objects.

@@ -21,21 +21,23 @@ const ICE_GATHERING_FAIL_TIMEOUT = 'timeout';
 const INITIAL_ICE_CONNECTION_STATE = 'new';
 const VOLUME_INTERVAL_MS = 50;
 
+// TODO: test all new signaling stuff
+
 /**
  * @typedef {Object} PeerConnection
  * @param audioHelper
- * @param pstream
+ * @param signaling
  * @param options
  * @return {PeerConnection}
  * @constructor
  */
-function PeerConnection(audioHelper, pstream, options) {
-  if (!audioHelper || !pstream) {
-    throw new InvalidArgumentError('Audiohelper, and pstream are required arguments');
+function PeerConnection(audioHelper, signaling, options) {
+  if (!audioHelper || !signaling) {
+    throw new InvalidArgumentError('Audiohelper, and signaling are required arguments');
   }
 
   if (!(this instanceof PeerConnection)) {
-    return new PeerConnection(audioHelper, pstream, options);
+    return new PeerConnection(audioHelper, signaling, options);
   }
 
   this._log = new Log('PeerConnection');
@@ -61,7 +63,7 @@ function PeerConnection(audioHelper, pstream, options) {
   this.onselectedcandidatepairchange = noop;
   this.onvolume = noop;
   this.version = null;
-  this.pstream = pstream;
+  this.signaling = signaling;
   this.stream = null;
   this.sinkIds = new Set(['default']);
   this.outputs = new Map();
@@ -764,12 +766,13 @@ PeerConnection.prototype._setupChannel = function() {
     this._onMediaConnectionStateChange(pc.iceConnectionState);
   };
 };
+
 PeerConnection.prototype._initializeMediaStream = function(rtcConfiguration) {
   // if mediastream already open then do nothing
   if (this.status === 'open') {
     return false;
   }
-  if (this.pstream.status === 'disconnected') {
+  if (this.signaling.status === 'disconnected') {
     this.onerror({ info: {
       code: 31000,
       message: 'Cannot establish connection. Client is disconnected',
@@ -788,9 +791,9 @@ PeerConnection.prototype._initializeMediaStream = function(rtcConfiguration) {
  * @private
  */
 PeerConnection.prototype._removeReconnectionListeners = function() {
-  if (this.pstream) {
-    this.pstream.removeListener('answer', this._onAnswerOrRinging);
-    this.pstream.removeListener('hangup', this._onHangup);
+  if (this.signaling) {
+    this.signaling.removeListener('answer', this._onAnswerOrRinging);
+    this.signaling.removeListener('hangup', this._onHangup);
   }
 };
 
@@ -866,9 +869,9 @@ PeerConnection.prototype.iceRestart = function() {
       this._removeReconnectionListeners();
     };
 
-    this.pstream.on('answer', this._onAnswerOrRinging);
-    this.pstream.on('hangup', this._onHangup);
-    this.pstream.reinvite(this.version.getSDP(), this.callSid);
+    this.signaling.on('answer', this._onAnswerOrRinging);
+    this.signaling.on('hangup', this._onHangup);
+    this.signaling.reinvite(this.version.getSDP(), this.callSid);
 
   }).catch((err) => {
     const message = err && err.message ? err.message : err;
@@ -908,15 +911,15 @@ PeerConnection.prototype.makeOutgoingCall = function(token, params, callsid, rtc
     if (self.status !== 'closed') {
       self.version.processAnswer(this.codecPreferences, sdp, onAnswerSuccess, onAnswerError);
     }
-    self.pstream.removeListener('answer', self._onAnswerOrRinging);
-    self.pstream.removeListener('ringing', self._onAnswerOrRinging);
+    self.signaling.removeListener('answer', self._onAnswerOrRinging);
+    self.signaling.removeListener('ringing', self._onAnswerOrRinging);
   };
-  this.pstream.on('answer', this._onAnswerOrRinging);
-  this.pstream.on('ringing', this._onAnswerOrRinging);
+  this.signaling.on('answer', this._onAnswerOrRinging);
+  this.signaling.on('ringing', this._onAnswerOrRinging);
 
   function onOfferSuccess() {
     if (self.status !== 'closed') {
-      self.pstream.invite(self.version.getSDP(), self.callSid, self.options.preflight, params);
+      self.signaling.invite(self.version.getSDP(), self.callSid, self.options.preflight, params);
       self._setupRTCDtlsTransportListener();
     }
   }
@@ -942,7 +945,7 @@ PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfigur
   const self = this;
   function onAnswerSuccess() {
     if (self.status !== 'closed') {
-      self.pstream.answer(self.version.getSDP(), callSid);
+      self.signaling.answer(self.version.getSDP(), callSid);
       if (self.options) {
         self._setEncodingParameters(self.options.dscp);
       }

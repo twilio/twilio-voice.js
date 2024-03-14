@@ -52,11 +52,11 @@ class PStream extends EventEmitter {
     const self = this;
 
     this.addListener('ready', () => {
-      self.status = 'ready';
+      self._setStatus('ready');
     });
 
     this.addListener('offline', () => {
-      self.status = 'offline';
+      self._setStatus('offline');
     });
 
     this.addListener('close', () => {
@@ -94,7 +94,7 @@ PStream.prototype._handleTransportClose = function() {
     if (this.status !== 'offline') {
       this.emit('offline', this);
     }
-    this.status = 'disconnected';
+    this._setStatus('disconnected');
   }
 };
 
@@ -129,13 +129,18 @@ PStream.prototype._handleTransportMessage = function(msg) {
 };
 
 PStream.prototype._handleTransportOpen = function() {
-  this.status = 'connected';
+  this._setStatus('connected');
   this.setToken(this.token);
 
   this.emit('transportOpen');
 
   const messages = this._messageQueue.splice(0, this._messageQueue.length);
   messages.forEach(message => this._publish(...message));
+};
+
+PStream.prototype._setStatus = function(status) {
+  this.status = status;
+  this.emit('status', status);
 };
 
 /**

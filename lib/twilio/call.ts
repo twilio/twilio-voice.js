@@ -25,6 +25,7 @@ import RTCSample from './rtc/sample';
 import { getPreferredCodecInfo } from './rtc/sdp';
 import RTCWarning from './rtc/warning';
 import StatsMonitor from './statsMonitor';
+import SignalingProxy from './signaling/proxy';
 import { isChrome } from './util';
 import { generateVoiceEventSid } from './uuid';
 
@@ -35,10 +36,6 @@ import { RELEASE_VERSION } from './constants';
  * @private
  */
 export type IAudioHelper = any;
-/**
- * @private
- */
-export type IPStream = any;
 /**
  * @private
  */
@@ -101,6 +98,8 @@ const WARNING_PREFIXES: Record<string, string> = {
   min: 'low-',
   minStandardDeviation: 'constant-',
 };
+
+// TODO: verify all signaling.foo
 
 /**
  * A {@link Call} represents a media and signaling connection to a TwiML application.
@@ -260,9 +259,9 @@ class Call extends EventEmitter {
   private _outputVolumeStreak: number = 0;
 
   /**
-   * The PStream instance to use for Twilio call signaling.
+   * The Signaling instance to use for Twilio call.
    */
-  private readonly _pstream: IPStream;
+  private readonly _signaling: SignalingProxy;
 
   /**
    * An instance of EventPublisher.
@@ -379,7 +378,7 @@ class Call extends EventEmitter {
     });
 
     this._mediaHandler = new (this._options.MediaHandler)
-      (config.audioHelper, config.pstream, {
+      (config.audioHelper, config.signaling, {
         RTCPeerConnection: this._options.RTCPeerConnection,
         codecPreferences: this._options.codecPreferences,
         dscp: this._options.dscp,
@@ -547,21 +546,21 @@ class Call extends EventEmitter {
       }
     };
 
-    this._pstream = config.pstream;
-    this._pstream.on('ack', this._onAck);
-    this._pstream.on('cancel', this._onCancel);
-    this._pstream.on('error', this._onSignalingError);
-    this._pstream.on('ringing', this._onRinging);
-    this._pstream.on('transportClose', this._onTransportClose);
-    this._pstream.on('connected', this._onConnected);
-    this._pstream.on('message', this._onMessageReceived);
+    this._signaling = config.signaling;
+    this._signaling.on('ack', this._onAck);
+    this._signaling.on('cancel', this._onCancel);
+    this._signaling.on('error', this._onSignalingError);
+    this._signaling.on('ringing', this._onRinging);
+    this._signaling.on('transportClose', this._onTransportClose);
+    this._signaling.on('connected', this._onConnected);
+    this._signaling.on('message', this._onMessageReceived);
 
-    this.on('error', error => {
+    this.on('error', (error) => {
       this._publisher.error('connection', 'error', {
         code: error.code, message: error.message,
       }, this);
 
-      if (this._pstream && this._pstream.status === 'disconnected') {
+      if (this._signaling && this._signaling.status === 'disconnected') {
         this._cleanupEventListeners();
       }
     });
@@ -647,18 +646,18 @@ class Call extends EventEmitter {
         });
       }
 
-      this._pstream.addListener('hangup', this._onHangup);
+      this._signaling.addListener('hangup', this._onHangup);
 
       if (this._direction === Call.CallDirection.Incoming) {
         this._isAnswered = true;
-        this._pstream.on('answer', this._onAnswer);
+        this._signaling.on('answer', this._onAnswer);
         this._mediaHandler.answerIncomingCall(this.parameters.CallSid,
           this._options.offerSdp, rtcConfiguration, onAnswer);
       } else {
         const params = Array.from(this.customParameters.entries()).map(pair =>
          `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
-        this._pstream.on('answer', this._onAnswer);
-        this._mediaHandler.makeOutgoingCall(this._pstream.token, params,
+        this._signaling.on('answer', this._onAnswer);
+        this._mediaHandler.makeOutgoingCall(this._signaling.token, params,
           this.outboundConnectionId, rtcConfiguration, onAnswer);
       }
     };
@@ -812,7 +811,7 @@ class Call extends EventEmitter {
     this._log.debug('.reject');
 
     this._isRejected = true;
-    this._pstream.reject(this.parameters.CallSid);
+    this._signaling.reject(this.parameters.CallSid);
     this._mediaHandler.reject(this.parameters.CallSid);
     this._publisher.info('connection', 'rejected-by-local', null, this);
     this._cleanupEventListeners();
@@ -882,11 +881,10 @@ class Call extends EventEmitter {
       this._log.info('RTCDTMFSender cannot insert DTMF');
     }
 
-    // send pstream message to send DTMF
-    this._log.info('Sending digits over PStream');
+    this._log.info('Sending digits over signaling');
 
-    if (this._pstream !== null && this._pstream.status !== 'disconnected') {
-      this._pstream.dtmf(this.parameters.CallSid, digits);
+    if (this._signaling !== null && this._signaling.status !== 'disconnected') {
+      this._signaling.dtmf(this.parameters.CallSid, digits);
     } else {
       const error = new GeneralErrors.ConnectionError('Could not send DTMF: Signaling channel is disconnected');
       this._log.debug('#error', error);
@@ -922,7 +920,7 @@ class Call extends EventEmitter {
       );
     }
 
-    if (this._pstream === null) {
+    if (this._signaling === null) {
       throw new InvalidStateError(
         'Could not send CallMessage; Signaling channel is disconnected',
       );
@@ -937,7 +935,7 @@ class Call extends EventEmitter {
 
     const voiceEventSid = this._voiceEventSidGenerator();
     this._messages.set(voiceEventSid, { content, contentType, messageType, voiceEventSid });
-    this._pstream.sendMessage(callSid, content, contentType, messageType, voiceEventSid);
+    this._signaling.sendMessage(callSid, content, contentType, messageType, voiceEventSid);
     return voiceEventSid;
   }
 
@@ -987,17 +985,18 @@ class Call extends EventEmitter {
    */
   private _cleanupEventListeners(): void {
     const cleanup = () => {
-      if (!this._pstream) { return; }
+      if (!this._signaling) { return; }
 
-      this._pstream.removeListener('ack', this._onAck);
-      this._pstream.removeListener('answer', this._onAnswer);
-      this._pstream.removeListener('cancel', this._onCancel);
-      this._pstream.removeListener('error', this._onSignalingError);
-      this._pstream.removeListener('hangup', this._onHangup);
-      this._pstream.removeListener('ringing', this._onRinging);
-      this._pstream.removeListener('transportClose', this._onTransportClose);
-      this._pstream.removeListener('connected', this._onConnected);
-      this._pstream.removeListener('message', this._onMessageReceived);
+      // TODO: verify all these
+      this._signaling.removeListener('ack', this._onAck);
+      this._signaling.removeListener('answer', this._onAnswer);
+      this._signaling.removeListener('cancel', this._onCancel);
+      this._signaling.removeListener('error', this._onSignalingError);
+      this._signaling.removeListener('hangup', this._onHangup);
+      this._signaling.removeListener('ringing', this._onRinging);
+      this._signaling.removeListener('transportClose', this._onTransportClose);
+      this._signaling.removeListener('connected', this._onConnected);
+      this._signaling.removeListener('message', this._onMessageReceived);
     };
 
     // This is kind of a hack, but it lets us avoid rewriting more code.
@@ -1051,11 +1050,10 @@ class Call extends EventEmitter {
 
     this._log.info('Disconnecting...');
 
-    // send pstream hangup message
-    if (this._pstream !== null && this._pstream.status !== 'disconnected' && this._shouldSendHangup) {
+    if (this._signaling !== null && this._signaling.status !== 'disconnected' && this._shouldSendHangup) {
       const callsid: string | undefined = this.parameters.CallSid || this.outboundConnectionId;
       if (callsid) {
-        this._pstream.hangup(callsid, message);
+        this._signaling.hangup(callsid, message);
       }
     }
 
@@ -1170,7 +1168,6 @@ class Call extends EventEmitter {
    * @param payload
    */
   private _onCancel = (payload: Record<string, any>): void => {
-    // (rrowland) Is this check necessary? Verify, and if so move to pstream / VSP module.
     const callsid = payload.callsid;
     if (this.parameters.CallSid === callsid) {
       this._isCancelled = true;
@@ -1181,18 +1178,18 @@ class Call extends EventEmitter {
       this._status = Call.State.Closed;
       this._log.debug('#cancel');
       this.emit('cancel');
-      this._pstream.removeListener('cancel', this._onCancel);
+      this._signaling.removeListener('cancel', this._onCancel);
     }
   }
 
   /**
-   * Called when we receive a connected event from pstream.
+   * Called when we receive a connected event from signaling.
    * Re-emits the event.
    */
   private _onConnected = (): void => {
-    this._log.info('Received connected from pstream');
+    this._log.info('Received connected from signaling');
     if (this._signalingReconnectToken && this._mediaHandler.version) {
-      this._pstream.reconnect(
+      this._signaling.reconnect(
         this._mediaHandler.version.getSDP(),
         this.parameters.CallSid,
         this._signalingReconnectToken,
@@ -1220,7 +1217,7 @@ class Call extends EventEmitter {
         return;
       }
     } else if (payload.callsid) {
-      // hangup is for another call
+      this._log.debug('Received hangup for another call: ' + payload.callsid);
       return;
     }
 
@@ -1379,7 +1376,7 @@ class Call extends EventEmitter {
   }
 
   /**
-   * When we get a RINGING signal from PStream, update the {@link Call} status.
+   * When we get a RINGING signal from Signaling, update the {@link Call} status.
    * @param payload
    */
   private _onRinging = (payload: Record<string, any>): void => {
@@ -1455,11 +1452,11 @@ class Call extends EventEmitter {
   }
 
   /**
-   * Called when we receive a transportClose event from pstream.
+   * Called when we receive a transportClose event from signaling.
    * Re-emits the event.
    */
   private _onTransportClose = (): void => {
-    this._log.error('Received transportClose from pstream');
+    this._log.error('Received transportClose from signaling');
     this._log.debug('#transportClose');
     this.emit('transportClose');
     if (this._signalingReconnectToken) {
@@ -1829,9 +1826,9 @@ namespace Call {
     onIgnore: () => void;
 
     /**
-     * The PStream instance to use for Twilio call signaling.
+     * The Signaling instance to use for Twilio call.
      */
-    pstream: IPStream;
+    signaling: SignalingProxy;
 
     /**
      * An EventPublisher instance to use for publishing events

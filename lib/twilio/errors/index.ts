@@ -85,6 +85,20 @@ export function getPreciseSignalingErrorByCode(
   return getErrorByCode(errorCode);
 }
 
+export function getTwilioError(
+  enableImprovedSignalingErrorPrecision: boolean,
+  code: number, 
+  originalError: string | object
+): TwilioError | undefined {
+  const errorConstructor = getPreciseSignalingErrorByCode(
+    enableImprovedSignalingErrorPrecision,
+    code,
+  );
+  if (typeof errorConstructor !== 'undefined') {
+    return new errorConstructor(originalError);
+  }
+}
+
 // Application errors that can be avoided by good app logic
 export class InvalidArgumentError extends Error {
   constructor(message?: string) {
