@@ -222,10 +222,9 @@ PStream.prototype.register = function(mediaCapabilities) {
   this._publish('register', regPayload, true);
 };
 
-PStream.prototype.invite = function(sdp, callsid, preflight, params) {
+PStream.prototype.invite = function(sdp, callsid, params) {
   const payload = {
     callsid,
-    preflight: !!preflight,
     sdp,
     twilio: params ? { params } : {},
   };

@@ -391,20 +391,15 @@ describe('PStream', () => {
     ]],
     ['invite', [
       {
-        args: ['bar', 'foo', true, ''],
-        payload: { callsid: 'foo', sdp: 'bar', preflight: true, twilio: {} },
+        args: ['bar', 'foo', ''],
+        payload: { callsid: 'foo', sdp: 'bar', twilio: {} },
         scenario: 'called with empty params'
       },
       {
-        args: ['bar', 'foo', true, 'baz=zee&foo=2'],
-        payload: { callsid: 'foo', sdp: 'bar', preflight: true,  twilio: { params: 'baz=zee&foo=2' } },
+        args: ['bar', 'foo', 'baz=zee&foo=2'],
+        payload: { callsid: 'foo', sdp: 'bar', twilio: { params: 'baz=zee&foo=2' } },
         scenario: 'called with non-empty params'
       },
-      {
-        args: ['bar', 'foo', false, ''],
-        payload: { callsid: 'foo', sdp: 'bar', preflight: false,  twilio: {} },
-        scenario: 'called with preflight = false'
-      }
     ]],
     ['answer', [
       {
