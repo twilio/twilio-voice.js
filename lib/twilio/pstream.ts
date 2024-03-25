@@ -234,7 +234,6 @@ PStream.prototype.invite = function(sdp, callsid, params) {
 PStream.prototype.reconnect = function(sdp, callsid, reconnect, params) {
   const payload = {
     callsid,
-    preflight: false,
     reconnect,
     sdp,
     twilio: params ? { params } : {},

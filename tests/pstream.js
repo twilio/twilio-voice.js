@@ -382,14 +382,14 @@ describe('PStream', () => {
   });
 
   [
-    ['register', [
+    ['register', 'register', [
       {
         args: [{ audio: true }],
         payload: { media: { audio: true } },
         scenario: 'called with media capabilities'
       }
     ]],
-    ['invite', [
+    ['invite', 'invite', [
       {
         args: ['bar', 'foo', ''],
         payload: { callsid: 'foo', sdp: 'bar', twilio: {} },
@@ -401,21 +401,43 @@ describe('PStream', () => {
         scenario: 'called with non-empty params'
       },
     ]],
-    ['answer', [
+    ['reconnect', 'invite', [
+      {
+        args: ['bar', 'foo', 'foobar-reconn-tok', ''],
+        payload: {
+          callsid: 'foo',
+          sdp: 'bar',
+          reconnect: 'foobar-reconn-tok',
+          twilio: {},
+        },
+        scenario: 'called with empty params'
+      },
+      {
+        args: ['bar', 'foo', 'foobar-reconn-tok', 'baz=zee&foo=2'],
+        payload: {
+          callsid: 'foo',
+          sdp: 'bar',
+          reconnect: 'foobar-reconn-tok',
+          twilio: { params: 'baz=zee&foo=2' },
+        },
+        scenario: 'called with non-empty params'
+      },
+    ]],
+    ['answer', 'answer', [
       {
         args: ['bar', 'foo'],
         payload: { callsid: 'foo', sdp: 'bar' },
         scenario: 'called with sdp and callsid'
       }
     ]],
-    ['dtmf', [
+    ['dtmf', 'dtmf', [
       {
         args: ['foo', '123'],
         payload: { callsid: 'foo', dtmf: '123' },
         scenario: 'called without callsid and dtmf digits'
       }
     ]],
-    ['hangup', [
+    ['hangup', 'hangup', [
       {
         args: ['foo'],
         payload: { callsid: 'foo' },
@@ -427,21 +449,21 @@ describe('PStream', () => {
         scenario: 'called with a message'
       }
     ]],
-    ['reject', [
+    ['reject', 'reject', [
       {
         args: ['foo'],
         payload: { callsid: 'foo' },
         scenario: 'called with callsid'
       }
     ]],
-    ['reinvite', [
+    ['reinvite', 'reinvite', [
       {
         args: ['bar', 'foo'],
         payload: { callsid: 'foo', sdp: 'bar' },
         scenario: 'called with sdp and callsid'
       }
-    ]]
-  ].forEach(([method, scenarios]) => {
+    ]],
+  ].forEach(([method, type, scenarios]) => {
     describe(method, () => {
       const shouldRetry = method !== 'reinvite';
       scenarios.forEach(({ args, payload, scenario }) => {
@@ -453,7 +475,7 @@ describe('PStream', () => {
           it(`should publish with${shouldRetry ? '' : 'out'} retry`, () => {
             const stub = sinon.stub(pstream, '_publish');
             pstream[method](...args);
-            assert(stub.calledWithExactly(method, payload, shouldRetry));
+            assert(stub.calledWithExactly(type, payload, shouldRetry));
             stub.restore();
           });
 
@@ -462,7 +484,7 @@ describe('PStream', () => {
             assert.equal(pstream.transport.send.callCount, 1);
             assert.deepEqual(JSON.parse(pstream.transport.send.args[0][0]), {
               payload,
-              type: method,
+              type,
               version: EXPECTED_PSTREAM_VERSION
             });
           });
