@@ -241,8 +241,10 @@ export default class WSTransport extends EventEmitter {
    * @returns Whether the message was sent.
    */
   send(message: string): boolean {
+    this._log.debug(`Sending: ${message}`);
     // We can't send the message if the WebSocket isn't open
     if (!this._socket || this._socket.readyState !== WebSocket.OPEN) {
+      this._log.debug('Cannot send message. WebSocket is not open.');
       return false;
     }
 
@@ -446,7 +448,12 @@ export default class WSTransport extends EventEmitter {
     // Filter and respond to heartbeats
     if (this._socket && message.data === '\n') {
       this._socket.send('\n');
+      this._log.debug('heartbeat');
       return;
+    }
+
+    if (message && typeof message.data === 'string') {
+      this._log.debug(`Received: ${message.data}`);
     }
 
     this.emit('message', message);

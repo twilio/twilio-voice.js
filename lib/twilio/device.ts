@@ -497,13 +497,11 @@ class Device extends EventEmitter {
         Twilio Support at <help@twilio.com>.`);
     }
 
-    if (window) {
-      const root: any = window as any;
-      const browser: any = root.msBrowser || root.browser || root.chrome;
+    const root: any = globalThis as any;
+    const browser: any = root.msBrowser || root.browser || root.chrome;
 
-      this._isBrowserExtension = (!!browser && !!browser.runtime && !!browser.runtime.id)
-        || (!!root.safari && !!root.safari.extension);
-    }
+    this._isBrowserExtension = (!!browser && !!browser.runtime && !!browser.runtime.id)
+      || (!!root.safari && !!root.safari.extension);
 
     if (this._isBrowserExtension) {
       this._log.info('Running as browser extension.');
@@ -556,25 +554,72 @@ class Device extends EventEmitter {
 
   /**
    * Make an outgoing Call.
+   */
+  async connect(options?: Device.ConnectOptions): Promise<Call>;
+
+  /**
+   * Manually reconnect to an existing call. A call can be manually reconnected if it was previously received (incoming)
+   * or created (outgoing) from a {@link Device} instance. A call is considered manually reconnected if it was created using this method.
+   * It will always have a {@link Call.direction} property set to {@link Call.CallDirection.Outgoing}.
+   *
+   * **Warning: Only unanswered incoming calls can be manually reconnected at this time.**
+   * **Invoking this method to an already answered call may introduce unexpected behavior.**
+   *
+   * @param connectToken - The {@link Call.connectToken} of the previous call.
+   * @param callSid - The callSid of the previous call.
+   * @param params - Use this parameter to move the {@link Call.parameters} and {@link Call.customParameters}
+   * values from the previous call to the reconnected call.
    * @param options
    */
-  async connect(options: Device.ConnectOptions = { }): Promise<Call> {
-    this._log.debug('.connect', JSON.stringify(options && options.params || {}), options);
-    this._throwIfDestroyed();
+  async connect(connectToken: string, callSid: string, params?: Call.Params, options?: Call.AcceptOptions): Promise<Call>;
 
+  async connect(
+    connectTokenOrOptions?: string | Device.ConnectOptions,
+    callSid?: string,
+    params?: Call.Params,
+    options?: Call.AcceptOptions,
+  ): Promise<Call> {
+
+    this._log.debug('.connect', JSON.stringify({ connectTokenOrOptions, callSid, params, options }));
+    this._throwIfDestroyed();
     if (this._activeCall) {
       throw new InvalidStateError('A Call is already active');
     }
 
-    const activeCall = this._activeCall = await this._makeCall(
-      options.params || { },
-      {
-        enableImprovedSignalingErrorPrecision:
-          !!this._options.enableImprovedSignalingErrorPrecision,
-        rtcConfiguration: options.rtcConfiguration,
-        voiceEventSidGenerator: this._options.voiceEventSidGenerator,
-      },
-    );
+    let isReconnect = false;
+    let acceptOptions: Call.AcceptOptions = {};
+    let twimlParams: Record<string, string> = {};
+    const callOptions: Call.Options = {
+      enableImprovedSignalingErrorPrecision:
+        !!this._options.enableImprovedSignalingErrorPrecision,
+      voiceEventSidGenerator: this._options.voiceEventSidGenerator,
+    };
+
+    if (connectTokenOrOptions && typeof connectTokenOrOptions === 'string' && callSid) {
+      isReconnect = true;
+      params = params || {};
+      acceptOptions = options || {};
+      const connectToken = connectTokenOrOptions;
+
+      callOptions.callParameters = params.parameters;
+      callOptions.reconnectCallSid = callSid;
+      callOptions.reconnectToken = connectToken;
+
+      twimlParams = params.customParameters && typeof params.customParameters.keys === 'function' ?
+        Array.from(params.customParameters.keys()).reduce((result: Record<string, string>, key: string) => {
+          result[key] = params!.customParameters!.get(key)!;
+          return result;
+        }, {}) : twimlParams;
+    } else if(typeof connectTokenOrOptions === 'undefined' || typeof connectTokenOrOptions === 'object') {
+      const connectOptions = connectTokenOrOptions || {};
+      acceptOptions = connectOptions;
+      twimlParams = connectOptions.params || twimlParams;
+    } else {
+      throw new InvalidArgumentError('Must provide a connect options or connect token and callsid');
+    }
+
+    callOptions.rtcConfiguration = acceptOptions.rtcConfiguration;
+    const activeCall = this._activeCall = await this._makeCall(twimlParams, callOptions, isReconnect);
 
     // Make sure any incoming calls are ignored
     this._calls.splice(0).forEach(call => call.ignore());
@@ -582,7 +627,7 @@ class Device extends EventEmitter {
     // Stop the incoming sound if it's playing
     this._soundcache.get(Device.SoundName.Incoming).stop();
 
-    activeCall.accept({ rtcConstraints: options.rtcConstraints });
+    activeCall.accept({ rtcConstraints: acceptOptions.rtcConstraints });
     this._publishNetworkChange();
     return activeCall;
   }
@@ -987,7 +1032,7 @@ class Device extends EventEmitter {
    * @param twimlParams - A flat object containing key:value pairs to be sent to the TwiML app.
    * @param options - Options to be used to instantiate the {@link Call}.
    */
-  private async _makeCall(twimlParams: Record<string, string>, options?: Call.Options): Promise<Call> {
+  private async _makeCall(twimlParams: Record<string, string>, options?: Call.Options, isReconnect: boolean = false): Promise<Call> {
     if (typeof Device._isUnifiedPlanDefault === 'undefined') {
       throw new InvalidStateError('Device has not been initialized.');
     }
@@ -1056,7 +1101,7 @@ class Device extends EventEmitter {
         this._audio._maybeStartPollingVolume();
       }
 
-      if (call.direction === Call.CallDirection.Outgoing && this._audio?.outgoing()) {
+      if (call.direction === Call.CallDirection.Outgoing && this._audio?.outgoing() && !isReconnect) {
         this._soundcache.get(Device.SoundName.Outgoing).play();
       }
 
