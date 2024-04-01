@@ -408,6 +408,7 @@ describe('PStream', () => {
           callsid: 'foo',
           sdp: 'bar',
           reconnect: 'foobar-reconn-tok',
+          twilio: {},
         },
         scenario: 'called with sdp, callsid, and reconnect token'
       },

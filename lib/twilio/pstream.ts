@@ -236,6 +236,7 @@ PStream.prototype.reconnect = function(sdp, callsid, reconnect) {
     callsid,
     reconnect,
     sdp,
+    twilio: {},
   };
   this._publish('invite', payload, true);
 };
