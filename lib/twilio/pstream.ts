@@ -231,12 +231,11 @@ PStream.prototype.invite = function(sdp, callsid, params) {
   this._publish('invite', payload, true);
 };
 
-PStream.prototype.reconnect = function(sdp, callsid, reconnect, params) {
+PStream.prototype.reconnect = function(sdp, callsid, reconnect) {
   const payload = {
     callsid,
     reconnect,
     sdp,
-    twilio: params ? { params } : {},
   };
   this._publish('invite', payload, true);
 };

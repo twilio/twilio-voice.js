@@ -403,24 +403,13 @@ describe('PStream', () => {
     ]],
     ['reconnect', 'invite', [
       {
-        args: ['bar', 'foo', 'foobar-reconn-tok', ''],
+        args: ['bar', 'foo', 'foobar-reconn-tok'],
         payload: {
           callsid: 'foo',
           sdp: 'bar',
           reconnect: 'foobar-reconn-tok',
-          twilio: {},
         },
-        scenario: 'called with empty params'
-      },
-      {
-        args: ['bar', 'foo', 'foobar-reconn-tok', 'baz=zee&foo=2'],
-        payload: {
-          callsid: 'foo',
-          sdp: 'bar',
-          reconnect: 'foobar-reconn-tok',
-          twilio: { params: 'baz=zee&foo=2' },
-        },
-        scenario: 'called with non-empty params'
+        scenario: 'called with sdp, callsid, and reconnect token'
       },
     ]],
     ['answer', 'answer', [
