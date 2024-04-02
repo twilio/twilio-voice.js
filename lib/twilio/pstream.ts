@@ -222,23 +222,21 @@ PStream.prototype.register = function(mediaCapabilities) {
   this._publish('register', regPayload, true);
 };
 
-PStream.prototype.invite = function(sdp, callsid, preflight, params) {
+PStream.prototype.invite = function(sdp, callsid, params) {
   const payload = {
     callsid,
-    preflight: !!preflight,
     sdp,
     twilio: params ? { params } : {},
   };
   this._publish('invite', payload, true);
 };
 
-PStream.prototype.reconnect = function(sdp, callsid, reconnect, params) {
+PStream.prototype.reconnect = function(sdp, callsid, reconnect) {
   const payload = {
     callsid,
-    preflight: false,
     reconnect,
     sdp,
-    twilio: params ? { params } : {},
+    twilio: {},
   };
   this._publish('invite', payload, true);
 };

@@ -916,7 +916,7 @@ PeerConnection.prototype.makeOutgoingCall = function(token, params, callsid, rtc
 
   function onOfferSuccess() {
     if (self.status !== 'closed') {
-      self.pstream.invite(self.version.getSDP(), self.callSid, self.options.preflight, params);
+      self.pstream.invite(self.version.getSDP(), self.callSid, params);
       self._setupRTCDtlsTransportListener();
     }
   }

@@ -386,7 +386,6 @@ class Call extends EventEmitter {
         forceAggressiveIceNomination: this._options.forceAggressiveIceNomination,
         isUnifiedPlan: this._isUnifiedPlanDefault,
         maxAverageBitrate: this._options.maxAverageBitrate,
-        preflight: this._options.preflight,
       });
 
     this.on('volume', (inputVolume: number, outputVolume: number): void => {
