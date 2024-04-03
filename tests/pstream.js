@@ -287,7 +287,7 @@ describe('PStream', () => {
   describe('sendMessage', () => {
     const callsid = 'testcallsid';
     const content = { foo: 'content' };
-    const messagetype = 'user-defined-message';
+    const messagetype = 'UserDefinedMessage';
     const voiceeventsid = 'testvoiceeventsid';
 
     it('should send a message with the provided info', () => {

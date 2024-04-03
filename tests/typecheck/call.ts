@@ -6,7 +6,7 @@ const checkCall = async () => {
   call.on('messageReceived', (message: Call.Message) => {
     const content: string = message.content;
     const contentType: string | undefined = message.contentType;
-    const messageType: Call.MessageType = message.messageType;
+    const messageType: string = message.messageType;
     const voiceEventSid: string | undefined = message.voiceEventSid;
   });
 
@@ -28,7 +28,7 @@ const checkCall = async () => {
   call.mute();
   call.reject();
   call.sendDigits('foo');
-  call.sendMessage({ content: 'foo', messageType: Call.MessageType.UserDefinedMessage });
+  call.sendMessage({ content: 'foo', messageType: 'UserDefinedMessage' });
 
   await call.postFeedback(Call.FeedbackScore.One, Call.FeedbackIssue.AudioLatency);
   const isMuted: boolean = call.isMuted();
