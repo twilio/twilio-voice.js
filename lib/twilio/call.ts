@@ -910,18 +910,14 @@ class Call extends EventEmitter {
 
     if (typeof messageType !== 'string') {
       throw new InvalidArgumentError(
-        '`messageType` must be an enumeration value of a string.',
+        '`messageType` must be a string.',
       );
     }
 
     if (messageType.length === 0) {
       throw new InvalidArgumentError(
         '`messageType` must be a non-empty string.',
-        );
-      }
-
-    if (messageType !== 'UserDefinedMessage') {
-      throw new InvalidArgumentError('`messageType` must have value UserDefinedMessage');
+      );
     }
 
     if (this._pstream === null) {
@@ -1850,7 +1846,9 @@ namespace Call {
     contentType?: string;
 
     /**
-     * The type of message
+     * The type of message. Currently, only 'user-defined-message' is supported.
+     * More message types will be added in the future.
+     * See [call resource](https://www.twilio.com/docs/voice/api/call-resource) documentation for more details.
      */
     messageType: string;
 

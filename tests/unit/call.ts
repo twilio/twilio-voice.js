@@ -1034,7 +1034,7 @@ describe('Call', function() {
     beforeEach(() => {
       message = {
         content: { foo: 'foo' },
-        messageType: 'UserDefinedMessage',
+        messageType: 'user-defined-message',
       };
     });
 
@@ -1050,7 +1050,7 @@ describe('Call', function() {
           assert.throws(
             () => conn.sendMessage({ ...message, messageType }),
             new InvalidArgumentError(
-              '`messageType` must be an enumeration value of a string.',
+              '`messageType` must be a string.',
             ),
           );
         });
@@ -1099,7 +1099,7 @@ describe('Call', function() {
         mockCallSid,
         message.content,
         undefined,
-        'UserDefinedMessage',
+        'user-defined-message',
         'foobar-voice-event-sid',
       );
     });
@@ -1921,7 +1921,7 @@ describe('Call', function() {
             foo: 'bar',
           },
           contentType: 'application/json',
-          messageType: 'UserDefinedMessage',
+          messageType: 'user-defined-message',
         };
 
         mockAckPayload = {

@@ -28,7 +28,7 @@ const checkCall = async () => {
   call.mute();
   call.reject();
   call.sendDigits('foo');
-  call.sendMessage({ content: 'foo', messageType: 'UserDefinedMessage' });
+  call.sendMessage({ content: 'foo', messageType: 'user-defined-message' });
 
   await call.postFeedback(Call.FeedbackScore.One, Call.FeedbackIssue.AudioLatency);
   const isMuted: boolean = call.isMuted();

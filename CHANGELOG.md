@@ -1,26 +1,5 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
-2.10.3 (WIP)
-
-Changes
---------
-
-- Convert Call.MessageType to 'string', and remove MessageType enum  
-
-**Example**
-
-```js
-const device = new Device(token, options);
-
-const call = await device.connect();
-
-// For sending a message
-const eventSid = call.sendMessage({
-  content: { foo: 'foo' },
-  messageType: 'UserDefinedMessage',
-});
-```
-
 2.10.2 (February 14, 2024)
 ==========================
 
