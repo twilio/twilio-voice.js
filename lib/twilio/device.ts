@@ -1223,6 +1223,16 @@ class Device extends EventEmitter {
         // Stop trying to register presence after token expires
         this._stopRegistrationTimer();
         twilioError = new AuthorizationErrors.AccessTokenExpired(originalError);
+      } else if (code === 31209 ) {
+        this._publisher.error('call-message', 'error', {
+          code,
+          message: customMessage,
+        }, this._activeCall);
+      } else if (code === 31100 ) {
+        this._publisher.error('call-message', 'error', {
+          code,
+          message: customMessage,
+        }, this._activeCall);
       } else {
         const errorConstructor = getPreciseSignalingErrorByCode(
           !!this._options.enableImprovedSignalingErrorPrecision,

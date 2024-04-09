@@ -1356,6 +1356,12 @@ class Call extends EventEmitter {
       messageType: messagetype,
       voiceEventSid: voiceeventsid,
     };
+    this._publisher.info('call-message', 'user-defined-message', {
+      call_sid: callsid,
+      content_type: contenttype,
+      event_type: 'received',
+      voice_event_sid: voiceeventsid,
+    }, this);
     this._log.debug('#messageReceived', JSON.stringify(data));
     this.emit('messageReceived', data);
   }
@@ -1372,6 +1378,12 @@ class Call extends EventEmitter {
     }
     const message = this._messages.get(voiceEventSid);
     this._messages.delete(voiceEventSid);
+    this._publisher.info('call-message', 'user-defined-message', {
+      call_sid: this.parameters.CallSid,
+      content_type: this._messages.get(voiceEventSid)?.contentType,
+      event_type: 'sent',
+      voice_event_sid: voiceEventSid,
+    }, this);
     this._log.debug('#messageSent', JSON.stringify(message));
     this.emit('messageSent', message);
   }
