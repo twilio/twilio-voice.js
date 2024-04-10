@@ -1356,8 +1356,7 @@ class Call extends EventEmitter {
       messageType: messagetype,
       voiceEventSid: voiceeventsid,
     };
-    this._publisher.info('call-message', 'user-defined-message', {
-      call_sid: callsid,
+    this._publisher.info('call-message', messagetype, {
       content_type: contenttype,
       event_type: 'received',
       voice_event_sid: voiceeventsid,
@@ -1378,9 +1377,8 @@ class Call extends EventEmitter {
     }
     const message = this._messages.get(voiceEventSid);
     this._messages.delete(voiceEventSid);
-    this._publisher.info('call-message', 'user-defined-message', {
-      call_sid: this.parameters.CallSid,
-      content_type: this._messages.get(voiceEventSid)?.contentType,
+    this._publisher.info('call-message', message?.messageType, {
+      content_type: message?.contentType,
       event_type: 'sent',
       voice_event_sid: voiceEventSid,
     }, this);
@@ -1433,7 +1431,7 @@ class Call extends EventEmitter {
    * Called when an 'error' event is received from the signaling stream.
    */
   private _onSignalingError = (payload: Record<string, any>): void => {
-    const { callsid, voiceeventsid } = payload;
+    const { callsid, voiceeventsid, error } = payload;
     if (this.parameters.CallSid !== callsid) {
       this._log.warn(`Received an error from a different callsid: ${callsid}`);
       return;
@@ -1442,6 +1440,12 @@ class Call extends EventEmitter {
       // Do not emit an error here. Device is handling all signaling related errors.
       this._messages.delete(voiceeventsid);
       this._log.warn(`Received an error while sending a message.`, payload);
+
+      this._publisher.error('call-message', 'error', {
+        code: error.code,
+        message: error.message,
+        voice_event_sid: voiceeventsid,
+      }, this);
     }
    }
 

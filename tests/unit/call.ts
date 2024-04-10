@@ -2002,7 +2002,14 @@ describe('Call', function() {
         const payloadPromise = new Promise((resolve, reject) => {
           conn.on('messageSent', reject);
         });
-        pstream.emit('error', { callsid: mockcallsid, voiceeventsid: sid });
+        pstream.emit('error', {
+          callsid: mockcallsid,
+          voiceeventsid: sid,
+          error: {
+            code: 123,
+            message: 'foo',
+          }
+        });
         pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid });
         await Promise.race([
           wait(1),
@@ -2084,6 +2091,33 @@ describe('Call', function() {
           wait(1),
           messagePromise,
         ]);
+      });
+
+      it('should publish a user-defined-message sent event', () => {
+        const payloadPromise = new Promise((resolve) => {
+          conn.on('messageSent', resolve);
+        });
+        payloadPromise.then(() => {
+          sinon.assert.calledWith(publisher.info, 'user-defined-message', 'sent');
+        });
+      });
+
+      it('should publish a user-defined-message received event', () => {
+        const payloadPromise = new Promise((resolve) => {
+          conn.on('messageReceived', resolve);
+        });
+        payloadPromise.then(() => {
+          sinon.assert.calledWith(publisher.info, 'user-defined-message', 'received');
+        });
+      });
+
+      it('should publish a user-defined-message error event', () => {
+        const payloadPromise = new Promise((resolve, reject) => {
+          conn.on('error', reject);
+        });
+        payloadPromise.then(() => {
+          sinon.assert.calledWith(publisher.error, 'user-defined-message', 'error');
+        });
       });
     });
   });
