@@ -1946,6 +1946,18 @@ describe('Call', function() {
         assert.deepEqual(await payloadPromise, { ...mockMessagePayload, voiceEventSid: sid });
       });
 
+      it('should publish a user-defined-message sent event', () => {
+        const sid = conn.sendMessage(mockMessagePayload);
+        const payloadPromise = new Promise((resolve) => {
+          conn.on('messageSent', resolve);
+        });
+        pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid });
+        payloadPromise.then((payload) => {
+          sinon.assert.calledWith(publisher.info, 'user-defined-message', 'sent');
+          assert.deepEqual(payload, { ...mockMessagePayload, voiceEventSid: sid });
+        });
+      });
+
       it('should ignore ack when callSids do not match', async () => {
         const sid = conn.sendMessage(mockMessagePayload);
         const payloadPromise = new Promise((resolve, reject) => {
@@ -2093,21 +2105,19 @@ describe('Call', function() {
         ]);
       });
 
-      it('should publish a user-defined-message sent event', () => {
-        const payloadPromise = new Promise((resolve) => {
-          conn.on('messageSent', resolve);
-        });
-        payloadPromise.then(() => {
-          sinon.assert.calledWith(publisher.info, 'user-defined-message', 'sent');
-        });
-      });
-
       it('should publish a user-defined-message received event', () => {
         const payloadPromise = new Promise((resolve) => {
           conn.on('messageReceived', resolve);
         });
-        payloadPromise.then(() => {
+        pstream.emit('message', mockPayload);
+        payloadPromise.then((payload) => {
           sinon.assert.calledWith(publisher.info, 'user-defined-message', 'received');
+          assert.deepEqual(payload, {
+            content: mockPayload.content,
+            contentType: mockPayload.contenttype,
+            messageType: mockPayload.messagetype,
+            voiceEventSid: mockPayload.voiceeventsid,
+          });
         });
       });
 
@@ -2115,8 +2125,21 @@ describe('Call', function() {
         const payloadPromise = new Promise((resolve, reject) => {
           conn.on('error', reject);
         });
-        payloadPromise.then(() => {
+        pstream.emit('error', {
+          callsid: mockcallsid,
+          voiceeventsid: 'mock-voiceeventsid-foobar',
+          error: {
+            code: 111,
+            message: 'foo-error',
+          }
+        });
+        payloadPromise.then((payload) => {
           sinon.assert.calledWith(publisher.error, 'user-defined-message', 'error');
+          assert.deepEqual(payload, {
+            code: 111,
+            message: 'foo-error',
+            voiceEventSid: 'mock-voiceeventsid-foobar',
+          });
         });
       });
     });
