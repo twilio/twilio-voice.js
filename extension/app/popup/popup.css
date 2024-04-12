@@ -1,0 +1,33 @@
+body {
+  margin: 0px;
+  padding: 0px;
+  background: linear-gradient(to right, #3b679e 0%,#2b88d9 50%,#207cca 100%,#7db9e8 100%,#207cca 101%);
+  font-family: Arial, Helvetica, sans-serif;
+}
+#root {
+  padding: 25px;
+}
+#recepient {
+  display: none;
+}
+#status {
+  font-size: 20px;
+  margin: 0;
+  white-space: nowrap;
+}
+input, button {
+  font-size: 25px;
+}
+button {
+  border-radius: 0%;
+  min-width: 105px;
+  margin-top: 10px;
+  display: none;
+  white-space: nowrap;
+}
+pre {
+  margin: 5px;
+  background-color: white;
+  max-height: 200px;
+  overflow: auto;
+}

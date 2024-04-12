@@ -7,7 +7,6 @@ coverage
 dist
 es5
 esm
-extension/token.js
 node_modules
 docs
 lib/twilio/constants.ts
