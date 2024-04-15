@@ -1982,7 +1982,7 @@ namespace Call {
     preflight?: boolean;
 
     /**
-     * The callSid to reconnect to
+     * The callSid to reconnect to.
      */
     reconnectCallSid?: string,
 
