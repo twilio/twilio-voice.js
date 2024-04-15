@@ -140,7 +140,7 @@ class Call extends EventEmitter {
   }
 
   /**
-   * The connect token is generated as soon as the call is established
+   * The connect token is available as soon as the call is established
    * and connected to Twilio. Use this token to reconnect to a call via the {@link Device.connect}
    * method.
    *
@@ -148,7 +148,27 @@ class Call extends EventEmitter {
    * For outgoing calls, it is available after the {@link Call.acceptEvent} is emitted.
    */
   get connectToken(): string | undefined {
-    return this._signalingReconnectToken;
+    const signalingReconnectToken = this._signalingReconnectToken;
+    const callSid = this.parameters && this.parameters.CallSid ? this.parameters.CallSid : undefined;
+
+    if (!signalingReconnectToken || !callSid) {
+      return;
+    }
+
+    const customParameters = this.customParameters && typeof this.customParameters.keys === 'function' ?
+    Array.from(this.customParameters.keys()).reduce((result: Record<string, string>, key: string) => {
+      result[key] = this.customParameters.get(key)!;
+      return result;
+    }, {}) : {};
+
+    const parameters = this.parameters || {};
+
+    return btoa(JSON.stringify({
+      callSid,
+      customParameters,
+      parameters,
+      signalingReconnectToken,
+    }));
   }
 
   /**
@@ -1879,23 +1899,6 @@ namespace Call {
      * But it will be available after the message is sent, or when a message is received.
      */
     voiceEventSid?: string;
-  }
-
-  /**
-   * Represents the different parameters of a Call.
-   */
-  export interface Params {
-    /**
-     * Call parameters received from Twilio for an incoming call.
-     * This maps to {@link Call.parameters} property.
-     */
-    parameters?: Record<string, string>;
-
-    /**
-     * The custom parameters sent to (outgoing) or received by (incoming) the TwiML app.
-     * This maps to {@link Call.customParameters} property.
-     */
-    customParameters?: Map<string, string>;
   }
 
   /**
