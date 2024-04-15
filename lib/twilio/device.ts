@@ -554,6 +554,7 @@ class Device extends EventEmitter {
 
   /**
    * Make an outgoing Call.
+   * @param options
    */
   async connect(options: Device.ConnectOptions = { }): Promise<Call> {
     this._log.debug('.connect', JSON.stringify(options));
