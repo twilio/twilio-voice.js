@@ -563,16 +563,19 @@ class Device extends EventEmitter {
       throw new InvalidStateError('A Call is already active');
     }
 
-    let callSid, customParameters, parameters, signalingReconnectToken;
+    let customParameters, parameters, signalingReconnectToken;
     if (options.connectToken) {
       try {
-        const parts = JSON.parse(atob(options.connectToken));
-        callSid = parts.callSid;
-        customParameters = parts.customParameters;
-        parameters = parts.parameters;
-        signalingReconnectToken = parts.signalingReconnectToken;
+        const connectTokenParts = JSON.parse(atob(options.connectToken));
+        customParameters = connectTokenParts.customParameters;
+        parameters = connectTokenParts.parameters;
+        signalingReconnectToken = connectTokenParts.signalingReconnectToken;
       } catch {
         throw new InvalidArgumentError('Cannot parse connectToken');
+      }
+
+      if (!parameters || !parameters.CallSid || !signalingReconnectToken) {
+        throw new InvalidArgumentError('Invalid connectToken');
       }
     }
 
@@ -585,10 +588,10 @@ class Device extends EventEmitter {
       voiceEventSidGenerator: this._options.voiceEventSidGenerator,
     };
 
-    if (signalingReconnectToken && callSid) {
+    if (signalingReconnectToken && parameters) {
       isReconnect = true;
       callOptions.callParameters = parameters;
-      callOptions.reconnectCallSid = callSid;
+      callOptions.reconnectCallSid = parameters.CallSid;
       callOptions.reconnectToken = signalingReconnectToken;
       twimlParams = customParameters || twimlParams;
     } else {

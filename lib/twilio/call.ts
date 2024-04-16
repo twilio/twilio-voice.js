@@ -164,7 +164,6 @@ class Call extends EventEmitter {
     const parameters = this.parameters || {};
 
     return btoa(JSON.stringify({
-      callSid,
       customParameters,
       parameters,
       signalingReconnectToken,
