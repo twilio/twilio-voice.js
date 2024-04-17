@@ -40,7 +40,6 @@
     "docs:js": "jsdoc -r -d dist/docs/js lib/twilio",
     "docs:json": "typedoc --json dist/docs/raw.json --internal-aliases internal,publicapi --external-aliases external,internalapi --excludePrivate --excludeProtected",
     "docs:ts": "typedoc --out docs --internal-aliases internal,publicapi --external-aliases external,internalapi --excludePrivate --excludeProtected --theme ./node_modules/typedoc-twilio-theme/bin/default",
-    "extension": "browserify -t brfs extension/token/index.js > extension/token.js",
     "lint": "tslint -c tslint.json --project tsconfig.json -t stylish",
     "release": "release",
     "start": "node server.js",

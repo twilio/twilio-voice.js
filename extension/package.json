@@ -1,0 +1,13 @@
+{
+  "name": "twilio-dialer",
+  "version": "0.0.1",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "source .env && node server/server.js"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "express": "^4.18.2",
+    "twilio": "^4.22.0"
+  }
+}

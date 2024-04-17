@@ -1,0 +1,17 @@
+{
+  "name": "Twilio Dialer",
+  "version": "1.0",
+  "description": "Shows how to implement a Twilio Dialer in a Chrome Extension MV3 using Twilio Voice JS SDK.",
+  "manifest_version": 3,
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": "icons/default.png"
+  },
+  "background": {
+    "service_worker": "worker.js",
+    "type": "module"
+  },
+  "permissions": [
+    "offscreen"
+  ]
+}
