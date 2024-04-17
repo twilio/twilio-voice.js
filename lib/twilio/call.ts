@@ -390,7 +390,10 @@ class Call extends EventEmitter {
     if (this._direction === Call.CallDirection.Incoming) {
       publisher.info('connection', 'incoming', null, this);
     } else {
-      publisher.info('connection', 'outgoing', { preflight: this._options.preflight }, this);
+      publisher.info('connection', 'outgoing', {
+        preflight: this._options.preflight,
+        reconnect: !!this._options.reconnectCallSid,
+      }, this);
     }
 
     const monitor = this._monitor = new (this._options.StatsMonitor || StatsMonitor)();
