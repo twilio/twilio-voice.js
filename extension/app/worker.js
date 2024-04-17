@@ -3,7 +3,7 @@ import './twilio.js';
 let incomingCall = null;
 
 const offscreenPath = 'offscreen/offscreen.html';
-const clientIdentity = 'csantos';
+const clientIdentity = 'test-identity';
 
 // Consider using storage API
 let sessionState = {
