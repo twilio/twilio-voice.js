@@ -1,5 +1,46 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.11.0 (In Progress)
+====================
+
+New Features
+------------
+
+### Chrome Extensions Manifest V3 Support
+
+In Manifest V2, [Chrome Extensions](https://developer.chrome.com/docs/extensions) have the ability to run the Voice JS SDK in the background when making calls. But with the introduction of [Manifest V3](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3), running the Voice JS SDK in the background can only be achieved through service workers. Service workers don't have access to certain features such as DOM, getUserMedia, and audio playback, making it impossible to make calls with previous versions of the SDK.
+
+With this new release, the SDK can now run in a service worker context to listen for incoming calls or initiate outgoing calls. When the call object is created, it can be forwarded to an [offscreen document](https://developer.chrome.com/docs/extensions/reference/api/offscreen) where the SDK has access to all the necessary APIs to fully establish the call. Check our [example](extension) to see how this works.
+
+### Incoming call forwarding and better support for simultaneous calls
+
+Prior versions of the SDK support simultaneous outgoing and incoming calls using different [identities](https://www.twilio.com/docs/iam/access-tokens#step-3-generate-token). If an incoming call comes in and the `Device` with the same identity is busy, the active call needs to be disconnected before accepting the incoming call. With this new release of the SDK, multiple incoming calls for the same identity can now be accepted, muted, or put on hold, without disconnecting any existing active calls. This can be achieved by forwarding the incoming call to a different `Device` instance. See the following new APIs and example for more details.
+
+#### New APIs
+- [Call.connectToken](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#connecttoken)
+- [ConnectOptions.connectToken](https://twilio.github.io/twilio-voice.js/interfaces/voice.device.connectoptions.html#connecttoken)
+
+#### Example
+
+```js
+// Create a Device instance that handles receiving of all incoming calls for the same identity.
+const receiverDevice = new Device(token, options);
+await receiverDevice.register();
+
+receiverDevice.on('incoming', (call) => {
+  // Forward this call to a new Device instance using the call.connectToken string.
+  forwardCall(call.connectToken);
+});
+
+// The forwardCall function may look something like the following.
+async function forwardCall(connectToken) {
+  // For every incoming call, we create a new Device instance which we can
+  // interact with, without affecting other calls.
+  const device = new Device(token, options);
+  const call = await device.connect({ connectToken });
+}
+```
+
 2.10.2 (February 14, 2024)
 ==========================
 

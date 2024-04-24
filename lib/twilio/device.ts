@@ -563,7 +563,10 @@ class Device extends EventEmitter {
       throw new InvalidStateError('A Call is already active');
     }
 
-    let customParameters, parameters, signalingReconnectToken;
+    let customParameters;
+    let parameters;
+    let signalingReconnectToken;
+
     if (options.connectToken) {
       try {
         const connectTokenParts = JSON.parse(atob(options.connectToken));
