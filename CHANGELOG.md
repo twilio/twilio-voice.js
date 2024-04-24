@@ -8,7 +8,7 @@ New Features
 
 ### Chrome Extensions Manifest V3 Support
 
-In Manifest V2, [Chrome Extensions](https://developer.chrome.com/docs/extensions) have the ability to run the Voice JS SDK in the background when making calls. But with the introduction of [Manifest V3](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3), running the Voice JS SDK in the background can only be achieved through service workers. Service workers don't have access to certain features such as DOM, getUserMedia, and audio playback, making it impossible to make calls.
+In Manifest V2, [Chrome Extensions](https://developer.chrome.com/docs/extensions) have the ability to run the Voice JS SDK in the background when making calls. But with the introduction of [Manifest V3](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3), running the Voice JS SDK in the background can only be achieved through service workers. Service workers don't have access to certain features such as DOM, getUserMedia, and audio playback, making it impossible to make calls with previous versions of the SDK.
 
 With this new release, the SDK can now run in a service worker context to listen for incoming calls or initiate outgoing calls. When the call object is created, it can be forwarded to an [offscreen document](https://developer.chrome.com/docs/extensions/reference/api/offscreen) where the SDK has access to all the necessary APIs to fully establish the call. Check our [example](extension) to see how this works.
 
