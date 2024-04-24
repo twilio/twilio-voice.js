@@ -1989,7 +1989,7 @@ namespace Call {
     /**
      * The callSid to reconnect to.
      */
-    reconnectCallSid?: string,
+    reconnectCallSid?: string;
 
     /**
      * A reconnect token for the {@link Call}. Passed in for incoming {@link Calls}.
