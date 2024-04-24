@@ -814,7 +814,8 @@ describe('PeerConnection', () => {
           once: sinon.stub(),
           on: sinon.stub(),
           removeListener: sinon.stub(),
-          invite: sinon.stub()
+          invite: sinon.stub(),
+          reconnect: sinon.stub(),
         },
         device: {
           token: null
@@ -822,8 +823,8 @@ describe('PeerConnection', () => {
       };
       toTest = METHOD.bind(
         context,
-        'token',
         eParams,
+        undefined,
         eCallSid,
         eIceServers,
         callback,
@@ -868,6 +869,22 @@ describe('PeerConnection', () => {
       assert.equal(callback.called, false);
       assert(context.pstream.invite.calledOnce);
       assert(context.pstream.invite.calledWithExactly(eSDP, eCallSid, eParams));
+      assert(version.getSDP.calledOnce);
+      assert(version.getSDP.calledWithExactly());
+      assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
+      sinon.assert.calledOnce(context._setupRTCDtlsTransportListener);
+    });
+
+    it('Should call onOfferSuccess and pstream reconnect when createOffer calls success callback and status is not closed', () => {
+      context.status = 'not closed';
+      version.createOffer.callsArg(3);
+      METHOD.call(context, eParams, 'reconnectToken', eCallSid, eIceServers, callback);
+      assert(context._initializeMediaStream.calledWithExactly(eIceServers));
+      assert(version.createOffer.calledOnce);
+      assert(version.createOffer.calledWithExactly(undefined, undefined, {audio: true}, sinon.match.func, sinon.match.func));
+      assert.equal(callback.called, false);
+      assert(context.pstream.reconnect.calledOnce);
+      assert(context.pstream.reconnect.calledWithExactly(eSDP, eCallSid, 'reconnectToken'));
       assert(version.getSDP.calledOnce);
       assert(version.getSDP.calledWithExactly());
       assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));

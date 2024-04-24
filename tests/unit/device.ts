@@ -1,7 +1,7 @@
 import { levels as LogLevels } from 'loglevel';
 import CallType from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
-import { GeneralErrors } from '../../lib/twilio/errors';
+import { GeneralErrors, InvalidArgumentError } from '../../lib/twilio/errors';
 import {
   Edge,
   Region,
@@ -18,6 +18,7 @@ import AudioHelper from '../../lib/twilio/audiohelper';
 const root = global as any;
 
 const ClientCapability = require('twilio').jwt.ClientCapability;
+const CallClass = require('../../lib/twilio/call').default;
 
 // tslint:disable max-classes-per-file only-arrow-functions no-empty
 
@@ -59,7 +60,7 @@ describe('Device', function() {
   };
   const Call = (_?: any, _connectOptions?: Record<string, any>) => {
     connectOptions = _connectOptions;
-    return activeCall = createEmitterStub(require('../../lib/twilio/call').default);
+    return activeCall = createEmitterStub(CallClass);
   };
   const PStream = sinon.spy((...args: any[]) =>
     pstream = createEmitterStub(require('../../lib/twilio/pstream').default));
@@ -162,7 +163,7 @@ describe('Device', function() {
       let registerDevice: () => Promise<void>;
       let unregisterDevice: () => Promise<void>;
 
-      beforeEach(async () => {
+      const setup = async () => {
         await setupStream();
         registerDevice = async () => {
           const regPromise = device.register();
@@ -176,29 +177,100 @@ describe('Device', function() {
           pstream.emit('offline');
           await regPromise;
         };
+      };
+
+      beforeEach(async () => {
+        await setup();
       });
 
       describe('insights gateway', () => {
-        beforeEach(() => {
-          publisher.setHost = sinon.stub();
-        });
+        describe('.setHost', () => {
+          beforeEach(() => {
+            publisher.setHost = sinon.stub();
+          });
 
-        it('should set default host address if home is not available', () => {
-          pstream.emit('connected', {});
-          sinon.assert.calledOnce(publisher.setHost);
-          sinon.assert.calledWithExactly(publisher.setHost, 'eventgw.twilio.com');
-        });
-
-        Object.values(Region).forEach(region => {
-          it(`should set host to eventgw.${region}.twilio.com when home is set to ${region}`, () => {
-            pstream.emit('connected', { home: region});
+          it('should set default host address if home is not available', () => {
+            pstream.emit('connected', {});
             sinon.assert.calledOnce(publisher.setHost);
-            sinon.assert.calledWithExactly(publisher.setHost, `eventgw.${region}.twilio.com`);
+            sinon.assert.calledWithExactly(publisher.setHost, 'eventgw.twilio.com');
+          });
+
+          Object.values(Region).forEach(region => {
+            it(`should set host to eventgw.${region}.twilio.com when home is set to ${region}`, () => {
+              pstream.emit('connected', { home: region});
+              sinon.assert.calledOnce(publisher.setHost);
+              sinon.assert.calledWithExactly(publisher.setHost, `eventgw.${region}.twilio.com`);
+            });
+          });
+        });
+
+        describe('defaultPayload', () => {
+          it('should add default payload', () => {
+            assert.deepStrictEqual(Publisher.args[0][2].defaultPayload(), {
+              aggressive_nomination: false,
+              browser_extension: false,
+              dscp: true,
+              ice_restart_enabled: true,
+              platform: 'WebRTC',
+              sdk_version: Device.version,
+            });
+          });
+
+          it('should set aggressive_nomination to true', () => {
+            device = new Device(token, { ...setupOptions, forceAggressiveIceNomination: true });
+            assert.deepStrictEqual(Publisher.args[1][2].defaultPayload(), {
+              aggressive_nomination: true,
+              browser_extension: false,
+              dscp: true,
+              ice_restart_enabled: true,
+              platform: 'WebRTC',
+              sdk_version: Device.version,
+            });
+          });
+
+          it('should set dscp to false', () => {
+            device = new Device(token, { ...setupOptions, dscp: false });
+            assert.deepStrictEqual(Publisher.args[1][2].defaultPayload(), {
+              aggressive_nomination: false,
+              browser_extension: false,
+              dscp: false,
+              ice_restart_enabled: true,
+              platform: 'WebRTC',
+              sdk_version: Device.version,
+            });
+          });
+
+          it('should set browser_extension to true', () => {
+            const root = globalThis as any;
+            const origChrome = root.chrome;
+            root.chrome = {runtime:{id: 'foo'}};
+            device = new Device(token, setupOptions);
+            assert.deepStrictEqual(Publisher.args[1][2].defaultPayload(), {
+              aggressive_nomination: false,
+              browser_extension: true,
+              dscp: true,
+              ice_restart_enabled: true,
+              platform: 'WebRTC',
+              sdk_version: Device.version,
+            });
+            root.chrome = origChrome;
           });
         });
       });
 
-      describe('.connect(params?, audioConstraints?, iceServers?)', () => {
+      describe('.connect()', () => {
+        let customParameters: any;
+        let parameters: any;
+        let signalingReconnectToken: any;
+        let rtcConfiguration: any;
+
+        beforeEach(() => {
+          customParameters = { To: 'foo', bar: '我不吃蛋' };
+          parameters = { CallSid: 'CA123', From: 'foo', bar: '我不吃蛋' };
+          signalingReconnectToken = 'foobarbaz';
+          rtcConfiguration = { iceServers: ['foo', 'bar'] } as any;
+        });
+
         it('should reject if there is already an active call', async () => {
           await device.connect();
           await assert.rejects(() => device.connect(), /A Call is already active/);
@@ -266,6 +338,99 @@ describe('Device', function() {
           activeCall.emit('accept');
           // should fail
           sinon.assert.notCalled(spy.play);
+        });
+
+        it('should not play outgoing sound if connectToken is provided', async () => {
+          const spy: any = { play: sinon.spy() };
+          device['_soundcache'].set(Device.SoundName.Outgoing, spy);
+          await device.connect({ connectToken: btoa(encodeURIComponent(JSON.stringify({
+            parameters,
+            signalingReconnectToken,
+          })))});
+          activeCall._direction = 'OUTGOING';
+          activeCall.emit('accept');
+          sinon.assert.notCalled(spy.play);
+        });
+
+        describe('ConnectOptions', () => {
+          let callSpy: any;
+
+          beforeEach(async () => {
+            callSpy = sinon.spy(() => createEmitterStub(CallClass));
+            device = new Device(token, { ...setupOptions, Call: callSpy });
+            await setup();
+          });
+
+          context('.rtcConfiguration', () => {
+            it('should pass rtcConfiguration to the Call object', async () => {
+              await device.connect({ rtcConfiguration });
+              assert.deepEqual(callSpy.args[0][1].rtcConfiguration, rtcConfiguration);
+            });
+          });
+
+          context('.params', () => {
+            it('should pass twimlParams to the Call object', async () => {
+              await device.connect({ params: customParameters });
+              assert.deepEqual(callSpy.args[0][1].twimlParams, customParameters);
+            });
+          });
+
+          context('.connectToken', () => {
+            it('should throw for non base64', async () => {
+              await assert.rejects(() => device.connect({ connectToken: 'foo' }), /Cannot parse connectToken/);
+            });
+
+            it('should throw for base64 but non-json', async () => {
+              await assert.rejects(() => device.connect({ connectToken: btoa(encodeURIComponent('foo')) }), /Cannot parse connectToken/);
+            });
+
+            it('should throw if parameters is missing', async () => {
+              await assert.rejects(() => device.connect({ connectToken: btoa(encodeURIComponent(JSON.stringify({
+                customParameters,
+                signalingReconnectToken,
+              }))) }), /Invalid connectToken/);
+            });
+
+            it('should throw if CallSid is missing', async () => {
+              await assert.rejects(() => device.connect({ connectToken: btoa(encodeURIComponent(JSON.stringify({
+                parameters: {foo: 'foo'},
+                customParameters,
+                signalingReconnectToken,
+              }))) }), /Invalid connectToken/);
+            });
+
+            it('should throw if signalingReconnectToken is missing', async () => {
+              await assert.rejects(() => device.connect({ connectToken: btoa(encodeURIComponent(JSON.stringify({
+                parameters,
+                customParameters,
+              }))) }), /Invalid connectToken/);
+            });
+
+            it('should pass connectToken info to the Call object', async () => {
+              await device.connect({ connectToken: btoa(encodeURIComponent(JSON.stringify({
+                parameters,
+                customParameters,
+                signalingReconnectToken,
+              })))});
+
+              assert.deepEqual(callSpy.args[0][1].callParameters, parameters);
+              assert.deepEqual(callSpy.args[0][1].twimlParams, customParameters);
+              assert.deepEqual(callSpy.args[0][1].reconnectToken, signalingReconnectToken);
+              assert.deepEqual(callSpy.args[0][1].reconnectCallSid, parameters.CallSid);
+            });
+
+            it('should pass connectToken info to the Call object if customParameters is missing', async () => {
+              await device.connect({ connectToken: btoa(encodeURIComponent(JSON.stringify({
+                parameters,
+                signalingReconnectToken,
+              })))});
+
+              assert.deepEqual(callSpy.args[0][1].callParameters, parameters);
+              assert.deepEqual(callSpy.args[0][1].twimlParams, {});
+              assert.deepEqual(callSpy.args[0][1].reconnectToken, signalingReconnectToken);
+              assert.deepEqual(callSpy.args[0][1].reconnectCallSid, parameters.CallSid);
+            });
+          });
         });
       });
 
@@ -1247,7 +1412,7 @@ describe('Device', function() {
         });
       });
 
-      describe('.connect(params?, audioConstraints?, iceServers?)', () => {
+      describe('.connect()', () => {
         it('should set up a signaling call if necessary', () => {
           device.connect();
           sinon.assert.calledOnce(PStream);

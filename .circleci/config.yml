@@ -83,9 +83,7 @@ commands:
       - build
       - run:
           name: Running build checks
-          # TODO
-          # command: npm run test:es5 && npm run test:esm && npm run test:typecheck && npm run lint && npm run test:unit
-          command: npm run test:es5 && npm run test:esm && npm run test:typecheck && npm run lint
+          command: npm run test:build && npm run test:unit
       - store_artifacts:
           path: coverage
           destination: coverage

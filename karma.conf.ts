@@ -104,7 +104,7 @@ module.exports = function(config: any) {
       ],
       tsconfig: './tsconfig.json',
     },
-    logLevel: config.LOG_INFO,
+    logLevel: process.env.E2E_LOGLEVEL || config.LOG_DEBUG,
     port: 9876,
     preprocessors: {
       'lib/**/*.ts': 'karma-typescript',

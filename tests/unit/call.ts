@@ -107,6 +107,42 @@ describe('Call', function() {
       assert.equal(conn.customParameters.get('baz'), 123);
     });
 
+    context('connectToken', () => {
+      it('should return underfined if callsid is missing', () => {
+        conn = new Call(config, Object.assign(options, { reconnectToken: 'testReconnectToken' }));
+        assert.equal(conn.connectToken, undefined);
+      });
+
+      it('should return underfined if reconnectToken is missing', () => {
+        conn = new Call(config, Object.assign(options, { callParameters: { CallSid: 'CA123' }}));
+        assert.equal(conn.connectToken, undefined);
+      });
+
+      it('should return a base64 string if customParameters is missing', () => {
+        conn = new Call(config, Object.assign(options, {
+          callParameters: { CallSid: 'CA123', foo: 'foo', bar: '我不吃蛋' }, reconnectToken: 'testReconnectToken'
+        }));
+        assert.equal(conn.connectToken, btoa(encodeURIComponent(JSON.stringify({
+          customParameters: {},
+          parameters: { CallSid: 'CA123', foo: 'foo', bar: '我不吃蛋' },
+          signalingReconnectToken: 'testReconnectToken',
+        }))));
+      });
+
+      it('should return a base64 string if there is a customParameters', () => {
+        conn = new Call(config, Object.assign(options, {
+          callParameters: { CallSid: 'CA123', foo: 'foo', bar: '我不吃蛋' },
+          reconnectToken: 'testReconnectToken',
+          twimlParams: { To: 'foo' },
+        }));
+        assert.equal(conn.connectToken, btoa(encodeURIComponent(JSON.stringify({
+          customParameters: { To: 'foo' },
+          parameters: { CallSid: 'CA123', foo: 'foo', bar: '我不吃蛋' },
+          signalingReconnectToken: 'testReconnectToken',
+        }))));
+      });
+    });
+
     context('when incoming', () => {
       it('should send incoming event to insights', () => {
         conn = new Call(config, Object.assign(options, { callParameters: {
@@ -296,17 +332,29 @@ describe('Call', function() {
     });
 
     context('when outgoing', () => {
-      it('should send outgoing event to insights', () => {
+      it('should send default outgoing event to insights', () => {
         conn = new Call(config, Object.assign(options, { preflight: true }));
         const args = publisher.info.lastCall.args;
         assert.equal(args[1], 'outgoing');
-        assert.deepEqual(args[2], { preflight: true })
+        assert.deepEqual(args[2], { preflight: true, reconnect: false })
       });
 
-      it('should not populate the .callerInfo fields, instead return null', () => {
+      it('should send outgoing event to insights with reconnect set to true', () => {
+        conn = new Call(config, Object.assign(options, { preflight: true, reconnectCallSid: 'foo' }));
+        const args = publisher.info.lastCall.args;
+        assert.equal(args[1], 'outgoing');
+        assert.deepEqual(args[2], { preflight: true, reconnect: true })
+      });
+
+      it('should populate the .callerInfo fields', () => {
         conn = new Call(config, Object.assign(options, { callParameters: {
           StirStatus: 'TN-Validation-Passed-A',
         }}));
+        assert.equal(conn.callerInfo!.isVerified, true);
+      });
+
+      it('should not populate the .callerInfo fields, instead return null', () => {
+        conn = new Call(config, Object.assign(options, { }));
         assert.equal(conn.callerInfo, null);
       });
     });
@@ -314,6 +362,12 @@ describe('Call', function() {
     it('should set .direction to CallDirection.Outgoing if there is no CallSid', () => {
       const callParameters = { foo: 'bar' };
       conn = new Call(config, Object.assign(options, { callParameters }));
+      assert.equal(conn.direction, Call.CallDirection.Outgoing);
+    });
+
+    it('should set .direction to CallDirection.Outgoing if there is a CallSid and a reconnectCallSid', () => {
+      const callParameters = { CallSid: 'CA1234' };
+      conn = new Call(config, Object.assign(options, { callParameters, reconnectCallSid: 'CA1234' }));
       assert.equal(conn.direction, Call.CallDirection.Outgoing);
     });
 
@@ -494,9 +548,9 @@ describe('Call', function() {
       context('when outgoing', () => {
         let callback: Function;
 
-        beforeEach(() => {
+        const setup = (callOptions = {}) => {
           getInputStream = sinon.spy(() => 'foo');
-          Object.assign(options, { getInputStream });
+          Object.assign(options, { getInputStream, ...callOptions });
           options.twimlParams = {
             To: 'foo',
             a: undefined,
@@ -523,14 +577,45 @@ describe('Call', function() {
           mediaHandler.makeOutgoingCall = sinon.spy((a: any, b: any, c: any, d: any, _callback: Function) => {
             callback = _callback;
           });
-        });
+        };
+
+        beforeEach(() => setup());
 
         it('should call mediaHandler.makeOutgoingCall with correctly encoded params', () => {
           conn.accept();
           return wait.then(() => {
             sinon.assert.calledOnce(mediaHandler.makeOutgoingCall);
-            assert.equal(mediaHandler.makeOutgoingCall.args[0][1],
+            assert.equal(mediaHandler.makeOutgoingCall.args[0][0],
               'To=foo&a=undefined&b=true&c=false&d=&e=123&f=123&g=null&h=undefined&i=null&j=0&k=0&l=a%24b%26c%3Fd%3De');
+          });
+        });
+
+        it('should call mediaHandler.makeOutgoingCall with a reconnectToken', () => {
+          setup({ reconnectToken: 'testReconnectToken' });
+          conn.accept();
+          return wait.then(() => {
+            sinon.assert.calledOnce(mediaHandler.makeOutgoingCall);
+            assert.equal(mediaHandler.makeOutgoingCall.args[0][1],
+              'testReconnectToken');
+          });
+        });
+
+        it('should call mediaHandler.makeOutgoingCall with a temp callsid', () => {
+          conn.accept();
+          return wait.then(() => {
+            sinon.assert.calledOnce(mediaHandler.makeOutgoingCall);
+            assert.equal(mediaHandler.makeOutgoingCall.args[0][2],
+              conn.outboundConnectionId);
+          });
+        });
+
+        it('should call mediaHandler.makeOutgoingCall with a reconnect callsid', () => {
+          setup({ reconnectCallSid: 'testReconnectCallsid' });
+          conn.accept();
+          return wait.then(() => {
+            sinon.assert.calledOnce(mediaHandler.makeOutgoingCall);
+            assert.equal(mediaHandler.makeOutgoingCall.args[0][2],
+              'testReconnectCallsid');
           });
         });
 

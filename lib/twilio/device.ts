@@ -569,7 +569,7 @@ class Device extends EventEmitter {
 
     if (options.connectToken) {
       try {
-        const connectTokenParts = JSON.parse(atob(options.connectToken));
+        const connectTokenParts = JSON.parse(decodeURIComponent(atob(options.connectToken)));
         customParameters = connectTokenParts.customParameters;
         parameters = connectTokenParts.parameters;
         signalingReconnectToken = connectTokenParts.signalingReconnectToken;
@@ -1677,6 +1677,9 @@ namespace Device {
    * {@link Device.connect} and {@link Call.connectToken}, enabling your application to
    * receive multiple incoming calls for the same identity.
    *
+   * **Important:** When forwarding a call, the token for target device instance needs to have
+   * the same identity as the token used in the device that originally received the call.
+   *
    * @example
    *
    * ```js
@@ -1692,6 +1695,8 @@ namespace Device {
    * async function forwardCall(connectToken) {
    *   // For every incoming call, we create a new Device instance which we can
    *   // interact with, without affecting other calls.
+   *   // IMPORTANT: The token for this new device needs to have the same identity
+   *   // as the token used in the receiverDevice.
    *   const device = new Device(token, options);
    *   const call = await device.connect({ connectToken });
    *
@@ -1800,6 +1805,8 @@ namespace Device {
      *
      * **Warning: Only unanswered incoming calls can be manually reconnected at this time.**
      * **Invoking this method to an already answered call may introduce unexpected behavior.**
+     *
+     * See {@link Device.incomingEvent} for an example.
      */
     connectToken?: string;
 

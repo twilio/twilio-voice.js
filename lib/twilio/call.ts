@@ -163,11 +163,11 @@ class Call extends EventEmitter {
 
     const parameters = this.parameters || {};
 
-    return btoa(JSON.stringify({
+    return btoa(encodeURIComponent(JSON.stringify({
       customParameters,
       parameters,
       signalingReconnectToken,
-    }));
+    })));
   }
 
   /**
@@ -628,10 +628,11 @@ class Call extends EventEmitter {
    * @param [options]
    */
   accept(options?: Call.AcceptOptions): void {
+    this._log.debug('.accept', options);
     if (this._status !== Call.State.Pending) {
+      this._log.debug(`.accept noop. status is '${this._status}'`);
       return;
     }
-    this._log.debug('.accept', options);
 
     options = options || { };
     const rtcConfiguration = options.rtcConfiguration || this._options.rtcConfiguration;
@@ -764,10 +765,11 @@ class Call extends EventEmitter {
    * Ignore the incoming {@link Call}.
    */
   ignore(): void {
+    this._log.debug('.ignore');
     if (this._status !== Call.State.Pending) {
+      this._log.debug(`.ignore noop. status is '${this._status}'`);
       return;
     }
-    this._log.debug('.ignore');
 
     this._status = Call.State.Closed;
     this._mediaHandler.ignore(this.parameters.CallSid);
@@ -836,10 +838,11 @@ class Call extends EventEmitter {
    * Reject the incoming {@link Call}.
    */
   reject(): void {
+    this._log.debug('.reject');
     if (this._status !== Call.State.Pending) {
+      this._log.debug(`.reject noop. status is '${this._status}'`);
       return;
     }
-    this._log.debug('.reject');
 
     this._isRejected = true;
     this._pstream.reject(this.parameters.CallSid);

@@ -36,6 +36,8 @@ receiverDevice.on('incoming', (call) => {
 async function forwardCall(connectToken) {
   // For every incoming call, we create a new Device instance which we can
   // interact with, without affecting other calls.
+  // IMPORTANT: The token for this new device needs to have the same identity
+  // as the token used in the receiverDevice.
   const device = new Device(token, options);
   const call = await device.connect({ connectToken });
 
