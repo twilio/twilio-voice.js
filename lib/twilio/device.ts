@@ -1672,9 +1672,35 @@ namespace Device {
   declare function errorEvent(error: TwilioError, call?: Call): void;
 
   /**
-   * Emitted when an incoming {@link Call} is received.
+   * Emitted when an incoming {@link Call} is received. You can interact with the call object
+   * using its public APIs, or you can forward it to a different {@link Device} using
+   * {@link Device.connect} and {@link Call.connectToken}, enabling your application to
+   * receive multiple incoming calls for the same identity.
+   *
+   * @example
+   *
+   * ```js
+   * const receiverDevice = new Device(token, options);
+   * await receiverDevice.register();
+   *
+   * receiverDevice.on('incoming', (call) => {
+   *   // Forward this call to a new Device instance using the call.connectToken string.
+   *   forwardCall(call.connectToken);
+   * });
+   *
+   * // The forwardCall function may look something like the following.
+   * async function forwardCall(connectToken) {
+   *   // For every incoming call, we create a new Device instance which we can
+   *   // interact with, without affecting other calls.
+   *   const device = new Device(token, options);
+   *   const call = await device.connect({ connectToken });
+   *
+   *   // Destroy the device after the call is completed
+   *   call.on('disconnect', () => device.destroy());
+   * }
+   * ```
+   *
    * @param call - The incoming {@link Call}.
-   * @example `device.on('incoming', call => { })`
    * @event
    */
   declare function incomingEvent(call: Call): void;
