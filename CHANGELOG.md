@@ -12,7 +12,7 @@ In Manifest V2, [Chrome Extensions](https://developer.chrome.com/docs/extensions
 
 With this new release, the SDK can now run in a service worker context to listen for incoming calls or initiate outgoing calls. When the call object is created, it can be forwarded to an [offscreen document](https://developer.chrome.com/docs/extensions/reference/api/offscreen) where the SDK has access to all the necessary APIs to fully establish the call. Check our [example](extension) to see how this works.
 
-### Incoming call forwarding and better support for simultaneous calls
+### Client side incoming call forwarding and better support for simultaneous calls
 
 Prior versions of the SDK support simultaneous outgoing and incoming calls using different [identities](https://www.twilio.com/docs/iam/access-tokens#step-3-generate-token). If an incoming call comes in and the `Device` with the same identity is busy, the active call needs to be disconnected before accepting the incoming call. With this new release of the SDK, multiple incoming calls for the same identity can now be accepted, muted, or put on hold, without disconnecting any existing active calls. This can be achieved by forwarding the incoming call to a different `Device` instance. See the following new APIs and example for more details.
 
@@ -38,6 +38,9 @@ async function forwardCall(connectToken) {
   // interact with, without affecting other calls.
   const device = new Device(token, options);
   const call = await device.connect({ connectToken });
+
+  // Destroy the device after the call is completed
+  call.on('disconnect', () => device.destroy());
 }
 ```
 
