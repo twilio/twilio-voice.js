@@ -31,6 +31,7 @@ const checkCall = async () => {
   call.sendMessage({ content: 'foo', messageType: Call.MessageType.UserDefinedMessage });
 
   await call.postFeedback(Call.FeedbackScore.One, Call.FeedbackIssue.AudioLatency);
+  const connectToken: string | undefined = call.connectToken;
   const isMuted: boolean = call.isMuted();
   const localStream: MediaStream | undefined = call.getLocalStream();
   const remoteStream: MediaStream | undefined = call.getRemoteStream();
