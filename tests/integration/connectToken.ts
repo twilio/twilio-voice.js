@@ -22,8 +22,8 @@ describe('connectToken', function() {
   let callerDeviceA: Device;
   let callerDeviceB: Device;
   let receiverDevice: Device;
-  let reconnecDeviceA: Device;
-  let reconnecDeviceB: Device;
+  let reconnectDeviceA: Device;
+  let reconnectDeviceB: Device;
   let identity: string;
 
   const setupDevices = () => {
@@ -31,14 +31,14 @@ describe('connectToken', function() {
     const callerTokenA = generateAccessToken();
     const callerTokenB = generateAccessToken();
     const receiverDeviceToken = generateAccessToken(identity);
-    const reconnecDeviceTokenA = generateAccessToken(identity);
-    const reconnecDeviceTokenB = generateAccessToken(identity);
+    const reconnectDeviceTokenA = generateAccessToken(identity);
+    const reconnectDeviceTokenB = generateAccessToken(identity);
 
     callerDeviceA = new Device(callerTokenA);
     callerDeviceB = new Device(callerTokenB);
     receiverDevice = new Device(receiverDeviceToken);
-    reconnecDeviceA = new Device(reconnecDeviceTokenA);
-    reconnecDeviceB = new Device(reconnecDeviceTokenB);
+    reconnectDeviceA = new Device(reconnectDeviceTokenA);
+    reconnectDeviceB = new Device(reconnectDeviceTokenB);
 
     // Only register the device that receives the incoming
     receiverDevice.register();
@@ -47,7 +47,7 @@ describe('connectToken', function() {
   };
 
   const destroyDevices = () => {
-    [callerDeviceA, callerDeviceB, receiverDevice, reconnecDeviceA, reconnecDeviceB].forEach(device => {
+    [callerDeviceA, callerDeviceB, receiverDevice, reconnectDeviceA, reconnectDeviceB].forEach(device => {
       if (device) {
         device.disconnectAll();
         device.destroy();
@@ -65,7 +65,7 @@ describe('connectToken', function() {
     const incomingCallA: Call = await expectEvent('incoming', receiverDevice);
     const cancelStubA = sinon.stub();
     incomingCallA.on('cancel', cancelStubA);
-    const forwardedCallA = await reconnecDeviceA.connect({ connectToken: incomingCallA.connectToken });
+    const forwardedCallA = await reconnectDeviceA.connect({ connectToken: incomingCallA.connectToken });
     const acceptStubA = sinon.stub();
     const disconnectStubA = sinon.stub();
     forwardedCallA.on('accept', acceptStubA);
@@ -79,7 +79,7 @@ describe('connectToken', function() {
     const incomingCallB: Call = await expectEvent('incoming', receiverDevice);
     const cancelStubB = sinon.stub();
     incomingCallB.on('cancel', cancelStubB);
-    const forwardedCallB = await reconnecDeviceB.connect({ connectToken: incomingCallB.connectToken });
+    const forwardedCallB = await reconnectDeviceB.connect({ connectToken: incomingCallB.connectToken });
     const acceptStubB = sinon.stub();
     const disconnectStubB = sinon.stub();
     forwardedCallB.on('accept', acceptStubB);

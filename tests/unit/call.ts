@@ -108,12 +108,12 @@ describe('Call', function() {
     });
 
     context('connectToken', () => {
-      it('should return underfined if callsid is missing', () => {
+      it('should return undefined if callsid is missing', () => {
         conn = new Call(config, Object.assign(options, { reconnectToken: 'testReconnectToken' }));
         assert.equal(conn.connectToken, undefined);
       });
 
-      it('should return underfined if reconnectToken is missing', () => {
+      it('should return undefined if reconnectToken is missing', () => {
         conn = new Call(config, Object.assign(options, { callParameters: { CallSid: 'CA123' }}));
         assert.equal(conn.connectToken, undefined);
       });

@@ -197,7 +197,7 @@ describe('Device', function() {
 
           Object.values(Region).forEach(region => {
             it(`should set host to eventgw.${region}.twilio.com when home is set to ${region}`, () => {
-              pstream.emit('connected', { home: region});
+              pstream.emit('connected', { home: region });
               sinon.assert.calledOnce(publisher.setHost);
               sinon.assert.calledWithExactly(publisher.setHost, `eventgw.${region}.twilio.com`);
             });
