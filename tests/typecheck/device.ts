@@ -51,11 +51,23 @@ const checkDevice = async () => {
   const identity: string | null = device.identity;
   const token: string | null = device.token;
 
+  await device.connect();
+  await device.connect({
+    params: { To: 'foo' }
+  });
+  await device.connect({
+    connectToken: 'foo',
+  });
+  await device.connect({
+    rtcConfiguration: {},
+    rtcConstraints: {},
+  });
   await device.connect({
     params: { To: 'foo' },
     rtcConfiguration: {},
     rtcConstraints: {},
   });
+
   device.destroy();
   device.disconnectAll();
   await device.register();
