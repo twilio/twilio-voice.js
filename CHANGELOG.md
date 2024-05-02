@@ -1,6 +1,6 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
-2.11.0 (In Progress)
+2.11.0 (May 2, 2024)
 ====================
 
 New Features
@@ -264,6 +264,8 @@ New Features
 ------------
 
 ### WebRTC API Overrides (Beta)
+
+_Updated: This is now GA as of December 14, 2023_
 
 The SDK now allows you to override WebRTC APIs using the following options and events. If your environment supports WebRTC redirection, such as [Citrix HDX](https://www.citrix.com/solutions/vdi-and-daas/hdx/what-is-hdx.html)'s WebRTC [redirection technologies](https://www.citrix.com/blogs/2019/01/15/hdx-a-webrtc-manifesto/), your application can use this new *beta* feature for improved audio quality in those environments.
 
