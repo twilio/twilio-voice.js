@@ -182,7 +182,7 @@
 					<div class="tsd-signature tsd-kind-icon">Toggleable<wbr>Sound<span class="tsd-signature-symbol">:</span> <a href="../enums/voice.device.soundname.html#incoming" class="tsd-signature-type">Incoming</a><span class="tsd-signature-symbol"> | </span><a href="../enums/voice.device.soundname.html#outgoing" class="tsd-signature-type">Outgoing</a><span class="tsd-signature-symbol"> | </span><a href="../enums/voice.device.soundname.html#disconnect" class="tsd-signature-type">Disconnect</a></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L1762">lib/twilio/device.ts:1762</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L1793">lib/twilio/device.ts:1793</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -204,7 +204,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L460">lib/twilio/device.ts:460</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L460">lib/twilio/device.ts:460</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -243,7 +243,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L1664">lib/twilio/device.ts:1664</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L1664">lib/twilio/device.ts:1664</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -270,7 +270,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L1672">lib/twilio/device.ts:1672</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L1672">lib/twilio/device.ts:1672</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -306,16 +306,41 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L1680">lib/twilio/device.ts:1680</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L1711">lib/twilio/device.ts:1711</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
 								<div class="lead">
-									<p>Emitted when an incoming <a href="voice.call.html">Call</a> is received.</p>
+									<p>Emitted when an incoming <a href="voice.call.html">Call</a> is received. You can interact with the call object
+										using its public APIs, or you can forward it to a different <a href="voice.device.html">Device</a> using
+										<a href="voice.device.html#connect">Device.connect</a> and <a href="voice.call.html#connecttoken">Call.connectToken</a>, enabling your application to
+									receive multiple incoming calls for the same identity.</p>
 								</div>
+								<p><strong>Important:</strong> When forwarding a call, the token for target device instance needs to have
+								the same identity as the token used in the device that originally received the call.</p>
 								<dl class="tsd-comment-tags">
 									<dt>example</dt>
-									<dd><p><code>device.on(&#39;incoming&#39;, call =&gt; { })</code></p>
+									<dd><pre><code class="language-js"><span class="hljs-keyword">const</span> receiverDevice = <span class="hljs-keyword">new</span> Device(token, options);
+<span class="hljs-keyword">await</span> receiverDevice.register();
+
+receiverDevice.on(<span class="hljs-string">&#x27;incoming&#x27;</span>, <span class="hljs-function">(<span class="hljs-params">call</span>) =&gt;</span> {
+  <span class="hljs-comment">// Forward this call to a new Device instance using the call.connectToken string.</span>
+  forwardCall(call.connectToken);
+});
+
+<span class="hljs-comment">// The forwardCall function may look something like the following.</span>
+<span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">forwardCall</span>(<span class="hljs-params">connectToken</span>) </span>{
+  <span class="hljs-comment">// For every incoming call, we create a new Device instance which we can</span>
+  <span class="hljs-comment">// interact with, without affecting other calls.</span>
+  <span class="hljs-comment">// IMPORTANT: The token for this new device needs to have the same identity</span>
+  <span class="hljs-comment">// as the token used in the receiverDevice.</span>
+  <span class="hljs-keyword">const</span> device = <span class="hljs-keyword">new</span> Device(token, options);
+  <span class="hljs-keyword">const</span> call = <span class="hljs-keyword">await</span> device.connect({ connectToken });
+
+  <span class="hljs-comment">// Destroy the device after the call is completed</span>
+  call.on(<span class="hljs-string">&#x27;disconnect&#x27;</span>, <span class="hljs-function">() =&gt;</span> device.destroy());
+}
+</code></pre>
 									</dd>
 								</dl>
 							</div>
@@ -342,7 +367,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L1701">lib/twilio/device.ts:1701</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L1732">lib/twilio/device.ts:1732</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -369,7 +394,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L1694">lib/twilio/device.ts:1694</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L1725">lib/twilio/device.ts:1725</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -396,7 +421,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L1713">lib/twilio/device.ts:1713</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L1744">lib/twilio/device.ts:1744</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -430,7 +455,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L1687">lib/twilio/device.ts:1687</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L1718">lib/twilio/device.ts:1718</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -473,7 +498,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L551">lib/twilio/device.ts:551</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L551">lib/twilio/device.ts:551</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -498,7 +523,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L620">lib/twilio/device.ts:620</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L620">lib/twilio/device.ts:620</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -520,7 +545,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L673">lib/twilio/device.ts:673</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L673">lib/twilio/device.ts:673</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -546,7 +571,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L681">lib/twilio/device.ts:681</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L681">lib/twilio/device.ts:681</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -572,7 +597,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L689">lib/twilio/device.ts:689</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L689">lib/twilio/device.ts:689</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -598,7 +623,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L696">lib/twilio/device.ts:696</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L696">lib/twilio/device.ts:696</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -620,7 +645,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L723">lib/twilio/device.ts:723</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L723">lib/twilio/device.ts:723</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -642,7 +667,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L730">lib/twilio/device.ts:730</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L730">lib/twilio/device.ts:730</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -667,7 +692,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L216">lib/twilio/device.ts:216</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L216">lib/twilio/device.ts:216</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -689,7 +714,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L221">lib/twilio/device.ts:221</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L221">lib/twilio/device.ts:221</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -711,7 +736,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L243">lib/twilio/device.ts:243</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L243">lib/twilio/device.ts:243</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -781,7 +806,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L559">lib/twilio/device.ts:559</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L559">lib/twilio/device.ts:559</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -811,7 +836,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L627">lib/twilio/device.ts:627</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L627">lib/twilio/device.ts:627</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -833,7 +858,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L659">lib/twilio/device.ts:659</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L659">lib/twilio/device.ts:659</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -1215,7 +1240,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L703">lib/twilio/device.ts:703</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L703">lib/twilio/device.ts:703</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -1330,7 +1355,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L746">lib/twilio/device.ts:746</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L746">lib/twilio/device.ts:746</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -1353,7 +1378,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L769">lib/twilio/device.ts:769</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L769">lib/twilio/device.ts:769</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -1383,7 +1408,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L847">lib/twilio/device.ts:847</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L847">lib/twilio/device.ts:847</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -1448,7 +1473,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/71e255f1/lib/twilio/device.ts#L228">lib/twilio/device.ts:228</a></li>
+									<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/ff048758/lib/twilio/device.ts#L228">lib/twilio/device.ts:228</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
