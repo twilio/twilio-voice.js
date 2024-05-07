@@ -921,6 +921,39 @@ export namespace AuthorizationErrors {
       this.originalError = originalError;
     }
   }
+
+  export class CallMessageEventTypeInvalidError extends TwilioError {
+    causes: string[] = [
+      'The Call Message Event Type is invalid and is not understood by Twilio Voice.',
+    ];
+    code: number = 31210;
+    description: string = 'Call Message Event Type is invalid.';
+    explanation: string = 'The Call Message Event Type is invalid and is not understood by Twilio Voice.';
+    name: string = 'CallMessageEventTypeInvalidError';
+    solutions: string[] = [
+      'Ensure the Call Message Event Type is Valid and understood by Twilio Voice and try again.',
+    ];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, AuthorizationErrors.CallMessageEventTypeInvalidError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
 }
 
 export namespace UserMediaErrors {
@@ -1200,6 +1233,7 @@ export const errorsByCode: ReadonlyMap<number, any> = new Map([
   [ 31206, AuthorizationErrors.RateExceededError ],
   [ 31207, AuthorizationErrors.JWTTokenExpirationTooLongError ],
   [ 31209, AuthorizationErrors.PayloadSizeExceededError ],
+  [ 31210, AuthorizationErrors.CallMessageEventTypeInvalidError ],
   [ 31401, UserMediaErrors.PermissionDeniedError ],
   [ 31402, UserMediaErrors.AcquisitionFailedError ],
   [ 53000, SignalingErrors.ConnectionError ],
