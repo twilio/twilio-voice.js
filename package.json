@@ -69,11 +69,13 @@
     "docs:ts"
   ],
   "devDependencies": {
+    "@ngrok/ngrok": "1.2.0",
     "@types/mime": "3.0.0",
     "@types/mocha": "5.2.7",
     "@types/node": "13.1.8",
     "@types/sinon": "9.0.5",
     "@types/ws": "7.2.0",
+    "axios": "1.6.8",
     "babel-plugin-transform-inline-environment-variables": "0.4.3",
     "browserify": "16.5.0",
     "buffer": "5.4.3",
