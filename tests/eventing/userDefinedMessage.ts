@@ -6,7 +6,7 @@ const env = require('../env');
 
 const RELAY_SERVER_URL = 'http://localhost:3030';
 
-describe('eventing', function() {
+describe('userDefinedMessage', function() {
   this.timeout(1000 * 60 * 10); // 10 minute timeout for the whole suite
 
   describe('outgoing call', function() {

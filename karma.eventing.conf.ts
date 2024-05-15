@@ -14,7 +14,7 @@ if (fs.existsSync(__dirname + '/config.yaml')) {
   process.env.AUTH_TOKEN = process.env.AUTH_TOKEN || creds.auth_token;
 }
 
-const testFiles = ['tests/integration/eventing.ts'];
+const testFiles = ['tests/eventing/userDefinedMessage.ts'];
 
 console.log('Test Files:', testFiles);
 
