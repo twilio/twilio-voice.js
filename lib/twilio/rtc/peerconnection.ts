@@ -879,7 +879,7 @@ PeerConnection.prototype.iceRestart = function() {
   });
 };
 
-PeerConnection.prototype.makeOutgoingCall = function(token, params, callsid, rtcConfiguration, onMediaStarted) {
+PeerConnection.prototype.makeOutgoingCall = function(params, signalingReconnectToken, callsid, rtcConfiguration, onMediaStarted) {
   if (!this._initializeMediaStream(rtcConfiguration)) {
     return;
   }
@@ -916,7 +916,11 @@ PeerConnection.prototype.makeOutgoingCall = function(token, params, callsid, rtc
 
   function onOfferSuccess() {
     if (self.status !== 'closed') {
-      self.pstream.invite(self.version.getSDP(), self.callSid, params);
+      if (signalingReconnectToken) {
+        self.pstream.reconnect(self.version.getSDP(), self.callSid, signalingReconnectToken);
+      } else {
+        self.pstream.invite(self.version.getSDP(), self.callSid, params);
+      }
       self._setupRTCDtlsTransportListener();
     }
   }

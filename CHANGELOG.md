@@ -17,6 +17,52 @@ interface Call.Message {
 ```
 When sending a `Call.Message` using `call.sendMessage()`, if the message type is invalid or not understood by Twilio, an error response will be sent. See this [error page](https://www.twilio.com/docs/api/errors/31210) for further details.
 
+2.11.0 (May 2, 2024)
+====================
+
+New Features
+------------
+
+### Chrome Extensions Manifest V3 Support
+
+In Manifest V2, [Chrome Extensions](https://developer.chrome.com/docs/extensions) have the ability to run the Voice JS SDK in the background when making calls. But with the introduction of [Manifest V3](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3), running the Voice JS SDK in the background can only be achieved through service workers. Service workers don't have access to certain features such as DOM, getUserMedia, and audio playback, making it impossible to make calls with previous versions of the SDK.
+
+With this new release, the SDK can now run in a service worker context to listen for incoming calls or initiate outgoing calls. When the call object is created, it can be forwarded to an [offscreen document](https://developer.chrome.com/docs/extensions/reference/api/offscreen) where the SDK has access to all the necessary APIs to fully establish the call. Check our [example](extension) to see how this works.
+
+### Client side incoming call forwarding and better support for simultaneous calls
+
+Prior versions of the SDK support simultaneous outgoing and incoming calls using different [identities](https://www.twilio.com/docs/iam/access-tokens#step-3-generate-token). If an incoming call comes in and the `Device` with the same identity is busy, the active call needs to be disconnected before accepting the incoming call. With this new release of the SDK, multiple incoming calls for the same identity can now be accepted, muted, or put on hold, without disconnecting any existing active calls. This can be achieved by forwarding the incoming call to a different `Device` instance. See the following new APIs and example for more details.
+
+#### New APIs
+- [Call.connectToken](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#connecttoken)
+- [ConnectOptions.connectToken](https://twilio.github.io/twilio-voice.js/interfaces/voice.device.connectoptions.html#connecttoken)
+
+#### Example
+
+```js
+// Create a Device instance that handles receiving of all incoming calls for the same identity.
+const receiverDevice = new Device(token, options);
+await receiverDevice.register();
+
+receiverDevice.on('incoming', (call) => {
+  // Forward this call to a new Device instance using the call.connectToken string.
+  forwardCall(call.connectToken);
+});
+
+// The forwardCall function may look something like the following.
+async function forwardCall(connectToken) {
+  // For every incoming call, we create a new Device instance which we can
+  // interact with, without affecting other calls.
+  // IMPORTANT: The token for this new device needs to have the same identity
+  // as the token used in the receiverDevice.
+  const device = new Device(token, options);
+  const call = await device.connect({ connectToken });
+
+  // Destroy the device after the call is completed
+  call.on('disconnect', () => device.destroy());
+}
+```
+
 2.10.2 (February 14, 2024)
 ==========================
 
@@ -235,6 +281,8 @@ New Features
 ------------
 
 ### WebRTC API Overrides (Beta)
+
+_Updated: This is now GA as of December 14, 2023_
 
 The SDK now allows you to override WebRTC APIs using the following options and events. If your environment supports WebRTC redirection, such as [Citrix HDX](https://www.citrix.com/solutions/vdi-and-daas/hdx/what-is-hdx.html)'s WebRTC [redirection technologies](https://www.citrix.com/blogs/2019/01/15/hdx-a-webrtc-manifesto/), your application can use this new *beta* feature for improved audio quality in those environments.
 

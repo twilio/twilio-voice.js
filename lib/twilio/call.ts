@@ -140,6 +140,37 @@ class Call extends EventEmitter {
   }
 
   /**
+   * The connect token is available as soon as the call is established
+   * and connected to Twilio. Use this token to reconnect to a call via the {@link Device.connect}
+   * method.
+   *
+   * For incoming calls, it is available in the call object after the {@link Device.incomingEvent} is emitted.
+   * For outgoing calls, it is available after the {@link Call.acceptEvent} is emitted.
+   */
+  get connectToken(): string | undefined {
+    const signalingReconnectToken = this._signalingReconnectToken;
+    const callSid = this.parameters && this.parameters.CallSid ? this.parameters.CallSid : undefined;
+
+    if (!signalingReconnectToken || !callSid) {
+      return;
+    }
+
+    const customParameters = this.customParameters && typeof this.customParameters.keys === 'function' ?
+    Array.from(this.customParameters.keys()).reduce((result: Record<string, string>, key: string) => {
+      result[key] = this.customParameters.get(key)!;
+      return result;
+    }, {}) : {};
+
+    const parameters = this.parameters || {};
+
+    return btoa(encodeURIComponent(JSON.stringify({
+      customParameters,
+      parameters,
+      signalingReconnectToken,
+    })));
+  }
+
+  /**
    * The temporary CallSid for this call, if it's outbound.
    */
   readonly outboundConnectionId?: string;
@@ -337,9 +368,10 @@ class Call extends EventEmitter {
     this._voiceEventSidGenerator =
       this._options.voiceEventSidGenerator || generateVoiceEventSid;
 
-    this._direction = this.parameters.CallSid ? Call.CallDirection.Incoming : Call.CallDirection.Outgoing;
+    this._direction = this.parameters.CallSid && !this._options.reconnectCallSid ?
+      Call.CallDirection.Incoming : Call.CallDirection.Outgoing;
 
-    if (this._direction === Call.CallDirection.Incoming && this.parameters) {
+    if (this.parameters) {
       this.callerInfo = this.parameters.StirStatus
         ? { isVerified: this.parameters.StirStatus === 'TN-Validation-Passed-A' }
         : null;
@@ -358,7 +390,10 @@ class Call extends EventEmitter {
     if (this._direction === Call.CallDirection.Incoming) {
       publisher.info('connection', 'incoming', null, this);
     } else {
-      publisher.info('connection', 'outgoing', { preflight: this._options.preflight }, this);
+      publisher.info('connection', 'outgoing', {
+        preflight: this._options.preflight,
+        reconnect: !!this._options.reconnectCallSid,
+      }, this);
     }
 
     const monitor = this._monitor = new (this._options.StatsMonitor || StatsMonitor)();
@@ -593,10 +628,11 @@ class Call extends EventEmitter {
    * @param [options]
    */
   accept(options?: Call.AcceptOptions): void {
+    this._log.debug('.accept', options);
     if (this._status !== Call.State.Pending) {
+      this._log.debug(`.accept noop. status is '${this._status}'`);
       return;
     }
-    this._log.debug('.accept', options);
 
     options = options || { };
     const rtcConfiguration = options.rtcConfiguration || this._options.rtcConfiguration;
@@ -615,16 +651,12 @@ class Call extends EventEmitter {
         return;
       }
 
-      const onAnswer = (pc: RTCPeerConnection, reconnectToken?: string) => {
+      const onAnswer = (pc: RTCPeerConnection) => {
         // Report that the call was answered, and directionality
         const eventName = this._direction === Call.CallDirection.Incoming
           ? 'accepted-by-local'
           : 'accepted-by-remote';
         this._publisher.info('connection', eventName, null, this);
-
-        if (typeof reconnectToken === 'string') {
-          this._signalingReconnectToken = reconnectToken;
-        }
 
         // Report the preferred codec and params as they appear in the SDP
         const { codecName, codecParams } = getPreferredCodecInfo(this._mediaHandler.version.getSDP());
@@ -657,8 +689,8 @@ class Call extends EventEmitter {
         const params = Array.from(this.customParameters.entries()).map(pair =>
          `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
         this._pstream.on('answer', this._onAnswer);
-        this._mediaHandler.makeOutgoingCall(this._pstream.token, params,
-          this.outboundConnectionId, rtcConfiguration, onAnswer);
+        this._mediaHandler.makeOutgoingCall(params, this._signalingReconnectToken,
+          this._options.reconnectCallSid || this.outboundConnectionId, rtcConfiguration, onAnswer);
       }
     };
 
@@ -733,10 +765,11 @@ class Call extends EventEmitter {
    * Ignore the incoming {@link Call}.
    */
   ignore(): void {
+    this._log.debug('.ignore');
     if (this._status !== Call.State.Pending) {
+      this._log.debug(`.ignore noop. status is '${this._status}'`);
       return;
     }
-    this._log.debug('.ignore');
 
     this._status = Call.State.Closed;
     this._mediaHandler.ignore(this.parameters.CallSid);
@@ -805,10 +838,11 @@ class Call extends EventEmitter {
    * Reject the incoming {@link Call}.
    */
   reject(): void {
+    this._log.debug('.reject');
     if (this._status !== Call.State.Pending) {
+      this._log.debug(`.reject noop. status is '${this._status}'`);
       return;
     }
-    this._log.debug('.reject');
 
     this._isRejected = true;
     this._pstream.reject(this.parameters.CallSid);
@@ -1958,6 +1992,11 @@ namespace Call {
      * Whether this is a preflight call or not
      */
     preflight?: boolean;
+
+    /**
+     * The callSid to reconnect to.
+     */
+    reconnectCallSid?: string;
 
     /**
      * A reconnect token for the {@link Call}. Passed in for incoming {@link Calls}.
