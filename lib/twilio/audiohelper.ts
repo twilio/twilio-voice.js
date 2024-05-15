@@ -832,7 +832,9 @@ class AudioHelper extends EventEmitter {
       //   then that device is unplugged or plugged back in. We can't check for the 'ended'
       //   event or readyState because it is asynchronous and may take upwards of 5 seconds,
       //   in my testing. (rrowland)
-      if (this.inputDevice !== null && this.inputDevice.deviceId === 'default') {
+
+      // If input device is null, we can assume it to behave it as if a default input device is selected 
+      if ((this.inputDevice === null && this.availableInputDevices.get("default")) || (this.inputDevice && this.inputDevice.deviceId === 'default')) {
         this._log.warn(`Calling getUserMedia after device change to ensure that the \
           tracks of the active device (default) have not gone stale.`);
         this._setInputDevice(this.inputDevice.deviceId, true);
