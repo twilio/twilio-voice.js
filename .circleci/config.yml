@@ -284,7 +284,7 @@ workflows:
             parameters:
               browser: ["chrome", "firefox"]
               bver: ["beta", "unstable", "stable"]
-              build_label: ["Daily build"]
+              build_label: ["Eventing tests"]
       # NOTE(csantos): Will be addressed on a future epic
       # - run-network-tests:
       #     name: Network Tests <<matrix.browser>> <<matrix.bver>>

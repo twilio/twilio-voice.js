@@ -107,7 +107,7 @@ module.exports = function(config: any) {
     port: 9876,
     preprocessors: {
       'lib/**/*.ts': 'karma-typescript',
-      'tests/integration/*.ts': 'karma-typescript',
+      'tests/eventing/*.ts': 'karma-typescript',
     },
     reporters: ['spec', 'karma-typescript'],
     singleRun: true,
