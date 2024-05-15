@@ -99,6 +99,16 @@ commands:
       - run:
           name: Running network tests
           command: npm run test:docker
+  eventing-tests:
+    steps:
+      - build
+      - run:
+          name: "Start test relay server"
+          background: true
+          command: node ./scripts/eventing/server.js
+      - run:
+          name: "Run eventing tests in browser"
+          command: npm run test:integration:eventing
 
 
 ###
