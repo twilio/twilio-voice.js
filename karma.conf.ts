@@ -15,7 +15,7 @@ if (fs.existsSync(__dirname + '/config.yaml')) {
 }
 
 const testFiles = process.env.INTEGRATION_TEST_FILES ?
-  process.env.INTEGRATION_TEST_FILES.split(',') : ['tests/integration/*.ts'];
+  process.env.INTEGRATION_TEST_FILES.split(',') : ['tests/integration/**/*.ts'];
 
 console.log('Test Files:', testFiles);
 
