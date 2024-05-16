@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import axios from 'axios';
 import Device from '../../../lib/twilio/device';
+import type Call from '../../../lib/twilio/call';
 import { generateAccessToken } from '../../lib/token';
 const env = require('../../env');
 
@@ -9,29 +10,53 @@ const RELAY_SERVER_URL = 'http://localhost:3030';
 describe('userDefinedMessage', function() {
   this.timeout(1000 * 60 * 10); // 10 minute timeout for the whole suite
 
-  describe('outgoing call', function() {
-    const createOutgoingCallTest = async () => {
-      const token = generateAccessToken(
-        `client-id-eventing-tests-outgoing-call-${Date.now()}`,
-        60 * 3, // 3 minute TTL
-        env.eventingTwimlAppSid,
-      );
-      const device = new Device(token);
-      const call = await device.connect();
-      await new Promise((res) => {
-        console.log('waiting for call to be accepted');
-        call.on('accept', () => {
-          console.log('call accepted');
-          res();
-        });
+  const createCallTest = async () => {
+    const tokenTtl = 60 * 3; // 3 minute TTL
+
+    const aliceId = `client-id-eventing-tests-alice-${Date.now()}`;
+    const aliceToken = generateAccessToken(aliceId, tokenTtl, env.appSid);
+    const aliceDevice = new Device(aliceToken);
+
+    const bobId = `client-id-eventing-tests-bob-${Date.now()}`;
+    const bobToken = generateAccessToken(bobId, tokenTtl, env.appSid);
+    const bobDevice = new Device(bobToken);
+
+    const bobCallPromise = new Promise<Call>((res) => {
+      bobDevice.on(Device.EventName.Incoming, (c) => res(c));
+    });
+    const aliceCall = await aliceDevice.connect({ params: { To: bobId } });
+    const aliceCallAcceptPromise = new Promise((res) => {
+      aliceCall.on('accept', () => {
+        res();
       });
-      return { device, call };
+    });
+    const bobCall = await bobCallPromise;
+    bobCall.accept();
+    await aliceCallAcceptPromise;
+
+    const performTeardown = () => {
+      aliceDevice.destroy();
+      bobDevice.destroy();
     };
 
+    return {
+      performTeardown,
+      alice: {
+        device: aliceDevice,
+        call: aliceCall,
+      },
+      bob: {
+        device: bobDevice,
+        call: bobCall,
+      },
+    };
+  };
+
+  describe('outgoing call leg', function() {
     it(
       'should successfully send a message to the customer server',
       async function() {
-        const { device, call } = await createOutgoingCallTest();
+        const { performTeardown, alice: { call } } = await createCallTest();
 
         const CallSid = call.parameters.CallSid;
         console.log('call sid', CallSid);
@@ -88,12 +113,12 @@ describe('userDefinedMessage', function() {
         assert.strictEqual(receivedMessage.CallSid, CallSid);
         assert.strictEqual(receivedMessage.Sid, eventSid);
 
-        device.destroy();
+        performTeardown();
       },
     );
 
     it('should successfully receive an incoming message', async function() {
-      const { device, call } = await createOutgoingCallTest();
+      const { performTeardown, alice: { call } } = await createCallTest();
 
       const messageReceivedPromise = new Promise<any>((res) => {
         call.on('messageReceived', (msg) => {
@@ -120,7 +145,7 @@ describe('userDefinedMessage', function() {
       assert.strictEqual(receivedMessage.contentType, 'application/json');
       assert.strictEqual(receivedMessage.messageType, 'user-defined-message');
 
-      device.destroy();
+      performTeardown();
     });
   });
 });
