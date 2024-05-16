@@ -188,4 +188,4 @@ const start = async () => {
   });
 };
 
-start().catch(console.error);
+start();
