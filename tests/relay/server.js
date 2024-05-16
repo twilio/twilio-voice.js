@@ -15,7 +15,6 @@ const receivedMessages = new Map();
  *    apiKeySid: string;
  *    apiKeySecret: string;
  *    accountSid: string;
- *    eventingTwimlAppSid: string;
  * }}
  */
 const getEnvVars = () => {
@@ -34,12 +33,7 @@ const getEnvVars = () => {
     throw new Error('ACCOUNT_SID env var not defined.');
   }
 
-  const eventingTwimlAppSid = process.env['EVENTING_TWIML_APP_SID'];
-  if (typeof eventingTwimlAppSid !== 'string') {
-    throw new Error('EVENTING_TWIML_APP_SID env var not defined.');
-  }
-
-  return { apiKeySid, apiKeySecret, accountSid, eventingTwimlAppSid };
+  return { apiKeySid, apiKeySecret, accountSid };
 };
 
 /**

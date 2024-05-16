@@ -21,18 +21,29 @@ describe('userDefinedMessage', function() {
     const bobToken = generateAccessToken(bobId, tokenTtl, env.appSid);
     const bobDevice = new Device(bobToken);
 
+    await bobDevice.register();
     const bobCallPromise = new Promise<Call>((res) => {
       bobDevice.on(Device.EventName.Incoming, (c) => res(c));
     });
+
     const aliceCall = await aliceDevice.connect({ params: { To: bobId } });
+    const bobCall = await bobCallPromise;
+
     const aliceCallAcceptPromise = new Promise((res) => {
       aliceCall.on('accept', () => {
         res();
       });
     });
-    const bobCall = await bobCallPromise;
+    const bobCallAcceptPromise = new Promise((res) => {
+      bobCall.on('accept', () => {
+        res();
+      });
+    });
+
     bobCall.accept();
+
     await aliceCallAcceptPromise;
+    await bobCallAcceptPromise;
 
     const performTeardown = () => {
       aliceDevice.destroy();
