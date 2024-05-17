@@ -164,7 +164,7 @@ const createExpressApp = (authToken, createSubscription, sendMessage) => {
       throw new Error('CallSid is not of type string');
     }
 
-    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader('Cache-Control', 'no-cache');
     res.json(receivedMessages.get(CallSid));
   });
 
