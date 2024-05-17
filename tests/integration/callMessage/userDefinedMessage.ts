@@ -95,14 +95,15 @@ describe('userDefinedMessage', function() {
         assert.strictEqual(msg.voiceEventSid, eventSid);
         console.log('sent message', eventSid);
 
-        // NOTE(mhuynh): Using a quick solution here such that we just wait for
-        // the message from Twilio to reach the test server. Otherwise, there is
-        // a high likelihood that the message will be missed.
+        /**
+         * NOTE(mhuynh): Using a quick solution here such that we just wait for
+         * the message from Twilio to reach the test server. Otherwise, there is
+         * a high likelihood that the message will be missed.
+         */
         await waitFor(3000);
 
-        const receivedMessagesResponse = await axios.post(
-          `${RELAY_SERVER_URL}/get-received-messages`,
-          { CallSid },
+        const receivedMessagesResponse = await axios.get(
+          `${RELAY_SERVER_URL}/get-received-messages/${CallSid}`,
         );
         const receivedMessages = receivedMessagesResponse.data;
         console.log('received messages', receivedMessages);
@@ -151,6 +152,24 @@ describe('userDefinedMessage', function() {
       );
       assert.strictEqual(receivedMessage.contentType, 'application/json');
       assert.strictEqual(receivedMessage.messageType, 'user-defined-message');
+    });
+
+    it('should receive an error if the message type is invalid', async function() {
+      const { device, call } = alice;
+      /**
+       * NOTE(mhuynh): We will be changing the API such that the call emits
+       * the call message error, not the device. Change this when we make that
+       * API change.
+       *
+       * See VBLOCKS-3064
+       */
+      const errorPromise = expectEvent('error', device);
+      call.sendMessage({
+        content: { foo: 'bar' },
+        messageType: 'not-a-valid-message-type',
+      });
+      const error = await errorPromise;
+      assert.strictEqual(error.code, 31210);
     });
   });
 });

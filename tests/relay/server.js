@@ -116,6 +116,7 @@ const createExpressApp = (authToken, createSubscription, sendMessage) => {
   app.use(cors());
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  app.set('trust proxy', 1);
 
   app.post('/create-subscription', async (req, res) => {
     const { CallSid } = req.body;
@@ -154,15 +155,16 @@ const createExpressApp = (authToken, createSubscription, sendMessage) => {
     res.sendStatus(200);
   });
 
-  app.post('/get-received-messages', (req, res) => {
-    console.log('sending received messages', req.body);
+  app.get('/get-received-messages/:CallSid', (req, res) => {
+    console.log('sending received messages', req.params);
 
-    const { CallSid } = req.body;
+    const { CallSid } = req.params;
     if (typeof CallSid !== 'string') {
       res.sendStatus(400);
       throw new Error('CallSid is not of type string');
     }
 
+    res.setHeader("Cache-Control", "no-cache");
     res.json(receivedMessages.get(CallSid));
   });
 
