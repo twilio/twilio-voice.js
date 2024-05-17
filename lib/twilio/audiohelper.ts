@@ -832,10 +832,25 @@ class AudioHelper extends EventEmitter {
       //   then that device is unplugged or plugged back in. We can't check for the 'ended'
       //   event or readyState because it is asynchronous and may take upwards of 5 seconds,
       //   in my testing. (rrowland)
-      if (this.inputDevice !== null && this.inputDevice.deviceId === 'default') {
+      const defaultId = 'default';
+      if (
+        // this.inputDevice is not null if audio.setInputDevice() was explicitly called
+        (this.inputDevice && this.inputDevice.deviceId === defaultId) ||
+
+        // If this.inputDevice is null, and default stream is not null, it means
+        // the user is using the default stream and did not explicitly call audio.setInputDevice()
+        (this._defaultInputDeviceStream && this.availableInputDevices.get(defaultId))
+      ) {
         this._log.warn(`Calling getUserMedia after device change to ensure that the \
           tracks of the active device (default) have not gone stale.`);
-        this._setInputDevice(this.inputDevice.deviceId, true);
+
+        // NOTE(csantos): Updating the stream in the same execution context as the devicechange event
+        // causes the new gUM call to fail silently. Meaning, the gUM call may succeed,
+        // but it won't actually update the stream. We need to update the stream in a different
+        // execution context (setTimeout) to properly update the stream.
+        setTimeout(() => {
+          this._setInputDevice(defaultId, true);
+        }, 0);
       }
       this._log.debug('#deviceChange', lostActiveDevices);
       this.emit('deviceChange', lostActiveDevices);

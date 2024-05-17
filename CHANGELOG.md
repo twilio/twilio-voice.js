@@ -1,5 +1,15 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.11.1 (In Progress)
+====================
+
+Bug Fixes
+---------
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/256) where the input stream stops working after changing the default input device.
+
+- Fixed an echo [issue](https://github.com/twilio/twilio-voice.js/pull/239) where the audio output is duplicated after the device permission is granted.
+
 2.11.0 (May 2, 2024)
 ====================
 
