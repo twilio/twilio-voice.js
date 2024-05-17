@@ -6,42 +6,50 @@ const ngrok = require('@ngrok/ngrok');
 const axios = require('axios').default;
 const express = require('express');
 const cors = require('cors');
+const twilio = require('twilio');
 
 /** @type {Map<string, any[]>} */
 const receivedMessages = new Map();
+
+/**
+ * @param {string} envVarKey
+ * @returns {string}
+ */
+const getEnvVar = (envVarKey) => {
+  const envVarVal = process.env[envVarKey];
+  if (typeof envVarVal !== 'string') {
+    throw new Error(`"${envVarKey}" env var not defined.`);
+  }
+  return envVarVal;
+};
 
 /**
  * @returns {{
  *    apiKeySid: string;
  *    apiKeySecret: string;
  *    accountSid: string;
+ *    authToken: string;
  * }}
  */
 const getEnvVars = () => {
-  const apiKeySid = process.env['API_KEY_SID'];
-  if (typeof apiKeySid !== 'string') {
-    throw new Error('API_KEY_SID env var not defined.');
-  }
-
-  const apiKeySecret = process.env['API_KEY_SECRET'];
-  if (typeof apiKeySecret !== 'string') {
-    throw new Error('API_KEY_SECRET env var not defined.');
-  }
-
-  const accountSid = process.env['ACCOUNT_SID'];
-  if (typeof accountSid !== 'string') {
-    throw new Error('ACCOUNT_SID env var not defined.');
-  }
-
-  return { apiKeySid, apiKeySecret, accountSid };
+  const apiKeySid = getEnvVar('API_KEY_SID');
+  const apiKeySecret = getEnvVar('API_KEY_SECRET');
+  const accountSid = getEnvVar('ACCOUNT_SID');
+  const authToken = getEnvVar('AUTH_TOKEN');
+  return { apiKeySid, apiKeySecret, accountSid, authToken };
 };
 
 /**
- * @typedef {(callSid: string, callbackUrl: string) => Promise<import('axios').AxiosResponse>} CreateSubscription
+ * @typedef {(
+ *   callSid: string,
+ *   callbackUrl: string,
+ * ) => Promise<import('axios').AxiosResponse>} CreateSubscription
  */
 
 /**
- * @typedef {(callSid: string) => Promise<import('axios').AxiosResponse>} SendMessage
+ * @typedef {(
+ *   callSid: string,
+ * ) => Promise<import('axios').AxiosResponse>} SendMessage
  */
 
 /**
@@ -49,7 +57,11 @@ const getEnvVars = () => {
  * @param {string} apiKeySid
  * @param {string} apiKeySecret
  */
-const createTwilioUserDefinedMessageActions = (accountSid, apiKeySid, apiKeySecret) => {
+const createTwilioUserDefinedMessageActions = (
+  accountSid,
+  apiKeySid,
+  apiKeySecret,
+) => {
   const baseUrl = 'https://api.twilio.com/2010-04-01';
   const extendedUrl = `${baseUrl}/Accounts/${accountSid}/Calls`;
 
@@ -94,10 +106,11 @@ const createTwilioUserDefinedMessageActions = (accountSid, apiKeySid, apiKeySecr
 }
 
 /**
+ * @param {string} authToken
  * @param {CreateSubscription} createSubscription
  * @param {SendMessage} sendMessage
  */
-const createExpressApp = (createSubscription, sendMessage) => {
+const createExpressApp = (authToken, createSubscription, sendMessage) => {
   const app = express();
 
   app.use(cors());
@@ -120,6 +133,13 @@ const createExpressApp = (createSubscription, sendMessage) => {
   });
 
   app.post('/receive-message', (req, res) => {
+    const isValidTwilioRequest = twilio.validateExpressRequest(req, authToken);
+    if (!isValidTwilioRequest) {
+      res.sendStatus(400);
+      console.warn('Incoming request is not from Twliio');
+      return;
+    }
+
     console.log('received message', req.body);
 
     const { CallSid } = req.body;
@@ -171,7 +191,12 @@ const start = async () => {
       envVars.apiKeySid,
       envVars.apiKeySecret,
     );
-  const app = createExpressApp(createSubscription, sendMessage);
+
+  const app = createExpressApp(
+    envVars.authToken,
+    createSubscription,
+    sendMessage,
+  );
 
   await ngrok.listen(app);
 

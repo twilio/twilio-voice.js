@@ -55,7 +55,7 @@
     "test:framework:react:run": "mocha ./tests/framework/react.js",
     "test:framework:react": "npm-run-all test:framework:react:*",
     "test:frameworks": "npm-run-all test:framework:no-framework test:framework:react",
-    "test:integration": "karma start $PWD/karma.conf.ts --log-level debug",
+    "test:integration": "karma start $PWD/karma.conf.ts",
     "test:network": "node ./scripts/karma.js $PWD/karma.network.conf.ts",
     "test:relay-server": "node ./tests/relay/server.js",
     "test:selenium": "mocha tests/browser/index.js",
