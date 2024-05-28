@@ -833,14 +833,13 @@ class AudioHelper extends EventEmitter {
       //   event or readyState because it is asynchronous and may take upwards of 5 seconds,
       //   in my testing. (rrowland)
       const defaultId = 'default';
-      if (
-        // this.inputDevice is not null if audio.setInputDevice() was explicitly called
-        (this.inputDevice && this.inputDevice.deviceId === defaultId) ||
-
-        // If this.inputDevice is null, and default stream is not null, it means
+      // this.inputDevice is not null if audio.setInputDevice() was explicitly called
+      const isInputDeviceSet = this.inputDevice && this.inputDevice.deviceId === defaultId;
+      // If this.inputDevice is null, and default stream is not null, it means
         // the user is using the default stream and did not explicitly call audio.setInputDevice()
-        (this._defaultInputDeviceStream && this.availableInputDevices.get(defaultId))
-      ) {
+      const isDefaultDeviceSet = this._defaultInputDeviceStream && this.availableInputDevices.get(defaultId);
+
+      if (isInputDeviceSet || isDefaultDeviceSet) {
         this._log.warn(`Calling getUserMedia after device change to ensure that the \
           tracks of the active device (default) have not gone stale.`);
 
