@@ -836,7 +836,7 @@ class AudioHelper extends EventEmitter {
       // this.inputDevice is not null if audio.setInputDevice() was explicitly called
       const isInputDeviceSet = this.inputDevice && this.inputDevice.deviceId === defaultId;
       // If this.inputDevice is null, and default stream is not null, it means
-        // the user is using the default stream and did not explicitly call audio.setInputDevice()
+      // the user is using the default stream and did not explicitly call audio.setInputDevice()
       const isDefaultDeviceSet = this._defaultInputDeviceStream && this.availableInputDevices.get(defaultId);
 
       if (isInputDeviceSet || isDefaultDeviceSet) {
