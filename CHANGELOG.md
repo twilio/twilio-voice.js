@@ -6,9 +6,9 @@
 Bug Fixes
 ---------
 
-- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/256) where the input stream stops working after changing the default input device.
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/256) where the input stream stops working after changing the default input device. Thanks @varunm0503 for your [contribution](https://github.com/twilio/twilio-voice.js/pull/267).
 
-- Fixed an echo [issue](https://github.com/twilio/twilio-voice.js/pull/239) where the audio output is duplicated after the device permission is granted.
+- Fixed an echo [issue](https://github.com/twilio/twilio-voice.js/pull/239) where the audio output is duplicated after the device permission is granted. Thanks @kmteras for your [contribution](https://github.com/twilio/twilio-voice.js/pull/239).
 
 2.11.0 (May 2, 2024)
 ====================
