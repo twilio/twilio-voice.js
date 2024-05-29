@@ -4,7 +4,7 @@ const AudioHelper = require('../lib/twilio/audiohelper').default;
 const { AudioProcessorEventObserver } = require('../lib/twilio/audioprocessoreventobserver');
 
 function getUserMedia() {
-  return Promise.resolve({ id: 'defaultfakestream', getTracks: () => [] });
+  return Promise.resolve({ id: 'default', getTracks: () => [] });
 }
 
 describe('AudioHelper', () => {
@@ -161,7 +161,7 @@ describe('AudioHelper', () => {
 
       beforeEach(() => {
         stopStub = sinon.stub();
-        getUserMedia = sinon.stub().returns(new Promise(res => res({id: 'defaultfakestream',getTracks: () => [{stop: stopStub}]})));
+        getUserMedia = sinon.stub().returns(new Promise(res => res({id: 'default',getTracks: () => [{stop: stopStub}]})));
         audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
           audioProcessorEventObserver: eventObserver,
           getUserMedia,
@@ -306,7 +306,7 @@ describe('AudioHelper', () => {
       beforeEach(() => {
         stopStub = sinon.stub();
         enumerateDevices = sinon.stub().returns(new Promise(res => res([])));
-        getUserMedia = sinon.stub().returns(new Promise(res => res({id: 'defaultfakestream', getTracks: () => [{stop: stopStub}]})));
+        getUserMedia = sinon.stub().returns(new Promise(res => res({id: 'default', getTracks: () => [{stop: stopStub}]})));
         audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
           audioProcessorEventObserver: eventObserver,
           enumerateDevices,
@@ -580,7 +580,7 @@ describe('AudioHelper', () => {
     describe('.inputStream', () => {
       it('should return the selected input stream', async () => {
         await audio.setInputDevice('input');
-        assert.strictEqual(audio.inputStream.id, 'defaultfakestream');
+        assert.strictEqual(audio.inputStream.id, 'default');
       });
 
       it('should return the processed stream', async () => {
@@ -797,6 +797,48 @@ describe('AudioHelper', () => {
           assert.equal(result.length, 1);
           assert.equal(result[0].deviceId, deviceFoo.deviceId);
         })));
+
+        describe('and the active device is the default device', () => {
+          let clock;
+
+          beforeEach(() => {
+            clock = sinon.useFakeTimers();
+            audio.availableInputDevices.set('default', {});
+            audio._setInputDevice = sinon.stub();
+            availableDevices[2].label = 'abc';
+          });
+
+          afterEach(() => {
+            clock.restore();
+            audio.availableInputDevices.delete('default');
+          });
+
+          context('and the input device was selected manually', () => {
+            it('should update the active device to the new default device in a setTimeout', (done) => {
+              audio.on('deviceChange', () => {
+                sinon.assert.notCalled(audio._setInputDevice);
+                clock.tick(1);
+                sinon.assert.calledWithExactly(audio._setInputDevice, 'default', true);
+                done();
+              });
+              audio._inputDevice = { deviceId: 'default' };
+              handlers.get('devicechange')();
+            });
+          });
+
+          context('and the input device was not selected manually (uses default)', () => {
+            it('should update the active device to the new default device in a setTimeout', (done) => {
+              audio.on('deviceChange', () => {
+                sinon.assert.notCalled(audio._setInputDevice);
+                clock.tick(1);
+                sinon.assert.calledWithExactly(audio._setInputDevice, 'default', true);
+                done();
+              });
+              audio._defaultInputDeviceStream = { id: 'foo' };
+              handlers.get('devicechange')();
+            });
+          });
+        });
       });
 
       context('when an existing non-active device is lost', () => {
