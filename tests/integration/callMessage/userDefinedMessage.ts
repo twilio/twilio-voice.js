@@ -155,15 +155,8 @@ describe('userDefinedMessage', function() {
     });
 
     it('should receive an error if the message type is invalid', async function() {
-      const { device, call } = alice;
-      /**
-       * NOTE(mhuynh): We will be changing the API such that the call emits
-       * the call message error, not the device. Change this when we make that
-       * API change.
-       *
-       * See VBLOCKS-3064
-       */
-      const errorPromise = expectEvent('error', device);
+      const { call } = alice;
+      const errorPromise = expectEvent('error', call);
       call.sendMessage({
         content: { foo: 'bar' },
         messageType: 'not-a-valid-message-type',
