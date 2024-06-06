@@ -6,6 +6,7 @@ const checkDevice = async () => {
     allowIncomingWhileBusy: true,
     appName: 'foo',
     appVersion: 'foo',
+    callMessageEvents: ['user-defined-message'],
     closeProtection: true,
     codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
     disableAudioContextSounds: true,

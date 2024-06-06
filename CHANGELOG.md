@@ -1,5 +1,38 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.11.2 (June 6, 2024)
+====================
+
+New Features
+------------
+
+### CallMessageEvents
+
+Users can now "opt-in" to their desired call message event types. "user-defined-message" will always be opted in by default.  
+- See [Device.Options.callMessageEvents](https://twilio.github.io/twilio-voice.js/interfaces/voice.device.options.html#callMessageEvents)
+
+#### Example
+
+```js
+// Create a Device instance that handles mutliple call message event types
+const options = {
+  callMessageEvents: ['user-defined-message', 'call-progress-event'],
+}
+const device = new Device(token, options);
+
+call.on('messageReceived', (message) => {
+  if (message.messageType === 'call-progress-event') {
+    console.log(JSON.stringify(message.content));
+    //the voiceEventSid can be used for tracking the message
+    console.log('voiceEventSid: ', message.voiceEventSid);
+  } else if (message.messageType === "user-defined-message") {
+    console.log(JSON.stringify(message.content));
+    //the voiceEventSid can be used for tracking the message
+    console.log('voiceEventSid: ', message.voiceEventSid);
+  }
+})
+```
+
 2.11.1 (May 30, 2024)
 ====================
 
