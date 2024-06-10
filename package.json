@@ -57,6 +57,7 @@
     "test:frameworks": "npm-run-all test:framework:no-framework test:framework:react",
     "test:integration": "karma start $PWD/karma.conf.ts",
     "test:network": "node ./scripts/karma.js $PWD/karma.network.conf.ts",
+    "test:relay-server": "node ./tests/relay/server.js",
     "test:selenium": "mocha tests/browser/index.js",
     "test:typecheck": "./node_modules/typescript/bin/tsc tests/typecheck/*.ts --noEmit",
     "test:unit": "nyc mocha -r ts-node/register ./tests/index.ts",
@@ -69,14 +70,17 @@
     "docs:ts"
   ],
   "devDependencies": {
+    "@ngrok/ngrok": "1.2.0",
     "@types/mime": "3.0.0",
     "@types/mocha": "5.2.7",
     "@types/node": "13.1.8",
     "@types/sinon": "9.0.5",
     "@types/ws": "7.2.0",
+    "axios": "1.6.8",
     "babel-plugin-transform-inline-environment-variables": "0.4.3",
     "browserify": "16.5.0",
     "buffer": "5.4.3",
+    "cors": "2.8.5",
     "envify": "4.1.0",
     "es-check": "5.2.4",
     "express": "4.18.2",
@@ -117,7 +121,7 @@
     "ws": "7.4.6"
   },
   "dependencies": {
-    "@twilio/voice-errors": "1.4.0",
+    "@twilio/voice-errors": "1.5.0",
     "@types/md5": "2.3.2",
     "events": "3.3.0",
     "loglevel": "1.6.7",

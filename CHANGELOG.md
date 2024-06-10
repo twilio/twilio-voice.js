@@ -1,6 +1,6 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
-2.11.2 (June 6, 2024)
+2.12.0 (In Progress)
 ====================
 
 New Features
@@ -32,6 +32,20 @@ call.on('messageReceived', (message) => {
   }
 })
 ```
+
+Changes
+-------
+
+- The `CallMessage` API has changed. The type of `Call.Message.messageType` formerly had type `Call.MessageType`. The `Call.MessageType` enumeration has been removed and `Call.Message.messageType` is now of type `string`. The `CallMessage` interface is now as follows:
+```ts
+interface Call.Message {
+  content: any;
+  contentType?: string;
+  messageType: string;
+  voiceEventSid?: string;
+}
+```
+When sending a `Call.Message` using `call.sendMessage()`, if the message type is invalid or not understood by Twilio, an error response will be sent. See this [error page](https://www.twilio.com/docs/api/errors/31210) for further details.
 
 2.11.1 (May 30, 2024)
 ====================
