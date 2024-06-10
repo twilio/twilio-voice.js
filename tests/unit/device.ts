@@ -121,10 +121,6 @@ describe('Device', function() {
       });
     });
 
-    it('should set callMessageEvents to ["user-defined-message"] by default', () => {
-      assert.deepEqual(device['_options'].callMessageEvents, ['user-defined-message'])
-    })
-
     it('should set preflight to false by default', () => {
       assert.equal(device['_options'].preflight, false);
     });

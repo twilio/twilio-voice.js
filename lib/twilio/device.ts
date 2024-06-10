@@ -342,7 +342,7 @@ class Device extends EventEmitter {
    */
   private readonly _defaultOptions: IExtendedDeviceOptions = {
     allowIncomingWhileBusy: false,
-    callMessageEvents: ['user-defined-message'],
+    callMessageEvents: [],
     closeProtection: false,
     codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
     dscp: true,
