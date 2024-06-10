@@ -47,7 +47,7 @@ interface Call.Message {
 ```
 When sending a `Call.Message` using `call.sendMessage()`, if the message type is invalid or not understood by Twilio, an error response will be sent. See this [error page](https://www.twilio.com/docs/api/errors/31210) for further details.
 
-2.11.1 (May 30, 2024)
+2.11.1 (In Progress)
 ====================
 
 Bug Fixes

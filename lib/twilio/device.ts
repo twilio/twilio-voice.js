@@ -1997,13 +1997,6 @@ namespace Device {
      *
      * This feature is opt-in, and will not work until a number greater than 0
      * is explicitly specified within the Device options.
-     *
-     * Read more about edge fallback and signaling reconnection on the
-     * [Edge Locations page](https://www.twilio.com/docs/voice/sdks/javascript/edges#edge-fallback-and-signaling-reconnection).
-     *
-     * **Note:** Setting this option to a value greater than zero means Twilio will not terminate the
-     * call until the timeout has expired. Please take this into consideration if your application
-     * contains webhooks that relies on [call status callbacks](https://www.twilio.com/docs/voice/twiml#callstatus-values).
      */
     maxCallSignalingTimeoutMs?: number;
 
