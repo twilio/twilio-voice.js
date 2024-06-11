@@ -1844,7 +1844,7 @@ namespace Device {
     appVersion?: string;
 
     /**
-     * The callMessage types a client subscribes to. "user-defined-message" will always be opted in by
+     * The callMessage types a client subscribes to. 'user-defined-message' will always be opted in by
      * default.
      */
     callMessageEvents?: string[];

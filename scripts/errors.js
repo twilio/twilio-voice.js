@@ -19,7 +19,6 @@ const USED_ERRORS = [
   'AuthorizationErrors.NoValidAccountError',
   'AuthorizationErrors.PayloadSizeExceededError',
   'AuthorizationErrors.RateExceededError',
-  'AuthorizationErrors.CallMessageEventTypeInvalidError',
   'ClientErrors.BadRequest',
   'ClientErrors.BusyHere',
   'ClientErrors.NotFound',

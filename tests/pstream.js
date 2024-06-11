@@ -391,20 +391,31 @@ describe('PStream', () => {
     ]],
     ['invite', 'invite', [
       {
-        args: ['bar', 'foo', ''],
-        payload: { callsid: 'foo', sdp: 'bar', twilio: {} },
+        args: ['bar', 'foo', '', 'foobar'],
+        payload: { 
+          callMessageEvents: 'foobar',
+          callsid: 'foo', 
+          sdp: 'bar', 
+          twilio: {} 
+         },
         scenario: 'called with empty params'
       },
       {
-        args: ['bar', 'foo', 'baz=zee&foo=2'],
-        payload: { callsid: 'foo', sdp: 'bar', twilio: { params: 'baz=zee&foo=2' } },
+        args: ['bar', 'foo', 'baz=zee&foo=2', 'foobar'],
+        payload: { 
+          callMessageEvents: 'foobar',
+          callsid: 'foo',
+          sdp: 'bar',
+          twilio: { params: 'baz=zee&foo=2' }
+        },
         scenario: 'called with non-empty params'
       },
     ]],
     ['reconnect', 'invite', [
       {
-        args: ['bar', 'foo', 'foobar-reconn-tok'],
+        args: ['bar', 'foo', 'foobar-reconn-tok', 'foobar'],
         payload: {
+          callMessageEvents: 'foobar',
           callsid: 'foo',
           sdp: 'bar',
           reconnect: 'foobar-reconn-tok',
@@ -415,8 +426,8 @@ describe('PStream', () => {
     ]],
     ['answer', 'answer', [
       {
-        args: ['bar', 'foo'],
-        payload: { callsid: 'foo', sdp: 'bar' },
+        args: ['bar', 'foo', 'foobar'],
+        payload: { callMessageEvents: 'foobar', callsid: 'foo', sdp: 'bar' },
         scenario: 'called with sdp and callsid'
       }
     ]],
