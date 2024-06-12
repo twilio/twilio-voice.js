@@ -3,19 +3,13 @@
 2.12.0 (In Progress)
 ====================
 
-Changes
--------
+### Call Message Events
 
-- The `CallMessage` API has changed. The type of `Call.Message.messageType` formerly had type `Call.MessageType`. The `Call.MessageType` enumeration has been removed and `Call.Message.messageType` is now of type `string`. The `CallMessage` interface is now as follows:
-```ts
-interface Call.Message {
-  content: any;
-  contentType?: string;
-  messageType: string;
-  voiceEventSid?: string;
-}
-```
-When sending a `Call.Message` using `call.sendMessage()`, if the message type is invalid or not understood by Twilio, an error response will be sent. See this [error page](https://www.twilio.com/docs/api/errors/31210) for further details.
+The Call Message Events (Beta), originally released in 2.2.0, has been promoted to GA. This release includes the following **breaking changes**.
+
+- [Call.Message.messageType](https://twilio.github.io/twilio-voice.js/interfaces/voice.call.message.html) has been converted from `Call.MessageType` enum to `string`.
+- Call Message related errors are now emitted via [call.on('error', handler(twilioError))](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#errorevent) instead of [device.on('error', handler(twilioError))](https://twilio.github.io/twilio-voice.js/classes/voice.device.html#errorevent).
+- A new error, [31210](https://www.twilio.com/docs/api/errors/31210), has been added to the SDK. This new error is emitted via [call.on('error', handler(twilioError))](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#errorevent) after calling the [sendMessage](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#sendmessage) API with an invalid [Call.Message.messageType](https://twilio.github.io/twilio-voice.js/interfaces/voice.call.message.html).
 
 2.11.1 (May 30, 2024)
 ====================
