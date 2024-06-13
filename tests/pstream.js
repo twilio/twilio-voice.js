@@ -393,7 +393,7 @@ describe('PStream', () => {
       {
         args: ['bar', 'foo', '', 'foobar'],
         payload: { 
-          callMessageEvents: 'foobar',
+          messagetypes: 'foobar',
           callsid: 'foo', 
           sdp: 'bar', 
           twilio: {} 
@@ -403,7 +403,7 @@ describe('PStream', () => {
       {
         args: ['bar', 'foo', 'baz=zee&foo=2', 'foobar'],
         payload: { 
-          callMessageEvents: 'foobar',
+          messagetypes: 'foobar',
           callsid: 'foo',
           sdp: 'bar',
           twilio: { params: 'baz=zee&foo=2' }
@@ -415,7 +415,7 @@ describe('PStream', () => {
       {
         args: ['bar', 'foo', 'foobar-reconn-tok', 'foobar'],
         payload: {
-          callMessageEvents: 'foobar',
+          messagetypes: 'foobar',
           callsid: 'foo',
           sdp: 'bar',
           reconnect: 'foobar-reconn-tok',
@@ -427,7 +427,7 @@ describe('PStream', () => {
     ['answer', 'answer', [
       {
         args: ['bar', 'foo', 'foobar'],
-        payload: { callMessageEvents: 'foobar', callsid: 'foo', sdp: 'bar' },
+        payload: { messagetypes: 'foobar', callsid: 'foo', sdp: 'bar' },
         scenario: 'called with sdp and callsid'
       }
     ]],

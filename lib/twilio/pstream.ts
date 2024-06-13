@@ -222,20 +222,20 @@ PStream.prototype.register = function(mediaCapabilities) {
   this._publish('register', regPayload, true);
 };
 
-PStream.prototype.invite = function(sdp, callsid, params, callMessageEvents) {
+PStream.prototype.invite = function(sdp, callsid, params, messagetypes) {
   const payload = {
-    callMessageEvents,
     callsid,
+    messagetypes,
     sdp,
     twilio: params ? { params } : {},
   };
   this._publish('invite', payload, true);
 };
 
-PStream.prototype.reconnect = function(sdp, callsid, reconnect, callMessageEvents) {
+PStream.prototype.reconnect = function(sdp, callsid, reconnect, messagetypes) {
   const payload = {
-    callMessageEvents,
     callsid,
+    messagetypes,
     reconnect,
     sdp,
     twilio: {},
@@ -243,8 +243,8 @@ PStream.prototype.reconnect = function(sdp, callsid, reconnect, callMessageEvent
   this._publish('invite', payload, true);
 };
 
-PStream.prototype.answer = function(sdp, callsid, callMessageEvents) {
-  this._publish('answer', { sdp, callsid, callMessageEvents }, true);
+PStream.prototype.answer = function(sdp, callsid, messagetypes) {
+  this._publish('answer', { sdp, callsid, messagetypes }, true);
 };
 
 PStream.prototype.dtmf = function(callsid, digits) {
