@@ -929,6 +929,12 @@ describe('Device', function() {
           assert.equal(31005, errorObject.code);
         });
 
+        it('should not emit error if a voiceeventsid is passed', () => {
+          const spy = device.emit = sinon.spy();
+          pstream.emit('error', { error: { code: 31005, twilioError: new GeneralErrors.UnknownError() }, voiceeventsid: 'foo' });
+          sinon.assert.notCalled(spy);
+        });
+
         it('should emit the proper error message', () => {
           const spy = device.emit = sinon.spy();
           pstream.emit('error', { error: { code: 31005, message: 'foobar', twilioError: new GeneralErrors.UnknownError() } });

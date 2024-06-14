@@ -1483,6 +1483,24 @@ class Call extends EventEmitter {
         message: error.message,
         voice_event_sid: voiceeventsid,
       }, this);
+
+      let twilioError;
+      const errorConstructor = getPreciseSignalingErrorByCode(
+        !!this._options.enableImprovedSignalingErrorPrecision,
+        error.code,
+      );
+
+      if (typeof errorConstructor !== 'undefined') {
+        twilioError = new errorConstructor(error);
+      }
+
+      if (!twilioError) {
+        this._log.error('Unknown Call Message Error: ', error);
+        twilioError = new GeneralErrors.UnknownError(error.message, error);
+      }
+
+      this._log.debug('#error', error, twilioError);
+      this.emit('error', twilioError);
     }
    }
 
