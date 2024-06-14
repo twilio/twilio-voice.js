@@ -1230,6 +1230,7 @@ class Call extends EventEmitter {
         this._mediaHandler.version.getSDP(),
         this.parameters.CallSid,
         this._signalingReconnectToken,
+        this._options.callMessageEvents,
       );
     }
   }

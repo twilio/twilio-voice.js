@@ -1844,8 +1844,11 @@ namespace Device {
     appVersion?: string;
 
     /**
-     * The callMessage types a client subscribes to. 'user-defined-message' will always be opted in by
-     * default.
+     * An array of {@link Call.Message.messageType} to subscribe to. Currently, only 'user-defined-message'
+     * is supported. More message types will be added in the future.
+     * See [call resource](https://www.twilio.com/docs/voice/api/call-resource) documentation for more details.
+     *
+     * When subscribed, the SDK will emit the message via {@link Call._onMessageReceived}.
      */
     callMessageEvents?: string[];
 

@@ -32,7 +32,7 @@ describe('Call', function() {
     mediaHandler.setInputTracksFromStream = sinon.spy((rejectCode?: number) => {
       return rejectCode ? Promise.reject({ code: rejectCode }) : Promise.resolve();
     });
-    mediaHandler.answerIncomingCall = sinon.spy((a: any, b: any, c: RTCConfiguration, cb: Function) => {
+    mediaHandler.answerIncomingCall = sinon.spy((a: any, b: any, c: RTCConfiguration, cb: Function, d: any) => {
       callback = cb;
       rtcConfig = c;
     });
@@ -484,6 +484,7 @@ describe('Call', function() {
           Object.assign(options, {
             getInputStream,
             callParameters: { CallSid: 'CA123' },
+            callMessageEvents: ['foo', 'bar'],
             rtcConfiguration: {
               foo: 'bar',
               sdpSemantics: 'unified-plan',
@@ -514,6 +515,13 @@ describe('Call', function() {
             assert.deepEqual(mediaHandler.answerIncomingCall.args[0][2], rtcConfiguration);
           });
         });
+
+        it('should call mediaHandler.answerIncomingCall with callMessageEvents', () => {
+          conn.accept();
+          return wait.then(() => {
+            assert.deepEqual(mediaHandler.answerIncomingCall.args[0][4], ['foo', 'bar'])
+          })
+        })
 
         context('when the success callback is called', () => {
           it('should publish an accepted-by-local event', () => {
@@ -566,6 +574,7 @@ describe('Call', function() {
             k: '0',
             l: 'a$b&c?d=e',
           };
+          options.callMessageEvents = ['foo', 'bar']
           conn = new Call(config, options);
 
           mediaHandler.setInputTracksFromStream = sinon.spy(() => {
@@ -574,7 +583,7 @@ describe('Call', function() {
             return p;
           });
 
-          mediaHandler.makeOutgoingCall = sinon.spy((a: any, b: any, c: any, d: any, _callback: Function) => {
+          mediaHandler.makeOutgoingCall = sinon.spy((a: any, b: any, c: any, d: any, _callback: Function, e: any) => {
             callback = _callback;
           });
         };
@@ -628,6 +637,13 @@ describe('Call', function() {
             assert.deepEqual(mediaHandler.makeOutgoingCall.args[0][3], rtcConfiguration);
           });
         });
+
+        it('should call mediaHandler.makeOutgoingCall with callMessageEvents', () => {
+          conn.accept();
+          return wait.then(() => {
+            assert.deepEqual(mediaHandler.makeOutgoingCall.args[0][5], ['foo', 'bar'])
+          })
+        })
 
         context('when the success callback is called', () => {
           it('should publish an accepted-by-remote event', () => {
