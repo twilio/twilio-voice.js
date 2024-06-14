@@ -1911,7 +1911,11 @@ describe('Call', function() {
             signalingReconnectToken ? 'exists' : 'does not exist'
           }`, () => {
             beforeEach(async () => {
-              conn = new Call(config, Object.assign(options, { callParameters: { CallSid: 'CA1234' } }));
+              conn = new Call(config, Object.assign(options, { 
+                callMessageEvents: ['foo', 'bar'],
+                callParameters: { CallSid: 'CA1234' },
+               })
+              );
               conn.accept();
               await clock.tickAsync(0);
               if (!doesMediaHandlerVersionExist) {
@@ -1928,7 +1932,13 @@ describe('Call', function() {
               doesMediaHandlerVersionExist && signalingReconnectToken ? '' : 'not '
             }call pstream.reconnect()`, async () => {
               if (doesMediaHandlerVersionExist && signalingReconnectToken) {
-                sinon.assert.calledWith(pstream.reconnect, mediaHandler.version.getSDP(), 'CA1234', signalingReconnectToken);
+                sinon.assert.calledWith(
+                  pstream.reconnect,
+                  mediaHandler.version.getSDP(),
+                  'CA1234',
+                  signalingReconnectToken,
+                  ['foo', 'bar']
+                );
               } else {
                 sinon.assert.notCalled(pstream.reconnect);
               }

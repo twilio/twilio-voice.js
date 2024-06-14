@@ -1848,7 +1848,7 @@ namespace Device {
      * is supported. More message types will be added in the future.
      * See [call resource](https://www.twilio.com/docs/voice/api/call-resource) documentation for more details.
      *
-     * When subscribed, the SDK will emit the message via {@link Call._onMessageReceived}.
+     * When subscribed, the SDK will emit the message via {@link Call.messageReceivedEvent}.
      */
     callMessageEvents?: string[];
 
