@@ -342,6 +342,7 @@ class Device extends EventEmitter {
    */
   private readonly _defaultOptions: IExtendedDeviceOptions = {
     allowIncomingWhileBusy: false,
+    callMessageEvents: [],
     closeProtection: false,
     codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
     dscp: true,
@@ -977,6 +978,7 @@ class Device extends EventEmitter {
       'allowIncomingWhileBusy',
       'appName',
       'appVersion',
+      'callMessageEvents',
       'closeProtection',
       'codecPreferences',
       'disableAudioContextSounds',
@@ -1041,6 +1043,7 @@ class Device extends EventEmitter {
         this._activeCall.disconnect();
         this._removeCall(this._activeCall);
       },
+      callMessageEvents: this._options.callMessageEvents,
       codecPreferences: this._options.codecPreferences,
       customSounds: this._options.sounds,
       dialtonePlayer: Device._dialtonePlayer,
@@ -1839,6 +1842,15 @@ namespace Device {
      * track down when application-level bugs were introduced.
      */
     appVersion?: string;
+
+    /**
+     * An array of {@link Call.Message.messageType} to subscribe to. Currently, only 'user-defined-message'
+     * is supported. More message types will be added in the future.
+     * See [call resource](https://www.twilio.com/docs/voice/api/call-resource) documentation for more details.
+     *
+     * When subscribed, the SDK will emit the message via {@link Call.messageReceivedEvent}.
+     */
+    callMessageEvents?: string[];
 
     /**
      * Whether to enable close protection, to prevent users from accidentally

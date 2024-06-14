@@ -472,6 +472,7 @@ describe('PeerConnection', () => {
     const eCallSid = 'callSid';
     const eSDP = 'sdp';
     const eIceServers = 'iceServers';
+    const eCallMessageEvents = 'callMessageEvents'
 
     let context = null;
     let version = null;
@@ -504,7 +505,8 @@ describe('PeerConnection', () => {
         eCallSid,
         eSDP,
         eIceServers,
-        callback
+        callback,
+        eCallMessageEvents
       );
     });
 
@@ -544,7 +546,7 @@ describe('PeerConnection', () => {
       context.status = false;
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
-      assert(context.pstream.answer.calledWithExactly(sdp1, eCallSid));
+      assert(context.pstream.answer.calledWithExactly(sdp1, eCallSid, eCallMessageEvents));
       assert(context.pstream.answer.calledOn(context.pstream));
       assert(version.processSDP.calledOnce);
       assert(version.processSDP.calledWithExactly(undefined, undefined, eSDP, {audio: true}, sinon.match.func, sinon.match.func));
@@ -786,6 +788,7 @@ describe('PeerConnection', () => {
     const eIceServers = 'iceServers';
     const eIss = 'this is iss';
     const eSDP = 'sdp';
+    const eCallMessageEvents = 'callMessageEvents'
 
     let context = null;
     let version = null;
@@ -828,6 +831,7 @@ describe('PeerConnection', () => {
         eCallSid,
         eIceServers,
         callback,
+        eCallMessageEvents,
       );
     });
 
@@ -868,7 +872,7 @@ describe('PeerConnection', () => {
       assert(version.createOffer.calledWithExactly(undefined, undefined, {audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
       assert(context.pstream.invite.calledOnce);
-      assert(context.pstream.invite.calledWithExactly(eSDP, eCallSid, eParams));
+      assert(context.pstream.invite.calledWithExactly(eSDP, eCallSid, eParams, eCallMessageEvents));
       assert(version.getSDP.calledOnce);
       assert(version.getSDP.calledWithExactly());
       assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
@@ -878,13 +882,13 @@ describe('PeerConnection', () => {
     it('Should call onOfferSuccess and pstream reconnect when createOffer calls success callback and status is not closed', () => {
       context.status = 'not closed';
       version.createOffer.callsArg(3);
-      METHOD.call(context, eParams, 'reconnectToken', eCallSid, eIceServers, callback);
+      METHOD.call(context, eParams, 'reconnectToken', eCallSid, eIceServers, callback, eCallMessageEvents);
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.createOffer.calledOnce);
       assert(version.createOffer.calledWithExactly(undefined, undefined, {audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
       assert(context.pstream.reconnect.calledOnce);
-      assert(context.pstream.reconnect.calledWithExactly(eSDP, eCallSid, 'reconnectToken'));
+      assert(context.pstream.reconnect.calledWithExactly(eSDP, eCallSid, 'reconnectToken', eCallMessageEvents));
       assert(version.getSDP.calledOnce);
       assert(version.getSDP.calledWithExactly());
       assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
@@ -901,7 +905,7 @@ describe('PeerConnection', () => {
       assert(version.createOffer.calledWithExactly(undefined, undefined, {audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
       assert(context.pstream.invite.calledOnce);
-      assert(context.pstream.invite.calledWithExactly(eSDP, eCallSid, eParams));
+      assert(context.pstream.invite.calledWithExactly(eSDP, eCallSid, eParams, eCallMessageEvents));
       assert(version.getSDP.calledOnce);
       assert(version.getSDP.calledWithExactly());
       assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));

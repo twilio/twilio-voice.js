@@ -884,7 +884,7 @@ PeerConnection.prototype.iceRestart = function() {
   });
 };
 
-PeerConnection.prototype.makeOutgoingCall = function(params, signalingReconnectToken, callsid, rtcConfiguration, onMediaStarted) {
+PeerConnection.prototype.makeOutgoingCall = function(params, signalingReconnectToken, callsid, rtcConfiguration, onMediaStarted, callMessageEvents) {
   if (!this._initializeMediaStream(rtcConfiguration)) {
     return;
   }
@@ -922,9 +922,9 @@ PeerConnection.prototype.makeOutgoingCall = function(params, signalingReconnectT
   function onOfferSuccess() {
     if (self.status !== 'closed') {
       if (signalingReconnectToken) {
-        self.pstream.reconnect(self.version.getSDP(), self.callSid, signalingReconnectToken);
+        self.pstream.reconnect(self.version.getSDP(), self.callSid, signalingReconnectToken, callMessageEvents);
       } else {
-        self.pstream.invite(self.version.getSDP(), self.callSid, params);
+        self.pstream.invite(self.version.getSDP(), self.callSid, params, callMessageEvents);
       }
       self._setupRTCDtlsTransportListener();
     }
@@ -941,7 +941,7 @@ PeerConnection.prototype.makeOutgoingCall = function(params, signalingReconnectT
 
   this.version.createOffer(this.options.maxAverageBitrate, this.codecPreferences, { audio: true }, onOfferSuccess, onOfferError);
 };
-PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfiguration, onMediaStarted) {
+PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfiguration, onMediaStarted, callMessageEvents) {
   if (!this._initializeMediaStream(rtcConfiguration)) {
     return;
   }
@@ -951,7 +951,7 @@ PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfigur
   const self = this;
   function onAnswerSuccess() {
     if (self.status !== 'closed') {
-      self.pstream.answer(self.version.getSDP(), callSid);
+      self.pstream.answer(self.version.getSDP(), callSid, callMessageEvents);
       if (self.options) {
         self._setEncodingParameters(self.options.dscp);
       }

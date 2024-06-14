@@ -279,6 +279,7 @@ class Call extends EventEmitter {
    */
   private _options: Call.Options = {
     MediaHandler: PeerConnection,
+    callMessageEvents: [],
     enableImprovedSignalingErrorPrecision: false,
     offerSdp: null,
     shouldPlayDisconnect: () => true,
@@ -684,13 +685,14 @@ class Call extends EventEmitter {
         this._isAnswered = true;
         this._pstream.on('answer', this._onAnswer);
         this._mediaHandler.answerIncomingCall(this.parameters.CallSid,
-          this._options.offerSdp, rtcConfiguration, onAnswer);
+          this._options.offerSdp, rtcConfiguration, onAnswer, this._options.callMessageEvents);
       } else {
         const params = Array.from(this.customParameters.entries()).map(pair =>
          `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
         this._pstream.on('answer', this._onAnswer);
         this._mediaHandler.makeOutgoingCall(params, this._signalingReconnectToken,
-          this._options.reconnectCallSid || this.outboundConnectionId, rtcConfiguration, onAnswer);
+          this._options.reconnectCallSid || this.outboundConnectionId, rtcConfiguration, onAnswer,
+          this._options.callMessageEvents);
       }
     };
 
@@ -1228,6 +1230,7 @@ class Call extends EventEmitter {
         this._mediaHandler.version.getSDP(),
         this.parameters.CallSid,
         this._signalingReconnectToken,
+        this._options.callMessageEvents,
       );
     }
   }
@@ -1919,6 +1922,12 @@ namespace Call {
      * A method to call before Call.accept is processed.
      */
     beforeAccept?: (call: Call) => void;
+
+    /**
+     * The callMessage types a client subscribes to. 'user-defined-message' will always be opted in by
+     * default.
+     */
+    callMessageEvents?: string[];
 
     /**
      * Custom format context parameters associated with this call.
