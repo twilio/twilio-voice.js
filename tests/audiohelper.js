@@ -471,6 +471,42 @@ describe('AudioHelper', () => {
           });
         });
 
+        describe('inputDevicePromise', () => {
+          [0, null, undefined, {}, false, true, 'non-existent'].forEach((id) => {
+            it(`should reject if id is ${id} and set the internal promise to null`, async () => {
+              audio.setInputDevice(id);
+              const promise = audio._getInputDevicePromise();
+              assert(!!promise);
+              const stub = sinon.stub();
+              try {
+                await promise;
+              } catch {
+                stub();
+              }
+              sinon.assert.calledOnce(stub);
+              assert(!audio._getInputDevicePromise());
+            });
+          });
+
+          it('should resolve and set the internal promise to null', async () => {
+            audio.setInputDevice('input');
+            const promise = audio._getInputDevicePromise();
+            assert(!!promise);
+            await promise;
+            assert(!audio._getInputDevicePromise());
+          });
+
+          it('should resolve and set the internal promise to null when called multiple times with the same id', async () => {
+            for(let i = 0; i < 5; i++) {
+              audio.setInputDevice('input');
+              const promise = audio._getInputDevicePromise();
+              assert(!!promise);
+              await promise;
+              assert(!audio._getInputDevicePromise());
+            }
+          });
+        });
+
         context('when the ID passed is new and valid', () => {
           it('should return a resolved Promise', () => audio.setInputDevice('input'));
 

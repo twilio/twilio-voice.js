@@ -1019,6 +1019,14 @@ class Device extends EventEmitter {
       throw new InvalidStateError('Device has not been initialized.');
     }
 
+    // Wait for the input device if it's set by the user
+    const inputDevicePromise = this._audio?._getInputDevicePromise();
+    if (inputDevicePromise) {
+      this._log.debug('inputDevicePromise detected, waiting..');
+      await inputDevicePromise;
+      this._log.debug('inputDevicePromise resolved');
+    }
+
     const config: Call.Config = {
       audioHelper: this._audio,
       isUnifiedPlanDefault: Device._isUnifiedPlanDefault,
