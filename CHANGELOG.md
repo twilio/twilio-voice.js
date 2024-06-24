@@ -1,5 +1,17 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.11.2 (In Progress)
+====================
+
+- Fixed an issue where an `AcquisitionFailedError` is raised when making a call while a `setInputDevice` invocation is still in progress. The following snippet will reproduce the issue.
+  ```js
+  // Call setInputDevice without waiting for it to resolve e.g. using 'await'
+  device.audio.setInputDevice(id);
+
+  // Calling device.connect immediately raises an AcquisitionFailedError error
+  device.connect(...);
+  ```
+
 2.11.1 (May 30, 2024)
 ====================
 
