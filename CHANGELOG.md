@@ -12,6 +12,18 @@ The Call Message Events (Beta), originally released in 2.2.0, has been promoted 
 - A new error, [31210](https://www.twilio.com/docs/api/errors/31210), has been added to the SDK. This new error is emitted via [call.on('error', handler(twilioError))](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#errorevent) after calling the [sendMessage](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#sendmessage) API with an invalid [Call.Message.messageType](https://twilio.github.io/twilio-voice.js/interfaces/voice.call.message.html).
 - Fixed an issue where the wrong error code `31209` is raised if the payload size of a Call Message Event exceeds the authorized limit. With this release, `31212` is raised instead.
 
+2.11.2 (In Progress)
+====================
+
+- Fixed an issue where an `AcquisitionFailedError` is raised when making a call while a `setInputDevice` invocation is still in progress. The following snippet will reproduce the issue.
+  ```js
+  // Call setInputDevice without waiting for it to resolve e.g. using 'await'
+  device.audio.setInputDevice(id);
+
+  // Calling device.connect immediately raises an AcquisitionFailedError error
+  device.connect(...);
+  ```
+
 2.11.1 (May 30, 2024)
 ====================
 
