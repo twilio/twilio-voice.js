@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>Status | @twilio/voice-sdk</title>
+	<title>MessageType | @twilio/voice-sdk</title>
 	<meta name="description" content="">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" href="../assets/css/main.css">
@@ -47,13 +47,13 @@
 					<a href="../modules/voice.html">Voice</a>
 				</li>
 				<li>
-					<a href="../classes/voice.preflighttest.html">PreflightTest</a>
+					<a href="../classes/voice.call.html">Call</a>
 				</li>
 				<li>
-					<a href="voice.preflighttest.status.html">Status</a>
+					<a href="voice.call.messagetype.html">MessageType</a>
 				</li>
 			</ul>
-			<h1>Enumeration Status</h1>
+			<h1>Enumeration MessageType</h1>
 		</div>
 	</div>
 </header>
@@ -63,7 +63,7 @@
 			<section class="tsd-panel tsd-comment">
 				<div class="tsd-comment tsd-typography">
 					<div class="lead">
-						<p>Possible status of the test.</p>
+						<p>Known call message types.</p>
 					</div>
 				</div>
 			</section>
@@ -74,10 +74,7 @@
 						<section class="tsd-index-section ">
 							<h3>Enumeration members</h3>
 							<ul class="tsd-index-list">
-								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="voice.preflighttest.status.html#completed" class="tsd-kind-icon">Completed</a></li>
-								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="voice.preflighttest.status.html#connected" class="tsd-kind-icon">Connected</a></li>
-								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="voice.preflighttest.status.html#connecting" class="tsd-kind-icon">Connecting</a></li>
-								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="voice.preflighttest.status.html#failed" class="tsd-kind-icon">Failed</a></li>
+								<li class="tsd-kind-enum-member tsd-parent-kind-enum"><a href="voice.call.messagetype.html#userdefinedmessage" class="tsd-kind-icon">User<wbr>Defined<wbr>Message</a></li>
 							</ul>
 						</section>
 					</div>
@@ -86,62 +83,20 @@
 			<section class="tsd-panel-group tsd-member-group ">
 				<h2>Enumeration members</h2>
 				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
-					<a name="completed" class="tsd-anchor"></a>
-					<h3>Completed</h3>
-					<div class="tsd-signature tsd-kind-icon">Completed<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;completed&quot;</span></div>
+					<a name="userdefinedmessage" class="tsd-anchor"></a>
+					<h3>User<wbr>Defined<wbr>Message</h3>
+					<div class="tsd-signature tsd-kind-icon">User<wbr>Defined<wbr>Message<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;user-defined-message&quot;</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/00b5b393/lib/twilio/preflight/preflight.ts#L712">lib/twilio/preflight/preflight.ts:712</a></li>
+							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/00b5b393/lib/twilio/call.ts#L1813">lib/twilio/call.ts:1813</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
 						<div class="lead">
-							<p>The connection to Twilio has been disconnected and the test call has completed.</p>
-						</div>
-					</div>
-				</section>
-				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
-					<a name="connected" class="tsd-anchor"></a>
-					<h3>Connected</h3>
-					<div class="tsd-signature tsd-kind-icon">Connected<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;connected&quot;</span></div>
-					<aside class="tsd-sources">
-						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/00b5b393/lib/twilio/preflight/preflight.ts#L707">lib/twilio/preflight/preflight.ts:707</a></li>
-						</ul>
-					</aside>
-					<div class="tsd-comment tsd-typography">
-						<div class="lead">
-							<p>Call to Twilio has been established.</p>
-						</div>
-					</div>
-				</section>
-				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
-					<a name="connecting" class="tsd-anchor"></a>
-					<h3>Connecting</h3>
-					<div class="tsd-signature tsd-kind-icon">Connecting<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;connecting&quot;</span></div>
-					<aside class="tsd-sources">
-						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/00b5b393/lib/twilio/preflight/preflight.ts#L702">lib/twilio/preflight/preflight.ts:702</a></li>
-						</ul>
-					</aside>
-					<div class="tsd-comment tsd-typography">
-						<div class="lead">
-							<p>Call to Twilio has initiated.</p>
-						</div>
-					</div>
-				</section>
-				<section class="tsd-panel tsd-member tsd-kind-enum-member tsd-parent-kind-enum">
-					<a name="failed" class="tsd-anchor"></a>
-					<h3>Failed</h3>
-					<div class="tsd-signature tsd-kind-icon">Failed<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol"> = &quot;failed&quot;</span></div>
-					<aside class="tsd-sources">
-						<ul>
-							<li>Defined in <a href="https://github.com/twilio/twilio-voice.js/blob/00b5b393/lib/twilio/preflight/preflight.ts#L717">lib/twilio/preflight/preflight.ts:717</a></li>
-						</ul>
-					</aside>
-					<div class="tsd-comment tsd-typography">
-						<div class="lead">
-							<p>The test has stopped and failed.</p>
+							<p>Allows for any object types to be defined by the user.
+								When this value is used in the <a href="../interfaces/voice.call.message.html">Call.Message</a> object,
+								The <a href="../interfaces/voice.call.message.html#content">Call.Message.content</a> can be of any type as long as
+							it matches the MIME type defined in <a href="../interfaces/voice.call.message.html#contenttype">Call.Message.contentType</a>.</p>
 						</div>
 					</div>
 				</section>
@@ -181,22 +136,13 @@
 				</ul>
 				<ul class="current">
 					<li class="current tsd-kind-class tsd-parent-kind-module">
-						<a href="../classes/voice.preflighttest.html" class="tsd-kind-icon">Preflight<wbr>Test</a>
+						<a href="../classes/voice.call.html" class="tsd-kind-icon">Call</a>
 						<ul>
 							<li class="current tsd-kind-enum tsd-parent-kind-class tsd-is-static">
-								<a href="voice.preflighttest.status.html" class="tsd-kind-icon">Status</a>
+								<a href="voice.call.messagetype.html" class="tsd-kind-icon">Message<wbr>Type</a>
 								<ul>
 									<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
-										<a href="voice.preflighttest.status.html#completed" class="tsd-kind-icon">Completed</a>
-									</li>
-									<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
-										<a href="voice.preflighttest.status.html#connected" class="tsd-kind-icon">Connected</a>
-									</li>
-									<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
-										<a href="voice.preflighttest.status.html#connecting" class="tsd-kind-icon">Connecting</a>
-									</li>
-									<li class=" tsd-kind-enum-member tsd-parent-kind-enum">
-										<a href="voice.preflighttest.status.html#failed" class="tsd-kind-icon">Failed</a>
+										<a href="voice.call.messagetype.html#userdefinedmessage" class="tsd-kind-icon">User<wbr>Defined<wbr>Message</a>
 									</li>
 								</ul>
 							</li>
