@@ -1022,7 +1022,7 @@ class Device extends EventEmitter {
     // Wait for the input device if it's set by the user
     const inputDevicePromise = this._audio?._getInputDevicePromise();
     if (inputDevicePromise) {
-      this._log.debug('inputDevicePromise detected, waiting..');
+      this._log.debug('inputDevicePromise detected, waiting...');
       await inputDevicePromise;
       this._log.debug('inputDevicePromise resolved');
     }
