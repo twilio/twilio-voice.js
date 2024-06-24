@@ -484,7 +484,7 @@ describe('AudioHelper', () => {
                 stub();
               }
               sinon.assert.calledOnce(stub);
-              assert(!audio._getInputDevicePromise());
+              assert.strictEqual(audio._getInputDevicePromise(), null);
             });
           });
 
@@ -493,7 +493,7 @@ describe('AudioHelper', () => {
             const promise = audio._getInputDevicePromise();
             assert(!!promise);
             await promise;
-            assert(!audio._getInputDevicePromise());
+            assert.strictEqual(audio._getInputDevicePromise(), null);
           });
 
           it('should resolve and set the internal promise to null when called multiple times with the same id', async () => {
@@ -502,7 +502,7 @@ describe('AudioHelper', () => {
               const promise = audio._getInputDevicePromise();
               assert(!!promise);
               await promise;
-              assert(!audio._getInputDevicePromise());
+              assert.strictEqual(audio._getInputDevicePromise(), null);
             }
           });
         });
