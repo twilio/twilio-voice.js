@@ -13,12 +13,14 @@ let page;
 describe('Chrome extension tests', () => {
   beforeEach(async () => {
     browser = await puppeteer.launch({
-      headless: false,
+      headless: true,
       slowMo: 100,
       args: [
         `--disable-extensions-except=${EXTENSION_PATH}`,
         `--load-extension=${EXTENSION_PATH}`,
         `--use-fake-ui-for-media-stream`,
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
       ],
     });
 
