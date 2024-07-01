@@ -13,6 +13,7 @@ let page;
 describe('Chrome extension tests', () => {
   beforeEach(async () => {
     browser = await puppeteer.launch({
+      dumpio: true,
       headless: true,
       slowMo: 100,
       args: [
