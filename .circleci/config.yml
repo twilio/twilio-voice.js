@@ -130,6 +130,7 @@ commands:
       - run:
           name: "Extension: Puppeteer test"
           command: |
+            sudo service dbus start
             cd tests/extension
             npm run test:extension
 
