@@ -24,16 +24,16 @@ async function setupDevice(identity, recepient, connectToken) {
   const { token } = await getJson('http://127.0.0.1:3030/token?identity=' + device2ClientIdentity);
   
   device = new Twilio.Device(token, { logLevel: 1 });
+  /**
+   * NOTE(kchoy): This is the second device created in this extension. device2ClientIdentity
+   * calls device1ClientIdentity in worker.js
+   */ 
 
   // The recepient parameter is provided to the offscreen document
   // when making an outgoing call. If it exists, we initiate the call right away.
-  if (recepient) {
+  if (recepient) { 
     call = await device.connect({ params: { recepient } });
-    // setupCallHandlers(call);
-  } else if(connectToken) {
-    incomingCallConnectToken = connectToken;
-    playIncomingSound();
-  }
+  };
 }
 
 function setupCallHandlers(call) {

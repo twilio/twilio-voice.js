@@ -38,6 +38,10 @@ function setStatus(status) {
   } else if (status === 'idle') {
     showButtons('call');
   } else if (status === 'incoming') {
+  /**
+    * NOTE(kchoy): To verify an incoming call has occured, for 
+    * e2e testing, manually set innerHTML.
+    */ 
     incomingCallTestEl.innerHTML = "Incoming call has occured"
     showButtons('accept', 'reject');
   } else if (status === 'inprogress') {

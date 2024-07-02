@@ -44,7 +44,6 @@ describe('Chrome extension tests', () => {
         width: 1200,
         height: 800,
       });
-      await delay(3000);
       return page;
     }
 
@@ -54,7 +53,7 @@ describe('Chrome extension tests', () => {
       return { browser, page };
     }
     ({ page } = await setUpBrowser());
-  }, 10000);
+  });
 
   afterEach(async () => {
     await browser.close();
@@ -79,7 +78,7 @@ describe('Chrome extension tests', () => {
     await textBox.type('test-extension-identity');
     const callButton = await page.$('#call');
     await callButton.click();
-    await delay(5000);
+    await delay(5000); // allow time for call to occur
     const testIncoming = await page.$('#test-incoming');
     const testIncomingText = await page.evaluate(
       (element) => element.innerText.trim(),

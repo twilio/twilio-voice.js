@@ -19,18 +19,6 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 });
 
-// Open welcome page and ask for user media permissions
-// after installation
-chrome.runtime.onInstalled.addListener((details) => {
-  if (details.reason.search(/install/g) === -1) {
-    return;
-  }
-  // chrome.tabs.create({
-  //   url: 'welcome/welcome.html',
-  //   active: true,
-  // });
-});
-
 // Messages coming from different sources (popup and offscreen documents)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'init' && sender.url.includes('popup')) {
@@ -67,6 +55,10 @@ async function init() {
   const data = await response.json();
   const device = new Twilio.Device(data.token, { logLevel: 1 });
   await device.register();
+  /**
+   * NOTE(kchoy): This is the first device created in this extension. device1ClientIdentity
+   * is registered to receive an incoming call from device2ClientIdentity in offscreen.js
+   */ 
 
   device.on('incoming', (call) => {
     call.on('disconnect', reset);
