@@ -58,7 +58,7 @@ async function init() {
   /**
    * NOTE(kchoy): This is the first device created in this extension. device1ClientIdentity
    * is registered to receive an incoming call from device2ClientIdentity in offscreen.js
-   */ 
+   */
 
   device.on('incoming', (call) => {
     call.on('disconnect', reset);
@@ -66,7 +66,6 @@ async function init() {
     call.on('reject', reset);
     incomingCall = call;
     setState({ status: 'incoming' });
-    launchOffscreen(device1ClientIdentity);
   });
 }
 
