@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer');
-const EXTENSION_PATH = '../extension/app';
+const EXTENSION_PATH = 'tests/extension/app';
+const assert = require('assert');
 
 function delay(time) {
   return new Promise(function (resolve) {
@@ -10,7 +11,8 @@ function delay(time) {
 let browser;
 let page;
 
-describe('Chrome extension tests', () => {
+describe('Chrome extension tests', function () {
+  this.timeout(10000);
   beforeEach(async () => {
     browser = await puppeteer.launch({
       dumpio: true,
@@ -67,7 +69,7 @@ describe('Chrome extension tests', () => {
       title
     );
     const expectedTitleText = 'Twilio Dialer';
-    expect(titleText).toBe(expectedTitleText);
+    assert.equal(titleText, expectedTitleText);
   });
 
   it('should allow worker.js to make outgoing call, and receive incoming call', async () => {
@@ -85,6 +87,6 @@ describe('Chrome extension tests', () => {
       testIncoming
     );
     const expectedIncomingText = 'Incoming call has occured';
-    expect(testIncomingText).toBe(expectedIncomingText);
-  }, 20000);
+    assert.equal(testIncomingText, expectedIncomingText);
+  });
 });
