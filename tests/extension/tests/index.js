@@ -74,12 +74,12 @@ describe('Chrome extension tests', function () {
 
   it('should allow worker.js to make outgoing call, and receive incoming call', async function () {
     const initButton = await page.$('[data-test-id=init]');
-    await initButton.click();
+    await initButton.evaluate((b) => b.click());
 
     const textBox = await page.$('[data-test-id=recepient]');
     await textBox.type('test-extension-identity');
     const callButton = await page.$('[data-test-id=call]');
-    await callButton.click();
+    await callButton.evaluate((b) => b.click());
     await delay(5000); // allow time for call to occur
     const testIncoming = await page.$('[data-test-id=test-incoming]');
     const testIncomingText = await page.evaluate(
