@@ -135,7 +135,7 @@ Use the following policy directives to enable [CSP](https://developer.mozilla.or
 
 ```
 script-src https://media.twiliocdn.com https://sdk.twilio.com
-media-src mediastream https://media.twiliocdn.com https://sdk.twilio.com
+media-src mediastream: https://media.twiliocdn.com https://sdk.twilio.com
 connect-src https://eventgw.twilio.com wss://voice-js.roaming.twilio.com https://media.twiliocdn.com https://sdk.twilio.com
 ```
 
