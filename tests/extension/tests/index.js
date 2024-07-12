@@ -12,7 +12,7 @@ let browser;
 let page;
 
 describe('Chrome extension tests', function () {
-  this.timeout(10000);
+  this.timeout(30000);
   beforeEach(async function () {
     browser = await puppeteer.launch({
       dumpio: true,
@@ -73,11 +73,14 @@ describe('Chrome extension tests', function () {
   });
 
   it('should allow worker.js to make outgoing call, and receive incoming call', async function () {
+    await delay(5000); // allow time for call to occu
     const initButton = await page.$('[data-test-id=init]');
     await initButton.evaluate((b) => b.click());
 
+    await delay(3000); // allow time for call to occur
     const textBox = await page.$('[data-test-id=recepient]');
     await textBox.type('test-extension-identity');
+    await delay(3000); // allow time for call to occur
     const callButton = await page.$('[data-test-id=call]');
     await callButton.evaluate((b) => b.click());
     await delay(5000); // allow time for call to occur
