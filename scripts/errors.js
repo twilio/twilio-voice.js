@@ -17,6 +17,7 @@ const USED_ERRORS = [
   'AuthorizationErrors.JWTTokenExpirationTooLongError',
   'AuthorizationErrors.JWTTokenExpiredError',
   'AuthorizationErrors.NoValidAccountError',
+  'AuthorizationErrors.ReconnectAttemptError',
   'AuthorizationErrors.PayloadSizeExceededError',
   'AuthorizationErrors.RateExceededError',
   'AuthorizationErrors.CallMessageEventTypeInvalidError',

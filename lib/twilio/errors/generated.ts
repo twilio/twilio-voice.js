@@ -889,17 +889,13 @@ export namespace AuthorizationErrors {
     }
   }
 
-  export class PayloadSizeExceededError extends TwilioError {
-    causes: string[] = [
-      'The payload size of Call Message Event exceeds the authorized limit.',
-    ];
+  export class ReconnectAttemptError extends TwilioError {
+    causes: string[] = [];
     code: number = 31209;
-    description: string = 'Call Message Event Payload size exceeded authorized limit.';
-    explanation: string = 'The request performed to send a Call Message Event exceeds the payload size authorized limit';
-    name: string = 'PayloadSizeExceededError';
-    solutions: string[] = [
-      'Reduce payload size of Call Message Event to be within the authorized limit and try again.',
-    ];
+    description: string = 'Reconnect attempt is not authorized.';
+    explanation: string = '';
+    name: string = 'ReconnectAttemptError';
+    solutions: string[] = [];
 
     constructor();
     constructor(message: string);
@@ -907,7 +903,7 @@ export namespace AuthorizationErrors {
     constructor(message: string, error: Error | object);
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
-      Object.setPrototypeOf(this, AuthorizationErrors.PayloadSizeExceededError.prototype);
+      Object.setPrototypeOf(this, AuthorizationErrors.ReconnectAttemptError.prototype);
 
       const message: string = typeof messageOrError === 'string'
         ? messageOrError
@@ -941,6 +937,39 @@ export namespace AuthorizationErrors {
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, AuthorizationErrors.CallMessageEventTypeInvalidError.prototype);
+
+      const message: string = typeof messageOrError === 'string'
+        ? messageOrError
+        : this.explanation;
+
+      const originalError: Error | object | undefined = typeof messageOrError === 'object'
+        ? messageOrError
+        : error;
+
+      this.message = `${this.name} (${this.code}): ${message}`;
+      this.originalError = originalError;
+    }
+  }
+
+  export class PayloadSizeExceededError extends TwilioError {
+    causes: string[] = [
+      'The payload size of Call Message Event exceeds the authorized limit.',
+    ];
+    code: number = 31212;
+    description: string = 'Call Message Event Payload size exceeded authorized limit.';
+    explanation: string = 'The request performed to send a Call Message Event exceeds the payload size authorized limit';
+    name: string = 'PayloadSizeExceededError';
+    solutions: string[] = [
+      'Reduce payload size of Call Message Event to be within the authorized limit and try again.',
+    ];
+
+    constructor();
+    constructor(message: string);
+    constructor(error: Error | object);
+    constructor(message: string, error: Error | object);
+    constructor(messageOrError?: string | Error | object, error?: Error | object) {
+      super(messageOrError, error);
+      Object.setPrototypeOf(this, AuthorizationErrors.PayloadSizeExceededError.prototype);
 
       const message: string = typeof messageOrError === 'string'
         ? messageOrError
@@ -1232,8 +1261,9 @@ export const errorsByCode: ReadonlyMap<number, any> = new Map([
   [ 31205, AuthorizationErrors.JWTTokenExpiredError ],
   [ 31206, AuthorizationErrors.RateExceededError ],
   [ 31207, AuthorizationErrors.JWTTokenExpirationTooLongError ],
-  [ 31209, AuthorizationErrors.PayloadSizeExceededError ],
+  [ 31209, AuthorizationErrors.ReconnectAttemptError ],
   [ 31210, AuthorizationErrors.CallMessageEventTypeInvalidError ],
+  [ 31212, AuthorizationErrors.PayloadSizeExceededError ],
   [ 31401, UserMediaErrors.PermissionDeniedError ],
   [ 31402, UserMediaErrors.AcquisitionFailedError ],
   [ 53000, SignalingErrors.ConnectionError ],

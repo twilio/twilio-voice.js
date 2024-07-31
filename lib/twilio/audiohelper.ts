@@ -134,6 +134,11 @@ class AudioHelper extends EventEmitter {
   private _inputDevice: MediaDeviceInfo | null = null;
 
   /**
+   * The internal promise created when calling setInputDevice
+   */
+  private _inputDevicePromise: Promise<void> | null = null;
+
+  /**
    * An AnalyserNode to use for input volume.
    */
   private _inputVolumeAnalyser?: AnalyserNode;
@@ -283,6 +288,14 @@ class AudioHelper extends EventEmitter {
     this._maybeStopPollingVolume();
     this.removeAllListeners();
     this._unbind();
+  }
+
+  /**
+   * Promise to wait for the input device, if setInputDevice is called outside of the SDK
+   * @private
+   */
+  _getInputDevicePromise(): Promise<void> | null {
+    return this._inputDevicePromise;
   }
 
   /**
@@ -738,45 +751,51 @@ class AudioHelper extends EventEmitter {
    *   the specified device is already active.
    */
   private _setInputDevice(deviceId: string, forceGetUserMedia: boolean): Promise<void> {
-    if (typeof deviceId !== 'string') {
-      return Promise.reject(new InvalidArgumentError('Must specify the device to set'));
-    }
-
-    const device: MediaDeviceInfo | undefined = this.availableInputDevices.get(deviceId);
-    if (!device) {
-      return Promise.reject(new InvalidArgumentError(`Device not found: ${deviceId}`));
-    }
-
-    this._log.info('Setting input device. ID: ' + deviceId);
-
-    if (this._inputDevice && this._inputDevice.deviceId === deviceId && this._selectedInputDeviceStream) {
-      if (!forceGetUserMedia) {
-        return Promise.resolve();
+    const setInputDevice = async () => {
+      if (typeof deviceId !== 'string') {
+        return Promise.reject(new InvalidArgumentError('Must specify the device to set'));
       }
 
-      // If the currently active track is still in readyState `live`, gUM may return the same track
-      // rather than returning a fresh track.
-      this._log.info('Same track detected on setInputDevice, stopping old tracks.');
-      this._stopSelectedInputDeviceStream();
-    }
+      const device: MediaDeviceInfo | undefined = this.availableInputDevices.get(deviceId);
+      if (!device) {
+        return Promise.reject(new InvalidArgumentError(`Device not found: ${deviceId}`));
+      }
 
-    // Release the default device in case it was created previously
-    this._stopDefaultInputDeviceStream();
+      this._log.info('Setting input device. ID: ' + deviceId);
 
-    const constraints = { audio: Object.assign({ deviceId: { exact: deviceId } }, this.audioConstraints) };
-    this._log.info('setInputDevice: getting new tracks.');
-    return this._getUserMedia(constraints).then((originalStream: MediaStream) => {
+      if (this._inputDevice && this._inputDevice.deviceId === deviceId && this._selectedInputDeviceStream) {
+        if (!forceGetUserMedia) {
+          return Promise.resolve();
+        }
 
-      this._destroyProcessedStream();
+        // If the currently active track is still in readyState `live`, gUM may return the same track
+        // rather than returning a fresh track.
+        this._log.info('Same track detected on setInputDevice, stopping old tracks.');
+        this._stopSelectedInputDeviceStream();
+      }
 
-      return this._maybeCreateProcessedStream(originalStream).then((newStream) => {
-        this._log.info('setInputDevice: invoking _onActiveInputChanged.');
-        return this._onActiveInputChanged(newStream).then(() => {
-          this._replaceStream(originalStream);
-          this._inputDevice = device;
-          this._maybeStartPollingVolume();
+      // Release the default device in case it was created previously
+      this._stopDefaultInputDeviceStream();
+
+      const constraints = { audio: Object.assign({ deviceId: { exact: deviceId } }, this.audioConstraints) };
+      this._log.info('setInputDevice: getting new tracks.');
+      return this._getUserMedia(constraints).then((originalStream: MediaStream) => {
+
+        this._destroyProcessedStream();
+
+        return this._maybeCreateProcessedStream(originalStream).then((newStream) => {
+          this._log.info('setInputDevice: invoking _onActiveInputChanged.');
+          return this._onActiveInputChanged(newStream).then(() => {
+            this._replaceStream(originalStream);
+            this._inputDevice = device;
+            this._maybeStartPollingVolume();
+          });
         });
       });
+    };
+
+    return this._inputDevicePromise = setInputDevice().finally(() => {
+      this._inputDevicePromise = null;
     });
   }
 

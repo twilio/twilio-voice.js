@@ -275,6 +275,20 @@ describe('Device', function() {
           rtcConfiguration = { iceServers: ['foo', 'bar'] } as any;
         });
 
+        it('should wait for the inputDevicePromise to resolve', async () => {
+          const stub = sinon.stub();
+          device.audio!._getInputDevicePromise = () => new Promise(res => res(stub()));
+          await device.connect();
+          sinon.assert.calledOnce(stub);
+          assert(!!device['_activeCall']);
+        });
+
+        it('should reject if inputDevicePromise rejects', async () => {
+          device.audio!._getInputDevicePromise = () => new Promise((resolve, reject) => reject());
+          await assert.rejects(() => device.connect());
+          assert(!device['_activeCall']);
+        });
+
         it('should reject if there is already an active call', async () => {
           await device.connect();
           await assert.rejects(() => device.connect(), /A Call is already active/);
