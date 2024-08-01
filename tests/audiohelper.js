@@ -7,6 +7,19 @@ function getUserMedia() {
   return Promise.resolve({ id: 'default', getTracks: () => [] });
 }
 
+const defaultNavigator = {
+  permissions: {
+    query: function() {
+      return Promise.resolve('prompt');
+    }
+  },
+  mediaDevices: {
+    enumerateDevices: function(){
+      return Promise.resolve([]);
+    }
+  }
+};
+
 describe('AudioHelper', () => {
   context('when enumerateDevices is not supported', () => {
     const noop = () => {};
@@ -34,7 +47,7 @@ describe('AudioHelper', () => {
         ? navigator
         : undefined;
       HTMLAudioElement = undefined;
-      navigator = { };
+      navigator = defaultNavigator;
     });
 
     after(() => {
@@ -68,6 +81,8 @@ describe('AudioHelper', () => {
     let availableDevices;
     let handlers;
     let mediaDevices;
+    let oldHTMLAudioElement;
+    let oldNavigator;
 
     beforeEach(() => {
       eventObserver = new AudioProcessorEventObserver();
@@ -100,6 +115,23 @@ describe('AudioHelper', () => {
       });
     });
 
+    before(() => {
+      oldHTMLAudioElement = typeof HTMLAudioElement !== 'undefined'
+        ? HTMLAudioElement
+        : undefined;
+      oldNavigator = typeof navigator !== 'undefined'
+        ? navigator
+        : undefined;
+      HTMLAudioElement = undefined;
+      navigator = defaultNavigator
+    });
+
+    after(() => {
+      HTMLAudioElement = oldHTMLAudioElement;
+      navigator = oldNavigator;
+    });
+
+
     describe('constructor', () => {
       it('should set .isOutputSelectionSupported to true', () => {
         assert.equal(audio.isOutputSelectionSupported, true);
@@ -123,6 +155,24 @@ describe('AudioHelper', () => {
         assert.deepStrictEqual(result, ['bar']);
       });
     });
+
+    describe('navigator.permissions', () => {
+      it('should listen for microphone state changes', () => {
+        let onChangeHandler = sinon.stub();
+        let microphonePermissionStatus = {
+          state: 'prompt',
+          addEventListener: (eventName, listener) => {
+            if (eventName === 'change') {
+              listener()
+            }
+          }
+        };
+        navigator.permissions.query = () => Promise.resolve(microphonePermissionStatus);
+        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {});
+        microphonePermissionStatus.addEventListener('change', onChangeHandler);
+        sinon.assert.calledOnce(onChangeHandler);
+      })
+    })
 
     describe('._destroy', () => {
       it('should properly dispose the audio instance', () => {

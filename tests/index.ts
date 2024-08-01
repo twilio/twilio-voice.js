@@ -73,6 +73,11 @@ root.navigator = {
   },
   platform: 'platform',
   userAgent: 'userAgent',
+  permissions: {
+    query: function() {
+      return Promise.resolve('prompt');
+    }
+  }
 };
 
 root.RTCPeerConnection = root.window.RTCPeerConnection = function() { };

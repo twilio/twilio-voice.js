@@ -275,6 +275,16 @@ class AudioHelper extends EventEmitter {
     if (isEnumerationSupported) {
       this._initializeEnumeration();
     }
+
+    navigator.permissions.query({ name: 'microphone' as PermissionName }).then((microphonePermissionStatus) => {
+      if (microphonePermissionStatus.state !== 'granted') {
+        const handleStateChange = () => {
+          this._updateAvailableDevices();
+          microphonePermissionStatus.removeEventListener('change', this._updateAvailableDevices);
+        };
+        microphonePermissionStatus.addEventListener('change', handleStateChange);
+      }
+    }).catch((reason) => this._log.warn(`Warning: unable to listen for microphone permission changes. ${reason}`));
   }
 
   /**
