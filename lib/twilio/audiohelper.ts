@@ -166,7 +166,7 @@ class AudioHelper extends EventEmitter {
   /**
    * The microphone permission status
    */
-  private _microphonePermissionStatus: PermissionStatus;
+  private _microphonePermissionStatus: PermissionStatus | null;
 
   /**
    * Called with the new input stream when the active input is changed.
@@ -412,7 +412,9 @@ class AudioHelper extends EventEmitter {
    * @private
    */
   _stopMicrophonePermissionListener(): void {
-    this._microphonePermissionStatus.removeEventListener('change', this._onMicrophonePermissionStatusChanged);
+    if (this._microphonePermissionStatus?.removeEventListener) {
+      this._microphonePermissionStatus.removeEventListener('change', this._onMicrophonePermissionStatusChanged);
+    }
   }
 
   /**
