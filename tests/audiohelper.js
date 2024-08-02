@@ -180,6 +180,7 @@ describe('AudioHelper', () => {
         audio._stopSelectedInputDeviceStream = sinon.stub();
         audio._destroyProcessedStream = sinon.stub();
         audio._maybeStopPollingVolume = sinon.stub();
+        audio._stopMicrophonePermissionListener = sinon.stub();
         audio._destroy();
         assert.strictEqual(audio.eventNames().length, 0);
         sinon.assert.calledOnce(audio._stopDefaultInputDeviceStream);
@@ -187,7 +188,7 @@ describe('AudioHelper', () => {
         sinon.assert.calledOnce(audio._destroyProcessedStream);
         sinon.assert.calledOnce(audio._maybeStopPollingVolume);
         sinon.assert.calledOnce(mediaDevices.removeEventListener);
-
+        sinon.assert.calledOnce(audio._stopMicrophonePermissionListener);
       });
     });
 

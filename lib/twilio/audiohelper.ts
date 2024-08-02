@@ -164,9 +164,19 @@ class AudioHelper extends EventEmitter {
   private _mediaDevices: AudioHelper.MediaDevicesLike | null;
 
   /**
+   * The microphone permission status
+   */
+  private _microphonePermissionStatus: PermissionStatus;
+
+  /**
    * Called with the new input stream when the active input is changed.
    */
   private _onActiveInputChanged: (stream: MediaStream | null) => Promise<void>;
+
+  /**
+   * Handler for microphone permission status change
+   */
+  private _onMicrophonePermissionStatusChanged: () => void;
 
   /**
    * Internal reference to the processed stream
@@ -276,13 +286,17 @@ class AudioHelper extends EventEmitter {
       this._initializeEnumeration();
     }
 
-    navigator.permissions.query({ name: 'microphone' as PermissionName }).then((microphonePermissionStatus) => {
+    // NOTE (kchoy): Currently microphone permissions are not supported in firefox.
+    // https://github.com/mozilla/standards-positions/issues/19#issuecomment-370158947
+    navigator.permissions.query({ name: 'microphone' }).then((microphonePermissionStatus) => {
       if (microphonePermissionStatus.state !== 'granted') {
         const handleStateChange = () => {
           this._updateAvailableDevices();
           microphonePermissionStatus.removeEventListener('change', this._updateAvailableDevices);
         };
         microphonePermissionStatus.addEventListener('change', handleStateChange);
+        this._microphonePermissionStatus = microphonePermissionStatus;
+        this._onMicrophonePermissionStatusChanged = handleStateChange;
       }
     }).catch((reason) => this._log.warn(`Warning: unable to listen for microphone permission changes. ${reason}`));
   }
@@ -297,6 +311,7 @@ class AudioHelper extends EventEmitter {
     this._destroyProcessedStream();
     this._maybeStopPollingVolume();
     this.removeAllListeners();
+    this._stopMicrophonePermissionListener();
     this._unbind();
   }
 
@@ -390,6 +405,14 @@ class AudioHelper extends EventEmitter {
       this._defaultInputDeviceStream = null;
       this._destroyProcessedStream();
     }
+  }
+
+  /**
+   * Remove event listener for microphone permissions
+   * @private
+   */
+  _stopMicrophonePermissionListener(): void {
+    this._microphonePermissionStatus.removeEventListener('change', this._onMicrophonePermissionStatusChanged);
   }
 
   /**
