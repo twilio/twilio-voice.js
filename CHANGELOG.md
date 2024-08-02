@@ -1,5 +1,13 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.11.3 (August 2, 2024)
+======================
+
+Improvements
+------------
+
+- The SDK now updates its internal device list when the microphone permission changes
+
 2.11.2 (June 26, 2024)
 ======================
 
