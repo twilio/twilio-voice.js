@@ -11,7 +11,7 @@ Bug Fixes
 Improvements
 ------------
 
-- The SDK now updates its internal device list when the microphone permission changes
+- The SDK now updates its internal device list when the microphone permission changes.
 
 2.11.2 (June 26, 2024)
 ======================

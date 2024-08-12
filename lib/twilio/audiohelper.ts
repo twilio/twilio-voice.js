@@ -292,7 +292,6 @@ class AudioHelper extends EventEmitter {
       if (microphonePermissionStatus.state !== 'granted') {
         const handleStateChange = () => {
           this._updateAvailableDevices();
-          microphonePermissionStatus.removeEventListener('change', this._updateAvailableDevices);
         };
         microphonePermissionStatus.addEventListener('change', handleStateChange);
         this._microphonePermissionStatus = microphonePermissionStatus;
@@ -404,16 +403,6 @@ class AudioHelper extends EventEmitter {
       this._defaultInputDeviceStream.getTracks().forEach(track => track.stop());
       this._defaultInputDeviceStream = null;
       this._destroyProcessedStream();
-    }
-  }
-
-  /**
-   * Remove event listener for microphone permissions
-   * @private
-   */
-  _stopMicrophonePermissionListener(): void {
-    if (this._microphonePermissionStatus?.removeEventListener) {
-      this._microphonePermissionStatus.removeEventListener('change', this._onMicrophonePermissionStatusChanged);
     }
   }
 
@@ -832,6 +821,15 @@ class AudioHelper extends EventEmitter {
     return this._inputDevicePromise = setInputDevice().finally(() => {
       this._inputDevicePromise = null;
     });
+  }
+
+  /**
+   * Remove event listener for microphone permissions
+   */
+  private _stopMicrophonePermissionListener(): void {
+    if (this._microphonePermissionStatus?.removeEventListener) {
+      this._microphonePermissionStatus.removeEventListener('change', this._onMicrophonePermissionStatusChanged);
+    }
   }
 
   /**
