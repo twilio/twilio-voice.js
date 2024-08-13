@@ -3,7 +3,15 @@
 2.11.3 (In Progress)
 ======================
 
+Bug Fixes
+---------
+
 - Fixed an issue where `PreflightTest` throws an error when `RTCIceCandidateStatsReport` is not available. Thanks @phi-line for your [contribution](https://github.com/twilio/twilio-voice.js/pull/280).
+
+Improvements
+------------
+
+- The SDK now updates its internal device list when the microphone permission changes.
 
 2.11.2 (June 26, 2024)
 ======================
