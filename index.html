@@ -159,7 +159,7 @@
 				</a>
 				<p>Use the following policy directives to enable <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP">CSP</a> that is compatible with twilio-voice.js.</p>
 				<pre><code>script-src http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span>
-media-src mediastream http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span>
+media-src mediastream: http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span>
 connect-src http<span class="hljs-variable">s:</span>//eventgw.twilio.<span class="hljs-keyword">com</span> <span class="hljs-keyword">ws</span><span class="hljs-variable">s:</span>//voice-js.roaming.twilio.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//media.twiliocdn.<span class="hljs-keyword">com</span> http<span class="hljs-variable">s:</span>//sdk.twilio.<span class="hljs-keyword">com</span>
 </code></pre>
 				<p>If you are providing a non-default value for <code>Device.ConnectOptions.edge</code> parameter, you need to add the Signaling URI <code>wss://voice-js.{edgeId}.twilio.com</code> in your <code>connect-src</code> directive where <code>edgeId</code> is the <code>Edge ID</code> as defined in this <a href="https://www.twilio.com/docs/global-infrastructure/edge-locations">page</a>. See examples below.</p>
