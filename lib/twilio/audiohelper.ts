@@ -292,6 +292,7 @@ class AudioHelper extends EventEmitter {
       if (microphonePermissionStatus.state !== 'granted') {
         const handleStateChange = () => {
           this._updateAvailableDevices();
+          this._stopMicrophonePermissionListener();
         };
         microphonePermissionStatus.addEventListener('change', handleStateChange);
         this._microphonePermissionStatus = microphonePermissionStatus;

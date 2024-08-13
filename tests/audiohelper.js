@@ -1,5 +1,6 @@
 const assert = require('assert');
 const sinon = require('sinon');
+const EventTarget = require('./eventtarget');
 const AudioHelper = require('../lib/twilio/audiohelper').default;
 const { AudioProcessorEventObserver } = require('../lib/twilio/audioprocessoreventobserver');
 
@@ -7,20 +8,9 @@ function getUserMedia() {
   return Promise.resolve({ id: 'default', getTracks: () => [] });
 }
 
-const defaultNavigator = {
-  permissions: {
-    query: function() {
-      return Promise.resolve('prompt');
-    }
-  },
-  mediaDevices: {
-    enumerateDevices: function(){
-      return Promise.resolve([]);
-    }
-  }
-};
-
 describe('AudioHelper', () => {
+  const wait = () => new Promise(res => res());
+
   context('when enumerateDevices is not supported', () => {
     const noop = () => {};
 
@@ -47,7 +37,7 @@ describe('AudioHelper', () => {
         ? navigator
         : undefined;
       HTMLAudioElement = undefined;
-      navigator = defaultNavigator;
+      navigator = { };
     });
 
     after(() => {
@@ -81,8 +71,6 @@ describe('AudioHelper', () => {
     let availableDevices;
     let handlers;
     let mediaDevices;
-    let oldHTMLAudioElement;
-    let oldNavigator;
 
     beforeEach(() => {
       eventObserver = new AudioProcessorEventObserver();
@@ -115,23 +103,6 @@ describe('AudioHelper', () => {
       });
     });
 
-    before(() => {
-      oldHTMLAudioElement = typeof HTMLAudioElement !== 'undefined'
-        ? HTMLAudioElement
-        : undefined;
-      oldNavigator = typeof navigator !== 'undefined'
-        ? navigator
-        : undefined;
-      HTMLAudioElement = undefined;
-      navigator = defaultNavigator
-    });
-
-    after(() => {
-      HTMLAudioElement = oldHTMLAudioElement;
-      navigator = oldNavigator;
-    });
-
-
     describe('constructor', () => {
       it('should set .isOutputSelectionSupported to true', () => {
         assert.equal(audio.isOutputSelectionSupported, true);
@@ -157,22 +128,58 @@ describe('AudioHelper', () => {
     });
 
     describe('navigator.permissions', () => {
-      it('should listen for microphone state changes', () => {
-        let onChangeHandler = sinon.stub();
-        let microphonePermissionStatus = {
-          state: 'prompt',
-          addEventListener: (eventName, listener) => {
-            if (eventName === 'change') {
-              listener()
-            }
+      let oldMicPerm;
+      let mockMicPerm;
+      let mockEventTarget;
+      let enumerateDevices;
+
+      beforeEach(() => {
+        enumerateDevices = sinon.stub().returns(new Promise(res => res([])));
+        oldMicPerm = navigator.permissions;
+        mockEventTarget = new EventTarget();
+        mockMicPerm = {
+          query: function() {
+            return Promise.resolve(mockEventTarget);
           }
         };
-        navigator.permissions.query = () => Promise.resolve(microphonePermissionStatus);
-        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {});
-        microphonePermissionStatus.addEventListener('change', onChangeHandler);
-        sinon.assert.calledOnce(onChangeHandler);
-      })
-    })
+        navigator.permissions = mockMicPerm;
+      });
+
+      afterEach(() => {
+        navigator.permissions = oldMicPerm;
+      });
+
+      it('should update list of devices when microphone state is not granted', async () => {
+        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, { enumerateDevices });
+        await wait();
+        mockEventTarget.dispatchEvent({ type: 'change' });
+        sinon.assert.calledTwice(enumerateDevices);
+      });
+
+      it('should update list of devices only once', async () => {
+        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, { enumerateDevices });
+        await wait();
+        mockEventTarget.dispatchEvent({ type: 'change' });
+        mockEventTarget.dispatchEvent({ type: 'change' });
+        sinon.assert.calledTwice(enumerateDevices);
+      });
+
+      it('should not update list of devices when microphone state is granted', async () => {
+        mockEventTarget.state = 'granted';
+        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, { enumerateDevices });
+        await wait();
+        mockEventTarget.dispatchEvent({ type: 'change' });
+        sinon.assert.calledOnce(enumerateDevices);
+      });
+
+      it('should remove the onchange handler on destroy', async () => {
+        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, { enumerateDevices });
+        await wait();
+        audio._destroy();
+        mockEventTarget.dispatchEvent({ type: 'change' });
+        sinon.assert.calledOnce(enumerateDevices);
+      });
+    });
 
     describe('._destroy', () => {
       it('should properly dispose the audio instance', () => {
@@ -188,7 +195,6 @@ describe('AudioHelper', () => {
         sinon.assert.calledOnce(audio._destroyProcessedStream);
         sinon.assert.calledOnce(audio._maybeStopPollingVolume);
         sinon.assert.calledOnce(mediaDevices.removeEventListener);
-        sinon.assert.calledOnce(audio._stopMicrophonePermissionListener);
       });
     });
 
