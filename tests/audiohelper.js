@@ -16,7 +16,7 @@ describe('AudioHelper', () => {
 
     let audio;
     let oldHTMLAudioElement;
-    let oldNavigator;
+    let oldMediaDevices;
 
     beforeEach(() => {
       audio = new AudioHelper(noop, noop, {
@@ -33,16 +33,15 @@ describe('AudioHelper', () => {
       oldHTMLAudioElement = typeof HTMLAudioElement !== 'undefined'
         ? HTMLAudioElement
         : undefined;
-      oldNavigator = typeof navigator !== 'undefined'
-        ? navigator
-        : undefined;
       HTMLAudioElement = undefined;
-      navigator = { };
+
+      oldMediaDevices = navigator.mediaDevices;
+      navigator.mediaDevices = undefined;
     });
 
     after(() => {
       HTMLAudioElement = oldHTMLAudioElement;
-      navigator = oldNavigator;
+      navigator.mediaDevices = oldMediaDevices;
     });
 
     describe('constructor', () => {
@@ -187,7 +186,6 @@ describe('AudioHelper', () => {
         audio._stopSelectedInputDeviceStream = sinon.stub();
         audio._destroyProcessedStream = sinon.stub();
         audio._maybeStopPollingVolume = sinon.stub();
-        audio._stopMicrophonePermissionListener = sinon.stub();
         audio._destroy();
         assert.strictEqual(audio.eventNames().length, 0);
         sinon.assert.calledOnce(audio._stopDefaultInputDeviceStream);
