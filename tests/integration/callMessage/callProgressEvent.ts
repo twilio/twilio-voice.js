@@ -65,13 +65,15 @@ describe('callProgressEvent', function() {
     };
   };
 
-//   beforeEach(() => {
-//     teardown = () => {};
-//   });
+  beforeEach(() => {
+    teardown = () => {};
+  });
 
-//   afterEach(() => {
-//     teardown?.();
-//   });
+  afterEach(() => {
+    if (teardown) {
+      teardown();
+    }
+  });
 
 //   // NOTE(mhuynh): Once backend changes are done to facilitate call message
 //   // event type filtering, we can re-enable this test.
