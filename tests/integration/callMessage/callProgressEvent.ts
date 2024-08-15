@@ -6,64 +6,64 @@ import { generateAccessToken } from '../../lib/token';
 import { expectEvent } from '../../lib/util';
 const env = require('../../env');
 
-// function waitFor(n: number, reject?: boolean) {
-//   return new Promise((res, rej) => setTimeout(reject ? rej : res, n));
-// }
+function waitFor(n: number, reject?: boolean) {
+  return new Promise((res, rej) => setTimeout(reject ? rej : res, n));
+}
 
-// describe('callProgressEvent', function() {
-//   let teardown: () => void;
+describe('callProgressEvent', function() {
+  let teardown: () => void;
 
-//   this.timeout(1000 * 60 * 10); // 10 minute timeout for the whole suite
+  this.timeout(1000 * 60 * 10); // 10 minute timeout for the whole suite
 
-//   const setup = async (aliceOptions: any, bobOptions: any, tokenTtl = 180) => {
-//     const aliceId = `client-id-call-message-tests-alice-${Date.now()}`;
-//     const aliceToken = generateAccessToken(aliceId, tokenTtl, env.appSid);
-//     const aliceDevice = new Device(aliceToken, aliceOptions);
+  const setup = async (aliceOptions: any, bobOptions: any, tokenTtl = 180) => {
+    const aliceId = `client-id-call-message-tests-alice-${Date.now()}`;
+    const aliceToken = generateAccessToken(aliceId, tokenTtl, env.appSid);
+    const aliceDevice = new Device(aliceToken, aliceOptions);
 
-//     const bobId = `client-id-call-message-tests-bob-${Date.now()}`;
-//     const bobToken = generateAccessToken(bobId, tokenTtl, env.appSid);
-//     const bobDevice = new Device(bobToken, bobOptions);
+    const bobId = `client-id-call-message-tests-bob-${Date.now()}`;
+    const bobToken = generateAccessToken(bobId, tokenTtl, env.appSid);
+    const bobDevice = new Device(bobToken, bobOptions);
 
-//     teardown = () => {
-//       aliceDevice.destroy();
-//       bobDevice.destroy();
-//     };
+    teardown = () => {
+      aliceDevice.destroy();
+      bobDevice.destroy();
+    };
 
-//     await bobDevice.register();
+    await bobDevice.register();
 
-//     const bobCallPromise: Promise<Call> = expectEvent(
-//       Device.EventName.Incoming,
-//       bobDevice,
-//     );
+    const bobCallPromise: Promise<Call> = expectEvent(
+      Device.EventName.Incoming,
+      bobDevice,
+    );
 
-//     const aliceCall = await aliceDevice.connect({ params: { To: bobId } });
-//     const bobCall = await bobCallPromise;
+    const aliceCall = await aliceDevice.connect({ params: { To: bobId } });
+    const bobCall = await bobCallPromise;
 
-//     const aliceMessageReceivedSpy = sinon.spy();
-//     const bobMessageReceivedSpy = sinon.spy();
+    const aliceMessageReceivedSpy = sinon.spy();
+    const bobMessageReceivedSpy = sinon.spy();
 
-//     aliceCall.on('messageReceived', aliceMessageReceivedSpy);
-//     bobCall.on('messageReceived', bobMessageReceivedSpy);
+    aliceCall.on('messageReceived', aliceMessageReceivedSpy);
+    bobCall.on('messageReceived', bobMessageReceivedSpy);
 
-//     const aliceCallAcceptPromise = expectEvent('accept', aliceCall);
-//     const bobCallAcceptPromise = expectEvent('accept', bobCall);
+    const aliceCallAcceptPromise = expectEvent('accept', aliceCall);
+    const bobCallAcceptPromise = expectEvent('accept', bobCall);
 
-//     bobCall.accept();
+    bobCall.accept();
 
-//     await aliceCallAcceptPromise;
-//     await bobCallAcceptPromise;
+    await aliceCallAcceptPromise;
+    await bobCallAcceptPromise;
 
-//     await waitFor(5000);
+    await waitFor(5000);
 
-//     return {
-//       aliceDevice,
-//       bobDevice,
-//       aliceCall,
-//       bobCall,
-//       aliceMessageReceivedSpy,
-//       bobMessageReceivedSpy,
-//     };
-//   };
+    return {
+      aliceDevice,
+      bobDevice,
+      aliceCall,
+      bobCall,
+      aliceMessageReceivedSpy,
+      bobMessageReceivedSpy,
+    };
+  };
 
 //   beforeEach(() => {
 //     teardown = () => {};
@@ -138,8 +138,4 @@ const env = require('../../env');
 //       );
 //     },
 //   );
-// });
-
-describe('empty test suite', function() {
-  it('does nothing', function() {});
 });
