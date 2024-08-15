@@ -1,10 +1,10 @@
-// import * as assert from 'assert';
-// import * as sinon from 'sinon';
-// import Device from '../../../lib/twilio/device';
-// import type Call from '../../../lib/twilio/call';
-// import { generateAccessToken } from '../../lib/token';
-// import { expectEvent } from '../../lib/util';
-// const env = require('../../env');
+import * as assert from 'assert';
+import * as sinon from 'sinon';
+import Device from '../../../lib/twilio/device';
+import type Call from '../../../lib/twilio/call';
+import { generateAccessToken } from '../../lib/token';
+import { expectEvent } from '../../lib/util';
+const env = require('../../env');
 
 // function waitFor(n: number, reject?: boolean) {
 //   return new Promise((res, rej) => setTimeout(reject ? rej : res, n));
