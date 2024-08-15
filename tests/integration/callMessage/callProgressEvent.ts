@@ -70,7 +70,9 @@ describe('callProgressEvent', function() {
   });
 
   afterEach(() => {
-    teardown?.();
+    if (teardown) {
+      teardown();
+    }
   });
 
   // NOTE(mhuynh): Once backend changes are done to facilitate call message
