@@ -78,21 +78,21 @@ describe('callProgressEvent', function() {
   // NOTE(mhuynh): Once backend changes are done to facilitate call message
   // event type filtering, we can re-enable this test.
   // See VBLOCKS-3332
-  it.skip(
-    'does not receive call progress events',
-    async function() {
-      const callMessageEvents = [];
-      const deviceOptions = { callMessageEvents };
+  // it(
+  //   'does not receive call progress events',
+  //   async function() {
+  //     const callMessageEvents = [];
+  //     const deviceOptions = { callMessageEvents };
 
-      const { aliceMessageReceivedSpy, bobMessageReceivedSpy } = await setup(
-        deviceOptions,
-        deviceOptions,
-      );
+  //     const { aliceMessageReceivedSpy, bobMessageReceivedSpy } = await setup(
+  //       deviceOptions,
+  //       deviceOptions,
+  //     );
 
-      sinon.assert.notCalled(aliceMessageReceivedSpy);
-      sinon.assert.notCalled(bobMessageReceivedSpy);
-    },
-  );
+  //     sinon.assert.notCalled(aliceMessageReceivedSpy);
+  //     sinon.assert.notCalled(bobMessageReceivedSpy);
+  //   },
+  // );
 
   it(
     'receives call progress events',
