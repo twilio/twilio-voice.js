@@ -94,50 +94,50 @@ describe('callProgressEvent', function() {
 //     },
 //   );
 
-//   it(
-//     'receives call progress events',
-//     async function() {
-//       const callMessageEvents = ['call-progress-event'];
-//       const deviceOptions = { callMessageEvents };
+  it(
+    'receives call progress events',
+    async function() {
+      const callMessageEvents = ['call-progress-event'];
+      const deviceOptions = { callMessageEvents };
 
-//       const { aliceCall, aliceMessageReceivedSpy, bobMessageReceivedSpy } =
-//         await setup(deviceOptions, deviceOptions);
+      const { aliceCall, aliceMessageReceivedSpy, bobMessageReceivedSpy } =
+        await setup(deviceOptions, deviceOptions);
 
-//       aliceCall.disconnect();
+      aliceCall.disconnect();
 
-//       await waitFor(5000);
+      await waitFor(5000);
 
-//       const expectedCallProgressEvents =
-//         ['ringing', 'initiated', 'in-progress'];
+      const expectedCallProgressEvents =
+        ['ringing', 'initiated', 'in-progress'];
 
-//       const actualCallProgressEvents: any[] = [];
+      const actualCallProgressEvents: any[] = [];
 
-//       for (const arg of aliceMessageReceivedSpy.args) {
-//         assert.strictEqual(arg.length, 1);
+      for (const arg of aliceMessageReceivedSpy.args) {
+        assert.strictEqual(arg.length, 1);
 
-//         const {
-//           content: {
-//             ParentCallSid,
-//             CallType,
-//             CallStatus,
-//             CallSid,
-//           },
-//           contentType,
-//           messageType,
-//           voiceEventSid
-//         } = arg[0];
+        const {
+          content: {
+            ParentCallSid,
+            CallType,
+            CallStatus,
+            CallSid,
+          },
+          contentType,
+          messageType,
+          voiceEventSid
+        } = arg[0];
 
-//         assert.deepStrictEqual(CallType, 'CLIENT');
-//         assert.deepStrictEqual(contentType, 'application/json');
-//         assert.deepStrictEqual(messageType, 'call-progress-event');
+        assert.deepStrictEqual(CallType, 'CLIENT');
+        assert.deepStrictEqual(contentType, 'application/json');
+        assert.deepStrictEqual(messageType, 'call-progress-event');
 
-//         actualCallProgressEvents.push(CallStatus);
-//       }
+        actualCallProgressEvents.push(CallStatus);
+      }
 
-//       assert.deepStrictEqual(
-//         actualCallProgressEvents,
-//         expectedCallProgressEvents,
-//       );
-//     },
-//   );
+      assert.deepStrictEqual(
+        actualCallProgressEvents,
+        expectedCallProgressEvents,
+      );
+    },
+  );
 });
