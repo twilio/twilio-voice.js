@@ -286,19 +286,24 @@ class AudioHelper extends EventEmitter {
       this._initializeEnumeration();
     }
 
-    // NOTE (kchoy): Currently microphone permissions are not supported in firefox.
+    // NOTE (kchoy): Currently microphone permissions are not supported in firefox, and Safari V15.
     // https://github.com/mozilla/standards-positions/issues/19#issuecomment-370158947
-    navigator.permissions.query({ name: 'microphone' }).then((microphonePermissionStatus) => {
-      if (microphonePermissionStatus.state !== 'granted') {
-        const handleStateChange = () => {
-          this._updateAvailableDevices();
-          this._stopMicrophonePermissionListener();
-        };
-        microphonePermissionStatus.addEventListener('change', handleStateChange);
-        this._microphonePermissionStatus = microphonePermissionStatus;
-        this._onMicrophonePermissionStatusChanged = handleStateChange;
-      }
-    }).catch((reason) => this._log.warn(`Warning: unable to listen for microphone permission changes. ${reason}`));
+    // https://caniuse.com/permissions-api
+    if (navigator && navigator.permissions && typeof navigator.permissions.query === 'function') {
+      navigator.permissions.query({ name: 'microphone' }).then((microphonePermissionStatus) => {
+        if (microphonePermissionStatus.state !== 'granted') {
+          const handleStateChange = () => {
+            this._updateAvailableDevices();
+            this._stopMicrophonePermissionListener();
+          };
+          microphonePermissionStatus.addEventListener('change', handleStateChange);
+          this._microphonePermissionStatus = microphonePermissionStatus;
+          this._onMicrophonePermissionStatusChanged = handleStateChange;
+        }
+      }).catch((reason) => this._log.warn(`Warning: unable to listen for microphone permission changes. ${reason}`));
+    } else {
+      this._log.warn('Warning: current browser does not support permissions API');
+    }
   }
 
   /**
