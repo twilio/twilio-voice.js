@@ -286,7 +286,7 @@ class AudioHelper extends EventEmitter {
       this._initializeEnumeration();
     }
 
-    // NOTE (kchoy): Currently microphone permissions are not supported in firefox, and Safari V15.
+    // NOTE (kchoy): Currently microphone permissions are not supported in firefox, and Safari V15 and older.
     // https://github.com/mozilla/standards-positions/issues/19#issuecomment-370158947
     // https://caniuse.com/permissions-api
     if (navigator && navigator.permissions && typeof navigator.permissions.query === 'function') {
@@ -302,7 +302,7 @@ class AudioHelper extends EventEmitter {
         }
       }).catch((reason) => this._log.warn(`Warning: unable to listen for microphone permission changes. ${reason}`));
     } else {
-      this._log.warn('Warning: current browser does not support permissions API');
+      this._log.warn('Warning: current browser does not support permissions API.');
     }
   }
 
