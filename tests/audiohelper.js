@@ -8,6 +8,10 @@ function getUserMedia() {
   return Promise.resolve({ id: 'default', getTracks: () => [] });
 }
 
+function getConnectPromise() {
+  return null;
+}
+
 describe('AudioHelper', () => {
   const wait = () => new Promise(res => res());
 
@@ -20,6 +24,7 @@ describe('AudioHelper', () => {
 
     beforeEach(() => {
       audio = new AudioHelper(noop, noop, {
+        getConnectPromise,
         getUserMedia,
         mediaDevices: {
           enumerateDevices: function(){
@@ -96,6 +101,7 @@ describe('AudioHelper', () => {
 
       audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
         audioProcessorEventObserver: eventObserver,
+        getConnectPromise,
         getUserMedia,
         mediaDevices,
         setSinkId: () => {}
@@ -219,6 +225,7 @@ describe('AudioHelper', () => {
         getUserMedia = sinon.stub().returns(new Promise(res => res({id: 'default',getTracks: () => [{stop: stopStub}]})));
         audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
           audioProcessorEventObserver: eventObserver,
+          getConnectPromise,
           getUserMedia,
           mediaDevices,
           setSinkId: () => {}
@@ -465,6 +472,7 @@ describe('AudioHelper', () => {
 
         audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
           audioProcessorEventObserver: eventObserver,
+          getConnectPromise,
           getUserMedia,
           mediaDevices,
           setSinkId: () => {}
@@ -504,6 +512,31 @@ describe('AudioHelper', () => {
       });
 
       describe('setInputDevice', () => {
+        it('should wait for the getConnectPromise to resolve', async () => {
+          const stub = sinon.stub();
+          audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
+            audioProcessorEventObserver: eventObserver,
+            getConnectPromise: () => new Promise(res => res(stub())),
+            getUserMedia,
+            mediaDevices,
+            setSinkId: () => {}
+          });
+          await audio._setInputDevice('input');
+          sinon.assert.calledOnce(stub);
+        });
+        
+        it('should reject if getConnectPromise rejects', async () => {
+          const stub = sinon.stub();
+          audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
+            audioProcessorEventObserver: eventObserver,
+            getConnectPromise: () => new Promise((resolve, reject) => reject()),
+            getUserMedia,
+            mediaDevices,
+            setSinkId: () => {}
+          });
+          await assert.rejects(() => audio._setInputDevice('input'));
+        });
+
         it('should return a rejected Promise if no deviceId is passed', () => audio.setInputDevice().then(() => {
           throw new Error('Expected a rejection, got resolved');
         }, () => { }));
@@ -802,6 +835,7 @@ describe('AudioHelper', () => {
         });
 
         audio = new AudioHelper(onActiveOutputsChanged, null, {
+          getConnectPromise,
           getUserMedia,
           mediaDevices,
           setSinkId: () => {}

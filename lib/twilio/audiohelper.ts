@@ -5,6 +5,7 @@
 import { EventEmitter } from 'events';
 import AudioProcessor from './audioprocessor';
 import { AudioProcessorEventObserver } from './audioprocessoreventobserver';
+import Call from './call';
 import Device from './device';
 import { InvalidArgumentError, NotSupportedError } from './errors';
 import Log from './log';
@@ -124,6 +125,11 @@ class AudioHelper extends EventEmitter {
   private _enumerateDevices: any;
 
   /**
+   * Promise to wait for {@link Device.connect}.
+   */
+  private _getConnectPromise: () => Promise<Call> | null;
+
+  /**
    * The `getUserMedia()` function to use.
    */
   private _getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
@@ -221,6 +227,8 @@ class AudioHelper extends EventEmitter {
       AudioContext: typeof AudioContext !== 'undefined' && AudioContext,
       setSinkId: typeof HTMLAudioElement !== 'undefined' && (HTMLAudioElement.prototype as any).setSinkId,
     }, options);
+
+    this._getConnectPromise = options.getConnectPromise;
 
     this._updateUserOptions(options);
 
@@ -775,7 +783,14 @@ class AudioHelper extends EventEmitter {
    * @param forceGetUserMedia - If true, getUserMedia will be called even if
    *   the specified device is already active.
    */
-  private _setInputDevice(deviceId: string, forceGetUserMedia: boolean): Promise<void> {
+  private async _setInputDevice(deviceId: string, forceGetUserMedia: boolean): Promise<void> {
+    const connectPromise = this._getConnectPromise();
+    if (connectPromise) {
+      this._log.debug('connectPromise detected, waiting...');
+      await connectPromise;
+      this._log.debug('connectPromise resolved');
+    }
+
     const setInputDevice = async () => {
       if (typeof deviceId !== 'string') {
         return Promise.reject(new InvalidArgumentError('Must specify the device to set'));
@@ -1018,6 +1033,11 @@ namespace AudioHelper {
      * Overrides the native MediaDevices.enumerateDevices API.
      */
     enumerateDevices?: any;
+
+    /**
+     * Promise to wait for {@link Device.connect}.
+     */
+    getConnectPromise: () => Promise<Call> | null;
 
     /**
      * The getUserMedia method to use

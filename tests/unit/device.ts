@@ -446,6 +446,18 @@ describe('Device', function() {
             });
           });
         });
+
+        describe('connectPromise', () => {
+          it('should resolve and set the internal promise to null', async () => {
+            await device.connect();
+            assert.strictEqual(device.getConnectPromise(), null);
+          })
+          
+          it('should set connectPromise when device.connect() is called', async () => {
+            device.connect();
+            assert.notEqual(device.getConnectPromise(), null);
+          })
+        })
       });
 
       describe('.destroy()', () => {
@@ -1685,16 +1697,18 @@ describe('Device', function() {
 
             it('should update audioHelper options', () => {
               const stub = sinon.stub();
+              const connectProm = sinon.stub().returns('fizz');
               device['_audio']!['_updateUserOptions'] = stub;
               device['_options'].enumerateDevices = 'foo';
+              device['getConnectPromise'] = connectProm;
+              device['getConnectPromise'].bind(device);
               device['_options'].getUserMedia = 'bar';
               device['_setupAudioHelper']();
-              sinon.assert.calledWith(stub, {
-                audioContext: Device.audioContext,
-                audioProcessorEventObserver: device['_audioProcessorEventObserver'],
-                enumerateDevices: 'foo',
-                getUserMedia: 'bar',
-              })
+              assert.deepEqual(stub.getCall(0).args[0].audioContext, Device.audioContext);
+              assert.deepEqual(stub.getCall(0).args[0].audioProcessorEventObserver, device['_audioProcessorEventObserver']);
+              assert.deepEqual(stub.getCall(0).args[0].enumerateDevices, 'foo');
+              assert.deepEqual(stub.getCall(0).args[0].getConnectPromise(), 'fizz');
+              assert.deepEqual(stub.getCall(0).args[0].getUserMedia, 'bar');
             });
           });
 

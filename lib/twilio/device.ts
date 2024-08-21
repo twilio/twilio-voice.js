@@ -338,6 +338,11 @@ class Device extends EventEmitter {
   private _chunderURIs: string[] = [];
 
   /**
+   * The internal promise created when calling {@link Device.connect}.
+   */
+  private _connectPromise: Promise<Call> | null = null;
+
+  /**
    * Default options used by {@link Device}.
    */
   private readonly _defaultOptions: IExtendedDeviceOptions = {
@@ -556,62 +561,68 @@ class Device extends EventEmitter {
    * Make an outgoing Call.
    * @param options
    */
-  async connect(options: Device.ConnectOptions = { }): Promise<Call> {
-    this._log.debug('.connect', JSON.stringify(options));
-    this._throwIfDestroyed();
-    if (this._activeCall) {
-      throw new InvalidStateError('A Call is already active');
-    }
-
-    let customParameters;
-    let parameters;
-    let signalingReconnectToken;
-
-    if (options.connectToken) {
-      try {
-        const connectTokenParts = JSON.parse(decodeURIComponent(atob(options.connectToken)));
-        customParameters = connectTokenParts.customParameters;
-        parameters = connectTokenParts.parameters;
-        signalingReconnectToken = connectTokenParts.signalingReconnectToken;
-      } catch {
-        throw new InvalidArgumentError('Cannot parse connectToken');
+  connect(options: Device.ConnectOptions = { }): Promise<Call> {
+    const _connect = async () => {
+      this._log.debug('.connect', JSON.stringify(options));
+      this._throwIfDestroyed();
+      if (this._activeCall) {
+        throw new InvalidStateError('A Call is already active');
       }
 
-      if (!parameters || !parameters.CallSid || !signalingReconnectToken) {
-        throw new InvalidArgumentError('Invalid connectToken');
-      }
-    }
+      let customParameters;
+      let parameters;
+      let signalingReconnectToken;
 
-    let isReconnect = false;
-    let twimlParams: Record<string, string> = {};
-    const callOptions: Call.Options = {
-      enableImprovedSignalingErrorPrecision:
+      if (options.connectToken) {
+        try {
+          const connectTokenParts = JSON.parse(decodeURIComponent(atob(options.connectToken)));
+          customParameters = connectTokenParts.customParameters;
+          parameters = connectTokenParts.parameters;
+          signalingReconnectToken = connectTokenParts.signalingReconnectToken;
+        } catch {
+          throw new InvalidArgumentError('Cannot parse connectToken');
+        }
+
+        if (!parameters || !parameters.CallSid || !signalingReconnectToken) {
+          throw new InvalidArgumentError('Invalid connectToken');
+        }
+      }
+
+      let isReconnect = false;
+      let twimlParams: Record<string, string> = {};
+      const callOptions: Call.Options = {
+        enableImprovedSignalingErrorPrecision:
         !!this._options.enableImprovedSignalingErrorPrecision,
-      rtcConfiguration: options.rtcConfiguration,
-      voiceEventSidGenerator: this._options.voiceEventSidGenerator,
+        rtcConfiguration: options.rtcConfiguration,
+        voiceEventSidGenerator: this._options.voiceEventSidGenerator,
+      };
+
+      if (signalingReconnectToken && parameters) {
+        isReconnect = true;
+        callOptions.callParameters = parameters;
+        callOptions.reconnectCallSid = parameters.CallSid;
+        callOptions.reconnectToken = signalingReconnectToken;
+        twimlParams = customParameters || twimlParams;
+      } else {
+        twimlParams = options.params || twimlParams;
+      }
+
+      const activeCall = this._activeCall = await this._makeCall(twimlParams, callOptions, isReconnect);
+
+      // Make sure any incoming calls are ignored
+      this._calls.splice(0).forEach(call => call.ignore());
+
+      // Stop the incoming sound if it's playing
+      this._soundcache.get(Device.SoundName.Incoming).stop();
+
+      activeCall.accept({ rtcConstraints: options.rtcConstraints });
+      this._publishNetworkChange();
+      return activeCall;
     };
 
-    if (signalingReconnectToken && parameters) {
-      isReconnect = true;
-      callOptions.callParameters = parameters;
-      callOptions.reconnectCallSid = parameters.CallSid;
-      callOptions.reconnectToken = signalingReconnectToken;
-      twimlParams = customParameters || twimlParams;
-    } else {
-      twimlParams = options.params || twimlParams;
-    }
-
-    const activeCall = this._activeCall = await this._makeCall(twimlParams, callOptions, isReconnect);
-
-    // Make sure any incoming calls are ignored
-    this._calls.splice(0).forEach(call => call.ignore());
-
-    // Stop the incoming sound if it's playing
-    this._soundcache.get(Device.SoundName.Incoming).stop();
-
-    activeCall.accept({ rtcConstraints: options.rtcConstraints });
-    this._publishNetworkChange();
-    return activeCall;
+    return this._connectPromise = _connect().finally(() => {
+      this._connectPromise = null;
+    });
   }
 
   /**
@@ -664,6 +675,14 @@ class Device extends EventEmitter {
     if (this._activeCall) {
       this._activeCall.disconnect();
     }
+  }
+
+  /**
+   * Promise to wait for {@link Device.connect}.
+   * @private
+   */
+  getConnectPromise(): Promise<Call> | null {
+    return this._connectPromise;
   }
 
   /**
@@ -1430,6 +1449,7 @@ class Device extends EventEmitter {
       audioContext: Device.audioContext,
       audioProcessorEventObserver: this._audioProcessorEventObserver,
       enumerateDevices: this._options.enumerateDevices,
+      getConnectPromise: this.getConnectPromise.bind(this),
       getUserMedia: this._options.getUserMedia || getUserMedia,
     };
 
