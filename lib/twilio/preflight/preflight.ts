@@ -806,7 +806,7 @@ export namespace PreflightTest {
      *
      * ```ts
      * import Client from 'twilio';
-     * import { Device } from 'twilio-client';
+     * import { Device } from '@twilio/voice-sdk';
      *
      * // Generate the STUN and TURN server credentials with a ttl of 120 seconds
      * const client = Client(twilioAccountSid, authToken);
