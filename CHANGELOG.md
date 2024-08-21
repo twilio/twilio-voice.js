@@ -1,5 +1,13 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.11.4 (WIP)
+============
+
+Bug Fixes
+---------
+
+- Fixed an issue where calling `device.connect()` without waiting for the promise to get resolved, then call `device.audio.setInputDevice()` right away results in an AcquisitionFailedError.
+
 2.11.3 (August 21, 2024)
 ========================
 
