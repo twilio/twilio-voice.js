@@ -184,6 +184,14 @@ describe('AudioHelper', () => {
         mockEventTarget.dispatchEvent({ type: 'change' });
         sinon.assert.calledOnce(enumerateDevices);
       });
+
+      it('should not update list of devices if navigator permissions is undefined', async () => {
+        navigator.permissions = undefined
+        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, { enumerateDevices });
+        await wait();
+        mockEventTarget.dispatchEvent({ type: 'change' });
+        sinon.assert.calledOnce(enumerateDevices);
+      })
     });
 
     describe('._destroy', () => {
