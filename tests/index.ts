@@ -1,5 +1,7 @@
 import * as WebSocket from 'ws';
 
+const EventTarget = require('./eventtarget');
+
 const root = global as any;
 let handlers = {};
 
@@ -73,6 +75,11 @@ root.navigator = {
   },
   platform: 'platform',
   userAgent: 'userAgent',
+  permissions: {
+    query: function() {
+      return Promise.resolve(new EventTarget());
+    }
+  }
 };
 
 root.RTCPeerConnection = root.window.RTCPeerConnection = function() { };

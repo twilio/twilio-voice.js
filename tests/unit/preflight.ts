@@ -766,6 +766,26 @@ describe('PreflightTest', () => {
         });
       });
 
+      context('when RTCIceCandidateStatsReport is not available', () => {
+        it('should not provide selectedIceCandidatePairStats and iceCandidateStats in the report', () => {
+          preflight = new PreflightTest('foo', {
+            ...options,
+            getRTCIceCandidateStatsReport: () => Promise.resolve(),
+          });
+
+          return new Promise(async (resolve) => {
+            const onCompleted = (results: PreflightTest.Report) => {
+              assert.deepStrictEqual(results.iceCandidateStats, []);
+              assert.strictEqual(results.selectedIceCandidatePairStats, undefined);
+              resolve();
+            };
+
+            preflight.on('completed', onCompleted);
+            passPreflight();
+          });
+        });
+      });
+
       [
         ['relay', 'relay', true],
         ['relay', 'host', true],

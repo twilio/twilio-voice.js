@@ -292,7 +292,7 @@ export class PreflightTest extends EventEmitter {
     const report: PreflightTest.Report = {
       callSid: this._callSid,
       edge: this._edge,
-      iceCandidateStats: this._rtcIceCandidateStatsReport.iceCandidateStats,
+      iceCandidateStats: this._rtcIceCandidateStatsReport?.iceCandidateStats ?? [],
       networkTiming: this._networkTiming,
       samples: this._samples,
       selectedEdge: this._options.edge,
@@ -302,7 +302,7 @@ export class PreflightTest extends EventEmitter {
       warnings: this._warnings,
     };
 
-    const selectedIceCandidatePairStats = this._rtcIceCandidateStatsReport.selectedIceCandidatePairStats;
+    const selectedIceCandidatePairStats = this._rtcIceCandidateStatsReport?.selectedIceCandidatePairStats;
 
     if (selectedIceCandidatePairStats) {
       report.selectedIceCandidatePairStats = selectedIceCandidatePairStats;
@@ -806,7 +806,7 @@ export namespace PreflightTest {
      *
      * ```ts
      * import Client from 'twilio';
-     * import { Device } from 'twilio-client';
+     * import { Device } from '@twilio/voice-sdk';
      *
      * // Generate the STUN and TURN server credentials with a ttl of 120 seconds
      * const client = Client(twilioAccountSid, authToken);
