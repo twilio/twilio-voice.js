@@ -338,11 +338,6 @@ class Device extends EventEmitter {
   private _chunderURIs: string[] = [];
 
   /**
-   * The internal promise created when calling {@link Device.connect}.
-   */
-  private _connectPromise: Promise<Call> | null = null;
-
-  /**
    * Default options used by {@link Device}.
    */
   private readonly _defaultOptions: IExtendedDeviceOptions = {
@@ -384,6 +379,11 @@ class Device extends EventEmitter {
    * An instance of Logger to use.
    */
   private _log: Log = new Log('Device');
+
+  /**
+   * The internal promise created when calling {@link Device.makeCall}.
+   */
+  private _makeCallPromise: Promise<any> = Promise.resolve();
 
   /**
    * Network related information
@@ -561,68 +561,62 @@ class Device extends EventEmitter {
    * Make an outgoing Call.
    * @param options
    */
-  connect(options: Device.ConnectOptions = { }): Promise<Call> {
-    const _connect = async () => {
-      this._log.debug('.connect', JSON.stringify(options));
-      this._throwIfDestroyed();
-      if (this._activeCall) {
-        throw new InvalidStateError('A Call is already active');
+  async connect(options: Device.ConnectOptions = { }): Promise<Call> {
+    this._log.debug('.connect', JSON.stringify(options));
+    this._throwIfDestroyed();
+    if (this._activeCall) {
+      throw new InvalidStateError('A Call is already active');
+    }
+
+    let customParameters;
+    let parameters;
+    let signalingReconnectToken;
+
+    if (options.connectToken) {
+      try {
+        const connectTokenParts = JSON.parse(decodeURIComponent(atob(options.connectToken)));
+        customParameters = connectTokenParts.customParameters;
+        parameters = connectTokenParts.parameters;
+        signalingReconnectToken = connectTokenParts.signalingReconnectToken;
+      } catch {
+        throw new InvalidArgumentError('Cannot parse connectToken');
       }
 
-      let customParameters;
-      let parameters;
-      let signalingReconnectToken;
-
-      if (options.connectToken) {
-        try {
-          const connectTokenParts = JSON.parse(decodeURIComponent(atob(options.connectToken)));
-          customParameters = connectTokenParts.customParameters;
-          parameters = connectTokenParts.parameters;
-          signalingReconnectToken = connectTokenParts.signalingReconnectToken;
-        } catch {
-          throw new InvalidArgumentError('Cannot parse connectToken');
-        }
-
-        if (!parameters || !parameters.CallSid || !signalingReconnectToken) {
-          throw new InvalidArgumentError('Invalid connectToken');
-        }
+      if (!parameters || !parameters.CallSid || !signalingReconnectToken) {
+        throw new InvalidArgumentError('Invalid connectToken');
       }
+    }
 
-      let isReconnect = false;
-      let twimlParams: Record<string, string> = {};
-      const callOptions: Call.Options = {
-        enableImprovedSignalingErrorPrecision:
-        !!this._options.enableImprovedSignalingErrorPrecision,
-        rtcConfiguration: options.rtcConfiguration,
-        voiceEventSidGenerator: this._options.voiceEventSidGenerator,
-      };
-
-      if (signalingReconnectToken && parameters) {
-        isReconnect = true;
-        callOptions.callParameters = parameters;
-        callOptions.reconnectCallSid = parameters.CallSid;
-        callOptions.reconnectToken = signalingReconnectToken;
-        twimlParams = customParameters || twimlParams;
-      } else {
-        twimlParams = options.params || twimlParams;
-      }
-
-      const activeCall = this._activeCall = await this._makeCall(twimlParams, callOptions, isReconnect);
-
-      // Make sure any incoming calls are ignored
-      this._calls.splice(0).forEach(call => call.ignore());
-
-      // Stop the incoming sound if it's playing
-      this._soundcache.get(Device.SoundName.Incoming).stop();
-
-      activeCall.accept({ rtcConstraints: options.rtcConstraints });
-      this._publishNetworkChange();
-      return activeCall;
+    let isReconnect = false;
+    let twimlParams: Record<string, string> = {};
+    const callOptions: Call.Options = {
+      enableImprovedSignalingErrorPrecision:
+      !!this._options.enableImprovedSignalingErrorPrecision,
+      rtcConfiguration: options.rtcConfiguration,
+      voiceEventSidGenerator: this._options.voiceEventSidGenerator,
     };
 
-    return this._connectPromise = _connect().finally(() => {
-      this._connectPromise = null;
-    });
+    if (signalingReconnectToken && parameters) {
+      isReconnect = true;
+      callOptions.callParameters = parameters;
+      callOptions.reconnectCallSid = parameters.CallSid;
+      callOptions.reconnectToken = signalingReconnectToken;
+      twimlParams = customParameters || twimlParams;
+    } else {
+      twimlParams = options.params || twimlParams;
+    }
+
+    const activeCall = this._activeCall = await this._makeCall(twimlParams, callOptions, isReconnect);
+
+    // Make sure any incoming calls are ignored
+    this._calls.splice(0).forEach(call => call.ignore());
+
+    // Stop the incoming sound if it's playing
+    this._soundcache.get(Device.SoundName.Incoming).stop();
+
+    activeCall.accept({ rtcConstraints: options.rtcConstraints });
+    this._publishNetworkChange();
+    return activeCall;
   }
 
   /**
@@ -678,14 +672,6 @@ class Device extends EventEmitter {
   }
 
   /**
-   * Promise to wait for {@link Device.connect}.
-   * @private
-   */
-  getConnectPromise(): Promise<Call> | null {
-    return this._connectPromise;
-  }
-
-  /**
    * Returns the {@link Edge} value the {@link Device} is currently connected
    * to. The value will be `null` when the {@link Device} is offline.
    */
@@ -714,6 +700,14 @@ class Device extends EventEmitter {
    */
   get isBusy(): boolean {
     return !!this._activeCall;
+  }
+
+  /**
+   * Promise to wait for {@link Device.connect}.
+   * @private
+   */
+  getMakeCallPromise(): Promise<any> {
+    return this._makeCallPromise;
   }
 
   /**
@@ -1033,162 +1027,168 @@ class Device extends EventEmitter {
    * @param twimlParams - A flat object containing key:value pairs to be sent to the TwiML app.
    * @param options - Options to be used to instantiate the {@link Call}.
    */
-  private async _makeCall(twimlParams: Record<string, string>, options?: Call.Options, isReconnect: boolean = false): Promise<Call> {
-    if (typeof Device._isUnifiedPlanDefault === 'undefined') {
-      throw new InvalidStateError('Device has not been initialized.');
-    }
+  private _makeCall(twimlParams: Record<string, string>, options?: Call.Options, isReconnect: boolean = false): Promise<Call> {
+    const makeCall = async () => {
+      if (typeof Device._isUnifiedPlanDefault === 'undefined') {
+        throw new InvalidStateError('Device has not been initialized.');
+      }
 
-    // Wait for the input device if it's set by the user
-    const inputDevicePromise = this._audio?._getInputDevicePromise();
-    if (inputDevicePromise) {
-      this._log.debug('inputDevicePromise detected, waiting...');
-      await inputDevicePromise;
-      this._log.debug('inputDevicePromise resolved');
-    }
+      // Wait for the input device if it's set by the user
+      const inputDevicePromise = this._audio?._getInputDevicePromise();
+      if (inputDevicePromise) {
+        this._log.debug('inputDevicePromise detected, waiting...');
+        await inputDevicePromise;
+        this._log.debug('inputDevicePromise resolved');
+      }
 
-    const config: Call.Config = {
-      audioHelper: this._audio,
-      isUnifiedPlanDefault: Device._isUnifiedPlanDefault,
-      onIgnore: (): void => {
-        this._soundcache.get(Device.SoundName.Incoming).stop();
-      },
-      pstream: await (this._streamConnectedPromise || this._setupStream()),
-      publisher: this._publisher,
-      soundcache: this._soundcache,
-    };
+      const config: Call.Config = {
+        audioHelper: this._audio,
+        isUnifiedPlanDefault: Device._isUnifiedPlanDefault,
+        onIgnore: (): void => {
+          this._soundcache.get(Device.SoundName.Incoming).stop();
+        },
+        pstream: await (this._streamConnectedPromise || this._setupStream()),
+        publisher: this._publisher,
+        soundcache: this._soundcache,
+      };
 
-    options = Object.assign({
-      MediaStream: this._options.MediaStream || rtc.PeerConnection,
-      RTCPeerConnection: this._options.RTCPeerConnection,
-      beforeAccept: (currentCall: Call) => {
-        if (!this._activeCall || this._activeCall === currentCall) {
+      options = Object.assign({
+        MediaStream: this._options.MediaStream || rtc.PeerConnection,
+        RTCPeerConnection: this._options.RTCPeerConnection,
+        beforeAccept: (currentCall: Call) => {
+          if (!this._activeCall || this._activeCall === currentCall) {
+            return;
+          }
+
+          this._activeCall.disconnect();
+          this._removeCall(this._activeCall);
+        },
+        codecPreferences: this._options.codecPreferences,
+        customSounds: this._options.sounds,
+        dialtonePlayer: Device._dialtonePlayer,
+        dscp: this._options.dscp,
+        // TODO(csantos): Remove forceAggressiveIceNomination option in 3.x
+        forceAggressiveIceNomination: this._options.forceAggressiveIceNomination,
+        getInputStream: (): MediaStream | null => this._options.fileInputStream || this._callInputStream,
+        getSinkIds: (): string[] => this._callSinkIds,
+        maxAverageBitrate: this._options.maxAverageBitrate,
+        preflight: this._options.preflight,
+        rtcConstraints: this._options.rtcConstraints,
+        shouldPlayDisconnect: () => this._audio?.disconnect(),
+        twimlParams,
+        voiceEventSidGenerator: this._options.voiceEventSidGenerator,
+      }, options);
+
+      const maybeUnsetPreferredUri = () => {
+        if (!this._stream) {
+          this._log.warn('UnsetPreferredUri called without a stream');
           return;
         }
+        if (this._activeCall === null && this._calls.length === 0) {
+          this._stream.updatePreferredURI(null);
+        }
+      };
 
-        this._activeCall.disconnect();
-        this._removeCall(this._activeCall);
-      },
-      codecPreferences: this._options.codecPreferences,
-      customSounds: this._options.sounds,
-      dialtonePlayer: Device._dialtonePlayer,
-      dscp: this._options.dscp,
-      // TODO(csantos): Remove forceAggressiveIceNomination option in 3.x
-      forceAggressiveIceNomination: this._options.forceAggressiveIceNomination,
-      getInputStream: (): MediaStream | null => this._options.fileInputStream || this._callInputStream,
-      getSinkIds: (): string[] => this._callSinkIds,
-      maxAverageBitrate: this._options.maxAverageBitrate,
-      preflight: this._options.preflight,
-      rtcConstraints: this._options.rtcConstraints,
-      shouldPlayDisconnect: () => this._audio?.disconnect(),
-      twimlParams,
-      voiceEventSidGenerator: this._options.voiceEventSidGenerator,
-    }, options);
+      const call = new (this._options.Call || Call)(config, options);
 
-    const maybeUnsetPreferredUri = () => {
-      if (!this._stream) {
-        this._log.warn('UnsetPreferredUri called without a stream');
-        return;
-      }
-      if (this._activeCall === null && this._calls.length === 0) {
-        this._stream.updatePreferredURI(null);
-      }
-    };
+      this._publisher.info('settings', 'init', {
+        RTCPeerConnection: !!this._options.RTCPeerConnection,
+        enumerateDevices: !!this._options.enumerateDevices,
+        getUserMedia: !!this._options.getUserMedia,
+      }, call);
 
-    const call = new (this._options.Call || Call)(config, options);
+      call.once('accept', () => {
+        this._stream.updatePreferredURI(this._preferredURI);
+        this._removeCall(call);
+        this._activeCall = call;
+        if (this._audio) {
+          this._audio._maybeStartPollingVolume();
+        }
 
-    this._publisher.info('settings', 'init', {
-      RTCPeerConnection: !!this._options.RTCPeerConnection,
-      enumerateDevices: !!this._options.enumerateDevices,
-      getUserMedia: !!this._options.getUserMedia,
-    }, call);
+        if (call.direction === Call.CallDirection.Outgoing && this._audio?.outgoing() && !isReconnect) {
+          this._soundcache.get(Device.SoundName.Outgoing).play();
+        }
 
-    call.once('accept', () => {
-      this._stream.updatePreferredURI(this._preferredURI);
-      this._removeCall(call);
-      this._activeCall = call;
-      if (this._audio) {
-        this._audio._maybeStartPollingVolume();
-      }
+        const data: any = { edge: this._edge || this._region };
+        if (this._options.edge) {
+          data['selected_edge'] = Array.isArray(this._options.edge)
+            ? this._options.edge
+            : [this._options.edge];
+        }
 
-      if (call.direction === Call.CallDirection.Outgoing && this._audio?.outgoing() && !isReconnect) {
-        this._soundcache.get(Device.SoundName.Outgoing).play();
-      }
+        this._publisher.info('settings', 'edge', data, call);
 
-      const data: any = { edge: this._edge || this._region };
-      if (this._options.edge) {
-        data['selected_edge'] = Array.isArray(this._options.edge)
-          ? this._options.edge
-          : [this._options.edge];
-      }
+        if (this._audio?.processedStream) {
+          this._audioProcessorEventObserver?.emit('enabled');
+        }
+      });
 
-      this._publisher.info('settings', 'edge', data, call);
+      call.addListener('error', (error: TwilioError) => {
+        if (call.status() === 'closed') {
+          this._removeCall(call);
+          maybeUnsetPreferredUri();
+        }
+        if (this._audio) {
+          this._audio._maybeStopPollingVolume();
+        }
+        this._maybeStopIncomingSound();
+      });
 
-      if (this._audio?.processedStream) {
-        this._audioProcessorEventObserver?.emit('enabled');
-      }
-    });
-
-    call.addListener('error', (error: TwilioError) => {
-      if (call.status() === 'closed') {
+      call.once('cancel', () => {
+        this._log.info(`Canceled: ${call.parameters.CallSid}`);
         this._removeCall(call);
         maybeUnsetPreferredUri();
-      }
-      if (this._audio) {
-        this._audio._maybeStopPollingVolume();
-      }
-      this._maybeStopIncomingSound();
-    });
+        if (this._audio) {
+          this._audio._maybeStopPollingVolume();
+        }
+        this._maybeStopIncomingSound();
+      });
 
-    call.once('cancel', () => {
-      this._log.info(`Canceled: ${call.parameters.CallSid}`);
-      this._removeCall(call);
-      maybeUnsetPreferredUri();
-      if (this._audio) {
-        this._audio._maybeStopPollingVolume();
-      }
-      this._maybeStopIncomingSound();
-    });
+      call.once('disconnect', () => {
+        if (this._audio) {
+          this._audio._maybeStopPollingVolume();
+        }
+        this._removeCall(call);
+        maybeUnsetPreferredUri();
+        /**
+         * NOTE(kamalbennani): We need to stop the incoming sound when the call is
+         * disconnected right after the user has accepted the call (activeCall.accept()), and before
+         * the call has been fully connected (i.e. before the `pstream.answer` event)
+         */
+        this._maybeStopIncomingSound();
+      });
 
-    call.once('disconnect', () => {
-      if (this._audio) {
-        this._audio._maybeStopPollingVolume();
-      }
-      this._removeCall(call);
-      maybeUnsetPreferredUri();
-      /**
-       * NOTE(kamalbennani): We need to stop the incoming sound when the call is
-       * disconnected right after the user has accepted the call (activeCall.accept()), and before
-       * the call has been fully connected (i.e. before the `pstream.answer` event)
-       */
-      this._maybeStopIncomingSound();
-    });
+      call.once('reject', () => {
+        this._log.info(`Rejected: ${call.parameters.CallSid}`);
+        if (this._audio) {
+          this._audio._maybeStopPollingVolume();
+        }
+        this._removeCall(call);
+        maybeUnsetPreferredUri();
+        this._maybeStopIncomingSound();
+      });
 
-    call.once('reject', () => {
-      this._log.info(`Rejected: ${call.parameters.CallSid}`);
-      if (this._audio) {
-        this._audio._maybeStopPollingVolume();
-      }
-      this._removeCall(call);
-      maybeUnsetPreferredUri();
-      this._maybeStopIncomingSound();
-    });
+      call.on('transportClose', () => {
+        if (call.status() !== Call.State.Pending) {
+          return;
+        }
+        if (this._audio) {
+          this._audio._maybeStopPollingVolume();
+        }
+        this._removeCall(call);
+        /**
+         * NOTE(mhuynh): We don't want to call `maybeUnsetPreferredUri` because
+         * a `transportClose` will happen during signaling reconnection.
+         */
+        this._maybeStopIncomingSound();
+      });
 
-    call.on('transportClose', () => {
-      if (call.status() !== Call.State.Pending) {
-        return;
-      }
-      if (this._audio) {
-        this._audio._maybeStopPollingVolume();
-      }
-      this._removeCall(call);
-      /**
-       * NOTE(mhuynh): We don't want to call `maybeUnsetPreferredUri` because
-       * a `transportClose` will happen during signaling reconnection.
-       */
-      this._maybeStopIncomingSound();
-    });
+      return call;
+    };
 
-    return call;
+    return this._makeCallPromise = makeCall().finally(() => {
+      this._makeCallPromise = Promise.resolve();
+    });
   }
 
   /**
@@ -1449,7 +1449,7 @@ class Device extends EventEmitter {
       audioContext: Device.audioContext,
       audioProcessorEventObserver: this._audioProcessorEventObserver,
       enumerateDevices: this._options.enumerateDevices,
-      getConnectPromise: this.getConnectPromise.bind(this),
+      getMakeCallPromise: this.getMakeCallPromise.bind(this),
       getUserMedia: this._options.getUserMedia || getUserMedia,
     };
 

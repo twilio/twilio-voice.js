@@ -5,7 +5,6 @@
 import { EventEmitter } from 'events';
 import AudioProcessor from './audioprocessor';
 import { AudioProcessorEventObserver } from './audioprocessoreventobserver';
-import Call from './call';
 import Device from './device';
 import { InvalidArgumentError, NotSupportedError } from './errors';
 import Log from './log';
@@ -125,11 +124,6 @@ class AudioHelper extends EventEmitter {
   private _enumerateDevices: any;
 
   /**
-   * Promise to wait for {@link Device.connect}.
-   */
-  private _getConnectPromise: () => Promise<Call> | null;
-
-  /**
    * The `getUserMedia()` function to use.
    */
   private _getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
@@ -228,7 +222,7 @@ class AudioHelper extends EventEmitter {
       setSinkId: typeof HTMLAudioElement !== 'undefined' && (HTMLAudioElement.prototype as any).setSinkId,
     }, options);
 
-    this._getConnectPromise = options.getConnectPromise;
+    this._beforeSetInputDevice = options.getMakeCallPromise || this._beforeSetInputDevice;
 
     this._updateUserOptions(options);
 
@@ -628,6 +622,11 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
+   * Promise to wait for {@link Device.connect}.
+   */
+  private _beforeSetInputDevice: () => Promise<any> = () => Promise.resolve();
+
+  /**
    * Destroys processed stream and update references
    */
   private _destroyProcessedStream() {
@@ -789,14 +788,9 @@ class AudioHelper extends EventEmitter {
    *   the specified device is already active.
    */
   private async _setInputDevice(deviceId: string, forceGetUserMedia: boolean): Promise<void> {
-    const connectPromise = this._getConnectPromise();
-    if (connectPromise) {
-      this._log.debug('connectPromise detected, waiting...');
-      await connectPromise;
-      this._log.debug('connectPromise resolved');
-    }
-
     const setInputDevice = async () => {
+      await this._beforeSetInputDevice();
+
       if (typeof deviceId !== 'string') {
         return Promise.reject(new InvalidArgumentError('Must specify the device to set'));
       }
@@ -1042,7 +1036,7 @@ namespace AudioHelper {
     /**
      * Promise to wait for {@link Device.connect}.
      */
-    getConnectPromise: () => Promise<Call> | null;
+    getMakeCallPromise: () => Promise<any>;
 
     /**
      * The getUserMedia method to use
