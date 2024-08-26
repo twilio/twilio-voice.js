@@ -1,12 +1,27 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
-2.11.4 (WIP)
+2.12.1 (In Progress)
 ============
 
 Bug Fixes
 ---------
 
 - Fixed an issue where calling `device.connect()` without waiting for the promise to get resolved, then call `device.audio.setInputDevice()` right away results in an `AcquisitionFailedError`.
+
+2.12.0 (August 26, 2024)
+====================
+
+New Features
+------------
+
+### Call Message Events
+
+The Call Message Events, originally released in 2.2.0, has been promoted to GA. This release includes the following **breaking changes**.
+
+- [Call.Message.messageType](https://twilio.github.io/twilio-voice.js/interfaces/voice.call.message.html) has been converted from `Call.MessageType` enum to `string`.
+- Call Message related errors are now emitted via [call.on('error', handler(twilioError))](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#errorevent) instead of [device.on('error', handler(twilioError))](https://twilio.github.io/twilio-voice.js/classes/voice.device.html#errorevent).
+- A new error, [31210](https://www.twilio.com/docs/api/errors/31210), has been added to the SDK. This new error is emitted via [call.on('error', handler(twilioError))](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#errorevent) after calling the [sendMessage](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#sendmessage) API with an invalid [Call.Message.messageType](https://twilio.github.io/twilio-voice.js/interfaces/voice.call.message.html).
+- Fixed an issue where the wrong error code `31209` is raised if the payload size of a Call Message Event exceeds the authorized limit. With this release, `31212` is raised instead.
 
 2.11.3 (August 21, 2024)
 ========================

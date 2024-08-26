@@ -4,7 +4,7 @@ import * as assert from 'assert';
 import { EventEmitter } from 'events';
 import { SinonFakeTimers, SinonSpy, SinonStubbedInstance } from 'sinon';
 import * as sinon from 'sinon';
-import { GeneralErrors, MediaErrors, InvalidStateError, InvalidArgumentError } from '../../lib/twilio/errors';
+import { GeneralErrors, MediaErrors, InvalidStateError, InvalidArgumentError, TwilioError } from '../../lib/twilio/errors';
 
 const Util = require('../../lib/twilio/util');
 
@@ -1119,7 +1119,7 @@ describe('Call', function() {
     beforeEach(() => {
       message = {
         content: { foo: 'foo' },
-        messageType: Call.MessageType.UserDefinedMessage,
+        messageType: 'user-defined-message',
       };
     });
 
@@ -1135,8 +1135,7 @@ describe('Call', function() {
           assert.throws(
             () => conn.sendMessage({ ...message, messageType }),
             new InvalidArgumentError(
-              '`messageType` must be an enumeration value of ' +
-              '`Call.MessageType` or a string.',
+              '`messageType` must be a string.',
             ),
           );
         });
@@ -1185,7 +1184,7 @@ describe('Call', function() {
         mockCallSid,
         message.content,
         undefined,
-        Call.MessageType.UserDefinedMessage,
+        'user-defined-message',
         'foobar-voice-event-sid',
       );
     });
@@ -2007,7 +2006,7 @@ describe('Call', function() {
             foo: 'bar',
           },
           contentType: 'application/json',
-          messageType: 'foo-bar',
+          messageType: 'user-defined-message',
         };
 
         mockAckPayload = {
@@ -2030,6 +2029,22 @@ describe('Call', function() {
         });
         pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid });
         assert.deepEqual(await payloadPromise, { ...mockMessagePayload, voiceEventSid: sid });
+      });
+
+      it('should publish a user-defined-message sent event', async () => {
+        const sid = conn.sendMessage(mockMessagePayload);
+        const payloadPromise = new Promise((resolve) => {
+          conn.on('messageSent', resolve);
+        });
+        pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid });
+        await payloadPromise;
+        assert.deepStrictEqual(publisher.info.args[1][0], 'call-message');
+        assert.deepStrictEqual(publisher.info.args[1][1], mockMessagePayload.messageType);
+        assert.deepStrictEqual(publisher.info.args[1][2], {
+          content_type: mockMessagePayload.contentType,
+          event_type: 'sent',
+          voice_event_sid: sid
+        });
       });
 
       it('should ignore ack when callSids do not match', async () => {
@@ -2088,7 +2103,7 @@ describe('Call', function() {
         const payloadPromise = new Promise((resolve, reject) => {
           conn.on('messageSent', reject);
         });
-        pstream.emit('error', { callsid: mockcallsid, voiceeventsid: sid });
+        pstream.emit('error', { callsid: mockcallsid, voiceeventsid: sid, error: { code: 31210, message: 'foo' }});
         pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid });
         await Promise.race([
           wait(1),
@@ -2101,7 +2116,7 @@ describe('Call', function() {
         const payloadPromise = new Promise((resolve) => {
           conn.on('messageSent', resolve);
         });
-        pstream.emit('error', { callsid: 'foo', voiceeventsid: sid });
+        pstream.emit('error', { callsid: 'foo', voiceeventsid: sid, error: { code: 31210, message: 'foo' }});
         pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid });
         await payloadPromise;
       });
@@ -2111,7 +2126,7 @@ describe('Call', function() {
         const payloadPromise = new Promise((resolve) => {
           conn.on('messageSent', resolve);
         });
-        pstream.emit('error', { callsid: mockcallsid, voiceeventsid: 'foo' });
+        pstream.emit('error', { callsid: mockcallsid, voiceeventsid: 'foo', error: { code: 31210, message: 'foo' }});
         pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid });
         await payloadPromise;
       });
@@ -2121,9 +2136,41 @@ describe('Call', function() {
         const payloadPromise = new Promise((resolve) => {
           conn.on('messageSent', resolve);
         });
-        pstream.emit('error', { callsid: mockcallsid });
+        pstream.emit('error', { callsid: mockcallsid, error: { code: 31210, message: 'foo' }});
         pstream.emit('ack', { ...mockAckPayload, voiceeventsid: sid });
         await payloadPromise;
+      });
+
+      it('should publish a user-defined-message error event', () => {
+        const sid = conn.sendMessage(mockMessagePayload);
+        pstream.emit('error', { callsid: mockcallsid, voiceeventsid: sid, error: { code: 31210, message: 'foo' }});
+        assert.deepStrictEqual(publisher.error.args[0][0], 'call-message');
+        assert.deepStrictEqual(publisher.error.args[0][1], 'error');
+        assert.deepStrictEqual(publisher.error.args[0][2],   {
+          code: 31210,
+          message: 'foo',
+          voice_event_sid: sid
+        });
+      });
+
+      it('should emit the correct call message error', async () => {
+        const sid = conn.sendMessage(mockMessagePayload);
+        const payloadPromise: Promise<TwilioError> = new Promise((resolve) => {
+          conn.on('error', resolve);
+        });
+        pstream.emit('error', { callsid: mockcallsid, voiceeventsid: sid, error: { code: 31210, message: 'foo' }});
+        const error = await payloadPromise;
+        assert.strictEqual(error.code, 31210);
+      });
+
+      it('should emit an unknown error', async () => {
+        const sid = conn.sendMessage(mockMessagePayload);
+        const payloadPromise: Promise<TwilioError> = new Promise((resolve) => {
+          conn.on('error', resolve);
+        });
+        pstream.emit('error', { callsid: mockcallsid, voiceeventsid: sid, error: { code: 111, message: 'foo' }});
+        const error = await payloadPromise;
+        assert.strictEqual(error.code, 31000);
       });
     });
 
@@ -2170,6 +2217,17 @@ describe('Call', function() {
           wait(1),
           messagePromise,
         ]);
+      });
+
+      it('should publish a user-defined-message received event', () => {
+        pstream.emit('message', mockPayload);
+        assert.deepStrictEqual(publisher.info.args[1][0], 'call-message');
+        assert.deepStrictEqual(publisher.info.args[1][1], mockPayload.messagetype);
+        assert.deepStrictEqual(publisher.info.args[1][2], {
+          content_type: mockPayload.contenttype,
+          event_type: 'received',
+          voice_event_sid: mockPayload.voiceeventsid
+        });
       });
     });
   });
