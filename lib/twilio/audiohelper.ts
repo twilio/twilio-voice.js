@@ -104,7 +104,7 @@ class AudioHelper extends EventEmitter {
   /**
    * Promise to wait for before setting the input device.
    */
-  private _beforeSetInputDevice: () => Promise<any> = () => Promise.resolve();
+  private _beforeSetInputDevice: () => Promise<any>;
 
   /**
    * The audio stream of the default device.
@@ -227,7 +227,7 @@ class AudioHelper extends EventEmitter {
       setSinkId: typeof HTMLAudioElement !== 'undefined' && (HTMLAudioElement.prototype as any).setSinkId,
     }, options);
 
-    this._beforeSetInputDevice = options.beforeSetInputDevice || this._beforeSetInputDevice;
+    this._beforeSetInputDevice = options.beforeSetInputDevice || (() => Promise.resolve());
 
     this._updateUserOptions(options);
 
