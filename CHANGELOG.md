@@ -1,11 +1,14 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
-2.12.0 (In Progress)
+2.12.0 (August 26, 2024)
 ====================
+
+New Features
+------------
 
 ### Call Message Events
 
-The Call Message Events (Beta), originally released in 2.2.0, has been promoted to GA. This release includes the following **breaking changes**.
+The Call Message Events, originally released in 2.2.0, has been promoted to GA. This release includes the following **breaking changes**.
 
 - [Call.Message.messageType](https://twilio.github.io/twilio-voice.js/interfaces/voice.call.message.html) has been converted from `Call.MessageType` enum to `string`.
 - Call Message related errors are now emitted via [call.on('error', handler(twilioError))](https://twilio.github.io/twilio-voice.js/classes/voice.call.html#errorevent) instead of [device.on('error', handler(twilioError))](https://twilio.github.io/twilio-voice.js/classes/voice.device.html#errorevent).
