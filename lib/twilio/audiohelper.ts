@@ -102,6 +102,11 @@ class AudioHelper extends EventEmitter {
   private _audioProcessorEventObserver: AudioProcessorEventObserver;
 
   /**
+   * Promise to wait for before setting the input device.
+   */
+  private _beforeSetInputDevice: () => Promise<any> = () => Promise.resolve();
+
+  /**
    * The audio stream of the default device.
    * This is populated when _openDefaultDeviceWithConstraints is called,
    * See _selectedInputDeviceStream for differences.
@@ -222,7 +227,7 @@ class AudioHelper extends EventEmitter {
       setSinkId: typeof HTMLAudioElement !== 'undefined' && (HTMLAudioElement.prototype as any).setSinkId,
     }, options);
 
-    this._beforeSetInputDevice = options.getMakeCallPromise || this._beforeSetInputDevice;
+    this._beforeSetInputDevice = options.beforeSetInputDevice || this._beforeSetInputDevice;
 
     this._updateUserOptions(options);
 
@@ -622,11 +627,6 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Promise to wait for {@link Device.connect}.
-   */
-  private _beforeSetInputDevice: () => Promise<any> = () => Promise.resolve();
-
-  /**
    * Destroys processed stream and update references
    */
   private _destroyProcessedStream() {
@@ -1024,6 +1024,11 @@ namespace AudioHelper {
     audioProcessorEventObserver: AudioProcessorEventObserver;
 
     /**
+     * Promise to wait for before setting the input device.
+     */
+    beforeSetInputDevice?: () => Promise<any>;
+
+    /**
      * Whether each sound is enabled.
      */
     enabledSounds?: Record<Device.ToggleableSound, boolean>;
@@ -1032,11 +1037,6 @@ namespace AudioHelper {
      * Overrides the native MediaDevices.enumerateDevices API.
      */
     enumerateDevices?: any;
-
-    /**
-     * Promise to wait for {@link Device.connect}.
-     */
-    getMakeCallPromise: () => Promise<any>;
 
     /**
      * The getUserMedia method to use

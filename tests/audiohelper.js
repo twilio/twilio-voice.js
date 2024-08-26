@@ -8,7 +8,7 @@ function getUserMedia() {
   return Promise.resolve({ id: 'default', getTracks: () => [] });
 }
 
-function getMakeCallPromise() {
+function beforeSetInputDevice() {
   return Promise.resolve();
 }
 
@@ -24,7 +24,7 @@ describe('AudioHelper', () => {
 
     beforeEach(() => {
       audio = new AudioHelper(noop, noop, {
-        getMakeCallPromise,
+        beforeSetInputDevice,
         getUserMedia,
         mediaDevices: {
           enumerateDevices: function(){
@@ -101,7 +101,7 @@ describe('AudioHelper', () => {
 
       audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
         audioProcessorEventObserver: eventObserver,
-        getMakeCallPromise,
+        beforeSetInputDevice,
         getUserMedia,
         mediaDevices,
         setSinkId: () => {}
@@ -233,7 +233,7 @@ describe('AudioHelper', () => {
         getUserMedia = sinon.stub().returns(new Promise(res => res({id: 'default',getTracks: () => [{stop: stopStub}]})));
         audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
           audioProcessorEventObserver: eventObserver,
-          getMakeCallPromise,
+          beforeSetInputDevice,
           getUserMedia,
           mediaDevices,
           setSinkId: () => {}
@@ -480,7 +480,7 @@ describe('AudioHelper', () => {
 
         audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
           audioProcessorEventObserver: eventObserver,
-          getMakeCallPromise,
+          beforeSetInputDevice,
           getUserMedia,
           mediaDevices,
           setSinkId: () => {}
@@ -520,11 +520,11 @@ describe('AudioHelper', () => {
       });
 
       describe('setInputDevice', () => {
-        it('should wait for the getMakeCallPromise to resolve', async () => {
+        it('should wait for the beforeSetInputDevice to resolve', async () => {
           const stub = sinon.stub();
           audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
             audioProcessorEventObserver: eventObserver,
-            getMakeCallPromise: () => new Promise(res => res(stub())),
+            beforeSetInputDevice: () => new Promise(res => res(stub())),
             getUserMedia,
             mediaDevices,
             setSinkId: () => {}
@@ -533,11 +533,11 @@ describe('AudioHelper', () => {
           sinon.assert.calledOnce(stub);
         });
         
-        it('should reject if getMakeCallPromise rejects', async () => {
+        it('should reject if beforeSetInputDevice rejects', async () => {
           const stub = sinon.stub();
           audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
             audioProcessorEventObserver: eventObserver,
-            getMakeCallPromise: () => new Promise((resolve, reject) => reject()),
+            beforeSetInputDevice: () => new Promise((resolve, reject) => reject()),
             getUserMedia,
             mediaDevices,
             setSinkId: () => {}
@@ -843,7 +843,7 @@ describe('AudioHelper', () => {
         });
 
         audio = new AudioHelper(onActiveOutputsChanged, null, {
-          getMakeCallPromise,
+          beforeSetInputDevice,
           getUserMedia,
           mediaDevices,
           setSinkId: () => {}

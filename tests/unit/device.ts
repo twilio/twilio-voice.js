@@ -446,15 +446,6 @@ describe('Device', function() {
             });
           });
         });
-
-        describe('getMakeCallPromise', () => {
-          it('should return a resolved Promise', () => device.connect());
-          
-          it('should set getMakeCallPromise when device.connect() is called', async () => {
-            device.connect();
-            assert.notEqual(device.getMakeCallPromise(), Promise.resolve());
-          })
-        })
       });
 
       describe('.destroy()', () => {
@@ -1700,17 +1691,13 @@ describe('Device', function() {
 
             it('should update audioHelper options', () => {
               const stub = sinon.stub();
-              const connectProm = sinon.stub().returns('fizz');
               device['_audio']!['_updateUserOptions'] = stub;
               device['_options'].enumerateDevices = 'foo';
-              device['getMakeCallPromise'] = connectProm;
-              device['getMakeCallPromise'].bind(device);
               device['_options'].getUserMedia = 'bar';
               device['_setupAudioHelper']();
               assert.deepEqual(stub.getCall(0).args[0].audioContext, Device.audioContext);
               assert.deepEqual(stub.getCall(0).args[0].audioProcessorEventObserver, device['_audioProcessorEventObserver']);
               assert.deepEqual(stub.getCall(0).args[0].enumerateDevices, 'foo');
-              assert.deepEqual(stub.getCall(0).args[0].getMakeCallPromise(), 'fizz');
               assert.deepEqual(stub.getCall(0).args[0].getUserMedia, 'bar');
             });
           });
