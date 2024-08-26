@@ -1237,11 +1237,19 @@ class Device extends EventEmitter {
    * Called when an 'error' event is received from the signaling stream.
    */
   private _onSignalingError = (payload: Record<string, any>) => {
-    if (typeof payload !== 'object') { return; }
+    if (typeof payload !== 'object') {
+      this._log.warn('Invalid signaling error payload', payload);
+      return;
+    }
 
-    const { error: originalError, callsid } = payload;
+    const { error: originalError, callsid, voiceeventsid } = payload;
 
-    if (typeof originalError !== 'object') { return; }
+    // voiceeventsid is for call message events which are handled in the call object
+    // missing originalError shouldn't be possible but check here to fail properly
+    if (typeof originalError !== 'object' || !!voiceeventsid) {
+      this._log.warn('Ignoring signaling error payload', { originalError, voiceeventsid });
+      return;
+    }
 
     const call: Call | undefined =
       (typeof callsid === 'string' && this._findCall(callsid)) || undefined;

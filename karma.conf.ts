@@ -15,7 +15,7 @@ if (fs.existsSync(__dirname + '/config.yaml')) {
 }
 
 const testFiles = process.env.INTEGRATION_TEST_FILES ?
-  process.env.INTEGRATION_TEST_FILES.split(',') : ['tests/integration/*.ts'];
+  process.env.INTEGRATION_TEST_FILES.split(',') : ['tests/integration/**/*.ts'];
 
 console.log('Test Files:', testFiles);
 
@@ -108,7 +108,7 @@ module.exports = function(config: any) {
     port: 9876,
     preprocessors: {
       'lib/**/*.ts': 'karma-typescript',
-      'tests/integration/*.ts': 'karma-typescript',
+      'tests/integration/**/*.ts': 'karma-typescript',
     },
     reporters: ['spec', 'karma-typescript'],
     singleRun: true,

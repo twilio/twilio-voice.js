@@ -91,15 +91,18 @@ commands:
     steps:
       - build
       - run:
+          name: "Start test relay server"
+          background: true
+          command: bash scripts/run-relay-server.sh
+      - run:
           name: Running integration tests
-          command: chmod +x ./scripts/run-integration-tests.sh && ./scripts/run-integration-tests.sh
+          command: bash scripts/run-integration-tests.sh
   network-tests:
     steps:
       - get-code
       - run:
           name: Running network tests
           command: npm run test:docker
-
 
 ###
 # Jobs
