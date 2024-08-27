@@ -8,10 +8,6 @@ function getUserMedia() {
   return Promise.resolve({ id: 'default', getTracks: () => [] });
 }
 
-function beforeSetInputDevice() {
-  return Promise.resolve();
-}
-
 describe('AudioHelper', () => {
   const wait = () => new Promise(res => res());
 
@@ -24,7 +20,6 @@ describe('AudioHelper', () => {
 
     beforeEach(() => {
       audio = new AudioHelper(noop, noop, {
-        beforeSetInputDevice,
         getUserMedia,
         mediaDevices: {
           enumerateDevices: function(){
@@ -101,7 +96,6 @@ describe('AudioHelper', () => {
 
       audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
         audioProcessorEventObserver: eventObserver,
-        beforeSetInputDevice,
         getUserMedia,
         mediaDevices,
         setSinkId: () => {}
@@ -233,7 +227,6 @@ describe('AudioHelper', () => {
         getUserMedia = sinon.stub().returns(new Promise(res => res({id: 'default',getTracks: () => [{stop: stopStub}]})));
         audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
           audioProcessorEventObserver: eventObserver,
-          beforeSetInputDevice,
           getUserMedia,
           mediaDevices,
           setSinkId: () => {}
@@ -480,7 +473,6 @@ describe('AudioHelper', () => {
 
         audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
           audioProcessorEventObserver: eventObserver,
-          beforeSetInputDevice,
           getUserMedia,
           mediaDevices,
           setSinkId: () => {}
@@ -529,12 +521,11 @@ describe('AudioHelper', () => {
             mediaDevices,
             setSinkId: () => {}
           });
-          await audio._setInputDevice('input');
+          await audio.setInputDevice('input');
           sinon.assert.calledOnce(stub);
         });
         
         it('should reject if beforeSetInputDevice rejects', async () => {
-          const stub = sinon.stub();
           audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
             audioProcessorEventObserver: eventObserver,
             beforeSetInputDevice: () => new Promise((resolve, reject) => reject()),
@@ -542,7 +533,7 @@ describe('AudioHelper', () => {
             mediaDevices,
             setSinkId: () => {}
           });
-          await assert.rejects(() => audio._setInputDevice('input'));
+          await assert.rejects(() => audio.setInputDevice('input'));
         });
 
         it('should return a rejected Promise if no deviceId is passed', () => audio.setInputDevice().then(() => {
@@ -843,7 +834,6 @@ describe('AudioHelper', () => {
         });
 
         audio = new AudioHelper(onActiveOutputsChanged, null, {
-          beforeSetInputDevice,
           getUserMedia,
           mediaDevices,
           setSinkId: () => {}
