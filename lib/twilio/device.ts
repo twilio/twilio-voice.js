@@ -1391,6 +1391,7 @@ class Device extends EventEmitter {
   private _removeCall(call: Call): void {
     if (this._activeCall === call) {
       this._activeCall = null;
+      this._makeCallPromise = null;
     }
 
     for (let i = this._calls.length - 1; i >= 0; i--) {
