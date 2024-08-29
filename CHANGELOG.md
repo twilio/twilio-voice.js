@@ -6,7 +6,7 @@
 Bug Fixes
 ---------
 
-- Fixed an issue where calling `device.connect()` without waiting for the promise to get resolved, then call `device.audio.setInputDevice()` right away results in an `AcquisitionFailedError`.
+- Fixed an issue where calling `device.connect()` without waiting for the promise to get resolved, then calling `device.audio.setInputDevice()` right away results in an `AcquisitionFailedError`.
 
 2.12.0 (August 26, 2024)
 ====================
