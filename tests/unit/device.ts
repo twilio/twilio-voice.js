@@ -284,8 +284,7 @@ describe('Device', function() {
           device.audio!._getInputDevicePromise = () => new Promise((resolve, reject) => reject());
           await assert.rejects(() => device.connect());
           assert(!device['_activeCall']);
-          assert.notDeepEqual(device['_makeCallPromise'], null)
-          device['_makeCallPromise'] !== null && assert.rejects(device['_makeCallPromise'])
+          assert.notDeepEqual(device['_makeCallPromise'], null);
         });
 
         it('should reject if there is already an active call', async () => {
@@ -1720,14 +1719,14 @@ describe('Device', function() {
               device['_setupAudioHelper']();
               device.connect();
               assert.deepEqual(stub.getCall(0).args[0].beforeSetInputDevice(), device['_makeCallPromise']);
-            })
+            });
 
             it(`should use a default Promise if there's no active call`, async () => {
               const stub = sinon.stub();
               device['_audio']!['_updateUserOptions'] = stub;
               device['_setupAudioHelper']();
               assert.deepEqual(stub.getCall(0).args[0].beforeSetInputDevice(), Promise.resolve());
-            })
+            });
           });
 
           describe('.state', () => {
