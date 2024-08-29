@@ -606,8 +606,13 @@ class Device extends EventEmitter {
       twimlParams = options.params || twimlParams;
     }
 
+    let activeCall;
     this._makeCallPromise = this._makeCall(twimlParams, callOptions, isReconnect);
-    const activeCall = this._activeCall = await this._makeCallPromise;
+    try {
+      activeCall = this._activeCall = await this._makeCallPromise;
+    } finally {
+      this._makeCallPromise = null;
+    }
 
     // Make sure any incoming calls are ignored
     this._calls.splice(0).forEach(call => call.ignore());
@@ -1326,7 +1331,12 @@ class Device extends EventEmitter {
       },
     );
 
-    const call = await this._makeCallPromise;
+    let call;
+    try {
+      call = await this._makeCallPromise;
+    } finally {
+      this._makeCallPromise = null;
+    }
 
     this._calls.push(call);
 

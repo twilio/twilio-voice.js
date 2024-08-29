@@ -277,14 +277,14 @@ describe('Device', function() {
           await device.connect();
           sinon.assert.calledOnce(stub);
           assert(!!device['_activeCall']);
-          assert(!!device['_makeCallPromise']);
+          assert(!device['_makeCallPromise']);
         });
 
         it('should reject if inputDevicePromise rejects', async () => {
           device.audio!._getInputDevicePromise = () => new Promise((resolve, reject) => reject());
           await assert.rejects(() => device.connect());
           assert(!device['_activeCall']);
-          assert.notDeepEqual(device['_makeCallPromise'], null);
+          assert(!device['_makeCallPromise']);
         });
 
         it('should reject if there is already an active call', async () => {
@@ -325,7 +325,7 @@ describe('Device', function() {
 
         it('should set ._makeCallPromise', () => {
           device.connect();
-          assert.notDeepEqual(device['_makeCallPromise'], null);
+          assert(device['_makeCallPromise']);
         })
 
         it('should play outgoing sound after accepted if enabled', async () => {
@@ -1099,7 +1099,7 @@ describe('Device', function() {
             const call = device.calls[0];
             call.emit('accept');
             assert.equal(call, device['_activeCall']);
-            assert.notDeepEqual(device['_makeCallPromise'], null);
+            assert(!device['_makeCallPromise']);
           });
 
           it('should remove the call', () => {
@@ -1209,7 +1209,7 @@ describe('Device', function() {
             call.emit('accept');
             assert.equal(typeof call, 'object');
             assert.equal(call, device['_activeCall']);
-            assert.notDeepEqual(device['_makeCallPromise'], null);
+            assert(!device['_makeCallPromise']);
 
             call.emit('disconnect');
             assert.equal(device['_activeCall'], null);
@@ -1450,13 +1450,13 @@ describe('Device', function() {
         });
 
         it('should not set the active call until the stream resolves', async () => {
-          assert.equal(device['_makeCallPromise'], null);
           const connectPromise = device.connect();
           assert.equal(device['_activeCall'], null);
-          assert.notDeepEqual(device['_makeCallPromise'], null);
+          assert(device['_makeCallPromise']);
           pstream.emit('connected', { region: 'US_EAST_VIRGINIA' });
           await connectPromise;
           assert(device['_activeCall']);
+          assert(!device['_makeCallPromise']);
         });
       });
 
