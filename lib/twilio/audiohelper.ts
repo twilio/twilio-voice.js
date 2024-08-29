@@ -102,6 +102,11 @@ class AudioHelper extends EventEmitter {
   private _audioProcessorEventObserver: AudioProcessorEventObserver;
 
   /**
+   * Promise to wait for before setting the input device.
+   */
+  private _beforeSetInputDevice: () => Promise<any>;
+
+  /**
    * The audio stream of the default device.
    * This is populated when _openDefaultDeviceWithConstraints is called,
    * See _selectedInputDeviceStream for differences.
@@ -221,6 +226,8 @@ class AudioHelper extends EventEmitter {
       AudioContext: typeof AudioContext !== 'undefined' && AudioContext,
       setSinkId: typeof HTMLAudioElement !== 'undefined' && (HTMLAudioElement.prototype as any).setSinkId,
     }, options);
+
+    this._beforeSetInputDevice = options.beforeSetInputDevice || (() => Promise.resolve());
 
     this._updateUserOptions(options);
 
@@ -780,8 +787,10 @@ class AudioHelper extends EventEmitter {
    * @param forceGetUserMedia - If true, getUserMedia will be called even if
    *   the specified device is already active.
    */
-  private _setInputDevice(deviceId: string, forceGetUserMedia: boolean): Promise<void> {
+  private async _setInputDevice(deviceId: string, forceGetUserMedia: boolean): Promise<void> {
     const setInputDevice = async () => {
+      await this._beforeSetInputDevice();
+
       if (typeof deviceId !== 'string') {
         return Promise.reject(new InvalidArgumentError('Must specify the device to set'));
       }
@@ -1013,6 +1022,11 @@ namespace AudioHelper {
      * AudioProcessorEventObserver to use
      */
     audioProcessorEventObserver: AudioProcessorEventObserver;
+
+    /**
+     * Promise to wait for before setting the input device.
+     */
+    beforeSetInputDevice?: () => Promise<any>;
 
     /**
      * Whether each sound is enabled.

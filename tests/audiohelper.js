@@ -512,6 +512,30 @@ describe('AudioHelper', () => {
       });
 
       describe('setInputDevice', () => {
+        it('should wait for the beforeSetInputDevice to resolve', async () => {
+          const stub = sinon.stub();
+          audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
+            audioProcessorEventObserver: eventObserver,
+            beforeSetInputDevice: () => new Promise(res => res(stub())),
+            getUserMedia,
+            mediaDevices,
+            setSinkId: () => {}
+          });
+          await audio.setInputDevice('input');
+          sinon.assert.calledOnce(stub);
+        });
+        
+        it('should reject if beforeSetInputDevice rejects', async () => {
+          audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
+            audioProcessorEventObserver: eventObserver,
+            beforeSetInputDevice: () => new Promise((resolve, reject) => reject()),
+            getUserMedia,
+            mediaDevices,
+            setSinkId: () => {}
+          });
+          await assert.rejects(() => audio.setInputDevice('input'));
+        });
+
         it('should return a rejected Promise if no deviceId is passed', () => audio.setInputDevice().then(() => {
           throw new Error('Expected a rejection, got resolved');
         }, () => { }));
@@ -573,8 +597,8 @@ describe('AudioHelper', () => {
         context('when the ID passed is new and valid', () => {
           it('should return a resolved Promise', () => audio.setInputDevice('input'));
 
-          it('should call getUserMedia with the passed ID', () => {
-            audio.setInputDevice('input');
+          it('should call getUserMedia with the passed ID', async () => {
+            await audio.setInputDevice('input');
             assert.equal(audio._getUserMedia.args[0][0].audio.deviceId.exact, 'input');
           });
 

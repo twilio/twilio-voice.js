@@ -381,6 +381,11 @@ class Device extends EventEmitter {
   private _log: Log = new Log('Device');
 
   /**
+   * The internal promise created when calling {@link Device.makeCall}.
+   */
+  private _makeCallPromise: Promise<any> | null = null;
+
+  /**
    * Network related information
    * See https://developer.mozilla.org/en-US/docs/Web/API/Network_Information_API
    */
@@ -586,7 +591,7 @@ class Device extends EventEmitter {
     let twimlParams: Record<string, string> = {};
     const callOptions: Call.Options = {
       enableImprovedSignalingErrorPrecision:
-        !!this._options.enableImprovedSignalingErrorPrecision,
+      !!this._options.enableImprovedSignalingErrorPrecision,
       rtcConfiguration: options.rtcConfiguration,
       voiceEventSidGenerator: this._options.voiceEventSidGenerator,
     };
@@ -601,7 +606,13 @@ class Device extends EventEmitter {
       twimlParams = options.params || twimlParams;
     }
 
-    const activeCall = this._activeCall = await this._makeCall(twimlParams, callOptions, isReconnect);
+    let activeCall;
+    this._makeCallPromise = this._makeCall(twimlParams, callOptions, isReconnect);
+    try {
+      activeCall = this._activeCall = await this._makeCallPromise;
+    } finally {
+      this._makeCallPromise = null;
+    }
 
     // Make sure any incoming calls are ignored
     this._calls.splice(0).forEach(call => call.ignore());
@@ -1308,7 +1319,7 @@ class Device extends EventEmitter {
 
     const customParameters = Object.assign({ }, queryToJson(callParameters.Params));
 
-    const call = await this._makeCall(
+    this._makeCallPromise = this._makeCall(
       customParameters,
       {
         callParameters,
@@ -1319,6 +1330,13 @@ class Device extends EventEmitter {
         voiceEventSidGenerator: this._options.voiceEventSidGenerator,
       },
     );
+
+    let call;
+    try {
+      call = await this._makeCallPromise;
+    } finally {
+      this._makeCallPromise = null;
+    }
 
     this._calls.push(call);
 
@@ -1383,6 +1401,7 @@ class Device extends EventEmitter {
   private _removeCall(call: Call): void {
     if (this._activeCall === call) {
       this._activeCall = null;
+      this._makeCallPromise = null;
     }
 
     for (let i = this._calls.length - 1; i >= 0; i--) {
@@ -1437,6 +1456,15 @@ class Device extends EventEmitter {
     const audioOptions: AudioHelper.Options = {
       audioContext: Device.audioContext,
       audioProcessorEventObserver: this._audioProcessorEventObserver,
+      beforeSetInputDevice: () => {
+        if (this._makeCallPromise) {
+          this._log.debug('beforeSetInputDevice pause detected');
+          return this._makeCallPromise;
+        } else {
+          this._log.debug('beforeSetInputDevice pause not detected, setting default');
+          return Promise.resolve();
+        }
+      },
       enumerateDevices: this._options.enumerateDevices,
       getUserMedia: this._options.getUserMedia || getUserMedia,
     };

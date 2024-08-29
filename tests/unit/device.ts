@@ -277,12 +277,14 @@ describe('Device', function() {
           await device.connect();
           sinon.assert.calledOnce(stub);
           assert(!!device['_activeCall']);
+          assert(!device['_makeCallPromise']);
         });
 
         it('should reject if inputDevicePromise rejects', async () => {
           device.audio!._getInputDevicePromise = () => new Promise((resolve, reject) => reject());
           await assert.rejects(() => device.connect());
           assert(!device['_activeCall']);
+          assert(!device['_makeCallPromise']);
         });
 
         it('should reject if there is already an active call', async () => {
@@ -320,6 +322,11 @@ describe('Device', function() {
         it('should set ._activeCall', async () => {
           assert.equal(await device.connect(), device['_activeCall']);
         });
+
+        it('should set ._makeCallPromise', () => {
+          device.connect();
+          assert(device['_makeCallPromise']);
+        })
 
         it('should play outgoing sound after accepted if enabled', async () => {
           const spy: any = { play: sinon.spy() };
@@ -1092,6 +1099,7 @@ describe('Device', function() {
             const call = device.calls[0];
             call.emit('accept');
             assert.equal(call, device['_activeCall']);
+            assert(!device['_makeCallPromise']);
           });
 
           it('should remove the call', () => {
@@ -1201,9 +1209,11 @@ describe('Device', function() {
             call.emit('accept');
             assert.equal(typeof call, 'object');
             assert.equal(call, device['_activeCall']);
+            assert(!device['_makeCallPromise']);
 
             call.emit('disconnect');
             assert.equal(device['_activeCall'], null);
+            assert.equal(device['_makeCallPromise'], null);
           });
 
           it('should unset the preferred uri', () => {
@@ -1442,9 +1452,11 @@ describe('Device', function() {
         it('should not set the active call until the stream resolves', async () => {
           const connectPromise = device.connect();
           assert.equal(device['_activeCall'], null);
+          assert(device['_makeCallPromise']);
           pstream.emit('connected', { region: 'US_EAST_VIRGINIA' });
           await connectPromise;
           assert(device['_activeCall']);
+          assert(!device['_makeCallPromise']);
         });
       });
 
@@ -1695,12 +1707,25 @@ describe('Device', function() {
               device['_options'].enumerateDevices = 'foo';
               device['_options'].getUserMedia = 'bar';
               device['_setupAudioHelper']();
-              sinon.assert.calledWith(stub, {
-                audioContext: Device.audioContext,
-                audioProcessorEventObserver: device['_audioProcessorEventObserver'],
-                enumerateDevices: 'foo',
-                getUserMedia: 'bar',
-              })
+              assert.deepEqual(stub.getCall(0).args[0].audioContext, Device.audioContext);
+              assert.deepEqual(stub.getCall(0).args[0].audioProcessorEventObserver, device['_audioProcessorEventObserver']);
+              assert.deepEqual(stub.getCall(0).args[0].enumerateDevices, 'foo');
+              assert.deepEqual(stub.getCall(0).args[0].getUserMedia, 'bar');
+            });
+
+            it(`should wait for makeCallPromise if there's an active call`, async () => {
+              const stub = sinon.stub();
+              device['_audio']!['_updateUserOptions'] = stub;
+              device['_setupAudioHelper']();
+              device.connect();
+              assert.deepEqual(stub.getCall(0).args[0].beforeSetInputDevice(), device['_makeCallPromise']);
+            });
+
+            it(`should use a default Promise if there's no active call`, async () => {
+              const stub = sinon.stub();
+              device['_audio']!['_updateUserOptions'] = stub;
+              device['_setupAudioHelper']();
+              assert.deepEqual(stub.getCall(0).args[0].beforeSetInputDevice(), Promise.resolve());
             });
           });
 
