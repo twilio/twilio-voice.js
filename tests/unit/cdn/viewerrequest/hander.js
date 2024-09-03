@@ -14,7 +14,7 @@ function handler(event) {
   if (isFolder(uri)) {
     redirectUri = redirectUri.replace(/\/$/, '');
     if (isUnpinned(uri)) {
-        redirectUri = `${redirectUri}/index.html`;
+      redirectUri = `${redirectUri}/index.html`;
     }
   }
   
@@ -25,10 +25,10 @@ function handler(event) {
       statusCode: 301,
       statusDescription: 'Moved Permanently',
       headers: {
-          location: { value: redirectUri },
-          'access-control-allow-methods': { value: 'GET' },
-          'access-control-allow-origin': { value: '*' },
-          'access-control-max-age': { value: '3000' }
+        location: { value: redirectUri },
+        'access-control-allow-methods': { value: 'GET' },
+        'access-control-allow-origin': { value: '*' },
+        'access-control-max-age': { value: '3000' }
       }
     };
   }
