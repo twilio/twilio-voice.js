@@ -1,5 +1,5 @@
 const assert = require('assert');
-const viewerRequestHandler = require('./hander');
+const viewerRequestHandler = require('./handler');
 
 describe('CDN Viewer Request', () => {
   [
