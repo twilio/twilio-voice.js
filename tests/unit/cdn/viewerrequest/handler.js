@@ -7,9 +7,10 @@ function isFolder(uri) {
 }
 
 function handler(event) {
-  const request = event.request;
-  const uri = event.request.uri;
-  let redirectUri = uri;
+  // Current CloudFront Function only support ES5
+  var request = event.request;
+  var uri = event.request.uri;
+  var redirectUri = uri;
   
   if (isFolder(uri)) {
     redirectUri = redirectUri.replace(/\/$/, '');
@@ -18,7 +19,9 @@ function handler(event) {
     }
   }
   
-  redirectUri = redirectUri.replace(/^\/sdk\//, '/');
+  redirectUri = redirectUri
+    .replace(/(\/)\1+/g, '/')
+    .replace(/^\/sdk\//, '/');
 
   if (redirectUri !== uri) {
     return {
@@ -36,4 +39,5 @@ function handler(event) {
   return request;
 }
 
+// Do not include the following line when deploying to CloudFront Functions
 module.exports = handler;

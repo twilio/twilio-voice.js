@@ -16,6 +16,24 @@ describe('CDN Viewer Request', () => {
       expectedUri: '/js/video/latest/docs',
       unmodified: true,
     },{
+      testUri: '//foo/bar/',
+      expectedUri: '/foo/bar',
+    },{
+      testUri: '///foo/bar/',
+      expectedUri: '/foo/bar',
+    },{
+      testUri: '////foo//bar//',
+      expectedUri: '/foo/bar/',
+    },{
+      testUri: '//sdk/foo/bar/',
+      expectedUri: '/foo/bar',
+    },{
+      testUri: '/sdk///foo/bar/',
+      expectedUri: '/foo/bar',
+    },{
+      testUri: '//sdk//foo//bar//',
+      expectedUri: '/foo/bar/',
+    },{
       testUri: '/js/video/latest/docs/',
       expectedUri: '/js/video/latest/docs',
     },{
