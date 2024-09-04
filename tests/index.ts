@@ -110,3 +110,5 @@ require('./unit/error');
 require('./unit/log');
 require('./unit/regions');
 require('./unit/uuid');
+require('./unit/cdn/viewerrequest/test');
+require('./unit/cdn/viewerresponse/test');
