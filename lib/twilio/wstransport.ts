@@ -268,7 +268,8 @@ export default class WSTransport extends EventEmitter {
    * @param uri
    */
   updatePreferredURI(uri: string | null) {
-    this._preferredUri = uri;
+    console.log('xxxxx updatePreferredURI', uri)
+    // this._preferredUri = uri;
   }
 
   /**
