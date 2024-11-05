@@ -789,16 +789,11 @@ class Device extends EventEmitter {
 
     const originalChunderURIs: Set<string> = new Set(this._chunderURIs);
 
-    const chunderw = typeof this._options.chunderw === 'string'
-      ? [this._options.chunderw]
-      : Array.isArray(this._options.chunderw) && this._options.chunderw;
-
     const newChunderURIs = this._chunderURIs = (
-      chunderw || getChunderURIs(this._options.edge)
+      this._getChunderws() || getChunderURIs(this._options.edge)
     ).map(createSignalingEndpointURL);
 
-    let hasChunderURIsChanged =
-      originalChunderURIs.size !== newChunderURIs.length;
+    let hasChunderURIsChanged = originalChunderURIs.size !== newChunderURIs.length;
 
     if (!hasChunderURIsChanged) {
       for (const uri of newChunderURIs) {
@@ -974,6 +969,14 @@ class Device extends EventEmitter {
   private _findCall(callSid: string): Call | null {
     return this._calls.find(call => call.parameters.CallSid === callSid
       || call.outboundConnectionId === callSid) || null;
+  }
+
+  /**
+   * Get chunderws array from the chunderw param
+   */
+  private _getChunderws(): string[] | null {
+    return typeof this._options.chunderw === 'string' ? [this._options.chunderw]
+      : Array.isArray(this._options.chunderw) ? this._options.chunderw : null;
   }
 
   /**
@@ -1229,7 +1232,7 @@ class Device extends EventEmitter {
       }
     }
 
-    const preferredURIs = getChunderURIs(this._edge as Edge);
+    const preferredURIs = this._getChunderws() || getChunderURIs(this._edge as Edge);
     if (preferredURIs.length > 0) {
       const [preferredURI] = preferredURIs;
       this._preferredURI = createSignalingEndpointURL(preferredURI);
