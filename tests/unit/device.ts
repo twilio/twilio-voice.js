@@ -806,6 +806,20 @@ describe('Device', function() {
           assert.equal(device['_preferredURI'], ['wss://voice-js.dublin.twilio.com/signal']);
         });
 
+        context('when chunderw is set', () => {
+          it('should use chunderw as the preferred uri if it is a string', () => {
+            device['_options'].chunderw = 'foo';
+            pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
+            assert.equal(device['_preferredURI'], ['wss://foo/signal']);
+          });
+
+          it('should use the first chunderw as the preferred uri if it is an array', () => {
+            device['_options'].chunderw = ['foo', 'bar'];
+            pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
+            assert.equal(device['_preferredURI'], ['wss://foo/signal']);
+          });
+        });
+
         it('should set the identity', () => {
           pstream.emit('connected', { token: { identity: 'foobar' } });
           assert.equal(device['_identity'], 'foobar');
