@@ -68,7 +68,7 @@ root.requestAnimationFrame = () => { };
 
 root.MediaStream = () => { };
 
-root.navigator = {
+root.navigator ??= {
   mediaDevices: {
     getUserMedia() { return Promise.resolve() },
     enumerateDevices() { return Promise.resolve([]) },

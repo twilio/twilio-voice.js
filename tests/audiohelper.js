@@ -100,6 +100,10 @@ describe('AudioHelper', () => {
         mediaDevices,
         setSinkId: () => {}
       });
+      
+      navigator.mediaDevices = {
+        enumerateDevices() { return Promise.resolve([]) },
+      };
     });
 
     describe('constructor', () => {
