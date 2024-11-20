@@ -1,5 +1,13 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.12.3 (In Progress)
+====================
+
+Bug Fixes
+---------
+
+- Fixed an issue where the `originalError` property is not populated when a general `ConnectionError (31005)` happens.
+
 2.12.2 (November 12, 2024)
 ==========================
 
