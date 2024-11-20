@@ -68,7 +68,8 @@ root.requestAnimationFrame = () => { };
 
 root.MediaStream = () => { };
 
-root.navigator = {
+// This only applies to Node v21 and earlier, as v22 already includes globalThis.navigator.
+root.navigator ??= {
   mediaDevices: {
     getUserMedia() { return Promise.resolve() },
     enumerateDevices() { return Promise.resolve([]) },

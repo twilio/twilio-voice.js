@@ -70,6 +70,7 @@ describe('AudioHelper', () => {
     let availableDevices;
     let handlers;
     let mediaDevices;
+    let oldMediaDevices;
 
     beforeEach(() => {
       eventObserver = new AudioProcessorEventObserver();
@@ -100,7 +101,16 @@ describe('AudioHelper', () => {
         mediaDevices,
         setSinkId: () => {}
       });
+      
+      oldMediaDevices = navigator.mediaDevices;
+      navigator.mediaDevices = {
+        enumerateDevices() { return Promise.resolve([]) },
+      };
     });
+
+    afterEach(() => {
+      navigator.mediaDevices = oldMediaDevices;
+    })
 
     describe('constructor', () => {
       it('should set .isOutputSelectionSupported to true', () => {
