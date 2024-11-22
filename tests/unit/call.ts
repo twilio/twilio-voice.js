@@ -1765,6 +1765,7 @@ describe('Call', function() {
 
           const rVal = callback.firstCall.args[0];
           assert.equal(rVal.code, 31005);
+          assert.deepStrictEqual(rVal.originalError, { code: 123, message: 'foo' });
         });
 
         describe('should transform an error if enableImprovedSignalingErrorPrecision is true', () => {
@@ -1804,7 +1805,7 @@ describe('Call', function() {
           const cb = sinon.stub();
           conn.on('error', cb);
           pstream.emit('hangup', { callsid: 'CA123', error: {
-            code: 31480,
+            code: 31480, message: 'foobar',
           }});
           const rVal = cb.firstCall.args[0];
           assert.equal(rVal.code, 31005);
@@ -1812,6 +1813,7 @@ describe('Call', function() {
             rVal.message,
             'ConnectionError (31005): Error sent from gateway in HANGUP',
           );
+          assert.deepStrictEqual(rVal.originalError, { code: 31480, message: 'foobar' });
         });
       });
 

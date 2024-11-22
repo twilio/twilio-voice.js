@@ -1265,9 +1265,7 @@ class Call extends EventEmitter {
       );
       const error = typeof errorConstructor !== 'undefined'
         ? new errorConstructor(payload.error.message)
-        : new GeneralErrors.ConnectionError(
-            'Error sent from gateway in HANGUP',
-          );
+        : new GeneralErrors.ConnectionError('Error sent from gateway in HANGUP', payload.error);
       this._log.error('Received an error from the gateway:', error);
       this._log.debug('#error', error);
       this.emit('error', error);
