@@ -103,6 +103,23 @@ commands:
       - run:
           name: Running network tests
           command: npm run test:docker
+  extension-server-start:
+    steps:
+      - run:
+          name: "Extension: server start"
+          background: true
+          command: |
+            echo 'export APPLICATION_SID_EXTENSION="$APPLICATION_SID_EXTENSION"' >> "$BASH_ENV"
+            echo 'export ACCOUNT_SID="$ACCOUNT_SID"' >> "$BASH_ENV"
+            echo 'export API_KEY_SID="$API_KEY_SID"' >> "$BASH_ENV"
+            echo 'export API_KEY_SECRET="$API_KEY_SECRET"' >> "$BASH_ENV"
+            source "$BASH_ENV"
+            npm run start:extension:server
+  extension-puppeteer-test:
+    steps:
+      - run:
+          name: "Extension: Puppeteer test"
+          command: npm run test:extension
 
 ###
 # Jobs
@@ -161,6 +178,21 @@ jobs:
           steps:
             - build
             - run: << pipeline.parameters.release_command >>
+  run-chrome-extension-tests:
+    parameters:
+      bver:
+        type: string
+      browser:
+        type: string
+    executor:
+      name: docker-with-browser
+    environment:
+      BROWSER: <<parameters.browser>>
+      BVER: <<parameters.bver>>
+    steps:
+      - build
+      - extension-server-start
+      - extension-puppeteer-test
 
   trigger-qe-tests:
     docker:
@@ -241,6 +273,14 @@ workflows:
               browser: ["chrome", "firefox"]
               bver: ["beta", "unstable", "stable"]
               build_label: ["Integration tests"]
+      - run-chrome-extension-tests:
+          name: Chrome extension tests <<matrix.browser>> <<matrix.bver>>
+          context: 
+            - vblocks-js
+          matrix:
+            parameters:
+              browser: ["chrome"]
+              bver: ["beta", "stable"]
       # NOTE(csantos): Will be addressed on a future epic
       # - run-network-tests:
       #     name: Network Tests <<matrix.browser>> <<matrix.bver>>

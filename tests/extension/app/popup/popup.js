@@ -26,6 +26,19 @@ function start() {
   chrome.runtime.sendMessage({ type: 'getstate' }, ({ status }) => {
     setStatus(status);
   });
+  
+  // [e2e-testing]: Since puppeteer only monitors logs for popup.js, we need
+  // to listen for error messages from other js files
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === 'offscreen') {
+      console.log(request.message)
+    }
+  })
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === 'worker') {
+      console.log(request.message)
+    }
+  })
 
   // Connect to the service worker. This allows the service worker
   // to detect whether the popup is open or not.

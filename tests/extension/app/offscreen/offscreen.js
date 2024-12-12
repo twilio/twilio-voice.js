@@ -6,7 +6,6 @@ let incomingSound;
 const device2ClientIdentity = "test-extension-identity2"
 
 async function start() {
-  console.log('Starting offscreen');
   chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
     if (request.type === 'hangup' && sender.url.includes('popup')) {
       device.disconnectAll();
@@ -33,6 +32,10 @@ async function setupDevice(identity, recepient, connectToken) {
   // when making an outgoing call. If it exists, we initiate the call right away.
   if (recepient) { 
     call = await device.connect({ params: { recepient } });
+    // [e2e-testing]: Log errors to terminal
+    call.on('error', (error) => {
+      chrome.runtime.sendMessage({type: 'offscreen', message: `offscreen.js error: ${JSON.stringify(error)}`})
+    });
   };
 }
 
