@@ -183,7 +183,7 @@ jobs:
       BVER: <<parameters.bver>>
     steps:
       - build
-      - extension-puppeteer-test
+      - extension-puppeteer-tests
 
   trigger-qe-tests:
     docker:
