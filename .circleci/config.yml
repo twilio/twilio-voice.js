@@ -183,7 +183,6 @@ jobs:
       BVER: <<parameters.bver>>
     steps:
       - build
-      - extension-server-start
       - extension-puppeteer-test
 
   trigger-qe-tests:
