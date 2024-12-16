@@ -76,6 +76,7 @@ describe('Chrome extension tests', function () {
   });
 
   it('should allow worker.js to make outgoing call, and receive incoming call', async () => {
+    await page.$('[data-testing-id=popup-title]');
     const initButton = await page.$('#init');
     await initButton.click();
     const textBox = await page.$('#recepient');
