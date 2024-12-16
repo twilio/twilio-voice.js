@@ -77,7 +77,6 @@ describe('Chrome extension tests', function () {
 
   it('should allow worker.js to make outgoing call, and receive incoming call', async () => {
     const initButton = await page.$('#init');
-    await delay(1000); // allow time for page to render
     await initButton.click();
     const textBox = await page.$('#recepient');
     await textBox.type('t');

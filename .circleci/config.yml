@@ -103,20 +103,12 @@ commands:
       - run:
           name: Running network tests
           command: npm run test:docker
-  extension-server-start:
+  extension-puppeteer-tests:
     steps:
       - run:
           name: "Extension: server start"
           background: true
-          command: |
-            echo 'export APPLICATION_SID_EXTENSION="$APPLICATION_SID_EXTENSION"' >> "$BASH_ENV"
-            echo 'export ACCOUNT_SID="$ACCOUNT_SID"' >> "$BASH_ENV"
-            echo 'export API_KEY_SID="$API_KEY_SID"' >> "$BASH_ENV"
-            echo 'export API_KEY_SECRET="$API_KEY_SECRET"' >> "$BASH_ENV"
-            source "$BASH_ENV"
-            npm run start:extension:server
-  extension-puppeteer-test:
-    steps:
+          command: npm run start:extension:server
       - run:
           name: "Extension: Puppeteer test"
           command: npm run test:extension

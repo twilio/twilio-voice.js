@@ -26,15 +26,15 @@ async function setupDevice(identity, recepient, connectToken) {
   /**
    * NOTE(kchoy): This is the second device created in this extension. device2ClientIdentity
    * calls device1ClientIdentity in worker.js
-   */ 
+   */
 
   // The recepient parameter is provided to the offscreen document
   // when making an outgoing call. If it exists, we initiate the call right away.
   if (recepient) { 
     call = await device.connect({ params: { recepient } });
-    // [e2e-testing]: Log errors to terminal
+    // [e2e-testing]: trigger fail
     call.on('error', (error) => {
-      chrome.runtime.sendMessage({type: 'offscreen', message: `offscreen.js error: ${JSON.stringify(error)}`})
+      throw new Error(`offscreen.js error: ${JSON.stringify(error)}`);
     });
   };
 }
