@@ -30,7 +30,7 @@ async function setupDevice(identity, recepient, connectToken) {
 
   // The recepient parameter is provided to the offscreen document
   // when making an outgoing call. If it exists, we initiate the call right away.
-  if (recepient) { 
+  if (recepient) {
     call = await device.connect({ params: { recepient } });
     // [e2e-testing]: trigger fail
     call.on('error', (error) => {
