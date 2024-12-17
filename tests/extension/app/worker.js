@@ -61,6 +61,9 @@ async function init() {
    */
 
   device.on('incoming', (call) => {
+    // [e2e-testing]: Log call info
+    chrome.runtime.sendMessage({ type: 'worker', message: `worker.js: ${JSON.stringify(call.parameters)}` });
+
     call.on('disconnect', reset);
     call.on('cancel', reset);
     call.on('reject', reset);

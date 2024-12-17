@@ -21,6 +21,7 @@ describe('Chrome extension tests', function () {
         `--disable-extensions-except=${EXTENSION_PATH}`,
         `--load-extension=${EXTENSION_PATH}`,
         `--use-fake-ui-for-media-stream`,
+        '--use-fake-device-for-media-stream',
         '--no-sandbox',
         '--disable-setuid-sandbox',
       ],
@@ -51,6 +52,8 @@ describe('Chrome extension tests', function () {
 
     async function setUpBrowser() {
       const page = await getPage(browser);
+      // [e2e-testing]: Log errors to terminal
+      page.on('console', (msg) => console.log('PAGE LOG:', msg.text()));
 
       return { browser, page };
     }
@@ -73,14 +76,13 @@ describe('Chrome extension tests', function () {
   });
 
   it('should allow worker.js to make outgoing call, and receive incoming call', async () => {
-    const initButton = await page.$('#init');
+    const initButton = await page.waitForSelector('#init', { visible: true });
     await initButton.click();
-
     const textBox = await page.$('#recepient');
-    await textBox.type('test-extension-identity');
+    await textBox.type('t');
     const callButton = await page.$('#call');
     await callButton.click();
-    await delay(5000); // allow time for call to occur
+    await delay(3000); // allow time for call to occur
     const testIncoming = await page.$('#test-incoming');
     const testIncomingText = await page.evaluate(
       (element) => element.innerText.trim(),

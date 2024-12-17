@@ -6,7 +6,6 @@ let incomingSound;
 const device2ClientIdentity = "test-extension-identity2"
 
 async function start() {
-  console.log('Starting offscreen');
   chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
     if (request.type === 'hangup' && sender.url.includes('popup')) {
       device.disconnectAll();
@@ -27,12 +26,16 @@ async function setupDevice(identity, recepient, connectToken) {
   /**
    * NOTE(kchoy): This is the second device created in this extension. device2ClientIdentity
    * calls device1ClientIdentity in worker.js
-   */ 
+   */
 
   // The recepient parameter is provided to the offscreen document
   // when making an outgoing call. If it exists, we initiate the call right away.
-  if (recepient) { 
+  if (recepient) {
     call = await device.connect({ params: { recepient } });
+    // [e2e-testing]: trigger fail
+    call.on('error', (error) => {
+      throw new Error(`offscreen.js error: ${JSON.stringify(error)}`);
+    });
   };
 }
 
