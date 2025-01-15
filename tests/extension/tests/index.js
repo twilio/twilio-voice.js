@@ -15,8 +15,7 @@ describe('Chrome extension tests', function () {
   this.timeout(10000);
   beforeEach(async () => {
     browser = await puppeteer.launch({
-      // Note (kchoy): remove line when testing locally
-      executablePath: '/usr/bin/google-chrome',
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
       dumpio: true,
       headless: true,
       args: [
