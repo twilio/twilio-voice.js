@@ -15,6 +15,7 @@ describe('Chrome extension tests', function () {
   this.timeout(10000);
   beforeEach(async () => {
     browser = await puppeteer.launch({
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
       dumpio: true,
       headless: true,
       args: [
