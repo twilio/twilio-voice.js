@@ -90,7 +90,6 @@ commands:
       - build
       - run: |
           echo "export DD_SERVICE=<<parameters.datadog-test-service>>" >> $BASH_ENV
-          echo "export DD_ENV=ci" >> $BASH_ENV
       - test-visibility-circleci-orb/autoinstrument:
           languages: js
           site: datadoghq.com
