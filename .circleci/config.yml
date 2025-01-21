@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  test-visibility-circleci-orb: datadog/test-visibility-circleci-orb@1
+
 ###
 # Parameters
 ###
@@ -79,8 +82,17 @@ commands:
           path: ./dist
           prefix: ./dist
   build-checks:
+    parameters:
+      datadog-test-service:
+        type: string
+        default: ""
     steps:
       - build
+      - run: |
+          echo "export DD_SERVICE=<<parameters.datadog-test-service>>" >> $BASH_ENV
+      - test-visibility-circleci-orb/autoinstrument:
+          languages: js
+          site: datadoghq.com
       - run:
           name: Running build checks
           command: npm run test:build && npm run test:unit
@@ -118,8 +130,14 @@ commands:
 ###
 jobs:
   run-build-checks:
+    parameters:
+      datadog-test-service:
+        type: string
+        default: ""
     executor: docker-with-browser
-    steps: [build-checks]
+    steps: 
+      - build-checks:
+          datadog-test-service: <<parameters.datadog-test-service>>
   run-network-tests:
     parameters:
       bver:
@@ -234,6 +252,7 @@ workflows:
           context:
             - vblocks-js
           name: Build Checks
+          datadog-test-service: "daily-build-workflow"
       - run-integration-tests:
           name: Integration tests <<matrix.browser>> <<matrix.bver>>
           context:
@@ -254,6 +273,7 @@ workflows:
           context:
             - vblocks-js
           name: Build Checks
+          datadog-test-service: "pull-request-workflow"
       - run-integration-tests:
           name: Integration tests <<matrix.browser>> <<matrix.bver>>
           context:
@@ -289,6 +309,7 @@ workflows:
           context:
             - vblocks-js
           name: Build Checks
+          datadog-test-service: "release-workflow"
       - run-integration-tests:
           context:
             - dockerhub-pulls
