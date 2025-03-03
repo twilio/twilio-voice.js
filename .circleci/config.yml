@@ -100,12 +100,19 @@ commands:
           path: coverage
           destination: coverage
   integration-tests:
+    parameters:
+      start_relay_server:
+        type: boolean
+        default: false
     steps:
       - build
-      - run:
-          name: "Start test relay server"
-          background: true
-          command: bash scripts/run-relay-server.sh
+      - when:
+          condition: <<parameters.start_relay_server>>
+          steps:
+            - run:
+                name: "Start test relay server"
+                background: true
+                command: bash scripts/run-relay-server.sh
       - run:
           name: Running integration tests
           command: bash scripts/run-integration-tests.sh
@@ -161,6 +168,9 @@ jobs:
       integration_test_files:
         type: string
         default: ""
+      start_relay_server:
+        type: boolean
+        default: false
     executor:
       name: docker-with-browser
       browser: <<parameters.browser>>
@@ -170,7 +180,9 @@ jobs:
       BVER: <<parameters.bver>>
       BUILD_LABEL: <<parameters.build_label>>
       INTEGRATION_TEST_FILES: <<parameters.integration_test_files>>
-    steps: [integration-tests]
+    steps:
+      - integration-tests:
+          start_relay_server: <<parameters.start_relay_server>>
   run-release:
     parameters:
       dryRun:
@@ -233,6 +245,7 @@ workflows:
           context:
             - dockerhub-pulls
             - vblocks-js
+          start_relay_server: false
           matrix:
             parameters:
               browser: ["chrome"]
@@ -258,6 +271,7 @@ workflows:
           context:
             - dockerhub-pulls
             - vblocks-js
+          start_relay_server: true
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
@@ -279,6 +293,7 @@ workflows:
           context:
             - dockerhub-pulls
             - vblocks-js
+          start_relay_server: true
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
@@ -311,10 +326,11 @@ workflows:
           name: Build Checks
           datadog-test-service: "release-workflow"
       - run-integration-tests:
+          name: Integration tests <<matrix.browser>> <<matrix.bver>>
           context:
             - dockerhub-pulls
             - vblocks-js
-          name: Integration tests <<matrix.browser>> <<matrix.bver>>
+          start_relay_server: true
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
