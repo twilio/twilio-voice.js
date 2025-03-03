@@ -293,6 +293,7 @@ workflows:
           context:
             - dockerhub-pulls
             - vblocks-js
+          start_relay_server: true
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
@@ -325,10 +326,11 @@ workflows:
           name: Build Checks
           datadog-test-service: "release-workflow"
       - run-integration-tests:
+          name: Integration tests <<matrix.browser>> <<matrix.bver>>
           context:
             - dockerhub-pulls
             - vblocks-js
-          name: Integration tests <<matrix.browser>> <<matrix.bver>>
+          start_relay_server: true
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
