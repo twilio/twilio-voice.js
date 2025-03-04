@@ -26,7 +26,7 @@ Installation
 We recommend using `npm` to add the Voice SDK as a dependency.
 
 ```
-npm install @twilio/voice-sdk --save
+npm install @twilio/voice-sdk @types/events --save
 ```
 
 Using this method, you can `import` the Voice SDK using ES Module or TypeScript syntax:
