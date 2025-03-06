@@ -13,6 +13,7 @@ Twilio's Voice SDK allows you to add real-time voice and PSTN calling to your we
 * [API Docs](https://twilio.github.io/twilio-voice.js/index.html)
 * [More Docs](https://www.twilio.com/docs/voice/sdks/javascript)
 * [Quickstart](https://www.twilio.com/docs/voice/client/javascript/quickstart)
+* [Reference Components](https://www.twilio.com/docs/voice/sdks/javascript/reference-components)
 * [Changelog](https://github.com/twilio/twilio-voice.js/blob/master/CHANGELOG.md)
 
 ### Issues and Support
