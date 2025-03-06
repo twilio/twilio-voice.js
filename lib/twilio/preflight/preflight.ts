@@ -386,8 +386,10 @@ export class PreflightTest extends EventEmitter {
   private _initDevice(token: string, options: PreflightTest.ExtendedOptions): void {
     try {
       this._device = new (options.deviceFactory || Device)(token, {
+        chunderw: options.chunderw,
         codecPreferences: options.codecPreferences,
         edge: options.edge,
+        eventgw: options.eventgw,
         fileInputStream: options.fileInputStream,
         logLevel: options.logLevel,
         preflight: true,
@@ -734,9 +736,22 @@ export namespace PreflightTest {
     audioContext?: AudioContext;
 
     /**
+     * A string or array of strings representing the URI of the signaling
+     * gateway to connect to.
+     * @private
+     */
+    chunderw?: string | string[];
+
+    /**
      * Device class to use.
      */
     deviceFactory?: typeof Device;
+
+    /**
+     * A string representing the URI of the insights gateway to connect to.
+     * @private
+     */
+    eventgw?: string;
 
     /**
      * File input stream to use instead of reading from mic
