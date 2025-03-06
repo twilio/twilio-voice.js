@@ -736,7 +736,8 @@ export namespace PreflightTest {
     audioContext?: AudioContext;
 
     /**
-     * A string representing the URI of the signaling gateway to connect to.
+     * A string or array of strings representing the URI of the signaling
+     * gateway to connect to.
      * @private
      */
     chunderw?: string | string[];

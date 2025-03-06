@@ -1,5 +1,13 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.12.4 (In Progress)
+====================
+
+Changes
+-------
+
+- Added an API for testing `PreflightTest` in realms other than prod. Users can now pass `chunderw` and `eventgw` values within the options object when constructing a `PreflightTest`. Note that these new options are meant for internal testing by Twilio employees only, and should not be used otherwise.
+
 2.12.3 (December 3, 2024)
 =========================
 
