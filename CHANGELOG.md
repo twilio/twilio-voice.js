@@ -3,6 +3,11 @@
 2.12.4 (In Progress)
 ====================
 
+Bug Fixes
+---------
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/309) where `device.destroy()` does not work for Chrome Extension V3.
+
 Changes
 -------
 

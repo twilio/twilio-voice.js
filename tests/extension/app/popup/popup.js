@@ -15,6 +15,7 @@ function start() {
   hangupBtn = document.querySelector('#hangup');
   acceptBtn = document.querySelector('#accept');
   rejectBtn = document.querySelector('#reject');
+  destroyBtn = document.querySelector('#destroy');
   incomingCallTestEl = document.querySelector('#test-incoming')
 
   setupButtonHandlers();
@@ -44,7 +45,7 @@ function setStatus(status) {
   if (status === 'pending') {
     showButtons('init');
   } else if (status === 'idle') {
-    showButtons('call');
+    showButtons('call', 'destroy');
   } else if (status === 'incoming') {
   /**
     * NOTE(kchoy): To verify an incoming call has occured, for 
@@ -54,6 +55,8 @@ function setStatus(status) {
     showButtons('accept', 'reject');
   } else if (status === 'inprogress') {
     showButtons('hangup');
+  } else if (status === 'destroyed') {
+    showButtons('init'); 
   }
   recepientEl.style.display = status === 'idle' ? 'block' : 'none';
   statusEl.innerHTML = `Status: ${status}`;
@@ -65,6 +68,7 @@ function setupButtonHandlers() {
   hangupBtn.onclick = () => chrome.runtime.sendMessage({ type: 'hangup' });
   acceptBtn.onclick = () => chrome.runtime.sendMessage({ type: 'accept' });
   rejectBtn.onclick = () => chrome.runtime.sendMessage({ type: 'reject' });
+  destroyBtn.onclick = () => chrome.runtime.sendMessage({ type: 'destroy'});
 }
 
 function showButtons(...buttonsToShow) {
