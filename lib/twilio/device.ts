@@ -646,9 +646,9 @@ class Device extends EventEmitter {
     this._stopRegistrationTimer();
 
     this._destroyStream();
-    this._destroyPublisher();
     this._destroyAudioHelper();
     this._audioProcessorEventObserver?.destroy();
+    this._destroyPublisher();
 
     if (this._networkInformation && typeof this._networkInformation.removeEventListener === 'function') {
       this._networkInformation.removeEventListener('change', this._publishNetworkChange);
