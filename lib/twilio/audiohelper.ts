@@ -424,11 +424,7 @@ class AudioHelper extends EventEmitter {
    * @private
    */
   _unbind(): void {
-    if (!this._mediaDevices || !this._enumerateDevices) {
-      throw new NotSupportedError('Enumeration is not supported');
-    }
-
-    if (this._mediaDevices.removeEventListener) {
+    if (this._mediaDevices?.removeEventListener) {
       this._mediaDevices.removeEventListener('devicechange', this._updateAvailableDevices);
     }
   }

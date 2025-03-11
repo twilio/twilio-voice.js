@@ -212,6 +212,22 @@ describe('AudioHelper', () => {
         sinon.assert.calledOnce(audio._maybeStopPollingVolume);
         sinon.assert.calledOnce(mediaDevices.removeEventListener);
       });
+
+      it('should allow enumerateDevices and mediaDevices to be undefined', () => {
+        navigator.enumerateDevices = undefined;
+        navigator.mediaDevices = undefined;
+        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged);
+        audio._stopDefaultInputDeviceStream = sinon.stub();
+        audio._stopSelectedInputDeviceStream = sinon.stub();
+        audio._destroyProcessedStream = sinon.stub();
+        audio._maybeStopPollingVolume = sinon.stub();
+        audio._destroy();
+        assert.strictEqual(audio.eventNames().length, 0);
+        sinon.assert.calledOnce(audio._stopDefaultInputDeviceStream);
+        sinon.assert.calledOnce(audio._stopSelectedInputDeviceStream);
+        sinon.assert.calledOnce(audio._destroyProcessedStream);
+        sinon.assert.calledOnce(audio._maybeStopPollingVolume);
+      });
     });
 
     describe('._updateUserOptions', () => {

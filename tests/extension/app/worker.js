@@ -1,5 +1,6 @@
 import './twilio.js';
 
+let device;
 let incomingCall = null;
 
 const offscreenPath = 'offscreen/offscreen.html';
@@ -34,6 +35,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     chrome.runtime.sendMessage({ type: 'connect-incoming' });
   } else if (request.type === 'getstate' && sender.url.includes('popup')) {
     sendResponse(sessionState);
+  } else if (request.type === 'destroy' && sender.url.includes('popup')) {
+    device.destroy();
+    setState({ status: 'destroyed'});
   } else if (request.type === 'accept' && sender.url.includes('offscreen')) {
     setState({ status: 'inprogress' });
     incomingCall = null;
@@ -53,7 +57,7 @@ async function init() {
     'http://127.0.0.1:3030/token?identity=' + device1ClientIdentity
   );
   const data = await response.json();
-  const device = new Twilio.Device(data.token, { logLevel: 1 });
+  device = new Twilio.Device(data.token, { logLevel: 1 });
   await device.register();
   /**
    * NOTE(kchoy): This is the first device created in this extension. device1ClientIdentity

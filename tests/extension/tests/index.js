@@ -92,4 +92,19 @@ describe('Chrome extension tests', function () {
     const expectedIncomingText = 'Incoming call has occured';
     assert.equal(testIncomingText, expectedIncomingText);
   });
+
+  it('should allow device to be destroyed', async () => {
+    const initButton = await page.waitForSelector('#init', { visible: true });
+    await initButton.click();
+    const destroyButton = await page.$('#destroy');
+    await destroyButton.click();
+    await page.waitForSelector('#init', { visible: true });
+    const status = await page.waitForSelector('#status');
+    const statusText = await page.evaluate(
+      (element) => element.innerText.trim(),
+      status
+    );
+    const expectedStatusText = 'Status: destroyed';
+    assert.equal(statusText, expectedStatusText);
+  });
 });
