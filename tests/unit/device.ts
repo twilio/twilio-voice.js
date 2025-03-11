@@ -475,6 +475,15 @@ describe('Device', function() {
           sinon.assert.calledOnce(stub);
         });
 
+        it('should destroy the publisher after the audioProcessorEventObserver', () => {
+          const observerStub =
+            (device['_audioProcessorEventObserver']!.destroy = sinon.stub());
+          const publisherStub =
+            (device['_destroyPublisher'] = sinon.stub());
+          device.destroy();
+          assert(observerStub.calledBefore(publisherStub));
+        });
+
         it('should stop sending registrations', () => {
           pstream.register.resetHistory();
 
