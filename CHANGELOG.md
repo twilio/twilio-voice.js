@@ -8,6 +8,11 @@ Changes
 
 - Added an API for testing `PreflightTest` in realms other than prod. Users can now pass `chunderw` and `eventgw` values within the options object when constructing a `PreflightTest`. Note that these new options are meant for internal testing by Twilio employees only, and should not be used otherwise.
 
+Bug Fixes
+---------
+
+- Addressed an issue where the `publisher` would be `null` upon destruction of an `AudioProcessorObserver`.
+
 2.12.3 (December 3, 2024)
 =========================
 
