@@ -82,17 +82,8 @@ commands:
           path: ./dist
           prefix: ./dist
   build-checks:
-    parameters:
-      datadog-test-service:
-        type: string
-        default: ""
     steps:
       - build
-      - run: |
-          echo "export DD_SERVICE=<<parameters.datadog-test-service>>" >> $BASH_ENV
-      - test-visibility-circleci-orb/autoinstrument:
-          languages: js
-          site: datadoghq.com
       - run:
           name: Running build checks
           command: npm run test:build && npm run test:unit
@@ -104,6 +95,9 @@ commands:
       start_relay_server:
         type: boolean
         default: false
+      datadog-test-service:
+        type: string
+        default: ""
     steps:
       - build
       - when:
@@ -113,6 +107,11 @@ commands:
                 name: "Start test relay server"
                 background: true
                 command: bash scripts/run-relay-server.sh
+      - run: |
+          echo "export DD_SERVICE=<<parameters.datadog-test-service>>" >> $BASH_ENV
+      - test-visibility-circleci-orb/autoinstrument:
+          languages: js
+          site: datadoghq.com
       - run:
           name: Running integration tests
           command: bash scripts/run-integration-tests.sh
@@ -137,14 +136,8 @@ commands:
 ###
 jobs:
   run-build-checks:
-    parameters:
-      datadog-test-service:
-        type: string
-        default: ""
     executor: docker-with-browser
-    steps: 
-      - build-checks:
-          datadog-test-service: <<parameters.datadog-test-service>>
+    steps: [build-checks]
   run-network-tests:
     parameters:
       bver:
@@ -165,6 +158,9 @@ jobs:
         type: string
       build_label:
         type: string
+      datadog-test-service:
+        type: string
+        default: ""
       integration_test_files:
         type: string
         default: ""
@@ -183,6 +179,7 @@ jobs:
     steps:
       - integration-tests:
           start_relay_server: <<parameters.start_relay_server>>
+          datadog-test-service: <<parameters.datadog-test-service>>
   run-release:
     parameters:
       dryRun:
@@ -265,12 +262,12 @@ workflows:
           context:
             - vblocks-js
           name: Build Checks
-          datadog-test-service: "daily-build-workflow"
       - run-integration-tests:
           name: Integration tests <<matrix.browser>> <<matrix.bver>>
           context:
             - dockerhub-pulls
             - vblocks-js
+          datadog-test-service: "daily-build-workflow"
           start_relay_server: true
           matrix:
             parameters:
@@ -287,12 +284,12 @@ workflows:
           context:
             - vblocks-js
           name: Build Checks
-          datadog-test-service: "pull-request-workflow"
       - run-integration-tests:
           name: Integration tests <<matrix.browser>> <<matrix.bver>>
           context:
             - dockerhub-pulls
             - vblocks-js
+          datadog-test-service: "pull-request-workflow"
           start_relay_server: true
           matrix:
             parameters:
@@ -324,12 +321,12 @@ workflows:
           context:
             - vblocks-js
           name: Build Checks
-          datadog-test-service: "release-workflow"
       - run-integration-tests:
           name: Integration tests <<matrix.browser>> <<matrix.bver>>
           context:
             - dockerhub-pulls
             - vblocks-js
+          datadog-test-service: "release-workflow"
           start_relay_server: true
           matrix:
             parameters:
