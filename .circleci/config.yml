@@ -108,10 +108,13 @@ commands:
         type: boolean
         default: false
     steps:
+      - run:
+          name: Set npm default directory
+          command: bash scripts/set-npm-default-directory.sh
       - build
       - run:
           name: Install Datadog CLI
-          command: sudo npm install -g @datadog/datadog-ci
+          command: npm install -g @datadog/datadog-ci
       - when:
           condition: <<parameters.start_relay_server>>
           steps:
