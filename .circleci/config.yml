@@ -108,10 +108,10 @@ commands:
         type: boolean
         default: false
     steps:
+      - build
       - run:
           name: Set npm default directory
           command: bash scripts/set-npm-default-directory.sh
-      - build
       - run:
           name: Install Datadog CLI
           command: npm install -g @datadog/datadog-ci
