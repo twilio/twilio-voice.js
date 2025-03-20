@@ -124,7 +124,7 @@ commands:
           command: bash scripts/run-integration-tests.sh
       - run:
           name: Upload test results to Datadog
-          command: project/node_modules/datadog-ci junit upload --service <<parameters.datadog-test-service>> reports/junit-report.xml
+          command: node_modules/datadog-ci junit upload --service <<parameters.datadog-test-service>> reports/junit-report.xml
   network-tests:
     steps:
       - get-code
