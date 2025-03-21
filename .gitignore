@@ -12,3 +12,4 @@ docs
 lib/twilio/constants.ts
 nodemon.json
 tests/webpack/package-lock.json
+reports

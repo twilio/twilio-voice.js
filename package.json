@@ -33,7 +33,7 @@
     "build:release": "npm-run-all lint build test:es5 test:esm status",
     "build:ts": "./node_modules/typescript/bin/tsc && ./node_modules/typescript/bin/tsc --project tsconfig-esm.json && renamer --find twilio --replace index esm/twilio.*",
     "build:constants": "node ./scripts/constants.js",
-    "clean": "rimraf ./coverage ./dist ./es5 ./esm",
+    "clean": "rimraf ./coverage ./dist ./es5 ./esm ./reports",
     "coverage": "nyc ./node_modules/mocha/bin/mocha -r ts-node/register ./tests/index.ts",
     "coverage:check": "nyc check-coverage --lines 60 --branches 60 --functions 60",
     "docs:clean": "rimraf ./docs",
