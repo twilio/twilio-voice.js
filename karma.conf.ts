@@ -110,10 +110,15 @@ module.exports = function(config: any) {
       'lib/**/*.ts': 'karma-typescript',
       'tests/integration/**/*.ts': 'karma-typescript',
     },
-    reporters: ['spec', 'karma-typescript'],
+    reporters: ['spec', 'karma-typescript', 'junit'],
     singleRun: true,
     browserDisconnectTolerance: 3,
     browserDisconnectTimeout : 5000,
     browserNoActivityTimeout : 120000,
+    junitReporter: {
+      outputDir: 'reports',
+      outputFile: 'junit-report.xml',
+      useBrowserName: false
+    }
   });
 };

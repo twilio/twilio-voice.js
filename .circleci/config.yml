@@ -101,6 +101,9 @@ commands:
           destination: coverage
   integration-tests:
     parameters:
+      datadog-test-service:
+        type: string
+        default: ""
       start_relay_server:
         type: boolean
         default: false
@@ -116,6 +119,9 @@ commands:
       - run:
           name: Running integration tests
           command: bash scripts/run-integration-tests.sh
+      - run:
+          name: Upload test results to Datadog
+          command: ./node_modules/.bin/datadog-ci junit upload --service <<parameters.datadog-test-service>> reports/junit-report.xml
   network-tests:
     steps:
       - get-code
@@ -165,6 +171,9 @@ jobs:
         type: string
       build_label:
         type: string
+      datadog-test-service:
+        type: string
+        default: ""
       integration_test_files:
         type: string
         default: ""
@@ -182,6 +191,7 @@ jobs:
       INTEGRATION_TEST_FILES: <<parameters.integration_test_files>>
     steps:
       - integration-tests:
+          datadog-test-service: <<parameters.datadog-test-service>>
           start_relay_server: <<parameters.start_relay_server>>
   run-release:
     parameters:
@@ -246,6 +256,7 @@ workflows:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: false
+          datadog-test-service: "healthcheck-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
           matrix:
             parameters:
               browser: ["chrome"]
@@ -265,13 +276,14 @@ workflows:
           context:
             - vblocks-js
           name: Build Checks
-          datadog-test-service: "daily-build-workflow"
+          datadog-test-service: "daily-build-unit-tests"
       - run-integration-tests:
           name: Integration tests <<matrix.browser>> <<matrix.bver>>
           context:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: true
+          datadog-test-service: "daily-build-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
@@ -287,13 +299,14 @@ workflows:
           context:
             - vblocks-js
           name: Build Checks
-          datadog-test-service: "pull-request-workflow"
+          datadog-test-service: "pull-request-unit-tests"
       - run-integration-tests:
           name: Integration tests <<matrix.browser>> <<matrix.bver>>
           context:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: true
+          datadog-test-service: "pull-request-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
@@ -324,13 +337,14 @@ workflows:
           context:
             - vblocks-js
           name: Build Checks
-          datadog-test-service: "release-workflow"
+          datadog-test-service: "release-unit-tests"
       - run-integration-tests:
           name: Integration tests <<matrix.browser>> <<matrix.bver>>
           context:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: true
+          datadog-test-service: "release-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
