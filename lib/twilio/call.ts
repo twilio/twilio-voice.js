@@ -578,6 +578,7 @@ class Call extends EventEmitter {
         // tslint:disable no-console
         this._log.debug('#disconnect');
         this.emit('disconnect', this);
+        this._publisher.info('slo', 'disconnected', null, this);
       }
     };
 
@@ -628,6 +629,7 @@ class Call extends EventEmitter {
    * @param [options]
    */
   accept(options?: Call.AcceptOptions): void {
+    this._publisher.info('slo', 'accepting', null, this);
     this._log.debug('.accept', options);
     if (this._status !== Call.State.Pending) {
       this._log.debug(`.accept noop. status is '${this._status}'`);
@@ -743,6 +745,7 @@ class Call extends EventEmitter {
    * Disconnect from the {@link Call}.
    */
   disconnect(): void {
+    this._publisher.info('slo', 'disconnecting', null, this);
     this._log.debug('.disconnect');
     this._disconnect();
   }
@@ -1155,6 +1158,7 @@ class Call extends EventEmitter {
           this._wasConnected = true;
           this._log.debug('#accept');
           this.emit('accept', this);
+          this._publisher.info('slo', 'accepted', null, this);
         }
       }
     }

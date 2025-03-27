@@ -122,6 +122,11 @@ EventPublisher.prototype._post = function _post(endpointName, level, group, name
     timestamp: (new Date()).toISOString(),
   };
 
+  if (group === 'slo') {
+    delete event.payload.temp_call_sid;
+    delete event.payload.call_sid
+  }
+
   if (this.metadata) {
     event.publisher_metadata = this.metadata;
   }

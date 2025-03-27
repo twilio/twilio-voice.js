@@ -622,6 +622,7 @@ class Device extends EventEmitter {
 
     activeCall.accept({ rtcConstraints: options.rtcConstraints });
     this._publishNetworkChange();
+    this._publisher.info('slo', 'connecting', null, activeCall);
     return activeCall;
   }
 
@@ -1121,6 +1122,7 @@ class Device extends EventEmitter {
       if (this._audio?.processedStream) {
         this._audioProcessorEventObserver?.emit('enabled');
       }
+      this._publisher.info('slo', 'connected', null, call);
     });
 
     call.addListener('error', (error: TwilioError) => {
