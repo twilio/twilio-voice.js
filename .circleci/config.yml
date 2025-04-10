@@ -104,6 +104,9 @@ commands:
       datadog-test-service:
         type: string
         default: ""
+      browser:
+        type: string
+        default: ""
       start_relay_server:
         type: boolean
         default: false
@@ -118,7 +121,7 @@ commands:
                 command: bash scripts/run-relay-server.sh
       - run:
           name: Running integration tests
-          command: bash scripts/run-integration-tests.sh
+          command: bash scripts/run-integration-tests.sh <<parameters.browser>>
       - run:
           name: Upload test results to Datadog
           command: ./node_modules/.bin/datadog-ci junit upload --service <<parameters.datadog-test-service>> reports/junit-report.xml
@@ -193,6 +196,7 @@ jobs:
       - integration-tests:
           datadog-test-service: <<parameters.datadog-test-service>>
           start_relay_server: <<parameters.start_relay_server>>
+          browser: <<parameters.browser>>
   run-release:
     parameters:
       dryRun:
@@ -284,6 +288,7 @@ workflows:
             - vblocks-js
           start_relay_server: true
           datadog-test-service: "daily-build-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
+          browser: <<matrix.browser>>
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
@@ -307,6 +312,7 @@ workflows:
             - vblocks-js
           start_relay_server: true
           datadog-test-service: "pull-request-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
+          browser: <<matrix.browser>>
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
@@ -345,6 +351,7 @@ workflows:
             - vblocks-js
           start_relay_server: true
           datadog-test-service: "release-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
+          browser: <<matrix.browser>>
           matrix:
             parameters:
               browser: ["chrome", "firefox"]

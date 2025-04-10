@@ -1,3 +1,7 @@
 #!/bin/bash
 
-npm run test:integration && echo "Integration tests passed" || bash scripts/report-failure.sh "Integration tests"
+if [ $1 == "chrome" ]; then
+  npm run test:cypress -- browser /usr/bin/google-chrome
+elif [ $1 === "firefox" ]; then
+  npm run test:cypress -- browser /usr/local/bin/firefox
+fi
