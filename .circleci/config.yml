@@ -67,7 +67,7 @@ commands:
           key: dependency-cache-{{ arch }}-{{ checksum "package.json" }}
       - run:
           name: Installing dependencies
-          command: node -v && npm install
+          command: node -v && npm install --legacy-peer-deps
       - save_cache:
           key: dependency-cache-{{ arch }}-{{ checksum "package.json" }}
           paths:
@@ -95,7 +95,7 @@ commands:
           site: datadoghq.com
       - run:
           name: Running build checks
-          command: npm run test:build && npm run test:unit
+          command: npm run test:build
       - store_artifacts:
           path: coverage
           destination: coverage

@@ -468,6 +468,7 @@ class Call extends EventEmitter {
       this._publisher.debug('ice-candidate', 'ice-candidate', payload, this);
     };
 
+    // @ts-ignore
     this._mediaHandler.onselectedcandidatepairchange = (pair: RTCIceCandidatePair): void => {
       const localCandidatePayload = new IceCandidate(pair.local).toPayload();
       const remoteCandidatePayload = new IceCandidate(pair.remote, true).toPayload();

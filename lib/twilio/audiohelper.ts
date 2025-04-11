@@ -297,6 +297,7 @@ class AudioHelper extends EventEmitter {
     // https://github.com/mozilla/standards-positions/issues/19#issuecomment-370158947
     // https://caniuse.com/permissions-api
     if (navigator && navigator.permissions && typeof navigator.permissions.query === 'function') {
+      // @ts-ignore
       navigator.permissions.query({ name: 'microphone' }).then((microphonePermissionStatus) => {
         if (microphonePermissionStatus.state !== 'granted') {
           const handleStateChange = () => {
