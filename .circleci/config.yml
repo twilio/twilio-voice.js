@@ -125,6 +125,9 @@ commands:
             sudo apt update
             sudo apt install xvfb
       - run:
+          name: install cypress
+          command: ./node_modules/.bin/cypress install
+      - run:
           name: Running integration tests
           command: bash scripts/run-integration-tests.sh <<parameters.browser>>
       - run:
