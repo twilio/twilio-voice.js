@@ -121,7 +121,9 @@ commands:
                 command: bash scripts/run-relay-server.sh
       - run:
           name: Install xvfb
-          command: sudo apt install xvfb
+          command: |
+            sudo apt update
+            sudo apt install xvfb
       - run:
           name: Running integration tests
           command: bash scripts/run-integration-tests.sh <<parameters.browser>>
