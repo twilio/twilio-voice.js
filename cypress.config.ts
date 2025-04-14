@@ -12,4 +12,8 @@ module.exports = defineConfig({
       });
     },
   },
+  reporter: 'junit',
+  reporterOptions: {
+    mochaFile: 'reports/junit-report.xml',
+  },
 });
