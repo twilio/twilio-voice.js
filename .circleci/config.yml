@@ -1,16 +1,15 @@
 version: 2.1
 
 orbs:
-  test-visibility-circleci-orb: datadog/test-visibility-circleci-orb@1
+  # test-visibility-circleci-orb: datadog/test-visibility-circleci-orb@1
   cypress: cypress-io/cypress@3
 
 workflows:
-  test:
+  build:
     jobs:
       - cypress/run:
           install-browsers: true
           cypress-command: 'npx cypress run --spec "cypress/e2e/*" --browser firefox'
-          name: Integration tests firefox
           context:
             - dockerhub-pulls
             - vblocks-js
