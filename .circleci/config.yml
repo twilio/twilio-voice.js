@@ -10,6 +10,7 @@ workflows:
       - cypress/run:
           install-browsers: true
           install-command: npm install --legacy-peer-deps
+          post-install: npm run build
           cypress-command: 'npx cypress run --spec "cypress/e2e/*" --browser firefox'
           context:
             - dockerhub-pulls
