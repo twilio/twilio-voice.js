@@ -2,424 +2,437 @@ version: 2.1
 
 orbs:
   test-visibility-circleci-orb: datadog/test-visibility-circleci-orb@1
+  cypress: cypress-io/cypress@3
 
-###
-# Parameters
-###
-parameters:
-  browser:
-    type: enum
-    enum: ["chrome", "firefox"]
-    default: "chrome"
-  bver:
-    type: enum
-    enum: ["stable", "beta", "unstable"]
-    default: "stable"
-  pr_workflow:
-    type: boolean
-    default: true # by default pr workflow will get executed.
-  tag:
-    type: string
-    default: "" # use something like: "2.0.0-beta.15" when invoking with parameters.
-  release_workflow:
-    type: boolean
-    default: false
-  release_command:
-    type: string
-    default: "echo \"no release-command specified\""
-
-###
-# Executors
-###
-executors:
-  machine-executor:
-    machine:
-      image: ubuntu-2004:current
-      docker_layer_caching: true
-  docker-with-browser:
-    parameters:
-      browser:
-        type: enum
-        enum: ["chrome", "firefox"]
-        default: "chrome"
-      bver:
-        type: enum
-        enum: ["stable", "beta", "unstable"]
-        default: "stable"
-    docker:
-      - image: twilio/twilio-video-browsers:<<parameters.browser>>-<<parameters.bver>>
-
-###
-# Commands
-###
-commands:
-  get-code:
-    steps:
-      - checkout
-      - when:
-          condition: <<pipeline.parameters.tag>>
-          steps:
-            - run: git checkout <<pipeline.parameters.tag>>
-  get-code-and-dependencies:
-    steps:
-      - get-code
-      - restore_cache:
-          key: dependency-cache-{{ arch }}-{{ checksum "package.json" }}
-      - run:
-          name: Installing dependencies
-          command: node -v && npm install --legacy-peer-deps
-      - save_cache:
-          key: dependency-cache-{{ arch }}-{{ checksum "package.json" }}
-          paths:
-            - ./node_modules
-  build:
-    steps:
-      - get-code-and-dependencies
-      - run:
-          name: Building project
-          command: npm run build
-      - store_artifacts:
-          path: ./dist
-          prefix: ./dist
-  build-checks:
-    parameters:
-      datadog-test-service:
-        type: string
-        default: ""
-    steps:
-      - build
-      - run: |
-          echo "export DD_SERVICE=<<parameters.datadog-test-service>>" >> $BASH_ENV
-      - test-visibility-circleci-orb/autoinstrument:
-          languages: js
-          site: datadoghq.com
-      - run:
-          name: Running build checks
-          command: npm run test:build
-      - store_artifacts:
-          path: coverage
-          destination: coverage
-  integration-tests:
-    parameters:
-      datadog-test-service:
-        type: string
-        default: ""
-      browser:
-        type: string
-        default: ""
-      start_relay_server:
-        type: boolean
-        default: false
-    steps:
-      - build
-      - when:
-          condition: <<parameters.start_relay_server>>
-          steps:
-            - run:
-                name: "Start test relay server"
-                background: true
-                command: bash scripts/run-relay-server.sh
-      - run:
-          name: Install xvfb
-          command: |
-            sudo apt update
-            sudo apt install xvfb
-            sudo apt-get install -y libgbm-dev
-      - run:
-          name: install cypress
-          command: ./node_modules/.bin/cypress install
-      - run:
-          name: Running integration tests
-          command: bash scripts/run-integration-tests.sh <<parameters.browser>>
-      - run:
-          name: Upload test results to Datadog
-          command: ./node_modules/.bin/datadog-ci junit upload --service <<parameters.datadog-test-service>> reports/junit-report.xml
-      - store_artifacts:
-          path: /home/circleci/project/cypress/screenshots
-  network-tests:
-    steps:
-      - get-code
-      - run:
-          name: Running network tests
-          command: npm run test:docker
-  extension-puppeteer-tests:
-    steps:
-      - run:
-          name: "Extension: server start"
-          background: true
-          command: npm run start:extension:server
-      - run:
-          name: "Extension: Puppeteer test"
-          command: npm run test:extension
-
-###
-# Jobs
-###
-jobs:
-  run-build-checks:
-    parameters:
-      datadog-test-service:
-        type: string
-        default: ""
-    executor: docker-with-browser
-    steps: 
-      - build-checks:
-          datadog-test-service: <<parameters.datadog-test-service>>
-  run-network-tests:
-    parameters:
-      bver:
-        type: string
-      browser:
-        type: string
-    executor:
-      name: machine-executor
-    environment:
-      BROWSER: <<parameters.browser>>
-      BVER: <<parameters.bver>>
-    steps: [network-tests]
-  run-integration-tests:
-    parameters:
-      bver:
-        type: string
-      browser:
-        type: string
-      build_label:
-        type: string
-      datadog-test-service:
-        type: string
-        default: ""
-      integration_test_files:
-        type: string
-        default: ""
-      start_relay_server:
-        type: boolean
-        default: false
-    executor:
-      name: docker-with-browser
-      browser: <<parameters.browser>>
-      bver: <<parameters.bver>>
-    environment:
-      BROWSER: <<parameters.browser>>
-      BVER: <<parameters.bver>>
-      BUILD_LABEL: <<parameters.build_label>>
-      INTEGRATION_TEST_FILES: <<parameters.integration_test_files>>
-    steps:
-      - integration-tests:
-          datadog-test-service: <<parameters.datadog-test-service>>
-          start_relay_server: <<parameters.start_relay_server>>
-          browser: <<parameters.browser>>
-  run-release:
-    parameters:
-      dryRun:
-        type: boolean
-        default: true
-    executor:
-      name: docker-with-browser
-    steps:
-      - when:
-          condition: << parameters.dryRun >>
-          steps:
-            - run: echo "Will run \"<< pipeline.parameters.release_command >>\""
-      - unless:
-          condition: << parameters.dryRun >>
-          steps:
-            - build
-            - run: << pipeline.parameters.release_command >>
-  run-chrome-extension-tests:
-    parameters:
-      bver:
-        type: string
-      browser:
-        type: string
-    executor:
-      name: docker-with-browser
-    environment:
-      BROWSER: <<parameters.browser>>
-      BVER: <<parameters.bver>>
-    steps:
-      - build
-      - extension-puppeteer-tests
-
-  trigger-qe-tests:
-    docker:
-      - image: circleci/node:latest
-    steps:
-      - run:
-          name: Trigger QE tests
-          command: |
-            curl --fail --write-out "\nHTTP Response Code: %{http_code}\n" \
-            -u "$CIRCLECI_PERSONAL_API_TOKEN": -X POST --header "Content-Type: application/json" \
-            -d '{"branch":"'v${CIRCLE_TAG:0:1}'","parameters":{"sdk_version":"'$CIRCLE_TAG'","is_rc":true}}' \
-            $SDKS_QE_CIRCLECI_VOICE_JS_SLAVE_PIPELINE_ENDPOINT
-
-###
-# Workflows
-###
 workflows:
-  healthcheck-workflow:
-    triggers:
-      - schedule:
-          cron: "0 * * * *"
-          filters:
-            branches:
-              only:
-                - master
+  test:
     jobs:
-      - run-integration-tests:
-          name: Integration tests <<matrix.browser>> <<matrix.bver>>
+      - cypress/run:
+          install-browsers: true
+          cypress-command: 'npx cypress run --spec "cypress/e2e/*" --browser firefox'
+          name: Integration tests firefox
           context:
             - dockerhub-pulls
             - vblocks-js
-          start_relay_server: false
-          datadog-test-service: "healthcheck-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
-          matrix:
-            parameters:
-              browser: ["chrome"]
-              bver: ["stable"]
-              build_label: ["Healthcheck"]
-              integration_test_files: ["tests/integration/device.ts"]
-  daily-build-workflow:
-    triggers:
-      - schedule:
-          cron: "0 16 * * *"
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-      - run-build-checks:
-          context:
-            - vblocks-js
-          name: Build Checks
-          datadog-test-service: "daily-build-unit-tests"
-      - run-integration-tests:
-          name: Integration tests <<matrix.browser>> <<matrix.bver>>
-          context:
-            - dockerhub-pulls
-            - vblocks-js
-          start_relay_server: true
-          datadog-test-service: "daily-build-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
-          browser: <<matrix.browser>>
-          matrix:
-            parameters:
-              browser: ["chrome", "firefox"]
-              bver: ["beta", "unstable", "stable"]
-              build_label: ["Daily build"]
-  pull-request-workflow:
-    when:
-        and:
-          - equal: [true, <<pipeline.parameters.pr_workflow>>]
-          - equal: [false, <<pipeline.parameters.release_workflow>>]
-    jobs:
-      - run-build-checks:
-          context:
-            - vblocks-js
-          name: Build Checks
-          datadog-test-service: "pull-request-unit-tests"
-      - run-integration-tests:
-          name: Integration tests <<matrix.browser>> <<matrix.bver>>
-          context:
-            - dockerhub-pulls
-            - vblocks-js
-          start_relay_server: true
-          datadog-test-service: "pull-request-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
-          browser: <<matrix.browser>>
-          matrix:
-            parameters:
-              browser: ["chrome", "firefox"]
-              bver: ["beta", "unstable", "stable"]
-              build_label: ["Integration tests"]
-      - run-chrome-extension-tests:
-          name: Chrome extension tests <<matrix.browser>> <<matrix.bver>>
-          context: 
-            - vblocks-js
-          matrix:
-            parameters:
-              browser: ["chrome"]
-              bver: ["beta", "stable"]
-      # NOTE(csantos): Will be addressed on a future epic
-      # - run-network-tests:
-      #     name: Network Tests <<matrix.browser>> <<matrix.bver>>
-      #     context:
-      #       - dockerhub-pulls
-      #       - vblocks-js
-      #     matrix:
-      #       parameters:
-      #         browser: ["chrome", "firefox"]
-      #         bver: ["stable"]
-  release-workflow:
-    when: <<pipeline.parameters.release_workflow>>
-    jobs:
-      - run-build-checks:
-          context:
-            - vblocks-js
-          name: Build Checks
-          datadog-test-service: "release-unit-tests"
-      - run-integration-tests:
-          name: Integration tests <<matrix.browser>> <<matrix.bver>>
-          context:
-            - dockerhub-pulls
-            - vblocks-js
-          start_relay_server: true
-          datadog-test-service: "release-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
-          browser: <<matrix.browser>>
-          matrix:
-            parameters:
-              browser: ["chrome", "firefox"]
-              bver: ["beta", "unstable", "stable"]
-              build_label: ["Release build"]
-      # NOTE(csantos): Will be addressed on a future epic
-      # - run-network-tests:
-      #     context:
-      #       - dockerhub-pulls
-      #       - vblocks-js
-      #     name: Network Tests <<matrix.browser>> <<matrix.bver>>
-      #     matrix:
-      #       parameters:
-      #         browser: ["chrome", "firefox"]
-      #         bver: ["stable"]
-      - run-release:
-          context:
-            - dockerhub-pulls
-            - vblocks-js
-          name: Create Release Dry Run
-          dryRun: true
-          requires:
-            - Build Checks
-            # NOTE(mhuynh): Temporarily allow release without these tests passing
-            # # Chrome integration tests
-            # - Integration tests chrome beta
-            # - Integration tests chrome unstable
-            # - Integration tests chrome stable
-            # # Firefox integration tests
-            # - Integration tests firefox beta
-            # - Integration tests firefox unstable
-            # - Integration tests firefox stable
-            # # Chrome network tests
-            # - Network Tests chrome stable
-            # # Firefox network tests
-            # - Network Tests firefox stable
-      - hold:
-          type: approval
-          requires:
-            - Create Release Dry Run
-      - run-release:
-          context:
-            - dockerhub-pulls
-            - vblocks-js
-          name: Create Release
-          dryRun: false
-          requires:
-            - hold
-  release-candidate:
-      jobs:
-        - trigger-qe-tests:
-            context: sdks-qe
-            filters:
-              tags:
-                only:
-                - /^\d+\.\d+\.\d+-rc\d+$/
-                - /^\d+\.\d+\.\d+-preview\d+-rc\d+$/
-                - /^\d+\.\d+\.\d+-beta\d+-rc\d+$/
-              branches:
-                ignore: /.*/
+
+  
+# ###
+# # Parameters
+# ###
+# parameters:
+#   browser:
+#     type: enum
+#     enum: ["chrome", "firefox"]
+#     default: "chrome"
+#   bver:
+#     type: enum
+#     enum: ["stable", "beta", "unstable"]
+#     default: "stable"
+#   pr_workflow:
+#     type: boolean
+#     default: true # by default pr workflow will get executed.
+#   tag:
+#     type: string
+#     default: "" # use something like: "2.0.0-beta.15" when invoking with parameters.
+#   release_workflow:
+#     type: boolean
+#     default: false
+#   release_command:
+#     type: string
+#     default: "echo \"no release-command specified\""
+
+# ###
+# # Executors
+# ###
+# executors:
+#   machine-executor:
+#     machine:
+#       image: ubuntu-2004:current
+#       docker_layer_caching: true
+#   docker-with-browser:
+#     parameters:
+#       browser:
+#         type: enum
+#         enum: ["chrome", "firefox"]
+#         default: "chrome"
+#       bver:
+#         type: enum
+#         enum: ["stable", "beta", "unstable"]
+#         default: "stable"
+#     docker:
+#       - image: twilio/twilio-video-browsers:<<parameters.browser>>-<<parameters.bver>>
+
+# ###
+# # Commands
+# ###
+# commands:
+#   get-code:
+#     steps:
+#       - checkout
+#       - when:
+#           condition: <<pipeline.parameters.tag>>
+#           steps:
+#             - run: git checkout <<pipeline.parameters.tag>>
+#   get-code-and-dependencies:
+#     steps:
+#       - get-code
+#       - restore_cache:
+#           key: dependency-cache-{{ arch }}-{{ checksum "package.json" }}
+#       - run:
+#           name: Installing dependencies
+#           command: node -v && npm install --legacy-peer-deps
+#       - save_cache:
+#           key: dependency-cache-{{ arch }}-{{ checksum "package.json" }}
+#           paths:
+#             - ./node_modules
+#   build:
+#     steps:
+#       - get-code-and-dependencies
+#       - run:
+#           name: Building project
+#           command: npm run build
+#       - store_artifacts:
+#           path: ./dist
+#           prefix: ./dist
+#   build-checks:
+#     parameters:
+#       datadog-test-service:
+#         type: string
+#         default: ""
+#     steps:
+#       - build
+#       - run: |
+#           echo "export DD_SERVICE=<<parameters.datadog-test-service>>" >> $BASH_ENV
+#       - test-visibility-circleci-orb/autoinstrument:
+#           languages: js
+#           site: datadoghq.com
+#       - run:
+#           name: Running build checks
+#           command: npm run test:build
+#       - store_artifacts:
+#           path: coverage
+#           destination: coverage
+#   integration-tests:
+#     parameters:
+#       datadog-test-service:
+#         type: string
+#         default: ""
+#       browser:
+#         type: string
+#         default: ""
+#       start_relay_server:
+#         type: boolean
+#         default: false
+#     steps:
+#       - build
+#       - when:
+#           condition: <<parameters.start_relay_server>>
+#           steps:
+#             - run:
+#                 name: "Start test relay server"
+#                 background: true
+#                 command: bash scripts/run-relay-server.sh
+#       - run:
+#           name: Install xvfb
+#           command: |
+#             sudo apt update
+#             sudo apt install xvfb
+#             sudo apt-get install -y libgbm-dev
+#       - run:
+#           name: install cypress
+#           command: ./node_modules/.bin/cypress install
+#       - run:
+#           name: Running integration tests
+#           command: bash scripts/run-integration-tests.sh <<parameters.browser>>
+#       - run:
+#           name: Upload test results to Datadog
+#           command: ./node_modules/.bin/datadog-ci junit upload --service <<parameters.datadog-test-service>> reports/junit-report.xml
+#       - store_artifacts:
+#           path: /home/circleci/project/cypress/screenshots
+#   network-tests:
+#     steps:
+#       - get-code
+#       - run:
+#           name: Running network tests
+#           command: npm run test:docker
+#   extension-puppeteer-tests:
+#     steps:
+#       - run:
+#           name: "Extension: server start"
+#           background: true
+#           command: npm run start:extension:server
+#       - run:
+#           name: "Extension: Puppeteer test"
+#           command: npm run test:extension
+
+# ###
+# # Jobs
+# ###
+# jobs:
+#   run-build-checks:
+#     parameters:
+#       datadog-test-service:
+#         type: string
+#         default: ""
+#     executor: docker-with-browser
+#     steps: 
+#       - build-checks:
+#           datadog-test-service: <<parameters.datadog-test-service>>
+#   run-network-tests:
+#     parameters:
+#       bver:
+#         type: string
+#       browser:
+#         type: string
+#     executor:
+#       name: machine-executor
+#     environment:
+#       BROWSER: <<parameters.browser>>
+#       BVER: <<parameters.bver>>
+#     steps: [network-tests]
+#   run-integration-tests:
+#     parameters:
+#       bver:
+#         type: string
+#       browser:
+#         type: string
+#       build_label:
+#         type: string
+#       datadog-test-service:
+#         type: string
+#         default: ""
+#       integration_test_files:
+#         type: string
+#         default: ""
+#       start_relay_server:
+#         type: boolean
+#         default: false
+#     executor:
+#       name: docker-with-browser
+#       browser: <<parameters.browser>>
+#       bver: <<parameters.bver>>
+#     environment:
+#       BROWSER: <<parameters.browser>>
+#       BVER: <<parameters.bver>>
+#       BUILD_LABEL: <<parameters.build_label>>
+#       INTEGRATION_TEST_FILES: <<parameters.integration_test_files>>
+#     steps:
+#       - integration-tests:
+#           datadog-test-service: <<parameters.datadog-test-service>>
+#           start_relay_server: <<parameters.start_relay_server>>
+#           browser: <<parameters.browser>>
+#   run-release:
+#     parameters:
+#       dryRun:
+#         type: boolean
+#         default: true
+#     executor:
+#       name: docker-with-browser
+#     steps:
+#       - when:
+#           condition: << parameters.dryRun >>
+#           steps:
+#             - run: echo "Will run \"<< pipeline.parameters.release_command >>\""
+#       - unless:
+#           condition: << parameters.dryRun >>
+#           steps:
+#             - build
+#             - run: << pipeline.parameters.release_command >>
+#   run-chrome-extension-tests:
+#     parameters:
+#       bver:
+#         type: string
+#       browser:
+#         type: string
+#     executor:
+#       name: docker-with-browser
+#     environment:
+#       BROWSER: <<parameters.browser>>
+#       BVER: <<parameters.bver>>
+#     steps:
+#       - build
+#       - extension-puppeteer-tests
+
+#   trigger-qe-tests:
+#     docker:
+#       - image: circleci/node:latest
+#     steps:
+#       - run:
+#           name: Trigger QE tests
+#           command: |
+#             curl --fail --write-out "\nHTTP Response Code: %{http_code}\n" \
+#             -u "$CIRCLECI_PERSONAL_API_TOKEN": -X POST --header "Content-Type: application/json" \
+#             -d '{"branch":"'v${CIRCLE_TAG:0:1}'","parameters":{"sdk_version":"'$CIRCLE_TAG'","is_rc":true}}' \
+#             $SDKS_QE_CIRCLECI_VOICE_JS_SLAVE_PIPELINE_ENDPOINT
+
+# ###
+# # Workflows
+# ###
+# workflows:
+#   healthcheck-workflow:
+#     triggers:
+#       - schedule:
+#           cron: "0 * * * *"
+#           filters:
+#             branches:
+#               only:
+#                 - master
+#     jobs:
+#       - run-integration-tests:
+#           name: Integration tests <<matrix.browser>> <<matrix.bver>>
+#           context:
+#             - dockerhub-pulls
+#             - vblocks-js
+#           start_relay_server: false
+#           datadog-test-service: "healthcheck-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
+#           matrix:
+#             parameters:
+#               browser: ["chrome"]
+#               bver: ["stable"]
+#               build_label: ["Healthcheck"]
+#               integration_test_files: ["tests/integration/device.ts"]
+#   daily-build-workflow:
+#     triggers:
+#       - schedule:
+#           cron: "0 16 * * *"
+#           filters:
+#             branches:
+#               only:
+#                 - master
+#     jobs:
+#       - run-build-checks:
+#           context:
+#             - vblocks-js
+#           name: Build Checks
+#           datadog-test-service: "daily-build-unit-tests"
+#       - run-integration-tests:
+#           name: Integration tests <<matrix.browser>> <<matrix.bver>>
+#           context:
+#             - dockerhub-pulls
+#             - vblocks-js
+#           start_relay_server: true
+#           datadog-test-service: "daily-build-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
+#           browser: <<matrix.browser>>
+#           matrix:
+#             parameters:
+#               browser: ["chrome", "firefox"]
+#               bver: ["beta", "unstable", "stable"]
+#               build_label: ["Daily build"]
+#   pull-request-workflow:
+#     when:
+#         and:
+#           - equal: [true, <<pipeline.parameters.pr_workflow>>]
+#           - equal: [false, <<pipeline.parameters.release_workflow>>]
+#     jobs:
+#       - run-build-checks:
+#           context:
+#             - vblocks-js
+#           name: Build Checks
+#           datadog-test-service: "pull-request-unit-tests"
+#       - run-integration-tests:
+#           name: Integration tests <<matrix.browser>> <<matrix.bver>>
+#           context:
+#             - dockerhub-pulls
+#             - vblocks-js
+#           start_relay_server: true
+#           datadog-test-service: "pull-request-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
+#           browser: <<matrix.browser>>
+#           matrix:
+#             parameters:
+#               browser: ["chrome", "firefox"]
+#               bver: ["beta", "unstable", "stable"]
+#               build_label: ["Integration tests"]
+#       - run-chrome-extension-tests:
+#           name: Chrome extension tests <<matrix.browser>> <<matrix.bver>>
+#           context: 
+#             - vblocks-js
+#           matrix:
+#             parameters:
+#               browser: ["chrome"]
+#               bver: ["beta", "stable"]
+#       # NOTE(csantos): Will be addressed on a future epic
+#       # - run-network-tests:
+#       #     name: Network Tests <<matrix.browser>> <<matrix.bver>>
+#       #     context:
+#       #       - dockerhub-pulls
+#       #       - vblocks-js
+#       #     matrix:
+#       #       parameters:
+#       #         browser: ["chrome", "firefox"]
+#       #         bver: ["stable"]
+#   release-workflow:
+#     when: <<pipeline.parameters.release_workflow>>
+#     jobs:
+#       - run-build-checks:
+#           context:
+#             - vblocks-js
+#           name: Build Checks
+#           datadog-test-service: "release-unit-tests"
+#       - run-integration-tests:
+#           name: Integration tests <<matrix.browser>> <<matrix.bver>>
+#           context:
+#             - dockerhub-pulls
+#             - vblocks-js
+#           start_relay_server: true
+#           datadog-test-service: "release-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
+#           browser: <<matrix.browser>>
+#           matrix:
+#             parameters:
+#               browser: ["chrome", "firefox"]
+#               bver: ["beta", "unstable", "stable"]
+#               build_label: ["Release build"]
+#       # NOTE(csantos): Will be addressed on a future epic
+#       # - run-network-tests:
+#       #     context:
+#       #       - dockerhub-pulls
+#       #       - vblocks-js
+#       #     name: Network Tests <<matrix.browser>> <<matrix.bver>>
+#       #     matrix:
+#       #       parameters:
+#       #         browser: ["chrome", "firefox"]
+#       #         bver: ["stable"]
+#       - run-release:
+#           context:
+#             - dockerhub-pulls
+#             - vblocks-js
+#           name: Create Release Dry Run
+#           dryRun: true
+#           requires:
+#             - Build Checks
+#             # NOTE(mhuynh): Temporarily allow release without these tests passing
+#             # # Chrome integration tests
+#             # - Integration tests chrome beta
+#             # - Integration tests chrome unstable
+#             # - Integration tests chrome stable
+#             # # Firefox integration tests
+#             # - Integration tests firefox beta
+#             # - Integration tests firefox unstable
+#             # - Integration tests firefox stable
+#             # # Chrome network tests
+#             # - Network Tests chrome stable
+#             # # Firefox network tests
+#             # - Network Tests firefox stable
+#       - hold:
+#           type: approval
+#           requires:
+#             - Create Release Dry Run
+#       - run-release:
+#           context:
+#             - dockerhub-pulls
+#             - vblocks-js
+#           name: Create Release
+#           dryRun: false
+#           requires:
+#             - hold
+#   release-candidate:
+#       jobs:
+#         - trigger-qe-tests:
+#             context: sdks-qe
+#             filters:
+#               tags:
+#                 only:
+#                 - /^\d+\.\d+\.\d+-rc\d+$/
+#                 - /^\d+\.\d+\.\d+-preview\d+-rc\d+$/
+#                 - /^\d+\.\d+\.\d+-beta\d+-rc\d+$/
+#               branches:
+#                 ignore: /.*/
