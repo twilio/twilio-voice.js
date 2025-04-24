@@ -590,6 +590,7 @@ class Device extends EventEmitter {
     let isReconnect = false;
     let twimlParams: Record<string, string> = {};
     const callOptions: Call.Options = {
+      createMediaStream: this._options.createMediaStream,
       enableImprovedSignalingErrorPrecision:
       !!this._options.enableImprovedSignalingErrorPrecision,
       rtcConfiguration: options.rtcConfiguration,
@@ -1006,6 +1007,7 @@ class Device extends EventEmitter {
     ];
     const userOptionOverrides = [
       'RTCPeerConnection',
+      'createMediaStream',
       'enumerateDevices',
       'getUserMedia',
     ];
@@ -1093,6 +1095,7 @@ class Device extends EventEmitter {
 
     this._publisher.info('settings', 'init', {
       RTCPeerConnection: !!this._options.RTCPeerConnection,
+      createMediaStream: !!this._options.createMediaStream,
       enumerateDevices: !!this._options.enumerateDevices,
       getUserMedia: !!this._options.getUserMedia,
     }, call);
@@ -1326,6 +1329,7 @@ class Device extends EventEmitter {
       customParameters,
       {
         callParameters,
+        createMediaStream: this._options.createMediaStream,
         enableImprovedSignalingErrorPrecision:
           !!this._options.enableImprovedSignalingErrorPrecision,
         offerSdp: payload.sdp,
@@ -1898,6 +1902,11 @@ namespace Device {
      * An ordered array of codec names, from most to least preferred.
      */
     codecPreferences?: Call.Codec[];
+
+    /**
+     * Citrix method to create a RemoteStream object.
+     */
+    createMediaStream?: any;
 
     /**
      * Whether AudioContext sounds should be disabled. Useful for trouble shooting sound issues

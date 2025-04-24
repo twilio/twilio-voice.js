@@ -279,6 +279,7 @@ class Call extends EventEmitter {
    */
   private _options: Call.Options = {
     MediaHandler: PeerConnection,
+    createMediaStream: null,
     enableImprovedSignalingErrorPrecision: false,
     offerSdp: null,
     shouldPlayDisconnect: () => true,
@@ -417,6 +418,7 @@ class Call extends EventEmitter {
       (config.audioHelper, config.pstream, {
         RTCPeerConnection: this._options.RTCPeerConnection,
         codecPreferences: this._options.codecPreferences,
+        createMediaStream: this._options.createMediaStream,
         dscp: this._options.dscp,
         forceAggressiveIceNomination: this._options.forceAggressiveIceNomination,
         isUnifiedPlan: this._isUnifiedPlanDefault,
@@ -1945,6 +1947,11 @@ namespace Call {
      * An ordered array of codec names, from most to least preferred.
      */
     codecPreferences?: Codec[];
+
+    /**
+     * Citrix method to create a RemoteStream object.
+     */
+    createMediaStream?: any;
 
     /**
      * A mapping of custom sound URLs by sound name.
