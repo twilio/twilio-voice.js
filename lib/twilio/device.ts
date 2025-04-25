@@ -590,7 +590,7 @@ class Device extends EventEmitter {
     let isReconnect = false;
     let twimlParams: Record<string, string> = {};
     const callOptions: Call.Options = {
-      createMediaStream: this._options.createMediaStream,
+      MediaStream: this._options.MediaStream,
       enableImprovedSignalingErrorPrecision:
       !!this._options.enableImprovedSignalingErrorPrecision,
       rtcConfiguration: options.rtcConfiguration,
@@ -1007,9 +1007,9 @@ class Device extends EventEmitter {
     ];
     const userOptionOverrides = [
       'RTCPeerConnection',
-      'createMediaStream',
       'enumerateDevices',
       'getUserMedia',
+      'MediaStream',
     ];
     if (typeof options === 'object') {
       const toLog: any = { ...options };
@@ -1094,8 +1094,8 @@ class Device extends EventEmitter {
     const call = new (this._options.Call || Call)(config, options);
 
     this._publisher.info('settings', 'init', {
+      MediaStream: !!this._options.MediaStream,
       RTCPeerConnection: !!this._options.RTCPeerConnection,
-      createMediaStream: !!this._options.createMediaStream,
       enumerateDevices: !!this._options.enumerateDevices,
       getUserMedia: !!this._options.getUserMedia,
     }, call);
@@ -1328,8 +1328,8 @@ class Device extends EventEmitter {
     this._makeCallPromise = this._makeCall(
       customParameters,
       {
+        MediaStream: this._options.MediaStream,
         callParameters,
-        createMediaStream: this._options.createMediaStream,
         enableImprovedSignalingErrorPrecision:
           !!this._options.enableImprovedSignalingErrorPrecision,
         offerSdp: payload.sdp,
@@ -1904,11 +1904,6 @@ namespace Device {
     codecPreferences?: Call.Codec[];
 
     /**
-     * Citrix method to create a RemoteStream object.
-     */
-    createMediaStream?: any;
-
-    /**
      * Whether AudioContext sounds should be disabled. Useful for trouble shooting sound issues
      * that may be caused by AudioContext-specific sounds. If set to true, will fall back to
      * HTMLAudioElement sounds.
@@ -2053,6 +2048,11 @@ namespace Device {
      * contains webhooks that relies on [call status callbacks](https://www.twilio.com/docs/voice/twiml#callstatus-values).
      */
     maxCallSignalingTimeoutMs?: number;
+
+    /**
+     * Overrides the native MediaStream class.
+     */
+    MediaStream?: any;
 
     /**
      * Overrides the native RTCPeerConnection class.

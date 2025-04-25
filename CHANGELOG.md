@@ -3,11 +3,10 @@
 2.12.5 (WIP)
 ============
 
-Bug Fixes
----------
-- Fixed a Citrix issue where calling `device.audio.setInputDevice()`, results in a `MediaStreamError`.
-  - User must add `createMediaStream` to their `Device.Options`.
-  - [Device.Options.createMediaStream](https://twilio.github.io/twilio-voice.js/interfaces/voice.device.options.html#createMediaStream)
+New Features
+------------
+
+In version `2.5.0`, the SDK introduced a mechanism to override WebRTC APIs, enabling support for redirection technologies like [Citrix HDX](https://www.citrix.com/solutions/vdi-and-daas/hdx/what-is-hdx.html). In this release, the SDK extends this capability by allowing the override of the native [MediaStream](https://developer.mozilla.org/en-US/docs/Web/API/MediaStream) API, making it possible to create custom media streams tailored for such environments. Please check this [page](https://www.twilio.com/docs/voice/sdks/javascript/best-practices#webrtc-api-overrides) for an example.
 
 2.12.4 (March 12, 2025)
 =======================

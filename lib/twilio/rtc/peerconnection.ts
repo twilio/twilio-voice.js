@@ -355,7 +355,7 @@ PeerConnection.prototype._setInputTracksForUnifiedPlan = function(shouldClone, n
   if (!localStream) {
     // We can't use MediaStream.clone() here because it stopped copying over tracks
     //   as of Chrome 61. https://bugs.chromium.org/p/chromium/issues/detail?id=770908
-    this.stream = shouldClone ? cloneStream(newStream, this.options.createMediaStream) : newStream;
+    this.stream = shouldClone ? cloneStream(newStream, this.options.MediaStream) : newStream;
   } else {
     // If the call was started with gUM, and we are now replacing that track with an
     // external stream's tracks, we should stop the old managed track.
@@ -369,7 +369,7 @@ PeerConnection.prototype._setInputTracksForUnifiedPlan = function(shouldClone, n
 
     return this._sender.replaceTrack(newStream.getAudioTracks()[0]).then(() => {
       this._updateInputStreamSource(newStream);
-      this.stream = shouldClone ? cloneStream(newStream, this.options.createMediaStream) : newStream;
+      this.stream = shouldClone ? cloneStream(newStream, this.options.MediaStream) : newStream;
       return getStreamPromise();
     });
   }
@@ -1122,10 +1122,10 @@ function addStream(pc, stream) {
   }
 }
 
-function cloneStream(oldStream, createMediaStream) {
+function cloneStream(oldStream, _MediaStream) {
   let newStream;
-  if (createMediaStream) {
-    newStream = createMediaStream();
+  if (_MediaStream) {
+    newStream = new _MediaStream();
   } else if (typeof MediaStream !== 'undefined') {
     newStream = new MediaStream();
   } else {
