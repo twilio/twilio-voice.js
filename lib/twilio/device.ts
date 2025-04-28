@@ -110,11 +110,6 @@ export interface IExtendedDeviceOptions extends Device.Options {
   ignoreBrowserSupport?: boolean;
 
   /**
-   * MediaStream constructor.
-   */
-  MediaStream?: typeof MediaStream;
-
-  /**
    * Whether this is a preflight call or not
    */
   preflight?: boolean;
@@ -1055,7 +1050,7 @@ class Device extends EventEmitter {
     };
 
     options = Object.assign({
-      MediaStream: this._options.MediaStream || rtc.PeerConnection,
+      MediaStream: this._options.MediaStream,
       RTCPeerConnection: this._options.RTCPeerConnection,
       beforeAccept: (currentCall: Call) => {
         if (!this._activeCall || this._activeCall === currentCall) {
