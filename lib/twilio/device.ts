@@ -585,7 +585,6 @@ class Device extends EventEmitter {
     let isReconnect = false;
     let twimlParams: Record<string, string> = {};
     const callOptions: Call.Options = {
-      MediaStream: this._options.MediaStream,
       enableImprovedSignalingErrorPrecision:
       !!this._options.enableImprovedSignalingErrorPrecision,
       rtcConfiguration: options.rtcConfiguration,
@@ -1323,7 +1322,6 @@ class Device extends EventEmitter {
     this._makeCallPromise = this._makeCall(
       customParameters,
       {
-        MediaStream: this._options.MediaStream,
         callParameters,
         enableImprovedSignalingErrorPrecision:
           !!this._options.enableImprovedSignalingErrorPrecision,
