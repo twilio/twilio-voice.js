@@ -160,7 +160,7 @@ describe('Device', function() {
     it('should set MediaStream to "foo" if passed in as "foo"', () => {
       device = new Device(token, { ...setupOptions, MediaStream: 'foo' });
       assert.equal(device['_options'].MediaStream, 'foo');
-    })
+    });
   });
 
   describe('after Device is constructed', () => {

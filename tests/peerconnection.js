@@ -281,7 +281,7 @@ describe('PeerConnection', () => {
         assert(mediaStream.calledOnce);
         assert(context._updateInputStreamSource.calledOnce);
       }).then(done).catch(done);
-    })
+    });
 
     it('Should call this.options.MediaStream if provided, and stream NOT provided', done => {
       const mediaStream = sinon.stub().returns({
@@ -298,10 +298,9 @@ describe('PeerConnection', () => {
       toTest(true, NEW_STREAM).then(() => {
         assert(mediaStream.calledOnce);
       }).then(done).catch(done);
-    })
+    });
   });
 
-  
   context('PeerConnection.prototype.close', () => {
     const METHOD = PeerConnection.prototype.close;
 
