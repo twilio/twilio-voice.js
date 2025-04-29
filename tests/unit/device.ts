@@ -152,6 +152,15 @@ describe('Device', function() {
     it('should throw if the token is an invalid type', () => {
       assert.throws(() => new Device(null as any), /Parameter "token" must be of type "string"./);
     });
+
+    it('should set MediaStream to undefined by default', () => {
+      assert.equal(device['_options'].MediaStream, undefined);
+    });
+
+    it('should set MediaStream to "foo" if passed in as "foo"', () => {
+      device = new Device(token, { ...setupOptions, MediaStream: 'foo' });
+      assert.equal(device['_options'].MediaStream, 'foo');
+    });
   });
 
   describe('after Device is constructed', () => {

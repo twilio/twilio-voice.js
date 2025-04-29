@@ -1,5 +1,13 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.13.0 (In Progress)
+============
+
+New Features
+------------
+
+In version `2.5.0`, the SDK introduced a mechanism to override WebRTC APIs, enabling support for redirection technologies like [Citrix HDX](https://www.citrix.com/solutions/vdi-and-daas/hdx/what-is-hdx.html). In this release, the SDK extends this capability by allowing the override of the native [MediaStream](https://developer.mozilla.org/en-US/docs/Web/API/MediaStream) API, making it possible to create custom media streams tailored for such environments. Please check this [page](https://www.twilio.com/docs/voice/sdks/javascript/best-practices#webrtc-api-overrides) for an example.
+
 2.12.4 (March 12, 2025)
 =======================
 

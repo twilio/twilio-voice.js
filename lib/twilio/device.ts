@@ -110,11 +110,6 @@ export interface IExtendedDeviceOptions extends Device.Options {
   ignoreBrowserSupport?: boolean;
 
   /**
-   * MediaStream constructor.
-   */
-  MediaStream?: typeof MediaStream;
-
-  /**
    * Whether this is a preflight call or not
    */
   preflight?: boolean;
@@ -1008,6 +1003,7 @@ class Device extends EventEmitter {
       'RTCPeerConnection',
       'enumerateDevices',
       'getUserMedia',
+      'MediaStream',
     ];
     if (typeof options === 'object') {
       const toLog: any = { ...options };
@@ -1053,7 +1049,7 @@ class Device extends EventEmitter {
     };
 
     options = Object.assign({
-      MediaStream: this._options.MediaStream || rtc.PeerConnection,
+      MediaStream: this._options.MediaStream,
       RTCPeerConnection: this._options.RTCPeerConnection,
       beforeAccept: (currentCall: Call) => {
         if (!this._activeCall || this._activeCall === currentCall) {
@@ -1092,6 +1088,7 @@ class Device extends EventEmitter {
     const call = new (this._options.Call || Call)(config, options);
 
     this._publisher.info('settings', 'init', {
+      MediaStream: !!this._options.MediaStream,
       RTCPeerConnection: !!this._options.RTCPeerConnection,
       enumerateDevices: !!this._options.enumerateDevices,
       getUserMedia: !!this._options.getUserMedia,
@@ -2044,6 +2041,11 @@ namespace Device {
      * contains webhooks that relies on [call status callbacks](https://www.twilio.com/docs/voice/twiml#callstatus-values).
      */
     maxCallSignalingTimeoutMs?: number;
+
+    /**
+     * Overrides the native MediaStream class.
+     */
+    MediaStream?: any;
 
     /**
      * Overrides the native RTCPeerConnection class.

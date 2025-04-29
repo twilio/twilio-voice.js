@@ -255,6 +255,50 @@ describe('PeerConnection', () => {
         assert.strictEqual(result.id, NEW_STREAM.id);
       }).then(done).catch(done);
     });
+    
+    it('Should call this.options.MediaStream if provided, and stream provided', done => {
+      const mediaStream = sinon.stub().returns({
+        addTrack: sinon.stub()
+      });
+      context = {
+        stream: STREAM,
+        mute: sinon.stub(),
+        _sender: {},
+        options: {
+          MediaStream: mediaStream,
+        },
+      };
+      toTest = METHOD.bind(context);
+      
+      const replaceTrackCb = sinon.stub();
+      context._updateInputStreamSource = sinon.stub();
+      context._sender.replaceTrack = () => ({ then: (cb) => {
+        replaceTrackCb();
+        return cb();
+      }})
+      
+      toTest(true, NEW_STREAM).then(() => {
+        assert(mediaStream.calledOnce);
+        assert(context._updateInputStreamSource.calledOnce);
+      }).then(done).catch(done);
+    });
+
+    it('Should call this.options.MediaStream if provided, and stream NOT provided', done => {
+      const mediaStream = sinon.stub().returns({
+        addTrack: sinon.stub()
+      });
+      context = {
+        mute: sinon.stub(),
+        options: {
+          MediaStream: mediaStream,
+        },
+      };
+      toTest = METHOD.bind(context);
+      
+      toTest(true, NEW_STREAM).then(() => {
+        assert(mediaStream.calledOnce);
+      }).then(done).catch(done);
+    });
   });
 
   context('PeerConnection.prototype.close', () => {

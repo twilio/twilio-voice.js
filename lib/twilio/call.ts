@@ -279,6 +279,7 @@ class Call extends EventEmitter {
    */
   private _options: Call.Options = {
     MediaHandler: PeerConnection,
+    MediaStream: null,
     enableImprovedSignalingErrorPrecision: false,
     offerSdp: null,
     shouldPlayDisconnect: () => true,
@@ -415,6 +416,7 @@ class Call extends EventEmitter {
 
     this._mediaHandler = new (this._options.MediaHandler)
       (config.audioHelper, config.pstream, {
+        MediaStream: this._options.MediaStream,
         RTCPeerConnection: this._options.RTCPeerConnection,
         codecPreferences: this._options.codecPreferences,
         dscp: this._options.dscp,
@@ -1998,6 +2000,11 @@ namespace Call {
      * Custom MediaHandler (PeerConnection) constructor.
      */
     MediaHandler?: IPeerConnection;
+
+    /**
+     * Overrides the native MediaStream class.
+     */
+    MediaStream?: any;
 
     /**
      * The offer SDP, if this is an incoming call.
