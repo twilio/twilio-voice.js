@@ -107,6 +107,15 @@ describe('Call', function() {
       assert.equal(conn.customParameters.get('baz'), 123);
     });
 
+    it('should set MediaStream to null by default', () => {
+      assert.equal(conn['_options'].MediaStream, null);
+    });
+
+    it('should set MediaStream to "foo" if passed in as "foo"', () => {
+      conn = new Call(config, Object.assign(options, { MediaStream: 'foo' }));
+      assert.equal(conn['_options'].MediaStream, 'foo');
+    });
+
     context('connectToken', () => {
       it('should return undefined if callsid is missing', () => {
         conn = new Call(config, Object.assign(options, { reconnectToken: 'testReconnectToken' }));
