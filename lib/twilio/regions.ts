@@ -7,7 +7,6 @@ import { InvalidArgumentError } from './errors';
 
 /**
  * Valid edges.
- * @private
  */
 export enum Edge {
   /**

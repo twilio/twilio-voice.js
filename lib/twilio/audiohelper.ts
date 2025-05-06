@@ -14,7 +14,6 @@ import { average, difference, isFirefox } from './util';
 
 /**
  * Aliases for audio kinds, used for labelling.
- * @private
  */
 const kindAliases: Record<string, string> = {
   audioinput: 'Audio Input',
@@ -23,7 +22,6 @@ const kindAliases: Record<string, string> = {
 
 /**
  * Provides input and output audio-based functionality in one convenient class.
- * @publicapi
  */
 class AudioHelper extends EventEmitter {
   /**
@@ -211,8 +209,7 @@ class AudioHelper extends EventEmitter {
   };
 
   /**
-   * @constructor
-   * @private
+   * @internal
    * @param onActiveOutputsChanged - A callback to be called when the user changes the active output devices.
    * @param onActiveInputChanged - A callback to be called when the user changes the active input device.
    * @param [options]
@@ -315,7 +312,7 @@ class AudioHelper extends EventEmitter {
 
   /**
    * Destroy this AudioHelper instance
-   * @private
+   * @internal
    */
   _destroy(): void {
     this._stopDefaultInputDeviceStream();
@@ -329,7 +326,7 @@ class AudioHelper extends EventEmitter {
 
   /**
    * Promise to wait for the input device, if setInputDevice is called outside of the SDK
-   * @private
+   * @internal
    */
   _getInputDevicePromise(): Promise<void> | null {
     return this._inputDevicePromise;
@@ -337,7 +334,7 @@ class AudioHelper extends EventEmitter {
 
   /**
    * Start polling volume if it's supported and there's an input stream to poll.
-   * @private
+   * @internal
    */
   _maybeStartPollingVolume(): void {
     if (!this.isVolumeSupported || !this.inputStream) { return; }
@@ -369,7 +366,7 @@ class AudioHelper extends EventEmitter {
 
   /**
    * Stop polling volume if it's currently polling and there are no listeners.
-   * @private
+   * @internal
    */
   _maybeStopPollingVolume(): void {
     if (!this.isVolumeSupported) { return; }
@@ -388,7 +385,7 @@ class AudioHelper extends EventEmitter {
 
   /**
    * Call getUserMedia with specified constraints
-   * @private
+   * @internal
    */
   _openDefaultDeviceWithConstraints(constraints: MediaStreamConstraints): Promise<MediaStream> {
     this._log.info('Opening default device with constraints', constraints);
@@ -408,7 +405,7 @@ class AudioHelper extends EventEmitter {
 
   /**
    * Stop the default audio stream
-   * @private
+   * @internal
    */
   _stopDefaultInputDeviceStream(): void {
     if (this._defaultInputDeviceStream) {
@@ -421,7 +418,7 @@ class AudioHelper extends EventEmitter {
 
   /**
    * Unbind the listeners from mediaDevices.
-   * @private
+   * @internal
    */
   _unbind(): void {
     if (this._mediaDevices?.removeEventListener) {
@@ -431,7 +428,7 @@ class AudioHelper extends EventEmitter {
 
   /**
    * Update the available input and output devices
-   * @private
+   * @internal
    */
   _updateAvailableDevices = (): Promise<void> => {
     if (!this._mediaDevices || !this._enumerateDevices) {
@@ -463,7 +460,7 @@ class AudioHelper extends EventEmitter {
 
   /**
    * Update AudioHelper options that can be changed by the user
-   * @private
+   * @internal
    */
   _updateUserOptions(options: AudioHelper.Options): void {
     if (typeof options.enumerateDevices === 'function') {
@@ -967,30 +964,39 @@ class AudioHelper extends EventEmitter {
   }
 }
 
+/**
+ * @mergeModuleWith AudioHelper
+ */
 namespace AudioHelper {
   /**
    * Emitted when the available set of Devices changes.
+   * @event
    * @param lostActiveDevices - An array containing any Devices that were previously active
    * that were lost as a result of this deviceChange event.
-   * @example `device.audio.on('deviceChange', lostActiveDevices => { })`
-   * @event
+   * @example
+   * ```ts
+   * device.audio.on('deviceChange', lostActiveDevices => { });
+   * ```
    */
-  declare function deviceChangeEvent(lostActiveDevices: MediaDeviceInfo[]): void;
+  export declare function deviceChangeEvent(lostActiveDevices: MediaDeviceInfo[]): void;
 
   /**
    * Emitted on `requestAnimationFrame` (up to 60fps, depending on browser) with
    *   the current input and output volumes, as a percentage of maximum
    *   volume, between -100dB and -30dB. Represented by a floating point
    *   number.
-   * @param inputVolume - A floating point number between 0.0 and 1.0 inclusive.
-   * @example `device.audio.on('inputVolume', volume => { })`
    * @event
+   * @param inputVolume - A floating point number between 0.0 and 1.0 inclusive.
+   * @example
+   * ```ts
+   * device.audio.on('inputVolume', volume => { });
+   * ```
    */
-  declare function inputVolumeEvent(inputVolume: number): void;
+  export declare function inputVolumeEvent(inputVolume: number): void;
 
   /**
    * An object like MediaDevices.
-   * @private
+   * @internal
    */
   export interface MediaDevicesLike {
     addEventListener?: (eventName: string, handler: (...args: any[]) => void) => void;
@@ -1001,7 +1007,7 @@ namespace AudioHelper {
 
   /**
    * Options that can be passed to the AudioHelper constructor
-   * @private
+   * @internal
    */
   export interface Options {
     /**

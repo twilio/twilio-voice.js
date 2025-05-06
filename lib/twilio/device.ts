@@ -168,7 +168,6 @@ export interface ISoundDefinition {
 
 /**
  * Twilio Device. Allows registration for incoming calls, and placing outgoing calls.
- * @publicapi
  */
 class Device extends EventEmitter {
   /**
@@ -462,7 +461,6 @@ class Device extends EventEmitter {
   /**
    * Construct a {@link Device} instance. The {@link Device} can be registered
    * to make and listen for calls using {@link Device.register}.
-   * @constructor
    * @param options
    */
   constructor(token: string, options: Device.Options = { }) {
@@ -1699,21 +1697,30 @@ class Device extends EventEmitter {
   }
 }
 
+/**
+ * @mergeModuleWith Device
+ */
 namespace Device {
   /**
    * Emitted when the {@link Device} has been destroyed.
-   * @example `device.on('destroyed', () => { })`
    * @event
+   * @example
+   * ```ts
+   * device.on('destroyed', () => { });
+   * ```
    */
-  declare function destroyedEvent(): void;
+  export declare function destroyedEvent(): void;
 
   /**
    * Emitted when the {@link Device} receives an error.
-   * @param error
-   * @example `device.on('error', call => { })`
    * @event
+   * @param error
+   * @example
+   * ```ts
+   * device.on('error', call => { });
+   * ```
    */
-  declare function errorEvent(error: TwilioError, call?: Call): void;
+  export declare function errorEvent(error: TwilioError, call?: Call): void;
 
   /**
    * Emitted when an incoming {@link Call} is received. You can interact with the call object
@@ -1724,8 +1731,9 @@ namespace Device {
    * **Important:** When forwarding a call, the token for target device instance needs to have
    * the same identity as the token used in the device that originally received the call.
    *
+   * @event
+   * @param call - The incoming {@link Call}.
    * @example
-   *
    * ```js
    * const receiverDevice = new Device(token, options);
    * await receiverDevice.register();
@@ -1748,44 +1756,53 @@ namespace Device {
    *   call.on('disconnect', () => device.destroy());
    * }
    * ```
-   *
-   * @param call - The incoming {@link Call}.
-   * @event
    */
-  declare function incomingEvent(call: Call): void;
+  export declare function incomingEvent(call: Call): void;
 
   /**
    * Emitted when the {@link Device} is unregistered.
-   * @example `device.on('unregistered', () => { })`
    * @event
+   * @example
+   * ```ts
+   * device.on('unregistered', () => { });
+   * ```
    */
-  declare function unregisteredEvent(): void;
+  export declare function unregisteredEvent(): void;
 
   /**
    * Emitted when the {@link Device} is registering.
-   * @example `device.on('registering', () => { })`
    * @event
+   * @example
+   * ```ts
+   * device.on('registering', () => { });
+   * ```
    */
-  declare function registeringEvent(): void;
+  export declare function registeringEvent(): void;
 
   /**
    * Emitted when the {@link Device} is registered.
-   * @example `device.on('registered', () => { })`
    * @event
+   * @example
+   * ```ts
+   * device.on('registered', () => { });
+   * ```
    */
-  declare function registeredEvent(): void;
+  export declare function registeredEvent(): void;
 
   /**
    * Emitted when the {@link Device}'s token is about to expire. Use DeviceOptions.refreshTokenMs
    * to set a custom warning time. Default is 10000 (10 seconds) prior to the token expiring.
+   * @event
    * @param device
-   * @example `device.on('tokenWillExpire', device => {
+   * @example
+   * ```ts
+   * device.on('tokenWillExpire', device => {
    *   const token = getNewTokenViaAjax();
    *   device.updateToken(token);
-   * })`
-   * @event
+   * });
+   * ```
    */
-  declare function tokenWillExpireEvent(device: Device): void;
+  export declare function tokenWillExpireEvent(device: Device): void;
 
   /**
    * All valid {@link Device} event names.

@@ -12,6 +12,9 @@ import TwilioError from './twilioError';
 export { TwilioError };
 
 export namespace AuthorizationErrors {
+  /**
+   * Error received from the Twilio backend.
+   */
   export class AccessTokenInvalid extends TwilioError {
     causes: string[] = [];
     code: number = 20101;
@@ -20,10 +23,25 @@ export namespace AuthorizationErrors {
     name: string = 'AccessTokenInvalid';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, AuthorizationErrors.AccessTokenInvalid.prototype);
@@ -41,6 +59,9 @@ export namespace AuthorizationErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class AccessTokenExpired extends TwilioError {
     causes: string[] = [];
     code: number = 20104;
@@ -49,10 +70,25 @@ export namespace AuthorizationErrors {
     name: string = 'AccessTokenExpired';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, AuthorizationErrors.AccessTokenExpired.prototype);
@@ -70,6 +106,9 @@ export namespace AuthorizationErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class AuthenticationFailed extends TwilioError {
     causes: string[] = [];
     code: number = 20151;
@@ -78,10 +117,25 @@ export namespace AuthorizationErrors {
     name: string = 'AuthenticationFailed';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, AuthorizationErrors.AuthenticationFailed.prototype);
@@ -101,6 +155,9 @@ export namespace AuthorizationErrors {
 }
 
 export namespace SignatureValidationErrors {
+  /**
+   * Error received from the Twilio backend.
+   */
   export class AccessTokenSignatureValidationFailed extends TwilioError {
     causes: string[] = [
       'The access token has an invalid Account SID, API Key, or API Key Secret.',
@@ -113,10 +170,25 @@ export namespace SignatureValidationErrors {
       'Ensure the Account SID, API Key, and API Key Secret are valid when generating your access token.',
     ];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, SignatureValidationErrors.AccessTokenSignatureValidationFailed.prototype);
@@ -136,6 +208,9 @@ export namespace SignatureValidationErrors {
 }
 
 export namespace ClientErrors {
+  /**
+   * Error received from the Twilio backend.
+   */
   export class BadRequest extends TwilioError {
     causes: string[] = [];
     code: number = 31400;
@@ -144,10 +219,25 @@ export namespace ClientErrors {
     name: string = 'BadRequest';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, ClientErrors.BadRequest.prototype);
@@ -165,6 +255,9 @@ export namespace ClientErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class NotFound extends TwilioError {
     causes: string[] = [
       'The outbound call was made to an invalid phone number.',
@@ -179,10 +272,25 @@ export namespace ClientErrors {
       'Ensure the TwiML application is configured correctly with a Voice URL link.',
     ];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, ClientErrors.NotFound.prototype);
@@ -200,6 +308,9 @@ export namespace ClientErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class TemporarilyUnavailable extends TwilioError {
     causes: string[] = [];
     code: number = 31480;
@@ -208,10 +319,25 @@ export namespace ClientErrors {
     name: string = 'TemporarilyUnavailable';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, ClientErrors.TemporarilyUnavailable.prototype);
@@ -229,6 +355,9 @@ export namespace ClientErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class BusyHere extends TwilioError {
     causes: string[] = [];
     code: number = 31486;
@@ -237,10 +366,25 @@ export namespace ClientErrors {
     name: string = 'BusyHere';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, ClientErrors.BusyHere.prototype);
@@ -260,6 +404,9 @@ export namespace ClientErrors {
 }
 
 export namespace SIPServerErrors {
+  /**
+   * Error received from the Twilio backend.
+   */
   export class Decline extends TwilioError {
     causes: string[] = [];
     code: number = 31603;
@@ -268,10 +415,25 @@ export namespace SIPServerErrors {
     name: string = 'Decline';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, SIPServerErrors.Decline.prototype);
@@ -291,6 +453,9 @@ export namespace SIPServerErrors {
 }
 
 export namespace GeneralErrors {
+  /**
+   * Error received from the Twilio backend.
+   */
   export class UnknownError extends TwilioError {
     causes: string[] = [];
     code: number = 31000;
@@ -299,10 +464,25 @@ export namespace GeneralErrors {
     name: string = 'UnknownError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, GeneralErrors.UnknownError.prototype);
@@ -320,6 +500,9 @@ export namespace GeneralErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class ApplicationNotFoundError extends TwilioError {
     causes: string[] = [];
     code: number = 31001;
@@ -328,10 +511,25 @@ export namespace GeneralErrors {
     name: string = 'ApplicationNotFoundError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, GeneralErrors.ApplicationNotFoundError.prototype);
@@ -349,6 +547,9 @@ export namespace GeneralErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class ConnectionDeclinedError extends TwilioError {
     causes: string[] = [];
     code: number = 31002;
@@ -357,10 +558,25 @@ export namespace GeneralErrors {
     name: string = 'ConnectionDeclinedError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, GeneralErrors.ConnectionDeclinedError.prototype);
@@ -378,6 +594,9 @@ export namespace GeneralErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class ConnectionTimeoutError extends TwilioError {
     causes: string[] = [];
     code: number = 31003;
@@ -386,10 +605,25 @@ export namespace GeneralErrors {
     name: string = 'ConnectionTimeoutError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, GeneralErrors.ConnectionTimeoutError.prototype);
@@ -407,6 +641,9 @@ export namespace GeneralErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class ConnectionError extends TwilioError {
     causes: string[] = [];
     code: number = 31005;
@@ -415,10 +652,25 @@ export namespace GeneralErrors {
     name: string = 'ConnectionError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, GeneralErrors.ConnectionError.prototype);
@@ -436,6 +688,9 @@ export namespace GeneralErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class CallCancelledError extends TwilioError {
     causes: string[] = [
       'The incoming call was cancelled because it was not answered in time or it was accepted/rejected by another application instance registered with the same identity.',
@@ -446,10 +701,25 @@ export namespace GeneralErrors {
     name: string = 'CallCancelledError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, GeneralErrors.CallCancelledError.prototype);
@@ -467,6 +737,9 @@ export namespace GeneralErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class TransportError extends TwilioError {
     causes: string[] = [];
     code: number = 31009;
@@ -475,10 +748,25 @@ export namespace GeneralErrors {
     name: string = 'TransportError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, GeneralErrors.TransportError.prototype);
@@ -498,6 +786,9 @@ export namespace GeneralErrors {
 }
 
 export namespace MalformedRequestErrors {
+  /**
+   * Error received from the Twilio backend.
+   */
   export class MalformedRequestError extends TwilioError {
     causes: string[] = [
       'Invalid content or MessageType passed to sendMessage method.',
@@ -510,10 +801,25 @@ export namespace MalformedRequestErrors {
       'Ensure content and MessageType passed to sendMessage method are valid.',
     ];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, MalformedRequestErrors.MalformedRequestError.prototype);
@@ -531,6 +837,9 @@ export namespace MalformedRequestErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class MissingParameterArrayError extends TwilioError {
     causes: string[] = [];
     code: number = 31101;
@@ -539,10 +848,25 @@ export namespace MalformedRequestErrors {
     name: string = 'MissingParameterArrayError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, MalformedRequestErrors.MissingParameterArrayError.prototype);
@@ -560,6 +884,9 @@ export namespace MalformedRequestErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class AuthorizationTokenMissingError extends TwilioError {
     causes: string[] = [];
     code: number = 31102;
@@ -568,10 +895,25 @@ export namespace MalformedRequestErrors {
     name: string = 'AuthorizationTokenMissingError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, MalformedRequestErrors.AuthorizationTokenMissingError.prototype);
@@ -589,6 +931,9 @@ export namespace MalformedRequestErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class MaxParameterLengthExceededError extends TwilioError {
     causes: string[] = [];
     code: number = 31103;
@@ -597,10 +942,25 @@ export namespace MalformedRequestErrors {
     name: string = 'MaxParameterLengthExceededError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, MalformedRequestErrors.MaxParameterLengthExceededError.prototype);
@@ -618,6 +978,9 @@ export namespace MalformedRequestErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class InvalidBridgeTokenError extends TwilioError {
     causes: string[] = [];
     code: number = 31104;
@@ -626,10 +989,25 @@ export namespace MalformedRequestErrors {
     name: string = 'InvalidBridgeTokenError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, MalformedRequestErrors.InvalidBridgeTokenError.prototype);
@@ -647,6 +1025,9 @@ export namespace MalformedRequestErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class InvalidClientNameError extends TwilioError {
     causes: string[] = [
       'Client name contains invalid characters.',
@@ -659,10 +1040,25 @@ export namespace MalformedRequestErrors {
       'Make sure that client name does not contain any of the invalid characters.',
     ];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, MalformedRequestErrors.InvalidClientNameError.prototype);
@@ -680,6 +1076,9 @@ export namespace MalformedRequestErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class ReconnectParameterInvalidError extends TwilioError {
     causes: string[] = [];
     code: number = 31107;
@@ -688,10 +1087,25 @@ export namespace MalformedRequestErrors {
     name: string = 'ReconnectParameterInvalidError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, MalformedRequestErrors.ReconnectParameterInvalidError.prototype);
@@ -711,6 +1125,9 @@ export namespace MalformedRequestErrors {
 }
 
 export namespace AuthorizationErrors {
+  /**
+   * Error received from the Twilio backend.
+   */
   export class AuthorizationError extends TwilioError {
     causes: string[] = [];
     code: number = 31201;
@@ -719,10 +1136,25 @@ export namespace AuthorizationErrors {
     name: string = 'AuthorizationError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, AuthorizationErrors.AuthorizationError.prototype);
@@ -740,6 +1172,9 @@ export namespace AuthorizationErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class NoValidAccountError extends TwilioError {
     causes: string[] = [];
     code: number = 31203;
@@ -748,10 +1183,25 @@ export namespace AuthorizationErrors {
     name: string = 'NoValidAccountError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, AuthorizationErrors.NoValidAccountError.prototype);
@@ -769,6 +1219,9 @@ export namespace AuthorizationErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class InvalidJWTTokenError extends TwilioError {
     causes: string[] = [];
     code: number = 31204;
@@ -777,10 +1230,25 @@ export namespace AuthorizationErrors {
     name: string = 'InvalidJWTTokenError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, AuthorizationErrors.InvalidJWTTokenError.prototype);
@@ -798,6 +1266,9 @@ export namespace AuthorizationErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class JWTTokenExpiredError extends TwilioError {
     causes: string[] = [];
     code: number = 31205;
@@ -806,10 +1277,25 @@ export namespace AuthorizationErrors {
     name: string = 'JWTTokenExpiredError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, AuthorizationErrors.JWTTokenExpiredError.prototype);
@@ -827,6 +1313,9 @@ export namespace AuthorizationErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class RateExceededError extends TwilioError {
     causes: string[] = [
       'Rate limit exceeded.',
@@ -839,10 +1328,25 @@ export namespace AuthorizationErrors {
       'Ensure message send rate does not exceed authorized limits.',
     ];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, AuthorizationErrors.RateExceededError.prototype);
@@ -860,6 +1364,9 @@ export namespace AuthorizationErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class JWTTokenExpirationTooLongError extends TwilioError {
     causes: string[] = [];
     code: number = 31207;
@@ -868,10 +1375,25 @@ export namespace AuthorizationErrors {
     name: string = 'JWTTokenExpirationTooLongError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, AuthorizationErrors.JWTTokenExpirationTooLongError.prototype);
@@ -889,6 +1411,9 @@ export namespace AuthorizationErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class ReconnectAttemptError extends TwilioError {
     causes: string[] = [];
     code: number = 31209;
@@ -897,10 +1422,25 @@ export namespace AuthorizationErrors {
     name: string = 'ReconnectAttemptError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, AuthorizationErrors.ReconnectAttemptError.prototype);
@@ -918,6 +1458,9 @@ export namespace AuthorizationErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class CallMessageEventTypeInvalidError extends TwilioError {
     causes: string[] = [
       'The Call Message Event Type is invalid and is not understood by Twilio Voice.',
@@ -930,10 +1473,25 @@ export namespace AuthorizationErrors {
       'Ensure the Call Message Event Type is Valid and understood by Twilio Voice and try again.',
     ];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, AuthorizationErrors.CallMessageEventTypeInvalidError.prototype);
@@ -951,6 +1509,9 @@ export namespace AuthorizationErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class PayloadSizeExceededError extends TwilioError {
     causes: string[] = [
       'The payload size of Call Message Event exceeds the authorized limit.',
@@ -963,10 +1524,25 @@ export namespace AuthorizationErrors {
       'Reduce payload size of Call Message Event to be within the authorized limit and try again.',
     ];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, AuthorizationErrors.PayloadSizeExceededError.prototype);
@@ -986,6 +1562,9 @@ export namespace AuthorizationErrors {
 }
 
 export namespace UserMediaErrors {
+  /**
+   * Error received from the Twilio backend.
+   */
   export class PermissionDeniedError extends TwilioError {
     causes: string[] = [
       'The user denied the getUserMedia request.',
@@ -1000,10 +1579,25 @@ export namespace UserMediaErrors {
       'The user should to verify that the browser has permission to access the microphone at this address.',
     ];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, UserMediaErrors.PermissionDeniedError.prototype);
@@ -1021,6 +1615,9 @@ export namespace UserMediaErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class AcquisitionFailedError extends TwilioError {
     causes: string[] = [
       'NotFoundError - The deviceID specified was not found.',
@@ -1035,10 +1632,25 @@ export namespace UserMediaErrors {
       'Try acquiring media with fewer constraints.',
     ];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, UserMediaErrors.AcquisitionFailedError.prototype);
@@ -1058,6 +1670,9 @@ export namespace UserMediaErrors {
 }
 
 export namespace SignalingErrors {
+  /**
+   * Error received from the Twilio backend.
+   */
   export class ConnectionError extends TwilioError {
     causes: string[] = [];
     code: number = 53000;
@@ -1066,10 +1681,25 @@ export namespace SignalingErrors {
     name: string = 'ConnectionError';
     solutions: string[] = [];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, SignalingErrors.ConnectionError.prototype);
@@ -1087,6 +1717,9 @@ export namespace SignalingErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class ConnectionDisconnected extends TwilioError {
     causes: string[] = [
       'The device running your application lost its Internet connection.',
@@ -1099,10 +1732,25 @@ export namespace SignalingErrors {
       'Ensure the device running your application has access to a stable Internet connection.',
     ];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, SignalingErrors.ConnectionDisconnected.prototype);
@@ -1122,6 +1770,9 @@ export namespace SignalingErrors {
 }
 
 export namespace MediaErrors {
+  /**
+   * Error received from the Twilio backend.
+   */
   export class ClientLocalDescFailed extends TwilioError {
     causes: string[] = [
       'The Client may not be using a supported WebRTC implementation.',
@@ -1135,10 +1786,25 @@ export namespace MediaErrors {
       'If you are experiencing this error using the JavaScript SDK, ensure you are running it with a supported WebRTC implementation.',
     ];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, MediaErrors.ClientLocalDescFailed.prototype);
@@ -1156,6 +1822,9 @@ export namespace MediaErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class ClientRemoteDescFailed extends TwilioError {
     causes: string[] = [
       'The Client may not be using a supported WebRTC implementation.',
@@ -1170,10 +1839,25 @@ export namespace MediaErrors {
       'If you are experiencing this error using the JavaScript SDK, ensure you are running it with a supported WebRTC implementation.',
     ];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, MediaErrors.ClientRemoteDescFailed.prototype);
@@ -1191,6 +1875,9 @@ export namespace MediaErrors {
     }
   }
 
+  /**
+   * Error received from the Twilio backend.
+   */
   export class ConnectionError extends TwilioError {
     causes: string[] = [
       'The Client was unable to establish a media connection.',
@@ -1206,10 +1893,25 @@ export namespace MediaErrors {
       'If you\'ve provided custom ICE Servers then ensure that the URLs and credentials are valid.',
     ];
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, MediaErrors.ConnectionError.prototype);
