@@ -409,7 +409,7 @@ class Device extends EventEmitter {
   /**
    * A timeout ID for a setTimeout schedule to re-register the {@link Device}.
    */
-  private _regTimer: NodeJS.Timer | null = null;
+  private _regTimer: NodeJS.Timeout | null = null;
 
   /**
    * Boolean representing whether or not the {@link Device} was registered when
@@ -457,7 +457,7 @@ class Device extends EventEmitter {
   /**
    * A timeout to track when the current AccessToken will expire.
    */
-  private _tokenWillExpireTimeout: NodeJS.Timer | null = null;
+  private _tokenWillExpireTimeout: NodeJS.Timeout | null = null;
 
   /**
    * Construct a {@link Device} instance. The {@link Device} can be registered
@@ -1582,7 +1582,7 @@ class Device extends EventEmitter {
    * @param play - The function to be used to play the sound. Must return a Promise.
    */
   private _showIncomingCall(call: Call, play: Function): Promise<void> {
-    let timeout: NodeJS.Timer;
+    let timeout: NodeJS.Timeout;
     return Promise.race([
       play(),
       new Promise((resolve, reject) => {

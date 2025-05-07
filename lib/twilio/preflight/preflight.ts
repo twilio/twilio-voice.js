@@ -104,7 +104,7 @@ export class PreflightTest extends EventEmitter {
    * The timer when doing an echo test
    * The echo test is used when fakeMicInput is set to true
    */
-  private _echoTimer: NodeJS.Timer;
+  private _echoTimer: NodeJS.Timeout;
 
   /**
    * The edge that the `Twilio.Device` connected to.
@@ -165,7 +165,7 @@ export class PreflightTest extends EventEmitter {
   /**
    * Timer for setting up signaling connection
    */
-  private _signalingTimeoutTimer: number;
+  private _signalingTimeoutTimer: NodeJS.Timeout;
 
   /**
    * Start of test timestamp
