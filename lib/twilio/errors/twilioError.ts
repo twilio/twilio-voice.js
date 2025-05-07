@@ -4,6 +4,11 @@
  * @publicapi
  * @internal
  */
+
+/**
+ * Base class for all possible errors that the library can receive from the
+ * Twilio backend.
+ */
 export default class TwilioError extends Error {
   /**
    * A list of possible causes for the Error.
@@ -45,6 +50,9 @@ export default class TwilioError extends Error {
    */
   solutions: string[];
 
+  /**
+   * @internal
+   */
   constructor(messageOrError?: string | Error | object, error?: Error | object) {
     super();
     Object.setPrototypeOf(this, TwilioError.prototype);

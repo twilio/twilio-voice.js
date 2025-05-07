@@ -3,6 +3,11 @@
  * @internalapi
  */
 /* tslint:disable max-classes-per-file */
+
+/**
+ * VBLOCKS-4589: Consider refactoring this file.
+ */
+
 import {
   AuthorizationErrors,
   ClientErrors,
@@ -63,6 +68,18 @@ const PRECISE_SIGNALING_ERROR_CODES: Set<number> = new Set([
    */
   31603,
 ]);
+
+/**
+ * Get a error constructor using the [[PRECISE_SIGNALING_ERROR_CODES]] set.
+ * @internal
+ * @param enableImprovedSignalingErrorPrecision - A boolean representing the
+ * optional flag whether or not to use more precise error codes.
+ * @param errorCode - The error code.
+ * @returns This function returns `undefined` if the passed error code does not
+ * correlate to an error or should not be constructed with a more precise error
+ * constructor. A sub-class of {@link TwilioError} if the code does correlate to
+ * an error.
+ */
 export function getPreciseSignalingErrorByCode(
   enableImprovedSignalingErrorPrecision: boolean,
   errorCode: number,
@@ -85,28 +102,51 @@ export function getPreciseSignalingErrorByCode(
   return getErrorByCode(errorCode);
 }
 
-// Application errors that can be avoided by good app logic
+/**
+ * The error that is thrown when an invalid argument is passed to a library API.
+ */
 export class InvalidArgumentError extends Error {
+  /**
+   * @internal
+   */
   constructor(message?: string) {
     super(message);
     this.name = 'InvalidArgumentError';
   }
 }
+
+/**
+ * The error that is thrown when the library has entered an invalid state.
+ */
 export class InvalidStateError extends Error {
+  /**
+   * @internal
+   */
   constructor(message?: string) {
     super(message);
     this.name = 'InvalidStateError';
   }
 }
+
+/**
+ * The error that is thrown when an attempt is made to use an API that is not
+ * supported on the current platform.
+ */
 export class NotSupportedError extends Error {
+  /**
+   * @internal
+   */
   constructor(message?: string) {
     super(message);
     this.name = 'NotSupportedError';
   }
 }
 
-// This should only be used to look up error codes returned by a server
-// using the same repo of error codes.
+/**
+ * This should only be used to look up error codes returned by a server
+ * using the same repo of error codes.
+ * @internal
+ */
 export function getErrorByCode(code: number): (typeof TwilioError) {
   const error: (typeof TwilioError) | undefined = errorsByCode.get(code);
   if (!error) {
@@ -115,13 +155,18 @@ export function getErrorByCode(code: number): (typeof TwilioError) {
   return error;
 }
 
-// This should only be used to look up error codes returned by a server
-// using the same repo of error codes.
+/**
+ * This should only be used to look up error codes returned by a server
+ * using the same repo of error codes.
+ * @internal
+ */
 export function hasErrorByCode(code: number): boolean {
   return errorsByCode.has(code);
 }
 
 /**
+ * @privateRemarks
+ *
  * All errors we want to throw or emit locally in the SDK need to be passed
  * through here.
  *

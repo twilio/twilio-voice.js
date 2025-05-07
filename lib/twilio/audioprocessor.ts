@@ -67,7 +67,6 @@
  * // Or remove it later
  * // await device.audio.removeProcessor(processor);
  * ```
- * @publicapi
  */
 interface AudioProcessor {
   /**

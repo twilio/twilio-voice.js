@@ -10,7 +10,7 @@ import Log from './log';
 /**
  * AudioProcessorEventObserver observes {@link AudioProcessor}
  * related operations and re-emits them as generic events.
- * @private
+ * @internal
  */
 export class AudioProcessorEventObserver extends EventEmitter {
 
