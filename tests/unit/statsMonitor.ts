@@ -267,7 +267,7 @@ describe('StatsMonitor', () => {
 
     context(`'minStandardDeviation' threshold`, () => {
       it(`Should raise a warning when 'minStandardDeviation' threshold is reached`, () =>
-        new Promise(async resolve => {
+        new Promise<void>(async resolve => {
           const statsMonitor = new StatsMonitor({
             getRTCStats: async () => ({}),
             thresholds: { audioInputLevel: { maxDuration: 2, sampleCount: 2 } },
