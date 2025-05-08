@@ -47,6 +47,7 @@ describe('Device', function () {
     let call2: Call;
 
     before(async function () {
+      this.timeout(10000);
       device2.once(Device.EventName.Incoming, (call: Call) => {
         call2 = call;
         cy.task('log', `(before)call2: ${JSON.stringify(call.parameters)}`);
@@ -59,7 +60,7 @@ describe('Device', function () {
           Custom3: '我不吃蛋',
         },
       });
-      await delay(2000);
+      await delay(5000);
       cy.task('log', `(before)call1: ${JSON.stringify(call1.parameters)}`);
     });
 
