@@ -28,7 +28,7 @@ const checkAudioHelper = async () => {
 
   [audio.ringtoneDevices, audio.speakerDevices].forEach(deviceCollection => {
     let d: Set<MediaDeviceInfo> = deviceCollection.get();
-    deviceCollection.delete(d.values()[0]);
+    deviceCollection.delete((d.values() as any)[0]);
     deviceCollection.set('');
     deviceCollection.set(['foo', 'bar']);
     deviceCollection.test('');
