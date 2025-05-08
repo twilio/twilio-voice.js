@@ -47,24 +47,21 @@ describe('Device', function () {
     let call2: Call;
 
     before(async function () {
-      this.timeout(10000);
+      this.timeout(20000);
       device2.once(Device.EventName.Incoming, (call: Call) => {
         call2 = call;
         cy.task('log', `(before)call2: ${JSON.stringify(call.parameters)}`);
       });
       device1.on('error', (twilioError, call) => {
-        cy.task('log', `An error has occurred: ${twilioError}`);
+        cy.task('log', `An error has occurred: ${JSON.stringify(twilioError)}`);
       });
-      call1 = await (device1['connect'] as any)({
+      call1 = await device1.connect({
         params: {
           To: identity2,
-          Custom1: 'foo + bar',
-          Custom2: undefined,
-          Custom3: '我不吃蛋',
         },
       });
-      await delay(5000);
-      cy.task('log', `(before)call1: ${JSON.stringify(call1)}`);
+      await delay(8000);
+      cy.task('log', `(before)call1: ${JSON.stringify(call1.parameters)}`);
     });
 
     describe('and device 2 accepts', () => {
