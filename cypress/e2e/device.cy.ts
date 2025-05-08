@@ -60,6 +60,7 @@ describe('Device', function () {
           Custom3: '我不吃蛋',
         },
       });
+      cy.task('log', `Device ${JSON.stringify(device1)}`);
       await delay(5000);
       cy.task('log', `(before)call1: ${JSON.stringify(call1.parameters)}`);
     });
