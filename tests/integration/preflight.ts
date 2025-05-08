@@ -21,12 +21,12 @@ describe('Preflight Test', function() {
   let receiverDevice: Device;
   let preflight: PreflightTest;
 
-  const expectEvent = (eventName: string, emitter: EventEmitter) => {
-    return new Promise((resolve) => emitter.once(eventName, (res) => resolve(res)));
+  const expectEvent = <T>(eventName: string, emitter: EventEmitter) => {
+    return new Promise<T>((resolve) => emitter.once(eventName, (res) => resolve(res)));
   };
 
   const waitFor = (promiseOrArray: Promise<any> | Promise<any>[], timeoutMS: number) => {
-    let timer: NodeJS.Timer;
+    let timer: NodeJS.Timeout;
     const promise = Array.isArray(promiseOrArray) ? Promise.all(promiseOrArray) : promiseOrArray;
     const timeoutPromise = new Promise((resolve, reject) => {
       timer = setTimeout(() => reject(new Error(`Timed out`)), timeoutMS);
@@ -117,19 +117,22 @@ describe('Preflight Test', function() {
 
     it('should emit completed event', () => {
       setTimeout(() => receiverDevice.disconnectAll(), 20000);
-      return waitFor(expectEvent('completed', preflight).then((report: PreflightTest.Report) => {
-        assert(!!report);
-        assert(!!report.callSid);
-        assert(!!report.callQuality);
-        assert(!!report.edge);
-        assert(!!report.networkTiming);
-        assert(!!report.stats);
-        assert(!!report.testTiming);
-        assert(!!report.totals);
-        assert(!!report.samples.length);
-        assert(!!report.warnings.length);
-        assert.deepEqual(report, preflight.report);
-      }), EVENT_TIMEOUT);
+      return waitFor(
+        expectEvent<PreflightTest.Report>('completed', preflight)
+          .then((report: PreflightTest.Report) => {
+            assert(!!report);
+            assert(!!report.callSid);
+            assert(!!report.callQuality);
+            assert(!!report.edge);
+            assert(!!report.networkTiming);
+            assert(!!report.stats);
+            assert(!!report.testTiming);
+            assert(!!report.totals);
+            assert(!!report.samples.length);
+            assert(!!report.warnings.length);
+            assert.deepEqual(report, preflight.report);
+          }),
+        EVENT_TIMEOUT);
     });
 
     it('should set status to completed', () => {
