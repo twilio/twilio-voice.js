@@ -59,7 +59,7 @@ describe('Reconnection', function() {
     await device1.register();
     await device2.register();
 
-    const incomingPromise = new Promise(resolve => {
+    const incomingPromise = new Promise<void>(resolve => {
       device2.once(Device.EventName.Incoming, (call) => {
         call2 = call;
         call.accept();
@@ -202,7 +202,7 @@ describe('Reconnection', function() {
         await runDockerCommand('blockMediaPorts');
         await waitFor(bindTestPerCall((call: Call) => Promise.all([
           expectEvent('disconnect', call),
-          new Promise((resolve) => call.on('error', (error) => error.code === 53405 && resolve())),
+          new Promise<void>((resolve) => call.on('error', (error) => error.code === 53405 && resolve())),
         ]).then(() =>  assert(call.status() === Call.State.Closed))), RTP_TIMEOUT);
       });
     });
@@ -226,7 +226,7 @@ describe('Reconnection', function() {
     it('should disconnect call with error 53405', () => {
       return waitFor(bindTestPerCall((call: Call) => Promise.all([
         expectEvent('disconnect', call),
-        new Promise((resolve) => call.on('error', (error) => error.code === 53405 && resolve())),
+        new Promise<void>((resolve) => call.on('error', (error) => error.code === 53405 && resolve())),
       ]).then(() =>  assert(call.status() === Call.State.Closed))), RTP_TIMEOUT);
     });
 

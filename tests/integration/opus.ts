@@ -49,7 +49,7 @@ describe('Opus', function() {
     let call1: Call;
     let call2: Call;
 
-    before(() => new Promise(async resolve => {
+    before(() => new Promise<void>(async resolve => {
       device2.once(Device.EventName.Incoming, (call: Call) => {
         call2 = call;
         resolve();

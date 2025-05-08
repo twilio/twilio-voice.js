@@ -3,5 +3,6 @@
   "excludePrivate": true,
   "excludeProtected": true,
   "excludeInternal": true,
-  "disableSources": true
+  "disableSources": true,
+  "ignoredHighlightLanguages": ["xml"]
 }

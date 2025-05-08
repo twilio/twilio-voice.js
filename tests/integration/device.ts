@@ -51,7 +51,7 @@ describe('Device', function() {
 
     it('should emit a "tokenWillExpire" event', async () => {
       const device = setupDevice(10, 1000);
-      await new Promise(async (resolve, reject) => {
+      await new Promise<void>(async (resolve, reject) => {
         let failureTimeout: any = null;
         device.on(Device.EventName.TokenWillExpire, () => {
           if (failureTimeout) {
@@ -66,7 +66,7 @@ describe('Device', function() {
 
     it('should not emit a "tokenWillExpire" event early', async () => {
       const device = setupDevice(10, 1000);
-      await new Promise(async (resolve, reject) => {
+      await new Promise<void>(async (resolve, reject) => {
         let successTimeout: any = null;
         device.on(Device.EventName.TokenWillExpire, () => {
           if (successTimeout) {
@@ -108,7 +108,7 @@ describe('Device', function() {
     let call1: Call;
     let call2: Call;
 
-    before(() => new Promise(async resolve => {
+    before(() => new Promise<void>(async resolve => {
       device2.once(Device.EventName.Incoming, (call: Call) => {
         call2 = call;
         resolve();

@@ -3,6 +3,7 @@
   "compilerOptions": {
     "target": "es6",
     "module": "ESNext",
-    "outDir": "esm"
+    "outDir": "esm",
+    "rootDir": "lib",
   }
 }
