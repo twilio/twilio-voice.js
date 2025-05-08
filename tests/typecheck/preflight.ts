@@ -1,4 +1,4 @@
-import { Call, Device, PreflightTest } from '../../';
+import { Call, Device, PreflightTest } from '../../lib/twilio';
 
 const checkPreflight = async () => {
   const preflight: PreflightTest = Device.runPreflight('foo', {
@@ -40,7 +40,7 @@ const checkPreflight = async () => {
     const edge: string | undefined = report.edge;
     const iceCandidateStats: PreflightTest.RTCIceCandidateStats[] = report.iceCandidateStats;
     const isTurnRequired: undefined | false | true = report.isTurnRequired;
-    
+
     const dtlsStart: number | undefined = report.networkTiming.dtls?.start;
     const dtlsEnd: number | undefined = report.networkTiming.dtls?.end;
     const dtlsDuration: number | undefined = report.networkTiming.dtls?.duration;

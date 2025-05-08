@@ -1,4 +1,4 @@
-import { TwilioError } from '../../';
+import { TwilioError } from '../../lib/twilio';
 
 const checkTwilioError = async () => {
   const error = new TwilioError.TwilioError;
