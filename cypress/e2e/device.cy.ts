@@ -52,6 +52,9 @@ describe('Device', function () {
         call2 = call;
         cy.task('log', `(before)call2: ${JSON.stringify(call.parameters)}`);
       });
+      device1.on('error', (twilioError, call) => {
+        cy.task('log', `An error has occurred: ${twilioError}`);
+      });
       call1 = await (device1['connect'] as any)({
         params: {
           To: identity2,
@@ -60,9 +63,8 @@ describe('Device', function () {
           Custom3: '我不吃蛋',
         },
       });
-      cy.task('log', `Device ${JSON.stringify(device1)}`);
       await delay(5000);
-      cy.task('log', `(before)call1: ${JSON.stringify(call1.parameters)}`);
+      cy.task('log', `(before)call1: ${JSON.stringify(call1)}`);
     });
 
     describe('and device 2 accepts', () => {
