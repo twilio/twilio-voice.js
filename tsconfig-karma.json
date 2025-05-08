@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig-base.json",
   "compilerOptions": {
-    "rootDirs": ["lib", "tests"],
+    "rootDir": "./",
     "target": "es5",
     "module": "commonjs",
     "outDir": "es5"
