@@ -1,9 +1,10 @@
 {
   "extends": "./tsconfig-base.json",
   "compilerOptions": {
-    "rootDir": "./",
     "target": "es5",
     "module": "commonjs",
-    "outDir": "es5"
-  }
+    "outDir": "es5",
+    "rootDirs": ["lib", "tests"],
+  },
+  "include": ["lib/**/*.ts", "tests/**/*.ts"],
 }
