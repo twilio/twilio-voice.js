@@ -4,6 +4,5 @@
     "target": "es5",
     "module": "commonjs",
     "outDir": "es5",
-    "rootDir": "lib",
   }
 }

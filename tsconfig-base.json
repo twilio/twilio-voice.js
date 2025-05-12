@@ -7,6 +7,7 @@
     "moduleResolution": "node",
     "noImplicitAny": true,
     "noImplicitThis": true,
+    "rootDir": "lib",
     "inlineSourceMap": true,
     "strictNullChecks": true
   },

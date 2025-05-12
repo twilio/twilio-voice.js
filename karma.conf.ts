@@ -102,7 +102,7 @@ module.exports = function(config: any) {
         'lib/**/*',
         ...testFiles,
       ],
-      tsconfig: './tsconfig-karma.json',
+      tsconfig: './tsconfig.json',
     },
     logLevel: process.env.E2E_LOGLEVEL || config.LOG_DEBUG,
     port: 9876,

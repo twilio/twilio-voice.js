@@ -97,7 +97,7 @@ module.exports = function(config: any) {
         'lib/**/*',
         'tests/network/**/*.ts',
       ],
-      tsconfig: './tsconfig-karma.json',
+      tsconfig: './tsconfig.json',
     },
     logLevel: config.LOG_INFO,
     port: 9876,
