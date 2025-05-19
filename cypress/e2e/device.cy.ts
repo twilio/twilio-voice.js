@@ -2,6 +2,12 @@ import Device from '../../lib/twilio/device';
 import Call from '../../lib/twilio/call';
 import { generateAccessToken } from '../../tests/lib/token';
 
+function delay(time) {
+  return new Promise(function (resolve) {
+    setTimeout(resolve, time);
+  });
+}
+
 describe('Device', function () {
   this.timeout(10000);
 
@@ -40,25 +46,30 @@ describe('Device', function () {
     let call1: Call;
     let call2: Call;
 
-    before(
-      () =>
-        new Promise(async (resolve) => {
-          device2.once(Device.EventName.Incoming, (call: Call) => {
-            call2 = call;
-            cy.task('log', `(before)call2: ${JSON.stringify(call.parameters)}`);
-            resolve();
-          });
-          call1 = await (device1['connect'] as any)({
-            params: {
-              To: identity2,
-              Custom1: 'foo + bar',
-              Custom2: undefined,
-              Custom3: '我不吃蛋',
-            },
-          });
-          cy.task('log', `(before)call1: ${JSON.stringify(call1.parameters)}`);
-        })
-    );
+    before(async function () {
+      this.timeout(20000);
+      device1.on('error', (twilioError, call) => {
+        cy.task('log', `Error-Device1: ${JSON.stringify(twilioError)}`);
+      });
+      device2.on('error', (twilioError, call) => {
+        cy.task('log', `Error-Device2: ${JSON.stringify(twilioError)}`);
+      });
+      device1.on('ringing', () => {
+        cy.task('log', `Ringing-Device1`);
+      });
+
+      device2.once(Device.EventName.Incoming, (call: Call) => {
+        call2 = call;
+        cy.task('log', `(before)call2: ${JSON.stringify(call.parameters)}`);
+      });
+      call1 = await device1.connect({
+        params: {
+          To: identity2,
+        },
+      });
+      await delay(8000);
+      cy.task('log', `(before)call1: ${JSON.stringify(call1.parameters)}`);
+    });
 
     describe('and device 2 accepts', () => {
       beforeEach(() => {
