@@ -48,12 +48,16 @@ describe('Device', function () {
 
     before(async function () {
       this.timeout(20000);
+      device1.on('error', (twilioError, call) => {
+        cy.task('log', `Error-Device1: ${JSON.stringify(twilioError)}`);
+      });
+      device2.on('error', (twilioError, call) => {
+        cy.task('log', `Error-Device2: ${JSON.stringify(twilioError)}`);
+      });
+
       device2.once(Device.EventName.Incoming, (call: Call) => {
         call2 = call;
         cy.task('log', `(before)call2: ${JSON.stringify(call.parameters)}`);
-      });
-      device1.on('error', (twilioError, call) => {
-        cy.task('log', `An error has occurred: ${JSON.stringify(twilioError)}`);
       });
       call1 = await device1.connect({
         params: {
