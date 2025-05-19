@@ -54,9 +54,6 @@ describe('Device', function () {
       device2.on('error', (twilioError, call) => {
         cy.task('log', `Error-Device2: ${JSON.stringify(twilioError)}`);
       });
-      device1.on('ringing', () => {
-        cy.task('log', `Ringing-Device1`);
-      });
 
       device2.once(Device.EventName.Incoming, (call: Call) => {
         call2 = call;
@@ -68,6 +65,7 @@ describe('Device', function () {
         },
       });
       await delay(8000);
+      cy.task('log', `dev1: ${JSON.stringify(device1)}`);
       cy.task('log', `(before)call1: ${JSON.stringify(call1.parameters)}`);
     });
 
