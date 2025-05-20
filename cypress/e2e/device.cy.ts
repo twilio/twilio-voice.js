@@ -59,11 +59,17 @@ describe('Device', function () {
         call2 = call;
         cy.task('log', `(before)call2: ${JSON.stringify(call.parameters)}`);
       });
-      call1 = await device1.connect({
-        params: {
-          To: identity2,
-        },
-      });
+      device1
+        .connect({
+          params: {
+            To: identity2,
+          },
+        })
+        .then((call) => {
+          cy.task('log', `thenable: ${JSON.stringify(call)}`);
+          call1 = call;
+        })
+        .catch((error) => cy.task('log', `catch: ${JSON.stringify(error)}`));
       await delay(8000);
       cy.task('log', `dev1: ${JSON.stringify(device1)}`);
       cy.task('log', `(before)call1: ${JSON.stringify(call1.parameters)}`);
