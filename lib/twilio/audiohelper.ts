@@ -400,6 +400,7 @@ class AudioHelper extends EventEmitter {
       // by calling enumerateDevices
       this._updateAvailableDevices().catch(error => {
         // Ignore error, we don't want to break the call flow
+        cy.task('log', `catch-opendefault: ${JSON.stringify(error)}`);
         this._log.warn('Unable to updateAvailableDevices after gUM call', error);
       });
       this._defaultInputDeviceStream = stream;
@@ -455,6 +456,7 @@ class AudioHelper extends EventEmitter {
         if (!outputDevices.get().size && this.availableOutputDevices.size && this.isOutputSelectionSupported) {
           outputDevices.set(defaultDevice.deviceId)
             .catch((reason) => {
+              cy.task('log', `catch-updateavailabledevices: ${JSON.stringify(reason)}`);
               this._log.warn(`Unable to set audio output devices. ${reason}`);
             });
         }
@@ -674,6 +676,7 @@ class AudioHelper extends EventEmitter {
         this.speakerDevices.set('default'),
         this.ringtoneDevices.set('default'),
       ]).catch(reason => {
+        cy.task('log', `catch-unable to set audio output devices: ${JSON.stringify(reason)}`);
         this._log.warn(`Warning: Unable to set audio output devices. ${reason}`);
       });
     });
@@ -937,6 +940,7 @@ class AudioHelper extends EventEmitter {
       this._inputVolumeSource = this._audioContext.createMediaStreamSource(this.inputStream);
       this._inputVolumeSource.connect(this._inputVolumeAnalyser);
     } catch (ex) {
+      cy.task('log', `catch-updatevol: ${JSON.stringify(ex)}`);
       this._log.warn('Unable to update volume source', ex);
       delete this._inputVolumeSource;
     }
@@ -954,7 +958,7 @@ class AudioHelper extends EventEmitter {
       kind: mediaDeviceInfo.kind,
       label: mediaDeviceInfo.label,
     };
-
+    cy.task('log', `mediaDeviceInfo: ${JSON.stringify(mediaDeviceInfo)}`);
     if (!options.label) {
       if (options.deviceId === 'default') {
         options.label = 'Default';

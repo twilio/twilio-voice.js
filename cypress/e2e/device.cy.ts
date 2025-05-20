@@ -57,7 +57,7 @@ describe('Device', function () {
 
       device2.once(Device.EventName.Incoming, (call: Call) => {
         call2 = call;
-        cy.task('log', `(before)call2: ${JSON.stringify(call.parameters)}`);
+        // cy.task('log', `(before)call2: ${JSON.stringify(call.parameters)}`);
       });
       device1
         .connect({
@@ -66,19 +66,19 @@ describe('Device', function () {
           },
         })
         .then((call) => {
-          cy.task('log', `thenable: ${JSON.stringify(call)}`);
+          // cy.task('log', `thenable: ${JSON.stringify(call)}`);
           call1 = call;
         })
         .catch((error) => cy.task('log', `catch: ${JSON.stringify(error)}`));
       await delay(8000);
-      cy.task('log', `dev1: ${JSON.stringify(device1)}`);
-      cy.task('log', `(before)call1: ${JSON.stringify(call1.parameters)}`);
+      // cy.task('log', `dev1: ${JSON.stringify(device1)}`);
+      // cy.task('log', `(before)call1: ${JSON.stringify(call1.parameters)}`);
     });
 
     describe('and device 2 accepts', () => {
       beforeEach(() => {
-        cy.task('log', `call1: ${JSON.stringify(call1.parameters)}`);
-        cy.task('log', `call2: ${JSON.stringify(call2.parameters)}`);
+        // cy.task('log', `call1: ${JSON.stringify(call1.parameters)}`);
+        // cy.task('log', `call2: ${JSON.stringify(call2.parameters)}`);
         if (!call1 || !call2) {
           throw new Error(`Calls weren't both open at beforeEach`);
         }
