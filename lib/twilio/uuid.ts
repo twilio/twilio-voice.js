@@ -5,41 +5,41 @@
  */
 
 import { NotSupportedError } from '../twilio/errors';
-import { md5 } from './md5';
 
-function generateUuid(): string {
+/**
+ * Generates a 16 character long random string where each character is from the
+ * set [0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f].
+ */
+function generateRandomizedString(): string {
   if (typeof window !== 'object') {
     throw new NotSupportedError('This platform is not supported.');
   }
 
-  const crypto: Crypto & { randomUUID?: () => string } = window.crypto;
+  const { crypto } = window;
   if (typeof crypto !== 'object') {
     throw new NotSupportedError(
       'The `crypto` module is not available on this platform.',
     );
   }
-  if (typeof (crypto.randomUUID || crypto.getRandomValues) === 'undefined') {
+
+  if (typeof crypto.getRandomValues !== 'function') {
     throw new NotSupportedError(
-      'Neither `crypto.randomUUID` or `crypto.getRandomValues` are available ' +
-      'on this platform.',
+      'The function `crypto.getRandomValues` is not available on this ' +
+      'platform.',
     );
   }
 
-  const uInt32Arr: typeof Uint32Array = window.Uint32Array;
-  if (typeof uInt32Arr === 'undefined') {
+  if (typeof window.Uint8Array !== 'function') {
     throw new NotSupportedError(
-      'The `Uint32Array` module is not available on this platform.',
+      'The `Uint8Array` module is not available on this platform.',
     );
   }
 
-  const generateRandomValues: () => string =
-    typeof crypto.randomUUID === 'function'
-      ? () => crypto.randomUUID!()
-      : () => crypto.getRandomValues(new Uint32Array(32)).toString();
-
-  return md5(generateRandomValues());
+  return crypto
+    .getRandomValues(new window.Uint8Array(16))
+    .reduce((r, n) => `${r}${n.toString(16).padStart(2, '0')}`, '');
 }
 
 export function generateVoiceEventSid() {
-  return `KX${generateUuid()}`;
+  return `KX${generateRandomizedString()}`;
 }

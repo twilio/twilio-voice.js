@@ -7,9 +7,8 @@ const root = global as any;
 
 describe('uuid util', () => {
   let originalWindow: any;
-  let randomUUID: sinon.SinonStub;
-  let getRandomValues: sinon.SinonSpy<[Uint32Array], Uint32Array>;
-  let Uint32ArrMock: sinon.SinonSpy<[number], Uint32Array>;
+  let getRandomValues: sinon.SinonSpy<[Uint8Array], Uint8Array>;
+  let Uint8ArrayMock: sinon.SinonSpy<[number], Uint8Array>;
 
   function injectWindow(injections: Record<string, any>) {
     root.window = {
@@ -21,16 +20,12 @@ describe('uuid util', () => {
   beforeEach(() => {
     originalWindow = root.window;
 
-    randomUUID = sinon
-      .stub()
-      .returns('here\'s a random uuid for you to use');
-
     getRandomValues = sinon
-      .spy((arr: Uint32Array) => {
+      .spy((arr: Uint8Array) => {
         return arr.fill(42);
       });
 
-    Uint32ArrMock = sinon.spy((n: number) => new Uint32Array(n));
+    Uint8ArrayMock = sinon.spy((n: number) => new Uint8Array(n));
   });
 
   afterEach(() => {
@@ -47,7 +42,7 @@ describe('uuid util', () => {
     });
 
     it('should throw if crypto is not available', () => {
-      injectWindow({ Uint32Array: Uint32ArrMock });
+      injectWindow({ Uint8Array: Uint8ArrayMock });
       assert.throws(
         () => generateVoiceEventSid(),
         new NotSupportedError('The `crypto` module is not available on this platform.'),
@@ -55,45 +50,29 @@ describe('uuid util', () => {
     });
 
     it('should throw if neither randomUUID or getRandomValues are available', () => {
-      injectWindow({ crypto: {}, Uint32Array: Uint32ArrMock });
+      injectWindow({ crypto: {}, Uint8Array: Uint8ArrayMock });
       assert.throws(
         () => generateVoiceEventSid(),
-        new NotSupportedError(
-          'Neither `crypto.randomUUID` or `crypto.getRandomValues` are ' +
-          'available on this platform.',
-        ),
+        new NotSupportedError('The function `crypto.getRandomValues` is not available on this platform.'),
       );
     });
 
     it('should throw if Uint32Array is not available', () => {
-      injectWindow({ crypto: { randomUUID, getRandomValues } });
+      injectWindow({ crypto: { getRandomValues } });
       assert.throws(
         () => generateVoiceEventSid(),
-        new NotSupportedError('The `Uint32Array` module is not available on this platform.'),
+        new NotSupportedError('The `Uint8Array` module is not available on this platform.'),
       );
     });
 
-    it('should generate a uuid using randomUUID', () => {
-      injectWindow({ crypto: { randomUUID }, Uint32Array: Uint32ArrMock });
-      assert(typeof generateVoiceEventSid() === 'string');
-      sinon.assert.calledOnce(randomUUID);
-    });
-
     it('should generate a uuid using getRandomValues', () => {
-      injectWindow({ crypto: { getRandomValues }, Uint32Array: Uint32ArrMock });
+      injectWindow({ crypto: { getRandomValues }, Uint8Array: Uint8ArrayMock });
       assert(typeof generateVoiceEventSid() === 'string');
       sinon.assert.calledOnce(getRandomValues);
     });
 
-    it('should prefer randomUUID if both randomUUID and getRandomValues are available', () => {
-      injectWindow({ crypto: { randomUUID, getRandomValues }, Uint32Array: Uint32ArrMock });
-      assert(typeof generateVoiceEventSid() === 'string');
-      sinon.assert.calledOnce(randomUUID);
-      sinon.assert.notCalled(getRandomValues);
-    });
-
     it('should be prefixed with `KX`', () => {
-      injectWindow({ crypto: { randomUUID }, Uint32Array: Uint32ArrMock });
+      injectWindow({ crypto: { getRandomValues }, Uint8Array: Uint8ArrayMock });
       const sid = generateVoiceEventSid();
       const matches = /^KX(.+)$/.exec(sid);
       assert(matches);
