@@ -19,12 +19,6 @@ describe('Device', function () {
   let token2: string;
 
   before(() => {
-    cy.on('window:load', (win) => {
-      win.parent.document
-        .querySelector('.aut-iframe') // this selector is rather empirical
-        .setAttribute('allow', 'camera;microphone');
-    });
-
     identity1 = 'id1-' + Date.now();
     identity2 = 'id2-' + Date.now();
     token1 = generateAccessToken(identity1);

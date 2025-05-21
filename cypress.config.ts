@@ -4,6 +4,12 @@ module.exports = defineConfig({
   e2e: {
     supportFile: false,
     setupNodeEvents(on, config) {
+      on('before:browser:launch', (browser, launchOptions) => {
+        if (browser.family === 'firefox') {
+          launchOptions.preferences['media.navigator.streams.fake'] = true;
+          return launchOptions;
+        }
+      });
       on('task', {
         log(message) {
           console.log(message);
