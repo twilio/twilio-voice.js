@@ -120,6 +120,15 @@ commands:
                 background: true
                 command: bash scripts/run-relay-server.sh
       - run:
+          name: Install xvfb
+          command: |
+            sudo apt update
+            sudo apt install xvfb
+            sudo apt-get install -y libgbm-dev
+      - run:
+          name: Install cypress
+          command: ./node_modules/.bin/cypress install
+      - run:
           name: Running integration tests
           command: bash scripts/run-integration-tests.sh <<parameters.browser>>
       - run:
