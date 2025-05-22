@@ -78,7 +78,7 @@ describe('sid util', () => {
       assert(matches);
     });
 
-    it.only('should consist of 34 characters', () => {
+    it('should consist of 34 characters', () => {
       injectWindow({ crypto: { getRandomValues }, Uint8Array: Uint8ArrayMock });
       const completeSid = generateVoiceEventSid();
       assert(completeSid.length === 34);
