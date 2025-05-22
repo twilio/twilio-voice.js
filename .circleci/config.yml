@@ -101,6 +101,9 @@ commands:
           destination: coverage
   integration-tests:
     parameters:
+      browser:
+        type: string
+        default: ""
       datadog-test-service:
         type: string
         default: ""
@@ -118,10 +121,12 @@ commands:
                 command: bash scripts/run-relay-server.sh
       - run:
           name: Running integration tests
-          command: bash scripts/run-integration-tests.sh
+          command: bash scripts/run-integration-tests.sh <<parameters.browser>>
       - run:
           name: Upload test results to Datadog
           command: ./node_modules/.bin/datadog-ci junit upload --service <<parameters.datadog-test-service>> reports/junit-report.xml
+      - store_artifacts:
+          path: /home/circleci/project/cypress/screenshots
   network-tests:
     steps:
       - get-code
@@ -191,6 +196,7 @@ jobs:
       INTEGRATION_TEST_FILES: <<parameters.integration_test_files>>
     steps:
       - integration-tests:
+          browser: <<parameters.browser>>
           datadog-test-service: <<parameters.datadog-test-service>>
           start_relay_server: <<parameters.start_relay_server>>
   run-release:
@@ -256,6 +262,7 @@ workflows:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: false
+          browser: <<matrix.browser>>
           datadog-test-service: "healthcheck-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
           matrix:
             parameters:
@@ -283,6 +290,7 @@ workflows:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: true
+          browser: <<matrix.browser>>
           datadog-test-service: "daily-build-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
           matrix:
             parameters:
@@ -306,6 +314,7 @@ workflows:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: true
+          browser: <<matrix.browser>>
           datadog-test-service: "pull-request-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
           matrix:
             parameters:
@@ -344,6 +353,7 @@ workflows:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: true
+          browser: <<matrix.browser>>
           datadog-test-service: "release-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
           matrix:
             parameters:
