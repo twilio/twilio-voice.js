@@ -1,11 +1,11 @@
 import * as assert from 'assert';
 import * as sinon from 'sinon';
 import { NotSupportedError } from '../../lib/twilio/errors';
-import { generateVoiceEventSid } from '../../lib/twilio/uuid';
+import { generateVoiceEventSid } from '../../lib/twilio/sid';
 
 const root = global as any;
 
-describe('uuid util', () => {
+describe('sid util', () => {
   let originalWindow: any;
   let getRandomValues: sinon.SinonSpy<[Uint8Array], Uint8Array>;
   let Uint8ArrayMock: sinon.SinonSpy<[number], Uint8Array>;
@@ -49,7 +49,7 @@ describe('uuid util', () => {
       );
     });
 
-    it('should throw if neither randomUUID or getRandomValues are available', () => {
+    it('should throw if getRandomValues is not available', () => {
       injectWindow({ crypto: {}, Uint8Array: Uint8ArrayMock });
       assert.throws(
         () => generateVoiceEventSid(),
@@ -65,7 +65,7 @@ describe('uuid util', () => {
       );
     });
 
-    it('should generate a uuid using getRandomValues', () => {
+    it('should generate a sid using getRandomValues', () => {
       injectWindow({ crypto: { getRandomValues }, Uint8Array: Uint8ArrayMock });
       assert(typeof generateVoiceEventSid() === 'string');
       sinon.assert.calledOnce(getRandomValues);
@@ -76,6 +76,19 @@ describe('uuid util', () => {
       const sid = generateVoiceEventSid();
       const matches = /^KX(.+)$/.exec(sid);
       assert(matches);
+    });
+
+    it.only('should consist of 34 characters', () => {
+      injectWindow({ crypto: { getRandomValues }, Uint8Array: Uint8ArrayMock });
+      const completeSid = generateVoiceEventSid();
+      assert(completeSid.length === 34);
+
+      const matches = /^(\w\w)([\d\w]+)$/.exec(completeSid);
+      assert(matches);
+
+      const [_, prefix, prefixlessSid] = matches!;
+      assert(prefix === 'KX');
+      assert(prefixlessSid.length === 32);
     });
   });
 });
