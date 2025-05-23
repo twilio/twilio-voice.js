@@ -60,8 +60,6 @@ describe('Device', function () {
 
     describe('and device 2 accepts', () => {
       beforeEach(() => {
-        cy.task('log', `call1: ${JSON.stringify(call1.parameters)}`);
-        cy.task('log', `call2: ${JSON.stringify(call2.parameters)}`);
         if (!call1 || !call2) {
           throw new Error(`Calls weren't both open at beforeEach`);
         }

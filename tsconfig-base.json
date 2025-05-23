@@ -9,8 +9,7 @@
     "noImplicitThis": true,
     "rootDir": "lib",
     "inlineSourceMap": true,
-    "skipLibCheck": true,
-    "strictNullChecks": true,
+    "strictNullChecks": true
   },
   "include": [
     "lib/**/*.ts"
