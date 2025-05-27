@@ -11,8 +11,6 @@ import Log from '../log';
 import * as util from '../util';
 import { setCodecPreferences, setMaxAverageBitrate } from './sdp';
 
-const RTCPeerConnectionShim = require('rtcpeerconnection-shim');
-
 function RTCPC(options) {
   if (typeof window === 'undefined') {
     this.log.info('No RTCPeerConnection implementation available. The window object was not found.');
@@ -22,7 +20,7 @@ function RTCPC(options) {
   if (options && options.RTCPeerConnection) {
     this.RTCPeerConnection = options.RTCPeerConnection;
   } else if (util.isLegacyEdge()) {
-    this.RTCPeerConnection = new RTCPeerConnectionShim(typeof window !== 'undefined' ? window : global);
+    this.log.error('This browser is not supported.');
   } else if (typeof window.RTCPeerConnection === 'function') {
     this.RTCPeerConnection = window.RTCPeerConnection;
   } else if (typeof window.webkitRTCPeerConnection === 'function') {
