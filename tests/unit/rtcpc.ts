@@ -7,7 +7,7 @@ describe('rtcpc', function() {
     sinon.restore();
   });
 
-  it('uses the default Log module when not passed an option', function() {
+  it('instantiates the default log module', function() {
     const logClassStub = sinon.createStubInstance(LogModule.default);
     const logConstructorStub = sinon.stub(LogModule, 'default').returns(logClassStub);
 
