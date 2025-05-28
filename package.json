@@ -51,6 +51,10 @@
     "test:es5": "es-check es5 \"./es5/**/*.js\" ./dist/*.js",
     "test:extension": "mocha tests/extension/tests",
     "test:esm": "es-check es6 \"./esm/**/*.js\" --module",
+    "test:cypress": "cypress run --spec 'cypress/e2e/*' --reporter junit",
+    "test:cypress:chrome": "npm run test:cypress -- --browser chrome",
+    "test:cypress:edge": "npm run test:cypress -- --browser edge",
+    "test:cypress:firefox": "npm run test:cypress -- --browser firefox",
     "test:framework:no-framework": "mocha tests/framework/no-framework.js",
     "test:framework:react:install": "cd ./tests/framework/react && rimraf ./node_modules package-lock.json && npm install",
     "test:framework:react:build": "cd ./tests/framework/react && npm run build",
@@ -85,6 +89,7 @@
     "browserify": "16.5.0",
     "buffer": "5.4.3",
     "cors": "2.8.5",
+    "cypress": "14.4.0",
     "envify": "4.1.0",
     "es-check": "5.2.4",
     "express": "4.18.2",
@@ -129,5 +134,8 @@
     "loglevel": "1.6.7",
     "md5": "2.3.0",
     "rtcpeerconnection-shim": "1.2.8"
+  },
+  "overrides": {
+    "tough-cookie": "4.1.4"
   }
 }
