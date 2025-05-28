@@ -124,7 +124,7 @@ commands:
           command: |
             sudo apt update
             sudo apt install xvfb
-            sudo apt-get install -y libgbm-dev
+            sudo apt install -y libgbm-dev
       - run:
           name: Install cypress
           command: ./node_modules/.bin/cypress install

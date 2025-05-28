@@ -42,7 +42,7 @@ describe('Device', function () {
 
     before(
       () =>
-        new Promise(async (resolve) => {
+        new Promise<void>(async (resolve) => {
           device2.once(Device.EventName.Incoming, (call: Call) => {
             call2 = call;
             resolve();
