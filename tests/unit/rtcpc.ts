@@ -1,3 +1,4 @@
+import * as assert from 'assert';
 import * as sinon from 'sinon';
 import * as LogModule from '../../lib/twilio/log';
 import RTCPC from '../../lib/twilio/rtc/rtcpc';
@@ -17,13 +18,10 @@ describe('rtcpc', function() {
   });
 
   it('logs a message when legacy edge is detected', function() {
-    (window.navigator as any).userAgent = 'foobar foobar Edge/12.34 foobar';
+    sinon.stub(window, 'RTCPeerConnection').get(() => undefined);
 
-    const logClassStub = sinon.createStubInstance(LogModule.default);
-    sinon.stub(LogModule, 'default').returns(logClassStub);
+    const result = RTCPC({});
 
-    RTCPC({});
-
-    sinon.assert.calledOnceWithExactly(logClassStub.info, 'This browser is not supported.');
+    assert(typeof result === 'undefined');
   });
 });

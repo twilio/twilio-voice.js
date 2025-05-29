@@ -21,8 +21,6 @@ function RTCPC(options: { RTCPeerConnection?: any }) {
 
   if (options && options.RTCPeerConnection) {
     this.RTCPeerConnection = options.RTCPeerConnection;
-  } else if (util.isLegacyEdge()) {
-    this.log.info('This browser is not supported.');
   } else if (typeof window.RTCPeerConnection === 'function') {
     this.RTCPeerConnection = window.RTCPeerConnection;
   } else if (typeof window.webkitRTCPeerConnection === 'function') {
