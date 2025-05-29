@@ -63,8 +63,6 @@ function isFirefox(navigator?) {
 }
 
 /**
- * @privateRemarks
- *
  * Chromium-based Edge has a user-agent of "Edg/" where legacy Edge has a
  * user-agent of "Edge/".
  */
