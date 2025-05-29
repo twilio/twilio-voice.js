@@ -62,6 +62,10 @@ function isFirefox(navigator?) {
     && /firefox|fxios/i.test(navigator.userAgent);
 }
 
+/**
+ * Chromium-based Edge has a user-agent of "Edg/" where legacy Edge has a
+ * user-agent of "Edge/".
+ */
 function isLegacyEdge(navigator?) {
   navigator = navigator || (typeof window === 'undefined'
     ? global.navigator : window.navigator);
