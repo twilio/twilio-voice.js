@@ -1,13 +1,11 @@
 import * as assert from 'assert';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
-import { generateAccessToken } from '../lib/token';
+import { generateAccessToken } from '../../tests/lib/token';
 
 // (rrowland) The TwiML expected by these tests can be found in the README.md
 
 describe('Device', function() {
-  this.timeout(10000);
-
   let device1: Device;
   let device2: Device;
   let identity1: string;
@@ -49,19 +47,12 @@ describe('Device', function() {
       return device;
     };
 
-    it('should emit a "tokenWillExpire" event', async () => {
-      const device = setupDevice(10, 1000);
-      await new Promise<void>(async (resolve, reject) => {
-        let failureTimeout: any = null;
-        device.on(Device.EventName.TokenWillExpire, () => {
-          if (failureTimeout) {
-            clearTimeout(failureTimeout);
-          }
-          resolve();
-        });
-        await device.register();
-        failureTimeout = setTimeout(reject, 9500);
+    it('should emit a "tokenWillExpire" event', (done) => {
+      const device = setupDevice(5, 1000);
+      device.on(Device.EventName.TokenWillExpire, () => {
+        done();
       });
+      device.register();
     });
 
     it('should not emit a "tokenWillExpire" event early', async () => {
