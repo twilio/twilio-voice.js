@@ -1,8 +1,8 @@
 import * as assert from 'assert';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
-import { generateAccessToken } from '../lib/token';
-import { expectEvent, isFirefox } from '../lib/util';
+import { generateAccessToken } from '../../tests/lib/token';
+import { expectEvent, isFirefox } from '../../tests/lib/util';
 
 const CONNECTION_DELAY_THRESHOLD = 1000;
 const SUITE_TIMEOUT = 20000;
