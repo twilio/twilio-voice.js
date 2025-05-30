@@ -2,8 +2,8 @@ import * as assert from 'assert';
 import * as sinon from 'sinon';
 import Device from '../../lib/twilio/device';
 import Call from '../../lib/twilio/call';
-import { generateAccessToken } from '../lib/token';
-import { expectEvent } from '../lib/util';
+import { generateAccessToken } from '../../tests/lib/token';
+import { expectEvent } from '../../tests/lib/util';
 
 describe('connectToken', function() {
   this.timeout(10000);
