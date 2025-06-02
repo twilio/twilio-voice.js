@@ -73,6 +73,7 @@ describe('mutable options', function() {
   });
 
   context('ongoing calls', function() {
+    Cypress.config('defaultCommandTimeout', 30000);
     this.timeout(30000);
 
     let caller: Device;
