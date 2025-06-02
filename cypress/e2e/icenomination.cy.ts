@@ -11,6 +11,7 @@ const MAX_TIMEOUT = 300000;
 const maybeSkip = isFirefox() ? describe.skip : describe;
 
 maybeSkip('ICE Nomination', function() {
+  Cypress.config('defaultCommandTimeout', MAX_TIMEOUT);
   this.timeout(MAX_TIMEOUT);
 
   let device1: Device;
@@ -135,7 +136,7 @@ maybeSkip('ICE Nomination', function() {
           assert(duration < CONNECTION_DELAY_THRESHOLD);
         });
       });
-
+      
       it('should not have a significant dtls handshake delay when using low-delay region and aggressive nomination is true', async () => {
         deviceOptions.edge = lowDelayEdge;
         deviceOptions.forceAggressiveIceNomination = true;
@@ -144,16 +145,16 @@ maybeSkip('ICE Nomination', function() {
           assert(duration < CONNECTION_DELAY_THRESHOLD);
         });
       });
-
-      // These two tests are flaky. Disable for now. We need to re-run/update them once media server deploys a fix.
-      it.skip('should have a significant dtls handshake delay when using high-delay region and aggressive nomination is false', async () => {
+      
+      it('should have a significant dtls handshake delay when using high-delay region and aggressive nomination is false', async () => {
         deviceOptions.edge = highDelayEdge;
         await setupDevices();
         await getCallDuration(direction).then(duration => {
           assert(duration > CONNECTION_DELAY_THRESHOLD);
         });
       });
-      it.skip('should not have a significant dtls handshake delay when using high-delay region and aggressive nomination is true', async () => {
+
+      it('should not have a significant dtls handshake delay when using high-delay region and aggressive nomination is true', async () => {
         deviceOptions.edge = highDelayEdge;
         deviceOptions.forceAggressiveIceNomination = true;
         await setupDevices();
