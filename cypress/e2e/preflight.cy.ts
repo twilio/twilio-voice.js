@@ -1,5 +1,5 @@
 import Device from '../../lib/twilio/device';
-import { generateAccessToken } from '../lib/token';
+import { generateAccessToken } from '../../tests/lib/token';
 import * as assert from 'assert';
 import { EventEmitter } from 'events';
 import { PreflightTest } from '../../lib/twilio/preflight/preflight';
