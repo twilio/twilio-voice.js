@@ -2,8 +2,8 @@ import * as assert from 'assert';
 import axios from 'axios';
 import Device from '../../../lib/twilio/device';
 import type Call from '../../../lib/twilio/call';
-import { generateAccessToken } from '../../lib/token';
-import { expectEvent } from '../../lib/util';
+import { generateAccessToken } from '../../../tests/lib/token';
+import { expectEvent } from '../../../tests/lib/util';
 const env = require('../../env');
 
 const RELAY_SERVER_URL = 'http://localhost:3030';
