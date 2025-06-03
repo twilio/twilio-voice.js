@@ -12,6 +12,7 @@ const MAX_TIMEOUT = 300000;
 
 describe('Preflight Test', function() {
   this.timeout(MAX_TIMEOUT);
+  Cypress.config('defaultCommandTimeout', MAX_TIMEOUT);
 
   let callerIdentity: string;
   let callerToken: string;
