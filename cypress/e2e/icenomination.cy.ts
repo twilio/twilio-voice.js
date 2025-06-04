@@ -136,7 +136,7 @@ maybeSkip('ICE Nomination', function() {
           assert(duration < CONNECTION_DELAY_THRESHOLD);
         });
       });
-      
+
       it('should not have a significant dtls handshake delay when using low-delay region and aggressive nomination is true', async () => {
         deviceOptions.edge = lowDelayEdge;
         deviceOptions.forceAggressiveIceNomination = true;
