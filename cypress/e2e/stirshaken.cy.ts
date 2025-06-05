@@ -2,8 +2,8 @@ import * as assert from 'assert';
 import { EventEmitter } from 'events';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
-import * as env from '../env';
-import { generateAccessToken } from '../lib/token';
+import * as env from '../../tests/env';
+import { generateAccessToken } from '../../tests/lib/token';
 
 describe('SHAKEN/STIR', function() {
   this.timeout(10000);

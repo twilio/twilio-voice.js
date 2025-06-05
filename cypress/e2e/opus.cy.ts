@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
-import { generateAccessToken } from '../lib/token';
+import { generateAccessToken } from '../../tests/lib/token';
 
 // (rrowland) The TwiML expected by these tests can be found in the README.md
 

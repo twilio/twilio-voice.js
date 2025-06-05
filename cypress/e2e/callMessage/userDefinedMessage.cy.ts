@@ -2,9 +2,8 @@ import * as assert from 'assert';
 import axios from 'axios';
 import Device from '../../../lib/twilio/device';
 import type Call from '../../../lib/twilio/call';
-import { generateAccessToken } from '../../lib/token';
-import { expectEvent } from '../../lib/util';
-const env = require('../../env');
+import { generateAccessToken } from '../../../tests/lib/token';
+import { expectEvent } from '../../../tests/lib/util';
 
 const RELAY_SERVER_URL = 'http://localhost:3030';
 
@@ -13,17 +12,19 @@ function waitFor(n: number, reject?: boolean) {
 }
 
 describe('userDefinedMessage', function() {
-  this.timeout(1000 * 60 * 10); // 10 minute timeout for the whole suite
+  const MAX_TIMEOUT = 1000 * 60 * 10; // 10 minute timeout for the whole suite
+  this.timeout(MAX_TIMEOUT); 
+  Cypress.config('defaultCommandTimeout', MAX_TIMEOUT);
 
   const createCallTest = async () => {
     const tokenTtl = 60 * 3; // 3 minute TTL
 
     const aliceId = `client-id-call-message-tests-alice-${Date.now()}`;
-    const aliceToken = generateAccessToken(aliceId, tokenTtl, env.appSid);
+    const aliceToken = generateAccessToken(aliceId, tokenTtl);
     const aliceDevice = new Device(aliceToken);
 
     const bobId = `client-id-call-message-tests-bob-${Date.now()}`;
-    const bobToken = generateAccessToken(bobId, tokenTtl, env.appSid);
+    const bobToken = generateAccessToken(bobId, tokenTtl);
     const bobDevice = new Device(bobToken);
 
     await bobDevice.register();
@@ -74,8 +75,7 @@ describe('userDefinedMessage', function() {
       performTeardown();
     });
 
-    it(
-      'should successfully send a message to the customer server',
+    it('should successfully send a message to the customer server',
       async function() {
         const { call } = alice;
 

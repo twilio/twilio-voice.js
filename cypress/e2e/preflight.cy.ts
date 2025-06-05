@@ -1,5 +1,5 @@
 import Device from '../../lib/twilio/device';
-import { generateAccessToken } from '../lib/token';
+import { generateAccessToken } from '../../tests/lib/token';
 import * as assert from 'assert';
 import { EventEmitter } from 'events';
 import { PreflightTest } from '../../lib/twilio/preflight/preflight';
@@ -12,6 +12,7 @@ const MAX_TIMEOUT = 300000;
 
 describe('Preflight Test', function() {
   this.timeout(MAX_TIMEOUT);
+  Cypress.config('defaultCommandTimeout', MAX_TIMEOUT);
 
   let callerIdentity: string;
   let callerToken: string;

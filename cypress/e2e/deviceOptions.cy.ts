@@ -1,6 +1,6 @@
 import Device from '../../lib/twilio/device';
-import { generateAccessToken } from '../lib/token';
-import { expectEvent } from '../lib/util';
+import { generateAccessToken } from '../../tests/lib/token';
+import { expectEvent } from '../../tests/lib/util';
 
 describe('DeviceOptions', function() {
   this.timeout(10000);
