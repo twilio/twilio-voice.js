@@ -1,9 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @preferred
- * @publicapi
- */
 import { EventEmitter } from 'events';
 import { levels as LogLevels, LogLevelDesc } from 'loglevel';
 import AudioHelper from './audiohelper';

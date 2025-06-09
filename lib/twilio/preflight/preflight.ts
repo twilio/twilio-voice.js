@@ -1,9 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @preferred
- * @publicapi
- */
 import { EventEmitter } from 'events';
 import Call from '../call';
 import Device, { IExtendedDeviceOptions } from '../device';

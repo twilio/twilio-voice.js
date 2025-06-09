@@ -1,7 +1,3 @@
-/**
- * @packageDocumentation
- * @internalapi
- */
 // @ts-nocheck
 // NOTE (csantos): This file was taken directly from twilio-video and has been renamed from JS to TS only.
 // It needs to be re-written as part of the overall updating of the files to TS.

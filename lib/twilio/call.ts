@@ -1,9 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @publicapi
- * @internal
- */
 import { EventEmitter } from 'events';
 import Backoff from './backoff';
 import Device from './device';

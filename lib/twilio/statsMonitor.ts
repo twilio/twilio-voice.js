@@ -1,9 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
-
 import { EventEmitter } from 'events';
 import { InvalidArgumentError } from './errors';
 import Mos from './rtc/mos';

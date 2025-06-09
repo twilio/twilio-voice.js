@@ -50,17 +50,7 @@ const USED_ERRORS = [
   'UserMediaErrors.AcquisitionFailedError',
 ];
 
-/**
- * VBLOCKS-4590: Consider removing the "@internalapi" tag from the generated
- * docs.
- */
 let output = `/* tslint:disable max-classes-per-file max-line-length */
-/**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
-
 /**
  * This is a generated file. Any modifications here will be overwritten. See scripts/errors.js.
  */

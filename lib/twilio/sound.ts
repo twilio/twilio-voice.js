@@ -1,8 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
 // @ts-nocheck
 import { AsyncQueue } from './asyncQueue';
 import AudioPlayer from './audioplayer/audioplayer';
