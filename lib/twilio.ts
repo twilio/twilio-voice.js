@@ -1,7 +1,3 @@
-/**
- * @packageDocumentation
- * @internalapi
- */
 import AudioProcessor from './twilio/audioprocessor';
 import Call from './twilio/call';
 import Device from './twilio/device';

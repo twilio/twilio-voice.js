@@ -1,11 +1,5 @@
 /* tslint:disable max-classes-per-file max-line-length */
 /**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
-
-/**
  * This is a generated file. Any modifications here will be overwritten. See scripts/errors.js.
  */
 import TwilioError from './twilioError';

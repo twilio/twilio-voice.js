@@ -1,8 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
 // @ts-nocheck
 // tslint:disable no-empty
 import { InvalidArgumentError, NotSupportedError } from '../errors';

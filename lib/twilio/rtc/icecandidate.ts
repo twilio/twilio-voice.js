@@ -1,10 +1,4 @@
 /**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
-
-/**
  * Payload object we send to insights
  * @private
  */

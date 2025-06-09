@@ -1,11 +1,4 @@
 /**
- * @packageDocumentation
- * @module Voice
- * @publicapi
- * @internal
- */
-
-/**
  * Base class for all possible errors that the library can receive from the
  * Twilio backend.
  */

@@ -1,7 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- */
 import { SOUNDS_BASE_URL } from './constants';
 import { InvalidArgumentError, InvalidStateError, NotSupportedError } from './errors';
 import Log from './log';

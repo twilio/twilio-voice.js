@@ -1,8 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
 // @ts-nocheck
 
 import { EventEmitter } from 'events';

@@ -1,7 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- */
 import { EventEmitter } from 'events';
 import AudioProcessor from './audioprocessor';
 import { AudioProcessorEventObserver } from './audioprocessoreventobserver';

@@ -1,8 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
 /* tslint:disable:interface-name */
 export default interface ChromeAudioContext extends AudioContext {
   createMediaStreamDestination: () => any;

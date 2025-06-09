@@ -1,9 +1,3 @@
-/**
- * @packageDocumentation
- * @module Tools
- * @internalapi
- */
-
 import { InvalidArgumentError } from './errors';
 
 /**

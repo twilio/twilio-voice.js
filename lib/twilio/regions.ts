@@ -1,8 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * This module describes valid and deprecated regions.
- */
 import { InvalidArgumentError } from './errors';
 
 /**
