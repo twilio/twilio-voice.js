@@ -66,7 +66,7 @@ const PRECISE_SIGNALING_ERROR_CODES: Set<number> = new Set([
 ]);
 
 /**
- * Get a error constructor using the [[PRECISE_SIGNALING_ERROR_CODES]] set.
+ * Get an error constructor using the [[PRECISE_SIGNALING_ERROR_CODES]] set.
  * @internal
  * @param enableImprovedSignalingErrorPrecision - A boolean representing the
  * optional flag whether or not to use more precise error codes.
