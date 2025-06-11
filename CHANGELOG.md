@@ -3,10 +3,10 @@
 2.14.0 (In Progress)
 ====================
 
-Changes
--------
+Bug Fixes
+---------
 
-- Removed outdated dependencies.
+- Fixed some build warnings when using the Twilio Voice JS SDK in an Angular webapp. See our [Common Issues document](./COMMON_ISSUES.md) for more information.
 
 
 2.13.0 (May 6, 2025)
