@@ -17,7 +17,7 @@ describe('rtcpc', function() {
     sinon.assert.calledOnceWithExactly(logConstructorStub, 'RTCPC');
   });
 
-  it('logs a message when legacy edge is detected', function() {
+  it('logs a message if the RTCPeerConnection constructor is not available', function() {
     sinon.stub(window, 'RTCPeerConnection').get(() => undefined);
 
     const result = RTCPC({});
