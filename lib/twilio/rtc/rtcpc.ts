@@ -11,9 +11,9 @@ import Log from '../log';
 import * as util from '../util';
 import { setCodecPreferences, setMaxAverageBitrate } from './sdp';
 
-const RTCPeerConnectionShim = require('rtcpeerconnection-shim');
+function RTCPC(options: { RTCPeerConnection?: any }) {
+  this.log = new Log('RTCPC');
 
-function RTCPC(options) {
   if (typeof window === 'undefined') {
     this.log.info('No RTCPeerConnection implementation available. The window object was not found.');
     return;
@@ -21,8 +21,6 @@ function RTCPC(options) {
 
   if (options && options.RTCPeerConnection) {
     this.RTCPeerConnection = options.RTCPeerConnection;
-  } else if (util.isLegacyEdge()) {
-    this.RTCPeerConnection = new RTCPeerConnectionShim(typeof window !== 'undefined' ? window : global);
   } else if (typeof window.RTCPeerConnection === 'function') {
     this.RTCPeerConnection = window.RTCPeerConnection;
   } else if (typeof window.webkitRTCPeerConnection === 'function') {
@@ -37,7 +35,6 @@ function RTCPC(options) {
 }
 
 RTCPC.prototype.create = function(rtcConfiguration) {
-  this.log = new Log('RTCPC');
   this.pc = new this.RTCPeerConnection(rtcConfiguration);
 };
 RTCPC.prototype.createModernConstraints = c => {
