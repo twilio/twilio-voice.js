@@ -6,9 +6,7 @@ import { Logger } from './twilio/log';
 import { PreflightTest } from './twilio/preflight/preflight';
 import type { NetworkTiming, TimeMeasurement } from './twilio/preflight/timing';
 
-/**
- * VBLOCKS-4589: Consider refactoring this export.
- */
+// TODO: Consider refactoring this export (VBLOCKS-4589)
 import * as TwilioError from './twilio/errors';
 
 import type AudioHelper from './twilio/audiohelper';

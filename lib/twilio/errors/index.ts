@@ -1,8 +1,6 @@
 /* tslint:disable max-classes-per-file */
 
-/**
- * VBLOCKS-4589: Consider refactoring this file.
- */
+// TODO: Consider refactoring this export (VBLOCKS-4589)
 
 import {
   AuthorizationErrors,
