@@ -1,5 +1,13 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.14.0 (In Progress)
+====================
+
+Bug Fixes
+---------
+
+- Fixed `md5` and `rtcpeerconnection-shim` build warnings (as reported in this [Github Issue](https://github.com/twilio/twilio-voice.js/issues/260)) when using the Twilio Voice JS SDK in an Angular webapp. See our [Common Issues document](./COMMON_ISSUES.md#build-warnings-with-angular) for more information.
+
 2.13.0 (May 6, 2025)
 ====================
 

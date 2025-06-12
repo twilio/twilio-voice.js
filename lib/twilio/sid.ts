@@ -1,9 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
-
 import { NotSupportedError } from './errors';
 
 /**
