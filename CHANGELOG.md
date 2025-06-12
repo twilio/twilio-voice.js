@@ -6,7 +6,8 @@
 Changes
 -------
 
-- Upgraded Typescript dependency to `5.x`. Includes upgrading several nested dependencies that also rely on Typescript, including Typedoc.
+- Upgraded Typescript dependency to 5.x
+- Replaced Karma test runner with Cypress
 
 2.13.0 (May 6, 2025)
 ====================
