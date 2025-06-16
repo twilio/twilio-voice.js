@@ -1,5 +1,14 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+*Next Release*
+====================
+
+New Features
+------------
+
+- Added `Call` [status](https://github.com/twilio/twilio-voice.js/commit/887ce625730b1cd96d08f453177e2a8db70014a9) events with [Call.CallStatus](https://github.com/twilio/twilio-voice.js/commit/9164ae8bd4e51ca258ed2573d69a1a3051e8a803) providing granular insight into the current call. [@cybex-dev](https://github.com/cybex-dev)
+
+
 2.13.0 (May 6, 2025)
 ====================
 
