@@ -1600,6 +1600,7 @@ class Device extends EventEmitter {
         parameters: call.parameters,
       }));
       this.emit(Device.EventName.Incoming, call);
+      call.emit('status', Call.State.Ringing);
     });
   }
 

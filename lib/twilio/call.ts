@@ -581,6 +581,7 @@ class Call extends EventEmitter {
         this._log.debug('#disconnect');
         this.emit('disconnect', this);
       }
+      this.emit('status', Call.CallStatus.Closed);
     };
 
     this._pstream = config.pstream;
@@ -644,6 +645,7 @@ class Call extends EventEmitter {
     };
 
     this._status = Call.State.Connecting;
+    this.emit('status', Call.CallStatus.Connecting);
 
     const connect = () => {
       if (this._status !== Call.State.Connecting) {
@@ -780,6 +782,7 @@ class Call extends EventEmitter {
     if (this._onIgnore) {
       this._onIgnore();
     }
+    this.emit('status', Call.CallStatus.Closed);
   }
 
   /**
@@ -855,6 +858,8 @@ class Call extends EventEmitter {
     this._status = Call.State.Closed;
     this._log.debug('#reject');
     this.emit('reject');
+    this.emit('status', Call.CallStatus.Rejected);
+    this.emit('status', Call.CallStatus.Closed);
   }
 
   /**
@@ -1158,6 +1163,7 @@ class Call extends EventEmitter {
           this._log.debug('#accept');
           this.emit('accept', this);
         }
+        this.emit('status', Call.CallStatus.Connected);
       }
     }
   }
@@ -1197,6 +1203,7 @@ class Call extends EventEmitter {
     this._setCallSid(payload);
     this._isAnswered = true;
     this._maybeTransitionToOpen();
+    this.emit('status', Call.CallStatus.Answer);
   }
 
   /**
@@ -1216,6 +1223,7 @@ class Call extends EventEmitter {
       this._log.debug('#cancel');
       this.emit('cancel');
       this._pstream.removeListener('cancel', this._onCancel);
+      this.emit('status', Call.CallStatus.Closed);
     }
   }
 
@@ -1232,6 +1240,7 @@ class Call extends EventEmitter {
         this._signalingReconnectToken,
       );
     }
+    this.emit('status', Call.CallStatus.Connected);
   }
 
   /**
@@ -1349,6 +1358,7 @@ class Call extends EventEmitter {
 
       this._log.debug('#reconnecting');
       this.emit('reconnecting', mediaReconnectionError);
+      this.emit('status', Call.CallStatus.Reconnecting);
     }
   }
 
@@ -1369,6 +1379,7 @@ class Call extends EventEmitter {
       this._log.debug('#reconnected');
       this.emit('reconnected');
       this._status = Call.State.Open;
+      this.emit('status', Call.CallStatus.Reconnected);
     }
   }
 
@@ -1437,6 +1448,7 @@ class Call extends EventEmitter {
     this._publisher.info('connection', 'outgoing-ringing', { hasEarlyMedia }, this);
     this._log.debug('#ringing');
     this.emit('ringing', hasEarlyMedia);
+    this.emit('status', Call.CallStatus.Ringing);
   }
 
   /**
@@ -1517,6 +1529,7 @@ class Call extends EventEmitter {
       this._log.debug('#reconnected');
       this.emit('reconnected');
       this._status = Call.State.Open;
+      this.emit('status', Call.CallStatus.Reconnected);
     }
   }
 
@@ -1533,9 +1546,11 @@ class Call extends EventEmitter {
       this._signalingStatus = Call.State.Reconnecting;
       this._log.debug('#reconnecting');
       this.emit('reconnecting', new SignalingErrors.ConnectionDisconnected());
+      this.emit('status', Call.CallStatus.Reconnecting);
     } else {
       this._status = Call.State.Closed;
       this._signalingStatus = Call.State.Closed;
+      this.emit('status', Call.CallStatus.Closed);
     }
   }
 
