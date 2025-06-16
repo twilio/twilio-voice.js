@@ -93,9 +93,7 @@ npm run test:unit
 
 Integration tests require some set up:
 
-1. If the account you want to use doesn't already have a TwiML app set up, create one using the
-   TwiML code below.
-2. Copy config.example.yaml to config.yaml, replacing the placeholder information with valid credentials.
+1. Create a TwiML App with the friendly name `Integration Tests`, using the TwiML code below.
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -115,18 +113,28 @@ Integration tests require some set up:
 </Response>
 ```
 
-Integration tests can be run via:
+2. Create a second TwiML App with the friendly name `STIR/SHAKEN`, using the TwiML code below. Be sure to use your Twilio number for the `Dial` verb. 
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial callerId="{{CallerId}}">xxxxxxxxxxxxxxxx</Dial>
+</Response>
+```
+
+3. Cypress requires `env` `vars` to be prefixed with `CYPRESS_`. Make a copy the `example.env` file with the name `.env` and populate the file with your credentials.
+
+4. Start the relay server
 
 ```
-npm run test:integration
+npm run test:relay-server
 ```
 
-These tests will run via karma, one at a time, in your system's default Chrome and then Firefox.
-
-Network tests have been split out into their own docker processes, and can be run via
+5. Integration tests run via Cypress, and can be run via:
 
 ```
-npm run test:docker
+npm run test:integration:chrome
+npm run test:integration:firefox
 ```
 
 Content Security Policy (CSP)
