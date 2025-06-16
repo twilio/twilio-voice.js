@@ -1775,6 +1775,22 @@ namespace Call {
   }
 
   /**
+   * Possible statuses of the {@link Call}.
+   * These statuses are used to indicate the current state of the call, to provide integration with 3rd party plugins or
+   * to provide a way to track the call state in a UI.
+   */
+  export enum CallStatus {
+    Closed = 'closed',
+    Connecting = 'connecting',
+    Connected = 'connected',
+    Reconnecting = 'reconnecting',
+    Reconnected = 'reconnected',
+    Ringing = 'ringing',
+    Rejected = 'rejected',
+    Answer = 'answer',
+  }
+
+  /**
    * Different issues that may have been experienced during a call, that can be
    * reported to Twilio Insights via {@link Call}.postFeedback().
    */
