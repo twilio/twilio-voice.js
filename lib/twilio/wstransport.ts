@@ -1,9 +1,3 @@
-/**
- * @packageDocumentation
- * @module Tools
- * @internalapi
- */
-
 import { EventEmitter } from 'events';
 import Backoff from './backoff';
 import { SignalingErrors } from './errors';

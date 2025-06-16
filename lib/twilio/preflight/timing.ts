@@ -1,10 +1,4 @@
 /**
- * @packageDocumentation
- * @module Voice
- * @publicapi
- */
-
-/**
  * Timing measurements that provides operational milestones.
  */
 export interface TimeMeasurement {

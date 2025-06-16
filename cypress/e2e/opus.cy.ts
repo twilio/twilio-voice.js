@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
-import { generateAccessToken } from '../lib/token';
+import { generateAccessToken } from '../../tests/lib/token';
 
 // (rrowland) The TwiML expected by these tests can be found in the README.md
 
@@ -49,7 +49,7 @@ describe('Opus', function() {
     let call1: Call;
     let call2: Call;
 
-    before(() => new Promise(async resolve => {
+    before(() => new Promise<void>(async resolve => {
       device2.once(Device.EventName.Incoming, (call: Call) => {
         call2 = call;
         resolve();

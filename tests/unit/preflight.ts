@@ -43,7 +43,7 @@ describe('PreflightTest', () => {
 
   const getTestSamples = () => {
     const totalSampleCount = 15;
-    const samples = [];
+    const samples: any[] = [];
     let total = 0;
 
     for (let i = 0; i < totalSampleCount; i++) {
@@ -541,7 +541,7 @@ describe('PreflightTest', () => {
     });
 
     it('should provide report', () => {
-      return new Promise(async (resolve) => {
+      return new Promise<void>(async (resolve) => {
         clock.reset();
         const warningData = {foo: 'foo', bar: 'bar'};
 
@@ -659,7 +659,7 @@ describe('PreflightTest', () => {
 
     describe('call quality', () => {
       it('should not include callQuality if stats are missing', async () => {
-        const completePromise = new Promise(resolve => {
+        const completePromise = new Promise<void>(resolve => {
           preflight.on('completed', (results: PreflightTest.Report) => {
             assert(!results.callQuality);
             resolve();
@@ -695,7 +695,7 @@ describe('PreflightTest', () => {
         [2.900, PreflightTest.CallQuality.Degraded],
       ].forEach(([averageMos, callQuality]) => {
         it(`should report quality as ${callQuality} if average mos is ${averageMos}`, async () => {
-          const completePromise = new Promise(resolve => {
+          const completePromise = new Promise<void>(resolve => {
             preflight.on('completed', (results: PreflightTest.Report) => {
               assert.equal(results.callQuality, callQuality);
               resolve();
@@ -757,7 +757,7 @@ describe('PreflightTest', () => {
           getRTCIceCandidateStatsReport: () => Promise.resolve(candidateInfo),
         });
 
-        return new Promise(async (resolve) => {
+        return new Promise<void>(async (resolve) => {
           const onCompleted = (results: PreflightTest.Report) => {
             assert.deepEqual(results.iceCandidateStats, ['foo', 'bar']);
             assert(!results.selectedIceCandidatePairStats);
@@ -776,7 +776,7 @@ describe('PreflightTest', () => {
           getRTCIceCandidateStatsReport: () => Promise.resolve(candidateInfo),
         });
 
-        return new Promise(async (resolve) => {
+        return new Promise<void>(async (resolve) => {
           const onCompleted = (results: PreflightTest.Report) => {
             assert(typeof results.isTurnRequired === 'undefined');
             resolve();
@@ -793,7 +793,7 @@ describe('PreflightTest', () => {
           getRTCIceCandidateStatsReport: () => Promise.resolve(candidateInfo),
         });
 
-        return new Promise(async (resolve) => {
+        return new Promise<void>(async (resolve) => {
           const onCompleted = (results: PreflightTest.Report) => {
             assert.deepEqual(results.iceCandidateStats, ['foo', 'bar']);
             assert.deepEqual(results.selectedIceCandidatePairStats, {
@@ -815,7 +815,7 @@ describe('PreflightTest', () => {
             getRTCIceCandidateStatsReport: () => Promise.resolve(),
           });
 
-          return new Promise(async (resolve) => {
+          return new Promise<void>(async (resolve) => {
             const onCompleted = (results: PreflightTest.Report) => {
               assert.deepStrictEqual(results.iceCandidateStats, []);
               assert.strictEqual(results.selectedIceCandidatePairStats, undefined);
@@ -842,7 +842,7 @@ describe('PreflightTest', () => {
             getRTCIceCandidateStatsReport: () => Promise.resolve(candidateInfo),
           });
 
-          return new Promise(async (resolve) => {
+          return new Promise<void>(async (resolve) => {
             const onCompleted = (results: PreflightTest.Report) => {
               assert.equal(results.isTurnRequired, isTurnRequired);
               resolve();

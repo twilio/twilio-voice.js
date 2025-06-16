@@ -2,8 +2,8 @@ import * as assert from 'assert';
 import { EventEmitter } from 'events';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
-import * as env from '../env';
-import { generateAccessToken } from '../lib/token';
+import * as env from '../../tests/env';
+import { generateAccessToken } from '../../tests/lib/token';
 
 describe('SHAKEN/STIR', function() {
   this.timeout(10000);
@@ -47,7 +47,7 @@ describe('SHAKEN/STIR', function() {
       let call1: Call;
       let call2: Call;
 
-      before(() => new Promise(async resolve => {
+      before(() => new Promise<void>(async resolve => {
         device2.once(Device.EventName.Incoming, (call: Call) => {
           resolve();
           call2 = call;

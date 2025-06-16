@@ -1,0 +1,8 @@
+{
+  "entryPoints": ["lib/twilio.ts"],
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeInternal": true,
+  "disableSources": true,
+  "ignoredHighlightLanguages": ["xml"]
+}

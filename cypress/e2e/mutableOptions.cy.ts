@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as sinon from 'sinon';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
-import { generateAccessToken } from '../lib/token';
+import { generateAccessToken } from '../../tests/lib/token';
 
 function waitFor(n: number, reject?: boolean) {
   return new Promise((res, rej) => setTimeout(reject ? rej : res, n));
@@ -73,6 +73,7 @@ describe('mutable options', function() {
   });
 
   context('ongoing calls', function() {
+    Cypress.config('defaultCommandTimeout', 30000);
     this.timeout(30000);
 
     let caller: Device;

@@ -1,9 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
-
 import { EventEmitter } from 'events';
 import { InvalidArgumentError } from './errors';
 import Mos from './rtc/mos';
@@ -170,7 +164,7 @@ class StatsMonitor extends EventEmitter {
   /**
    * The setInterval id for fetching samples.
    */
-  private _sampleInterval?: NodeJS.Timer;
+  private _sampleInterval?: NodeJS.Timeout;
 
   /**
    * Keeps track of supplemental sample values.

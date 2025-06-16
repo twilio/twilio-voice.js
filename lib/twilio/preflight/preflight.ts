@@ -1,9 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @preferred
- * @publicapi
- */
 import { EventEmitter } from 'events';
 import Call from '../call';
 import Device, { IExtendedDeviceOptions } from '../device';
@@ -26,7 +20,6 @@ import { COWBELL_AUDIO_URL, ECHO_TEST_DURATION } from '../constants';
 /**
  * Placeholder until we convert peerconnection.js to TypeScript.
  * Represents the audio output object coming from Client SDK's PeerConnection object.
- * @internalapi
  */
 export interface AudioOutput {
   /**
@@ -35,6 +28,9 @@ export interface AudioOutput {
   audio: HTMLAudioElement;
 }
 
+/**
+ * @mergeModuleWith PreflightTest
+ */
 export declare interface PreflightTest {
   /**
    * Raised when [[PreflightTest.status]] has transitioned to [[PreflightTest.Status.Completed]].
@@ -104,7 +100,7 @@ export class PreflightTest extends EventEmitter {
    * The timer when doing an echo test
    * The echo test is used when fakeMicInput is set to true
    */
-  private _echoTimer: NodeJS.Timer;
+  private _echoTimer: NodeJS.Timeout;
 
   /**
    * The edge that the `Twilio.Device` connected to.
@@ -165,7 +161,7 @@ export class PreflightTest extends EventEmitter {
   /**
    * Timer for setting up signaling connection
    */
-  private _signalingTimeoutTimer: number;
+  private _signalingTimeoutTimer: NodeJS.Timeout;
 
   /**
    * Start of test timestamp
@@ -184,7 +180,6 @@ export class PreflightTest extends EventEmitter {
 
   /**
    * Construct a {@link PreflightTest} instance.
-   * @constructor
    * @param token - A Twilio JWT token string.
    * @param options
    */
@@ -632,6 +627,9 @@ export class PreflightTest extends EventEmitter {
   }
 }
 
+/**
+ * @mergeModuleWith PreflightTest
+ */
 export namespace PreflightTest {
   /**
    * The quality of the call determined by different mos ranges.
@@ -727,7 +725,7 @@ export namespace PreflightTest {
 
   /**
    * Options that may be passed to {@link PreflightTest} constructor for internal testing.
-   * @internalapi
+   * @internal
    */
   export interface ExtendedOptions extends Options {
     /**
@@ -738,7 +736,6 @@ export namespace PreflightTest {
     /**
      * A string or array of strings representing the URI of the signaling
      * gateway to connect to.
-     * @private
      */
     chunderw?: string | string[];
 
@@ -749,7 +746,6 @@ export namespace PreflightTest {
 
     /**
      * A string representing the URI of the insights gateway to connect to.
-     * @private
      */
     eventgw?: string;
 

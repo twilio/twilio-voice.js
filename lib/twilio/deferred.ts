@@ -1,10 +1,4 @@
 /**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
-
-/**
  * Deferred Promise
  */
 export default class Deferred {

@@ -1,8 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
 // @ts-nocheck
 export default class Deferred<T> {
   readonly promise: Promise<T>;

@@ -1,8 +1,6 @@
 /**
- * @packageDocumentation
- * @module Voice
- * @publicapi
- * @internal
+ * Base class for all possible errors that the library can receive from the
+ * Twilio backend.
  */
 export default class TwilioError extends Error {
   /**
@@ -45,6 +43,9 @@ export default class TwilioError extends Error {
    */
   solutions: string[];
 
+  /**
+   * @internal
+   */
   constructor(messageOrError?: string | Error | object, error?: Error | object) {
     super();
     Object.setPrototypeOf(this, TwilioError.prototype);
