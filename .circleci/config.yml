@@ -110,6 +110,9 @@ commands:
       start_relay_server:
         type: boolean
         default: false
+      integration_test_files:
+        type: string
+        default: ""
     steps:
       - build
       - when:
@@ -131,10 +134,11 @@ commands:
           command: ./node_modules/.bin/cypress install
       - run:
           name: Running integration tests
-          command: bash scripts/run-integration-tests.sh <<parameters.browser>>
+          command: bash scripts/run-integration-tests.sh <<parameters.browser>> <<parameters.integration_test_files>>
       - run:
           name: Upload test results to Datadog
           command: ./node_modules/.bin/datadog-ci junit upload --service <<parameters.datadog-test-service>> reports/junit-report.xml
+          when: always
       - store_artifacts:
           path: /home/circleci/project/cypress/screenshots
   network-tests:
@@ -203,12 +207,12 @@ jobs:
       BROWSER: <<parameters.browser>>
       BVER: <<parameters.bver>>
       BUILD_LABEL: <<parameters.build_label>>
-      INTEGRATION_TEST_FILES: <<parameters.integration_test_files>>
     steps:
       - integration-tests:
           browser: <<parameters.browser>>
           datadog-test-service: <<parameters.datadog-test-service>>
           start_relay_server: <<parameters.start_relay_server>>
+          integration_test_files: <<parameters.integration_test_files>>
   run-release:
     parameters:
       dryRun:
@@ -274,12 +278,12 @@ workflows:
           start_relay_server: false
           browser: <<matrix.browser>>
           datadog-test-service: "healthcheck-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
+          integration_test_files: "cypress/e2e/device.cy.ts"
           matrix:
             parameters:
               browser: ["chrome"]
               bver: ["stable"]
               build_label: ["Healthcheck"]
-              integration_test_files: ["tests/integration/device.ts"]
   daily-build-workflow:
     triggers:
       - schedule:

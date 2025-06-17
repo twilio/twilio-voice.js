@@ -57,7 +57,7 @@
     "test:framework:react:run": "mocha ./tests/framework/react.js",
     "test:framework:react": "npm-run-all test:framework:react:*",
     "test:frameworks": "npm-run-all test:framework:no-framework test:framework:react",
-    "test:integration": "cypress run --spec 'cypress/e2e/**/*.cy.ts' --reporter junit",
+    "test:integration": "cypress run",
     "test:integration:chrome": "npm run test:integration -- --browser chrome",
     "test:integration:edge": "npm run test:integration -- --browser edge",
     "test:integration:firefox": "npm run test:integration -- --browser firefox",
