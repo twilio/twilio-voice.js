@@ -1,9 +1,11 @@
 #!/bin/bash
 
-if [[ "$1" == "chrome" ]]; then
+if [[ "$1" == "chrome" && "$2" == "cypress/e2e/device.cy.ts" ]]; then
+  npm run test:integration -- --spec 'cypress/e2e/device.cy.ts' --browser chrome
+elif [[ "$1" == "chrome" ]]; then
   npm run test:integration:chrome && echo "Integration tests passed" || bash scripts/report-failure.sh "Integration tests"
 elif [[ "$1" == "firefox" ]]; then
-  npm run test:integration -- --browser /usr/local/bin/firefox && echo "Integration tests passed" || bash scripts/report-failure.sh "Integration tests"
+  npm run test:integration -- --spec 'cypress/e2e/**/*.cy.ts' --browser /usr/local/bin/firefox && echo "Integration tests passed" || bash scripts/report-failure.sh "Integration tests"
 else
   echo "$1 browser not supported"
   exit 1
