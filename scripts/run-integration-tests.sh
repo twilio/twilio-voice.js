@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [[ -n "$2" ]]; then
-  npm run test:integration -- --spec "$2" --browser chrome
+if [[ "$1" == "chrome" && -n "$2" ]]; then
+  npm run test:integration -- --spec "$2" --browser chrome && echo "$2 tests passed" || bash scripts/report-failure.sh "$2 tests"
 elif [[ "$1" == "chrome" ]]; then
   npm run test:integration:chrome && echo "Integration tests passed" || bash scripts/report-failure.sh "Integration tests"
 elif [[ "$1" == "firefox" ]]; then
