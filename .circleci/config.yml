@@ -138,6 +138,7 @@ commands:
       - run:
           name: Upload test results to Datadog
           command: ./node_modules/.bin/datadog-ci junit upload --service <<parameters.datadog-test-service>> reports/junit-report.xml
+          when: always
       - store_artifacts:
           path: /home/circleci/project/cypress/screenshots
   network-tests:
