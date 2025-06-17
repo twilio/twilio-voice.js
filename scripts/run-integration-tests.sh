@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [[ "$1" == "chrome" && "$2" == "cypress/e2e/device.cy.ts" ]]; then
-  npm run test:integration -- --spec 'cypress/e2e/device.cy.ts' --browser chrome
+if [[ -n "$2" ]]; then
+  npm run test:integration -- --spec "$2" --browser chrome
 elif [[ "$1" == "chrome" ]]; then
   npm run test:integration:chrome && echo "Integration tests passed" || bash scripts/report-failure.sh "Integration tests"
 elif [[ "$1" == "firefox" ]]; then
