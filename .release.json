@@ -32,7 +32,7 @@
         "git subtree add --prefix docs origin gh-pages",
         "npm run docs:ts",
         "git stage docs -f",
-        "git commit -nm \"${RELEASE_VERSION}\"",
+        "git diff --quiet || git commit -nm \"${RELEASE_VERSION}\"",
         "git subtree push --prefix docs origin gh-pages",
         "git checkout ${BRANCH}",
         "git reset --hard origin/${BRANCH}"
