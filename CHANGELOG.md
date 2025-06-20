@@ -3,6 +3,11 @@
 2.14.0 (In Progress)
 ====================
 
+Bug Fixes
+---------
+
+- Fixed `md5` and `rtcpeerconnection-shim` build warnings (as reported in this [Github Issue](https://github.com/twilio/twilio-voice.js/issues/260)) when using the Twilio Voice JS SDK in an Angular webapp. See our [Common Issues document](./COMMON_ISSUES.md#build-warnings-with-angular) for more information.
+
 Changes
 -------
 

@@ -62,3 +62,16 @@ twilio-voice.js to fail. Examples of such plugins include
 These are unsupported and likely to break twilio-voice.js. If you are having
 trouble with twilio-voice.js, ensure these are not running.
 
+Build warnings with Angular
+---------------------------
+Angular webapps that use the Twilio Voice JS SDK may generate the following
+warning upon building the webapp:
+
+```
+CommonJS or AMD dependencies can cause optimization bailouts.
+```
+
+This is expected. The Twilio Voice JS SDK will continue to behave normally. To
+learn more about this warning and to silence it, please see this official
+documentation from the Angular website:
+https://angular.dev/tools/cli/build#configuring-commonjs-dependencies

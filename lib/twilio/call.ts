@@ -18,9 +18,9 @@ import { IceCandidate, RTCIceCandidate } from './rtc/icecandidate';
 import RTCSample from './rtc/sample';
 import { getPreferredCodecInfo } from './rtc/sdp';
 import RTCWarning from './rtc/warning';
+import { generateVoiceEventSid } from './sid';
 import StatsMonitor from './statsMonitor';
 import { isChrome } from './util';
-import { generateVoiceEventSid } from './uuid';
 
 import { RELEASE_VERSION } from './constants';
 
