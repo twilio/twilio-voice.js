@@ -80,7 +80,7 @@ RTCPC.prototype.createOffer = function(maxAverageBitrate, codecPreferences, cons
     const sdp = setMaxAverageBitrate(offer.sdp, maxAverageBitrate);
 
     return promisifySet(this.pc.setLocalDescription, this.pc)(new RTCSessionDescription({
-      sdp: setCodecPreferences(sdp, codecPreferences),
+      sdp,
       type: 'offer',
     }));
   }).then(onSuccess, onError);
@@ -92,7 +92,7 @@ RTCPC.prototype.createAnswer = function(maxAverageBitrate, codecPreferences, con
     const sdp = setMaxAverageBitrate(answer.sdp, maxAverageBitrate);
 
     return promisifySet(this.pc.setLocalDescription, this.pc)(new RTCSessionDescription({
-      sdp: setCodecPreferences(sdp, codecPreferences),
+      sdp,
       type: 'answer',
     }));
   }).then(onSuccess, onError);

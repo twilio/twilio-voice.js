@@ -8,6 +8,7 @@ Changes
 
 - Upgraded Typescript dependency to 5.x
 - Replaced Karma test runner with Cypress
+- Replaced sdp munging with [setCodecPreferences](https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/setCodecPreferences)
 
 2.13.0 (May 6, 2025)
 ====================

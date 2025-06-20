@@ -650,6 +650,11 @@ PeerConnection.prototype._setupPeerConnection = function(rtcConfiguration) {
   version.create(rtcConfiguration);
   addStream(version.pc, this.stream);
 
+  const supportedCodecs = RTCRtpReceiver.getCapabilities('audio').codecs;
+  const sortedCodecs = sortByMimeTypes(supportedCodecs, this.codecPreferences);
+  const [transceiver] = version.pc.getTransceivers();
+  transceiver.setCodecPreferences(sortedCodecs);
+
   const eventName = 'ontrack' in version.pc
     ? 'ontrack' : 'onaddstream';
 
@@ -1158,6 +1163,17 @@ function setAudioSource(audio, stream) {
   }
 
   return true;
+}
+
+function sortByMimeTypes(codecs, preferredOrder) {
+  const preferredCodecs = preferredOrder.map(codec => 'audio/' + codec);
+  return codecs.sort((a, b) => {
+    const indexA = preferredCodecs.indexOf(a.mimeType.toLowerCase());
+    const indexB = preferredCodecs.indexOf(b.mimeType.toLowerCase());
+    const orderA = indexA >= 0 ? indexA : Number.MAX_VALUE;
+    const orderB = indexB >= 0 ? indexB : Number.MAX_VALUE;
+    return orderA - orderB;
+  });
 }
 
 PeerConnection.enabled = RTCPC.test();

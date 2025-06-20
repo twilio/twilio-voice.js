@@ -2280,12 +2280,17 @@ describe('PeerConnection', () => {
         getParameters: sinon.spy(() => Object.assign({ }, params)),
         setParameters: sinon.spy((p) => params = p),
       };
+      transceiver = {
+        setCodecPreferences: sinon.stub(),
+      };
       versionCreate = sinon.stub();
       versionPc = {
         addStream: sinon.stub(),
         getSenders: () => [sender],
+        getTransceivers: () => [transceiver],
       };
       context = {
+        codecPreferences: ['pcmu', 'opus'],
         _isSinkSupported: true,
         options: {
           rtcpcFactory
