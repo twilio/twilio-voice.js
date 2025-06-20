@@ -12,7 +12,7 @@ describe('rtcpc', function() {
     const logClassStub = sinon.createStubInstance(LogModule.default);
     const logConstructorStub = sinon.stub(LogModule, 'default').returns(logClassStub);
 
-    RTCPC({});
+    new (RTCPC as any)({});
 
     sinon.assert.calledOnceWithExactly(logConstructorStub, 'RTCPC');
   });
@@ -20,8 +20,9 @@ describe('rtcpc', function() {
   it('logs a message if the RTCPeerConnection constructor is not available', function() {
     sinon.stub(window, 'RTCPeerConnection').get(() => undefined);
 
-    const result = RTCPC({});
+    const result = new (RTCPC as any)({});
 
-    assert(typeof result === 'undefined');
+    assert(typeof result === 'object');
+    assert(typeof result.RTCPeerConnection === 'undefined');
   });
 });
