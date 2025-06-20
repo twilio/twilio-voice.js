@@ -1,9 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
-
 import * as LogLevelModule from 'loglevel';
 import { PACKAGE_NAME } from './constants';
 

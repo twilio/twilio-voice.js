@@ -13,8 +13,6 @@ config.yaml
 coverage
 docs
 extension
-karma.conf.ts
-karma.network.conf.ts
 node_modules
 nodemon.json
 PREFLIGHT.md

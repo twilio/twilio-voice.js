@@ -52,12 +52,6 @@ const USED_ERRORS = [
 
 let output = `/* tslint:disable max-classes-per-file max-line-length */
 /**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
-
-/**
  * This is a generated file. Any modifications here will be overwritten. See scripts/errors.js.
  */
 import TwilioError from './twilioError';
@@ -70,6 +64,9 @@ const generateStringArray = arr => arr ? `[
     ]` : '[]';
 
 const generateDefinition = (code, subclassName, errorName, error) => `\
+  /**
+   * Error received from the Twilio backend.
+   */
   export class ${errorName} extends TwilioError {
     causes: string[] = ${generateStringArray(error.causes)};
     code: number = ${code};
@@ -78,10 +75,25 @@ const generateDefinition = (code, subclassName, errorName, error) => `\
     name: string = '${escapeQuotes(errorName)}';
     solutions: string[] = ${generateStringArray(error.solutions)};
 
+    /**
+     * @internal
+     */
     constructor();
+    /**
+     * @internal
+     */
     constructor(message: string);
+    /**
+     * @internal
+     */
     constructor(error: Error | object);
+    /**
+     * @internal
+     */
     constructor(message: string, error: Error | object);
+    /**
+     * @internal
+     */
     constructor(messageOrError?: string | Error | object, error?: Error | object) {
       super(messageOrError, error);
       Object.setPrototypeOf(this, ${subclassName}Errors.${errorName}.prototype);

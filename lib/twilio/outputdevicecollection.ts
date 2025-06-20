@@ -1,7 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- */
 import { SOUNDS_BASE_URL } from './constants';
 import { InvalidArgumentError, InvalidStateError, NotSupportedError } from './errors';
 import Log from './log';
@@ -9,7 +5,6 @@ const DEFAULT_TEST_SOUND_URL = `${SOUNDS_BASE_URL}/outgoing.mp3`;
 
 /**
  * A smart collection containing a Set of active output devices.
- * @publicapi
  */
 export default class OutputDeviceCollection {
   /**
@@ -23,7 +18,7 @@ export default class OutputDeviceCollection {
   private _log: Log = new Log('OutputDeviceCollection');
 
   /**
-   * @private
+   * @internal
    */
   constructor(private _name: string,
               private _availableDevices: Map<string, MediaDeviceInfo>,

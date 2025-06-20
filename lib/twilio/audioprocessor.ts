@@ -1,9 +1,4 @@
 /**
- * @packageDocumentation
- * @module Voice
- */
-
-/**
  * An AudioProcessor can be added to the SDK, providing access to the audio input stream
  * and the ability to process or analyze the stream before sending it to Twilio.
  * To add the processor, you must implement the AudioProcessor interface and use
@@ -67,7 +62,6 @@
  * // Or remove it later
  * // await device.audio.removeProcessor(processor);
  * ```
- * @publicapi
  */
 interface AudioProcessor {
   /**

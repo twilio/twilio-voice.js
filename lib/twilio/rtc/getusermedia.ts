@@ -1,8 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
 // @ts-nocheck
 import { NotSupportedError } from '../errors';
 import * as util from '../util';

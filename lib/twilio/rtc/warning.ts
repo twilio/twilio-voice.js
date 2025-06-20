@@ -1,8 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @publicapi
- */
 import RTCSample from './sample';
 
 /**

@@ -1,8 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @internalapi
- */
 // @ts-nocheck
 import Deferred from './deferred';
 import EventTarget from './eventtarget';

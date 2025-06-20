@@ -1,10 +1,4 @@
 /**
- * @packageDocumentation
- * @module Voice
- * @publicapi
- */
-
-/**
  * Sample RTC statistics. See [[Call.sampleEvent]]
  */
 export default interface RTCSample {

@@ -1,9 +1,3 @@
-/**
- * @packageDocumentation
- * @module Voice
- * @publicapi
- * @internal
- */
 import { EventEmitter } from 'events';
 import Backoff from './backoff';
 import Device from './device';
@@ -31,25 +25,10 @@ import { isChrome } from './util';
 import { RELEASE_VERSION } from './constants';
 
 // Placeholders until we convert the respective files to TypeScript.
-/**
- * @private
- */
 export type IAudioHelper = any;
-/**
- * @private
- */
 export type IPStream = any;
-/**
- * @private
- */
 export type IPeerConnection = any;
-/**
- * @private
- */
 export type IPublisher = any;
-/**
- * @private
- */
 export type ISound = any;
 
 const BACKOFF_CONFIG = {
@@ -104,12 +83,10 @@ const WARNING_PREFIXES: Record<string, string> = {
 
 /**
  * A {@link Call} represents a media and signaling connection to a TwiML application.
- * @publicapi
  */
 class Call extends EventEmitter {
   /**
    * String representation of the {@link Call} class.
-   * @private
    */
   static toString = () => '[Twilio.Call class]';
 
@@ -337,10 +314,9 @@ class Call extends EventEmitter {
   private _wasConnected: boolean = false;
 
   /**
-   * @constructor
-   * @private
+   * @internal
    * @param config - Mandatory configuration options
-   * @param [options] - Optional settings
+   * @param options - Optional settings
    */
   constructor(config: Call.Config, options?: Call.Options) {
     super();
@@ -609,8 +585,8 @@ class Call extends EventEmitter {
 
   /**
    * Set the audio input tracks from a given stream.
+   * @internal
    * @param stream
-   * @private
    */
   _setInputTracksFromStream(stream: MediaStream | null): Promise<void> {
     return this._mediaHandler.setInputTracksFromStream(stream);
@@ -618,8 +594,8 @@ class Call extends EventEmitter {
 
   /**
    * Set the audio output sink IDs.
+   * @internal
    * @param sinkIds
-   * @private
    */
   _setSinkIds(sinkIds: string[]): Promise<void> {
     return this._mediaHandler._setSinkIds(sinkIds);
@@ -984,7 +960,7 @@ class Call extends EventEmitter {
 
   /**
    * String representation of {@link Call} instance.
-   * @private
+   * @internal
    */
   toString = () => '[Twilio.Call instance]';
 
@@ -1612,127 +1588,166 @@ class Call extends EventEmitter {
   }
 }
 
+/**
+ * @mergeModuleWith Call
+ */
 namespace Call {
   /**
    * Emitted when the {@link Call} is accepted.
-   * @param call - The {@link Call}.
-   * @example `call.on('accept', call => { })`
    * @event
+   * @param call - The {@link Call}.
+   * @example
+   * ```ts
+   * call.on('accept', (call) => { });
+   * ```
    */
-  declare function acceptEvent(call: Call): void;
+  export declare function acceptEvent(call: Call): void;
 
   /**
    * Emitted after the HTMLAudioElement for the remote audio is created.
-   * @param remoteAudio - The HTMLAudioElement.
-   * @example `call.on('audio', handler(remoteAudio))`
    * @event
+   * @param remoteAudio - The HTMLAudioElement.
+   * @example
+   * ```ts
+   * call.on('audio', (remoteAudio) => { });
+   * ```
    */
-  declare function audioEvent(remoteAudio: HTMLAudioElement): void;
+  export declare function audioEvent(remoteAudio: HTMLAudioElement): void;
 
   /**
    * Emitted when the {@link Call} is canceled.
-   * @example `call.on('cancel', () => { })`
    * @event
+   * @example
+   * ```ts
+   * call.on('cancel', () => { });
+   * ```
    */
-  declare function cancelEvent(): void;
+  export declare function cancelEvent(): void;
 
   /**
    * Emitted when the {@link Call} is disconnected.
-   * @param call - The {@link Call}.
-   * @example `call.on('disconnect', call => { })`
    * @event
+   * @param call - The {@link Call}.
+   * @example
+   * ```ts
+   * call.on('disconnect', (call) => { });
+   * ```
    */
-  declare function disconnectEvent(call: Call): void;
+  export declare function disconnectEvent(call: Call): void;
 
   /**
    * Emitted when the {@link Call} receives an error.
-   * @param error
-   * @example `call.on('error', error => { })`
    * @event
+   * @param error
+   * @example
+   * ```ts
+   * call.on('error', (error) => { });
+   * ```
    */
-  declare function errorEvent(error: TwilioError): void;
+  export declare function errorEvent(error: TwilioError): void;
 
   /**
    * Emitted when a Call receives a message from the backend.
    * <br/><br/>This feature is currently in Beta.
+   * @event
    * @param message - A message object representing the payload
    * that was received from the Twilio backend.
-   * @event
    */
-  declare function messageReceivedEvent(message: Call.Message): void;
+  export declare function messageReceivedEvent(message: Call.Message): void;
 
   /**
    * Emitted after calling the {@link Call.sendMessage} API.
    * This event indicates that Twilio has received the message.
    * <br/><br/>This feature is currently in Beta.
-   * @param message - A message object that was sent to the Twilio backend.
    * @event
+   * @param message - A message object that was sent to the Twilio backend.
    */
-  declare function messageSentEvent(message: Call.Message): void;
+  export declare function messageSentEvent(message: Call.Message): void;
 
   /**
    * Emitted when the {@link Call} is muted or unmuted.
+   * @event
    * @param isMuted - Whether the {@link Call} is muted.
    * @param call - The {@link Call}.
-   * @example `call.on('mute', (isMuted, call) => { })`
-   * @event
+   * @example
+   * ```ts
+   * call.on('mute', (isMuted, call) => { });
+   * ```
    */
-  declare function muteEvent(isMuted: boolean, call: Call): void;
+  export declare function muteEvent(isMuted: boolean, call: Call): void;
 
   /**
    * Emitted when the {@link Call} has regained media connectivity.
-   * @example `call.on('reconnected', () => { })`
    * @event
+   * @example
+   * ```ts
+   * call.on('reconnected', () => { })
+   * ```
    */
-  declare function reconnectedEvent(): void;
+  export declare function reconnectedEvent(): void;
 
   /**
    * Emitted when the {@link Call} has lost media connectivity and is reconnecting.
-   * @param error - The {@link TwilioError} that caused the media connectivity loss
-   * @example `call.on('reconnecting', error => { })`
    * @event
+   * @param error - The {@link TwilioError} that caused the media connectivity loss
+   * @example
+   * ```ts
+   * call.on('reconnecting', (error) => { });
+   * ```
    */
-  declare function reconnectingEvent(error: TwilioError): void;
+  export declare function reconnectingEvent(error: TwilioError): void;
 
   /**
    * Emitted when the {@link Call} is rejected.
-   * @example `call.on('reject', () => { })`
    * @event
+   * @example
+   * ```ts
+   * call.on('reject', () => { })
+   * ```
    */
-  declare function rejectEvent(): void;
+  export declare function rejectEvent(): void;
 
   /**
    * Emitted when the {@link Call} has entered the `ringing` state.
    * When using the Dial verb with `answerOnBridge=true`, the ringing state will begin when
    * the callee has been notified of the call and will transition into open after the callee accepts the call,
    * or closed if the call is rejected or cancelled.
+   * @event
    * @param hasEarlyMedia - Denotes whether there is early media available from the callee.
    * If `true`, the Client SDK will automatically play the early media. Sometimes this is ringing,
    * other times it may be an important message about the call. If `false`, there is no remote media to play,
    * so the application may want to play its own outgoing ringtone sound.
-   * @example `call.on('ringing', hasEarlyMedia => { })`
-   * @event
+   * @example
+   * ```ts
+   * call.on('ringing', (hasEarlyMedia) => { });
+   * ```
    */
-  declare function ringingEvent(hasEarlyMedia: boolean): void;
+  export declare function ringingEvent(hasEarlyMedia: boolean): void;
 
   /**
    * Emitted when the {@link Call} gets a webrtc sample object.
    * This event is published every second.
-   * @param sample
-   * @example `call.on('sample', sample => { })`
    * @event
+   * @param sample
+   * @example
+   * ```ts
+   * call.on('sample', (sample) => { });
+   * ```
    */
-  declare function sampleEvent(sample: RTCSample): void;
+  export declare function sampleEvent(sample: RTCSample): void;
 
   /**
    * Emitted every 50ms with the current input and output volumes, as a percentage of maximum
    * volume, between -100dB and -30dB. Represented by a floating point number.
+   * @event
    * @param inputVolume - A floating point number between 0.0 and 1.0 inclusive.
    * @param outputVolume - A floating point number between 0.0 and 1.0 inclusive.
-   * @example `call.on('volume', (inputVolume, outputVolume) => { })`
-   * @event
+   * @example
+   * ```ts
+   * call.on('volume', (inputVolume, outputVolume) => { });
+   * ```
    */
-  declare function volumeEvent(inputVolume: number, outputVolume: number): void;
+  export declare function volumeEvent(inputVolume: number, outputVolume: number): void;
 
   /**
    * Emitted when the SDK detects a drop in call quality or other conditions that may indicate
@@ -1745,22 +1760,28 @@ namespace Call {
    * For a full list of conditions that will raise a warning event, check the
    * [Voice Insights SDK Events Reference](https://www.twilio.com/docs/voice/voice-insights/api/call/details-sdk-call-quality-events) page.
    *
+   * @event
    * @param name - The name of the warning
    * @param data - An object containing data on the warning
-   * @example `call.on('warning', (name, data) => { })`
-   * @event
+   * @example
+   * ```ts
+   * call.on('warning', (name, data) => { });
+   * ```
    */
-  declare function warningEvent(name: string, data: any): void;
+  export declare function warningEvent(name: string, data: any): void;
 
   /**
    * Emitted when a call quality metric has returned to normal.
    * You can listen for this event to update the user when a call quality issue has been resolved.
    *
-   * @param name - The name of the warning
-   * @example `call.on('warning-cleared', name => { })`
    * @event
+   * @param name - The name of the warning
+   * @example
+   * ```ts
+   * call.on('warning-cleared', (name) => { });
+   * ```
    */
-  declare function warningClearedEvent(name: string): void;
+  export declare function warningClearedEvent(name: string): void;
 
   /**
    * Possible states of the {@link Call}.
@@ -1863,7 +1884,7 @@ namespace Call {
 
   /**
    * Mandatory config options to be passed to the {@link Call} constructor.
-   * @private
+   * @internal
    */
   export interface Config {
     /**
@@ -1930,7 +1951,7 @@ namespace Call {
 
   /**
    * Options to be passed to the {@link Call} constructor.
-   * @private
+   * @internal
    */
   export interface Options {
     /**
@@ -2066,7 +2087,7 @@ namespace Call {
   /**
    * Call metrics published to Insight Metrics.
    * This include rtc samples and audio information.
-   * @private
+   * @internal
    */
   export interface CallMetrics extends RTCSample {
     /**

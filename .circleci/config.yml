@@ -24,6 +24,9 @@ parameters:
   release_workflow:
     type: boolean
     default: false
+  qe_workflow:
+    type: boolean
+    default: false
   release_command:
     type: string
     default: "echo \"no release-command specified\""
@@ -101,12 +104,18 @@ commands:
           destination: coverage
   integration-tests:
     parameters:
+      browser:
+        type: string
+        default: ""
       datadog-test-service:
         type: string
         default: ""
       start_relay_server:
         type: boolean
         default: false
+      integration_test_files:
+        type: string
+        default: ""
     steps:
       - build
       - when:
@@ -117,11 +126,24 @@ commands:
                 background: true
                 command: bash scripts/run-relay-server.sh
       - run:
+          name: Install xvfb
+          command: |
+            sudo apt update
+            sudo apt install xvfb
+            sudo apt install -y libgbm-dev
+      - run:
+          # NOTE(kchoy): Addresses following pipeline cypress install issue: https://app.circleci.com/pipelines/github/twilio/twilio-voice.js/18965/workflows/b8248669-0a6b-4b30-a946-da636ff70382/jobs/33516
+          name: Install cypress
+          command: ./node_modules/.bin/cypress install
+      - run:
           name: Running integration tests
-          command: bash scripts/run-integration-tests.sh
+          command: bash scripts/run-integration-tests.sh <<parameters.browser>> <<parameters.integration_test_files>>
       - run:
           name: Upload test results to Datadog
           command: ./node_modules/.bin/datadog-ci junit upload --service <<parameters.datadog-test-service>> reports/junit-report.xml
+          when: always
+      - store_artifacts:
+          path: /home/circleci/project/cypress/screenshots
   network-tests:
     steps:
       - get-code
@@ -188,11 +210,12 @@ jobs:
       BROWSER: <<parameters.browser>>
       BVER: <<parameters.bver>>
       BUILD_LABEL: <<parameters.build_label>>
-      INTEGRATION_TEST_FILES: <<parameters.integration_test_files>>
     steps:
       - integration-tests:
+          browser: <<parameters.browser>>
           datadog-test-service: <<parameters.datadog-test-service>>
           start_relay_server: <<parameters.start_relay_server>>
+          integration_test_files: <<parameters.integration_test_files>>
   run-release:
     parameters:
       dryRun:
@@ -233,8 +256,8 @@ jobs:
           name: Trigger QE tests
           command: |
             curl --fail --write-out "\nHTTP Response Code: %{http_code}\n" \
-            -u "$CIRCLECI_PERSONAL_API_TOKEN": -X POST --header "Content-Type: application/json" \
-            -d '{"branch":"'v${CIRCLE_TAG:0:1}'","parameters":{"sdk_version":"'$CIRCLE_TAG'","is_rc":true}}' \
+            -u "$INTERNAL_CIRCLECI_PERSONAL_API_TOKEN": -X POST --header "Content-Type: application/json" \
+            -d '{"config":{"branch":"'v${CIRCLE_TAG:0:1}'"},"checkout":{"branch":"'v${CIRCLE_TAG:0:1}'"},"definition_id":"'$SDKS_QE_CIRCLECI_VOICE_JS_SLAVE_DEFINITION_ID'","parameters":{"sdk_version":"'$CIRCLE_TAG'","is_rc":true}}' \
             $SDKS_QE_CIRCLECI_VOICE_JS_SLAVE_PIPELINE_ENDPOINT
 
 ###
@@ -256,13 +279,14 @@ workflows:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: false
+          browser: <<matrix.browser>>
           datadog-test-service: "healthcheck-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
+          integration_test_files: "cypress/e2e/device.cy.ts"
           matrix:
             parameters:
               browser: ["chrome"]
               bver: ["stable"]
               build_label: ["Healthcheck"]
-              integration_test_files: ["tests/integration/device.ts"]
   daily-build-workflow:
     triggers:
       - schedule:
@@ -283,6 +307,7 @@ workflows:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: true
+          browser: <<matrix.browser>>
           datadog-test-service: "daily-build-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
           matrix:
             parameters:
@@ -306,6 +331,7 @@ workflows:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: true
+          browser: <<matrix.browser>>
           datadog-test-service: "pull-request-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
           matrix:
             parameters:
@@ -344,6 +370,7 @@ workflows:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: true
+          browser: <<matrix.browser>>
           datadog-test-service: "release-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
           matrix:
             parameters:
@@ -394,14 +421,18 @@ workflows:
           requires:
             - hold
   release-candidate:
-      jobs:
-        - trigger-qe-tests:
-            context: sdks-qe
-            filters:
-              tags:
-                only:
-                - /^\d+\.\d+\.\d+-rc\d+$/
-                - /^\d+\.\d+\.\d+-preview\d+-rc\d+$/
-                - /^\d+\.\d+\.\d+-beta\d+-rc\d+$/
-              branches:
-                ignore: /.*/
+    when:
+        or:
+          - equal: [true, <<pipeline.parameters.qe_workflow>>]
+          - equal: [true, <<pipeline.parameters.release_workflow>>]
+    jobs:
+      - trigger-qe-tests:
+          context: sdks-qe
+          filters:
+            tags:
+              only:
+              - /^\d+\.\d+\.\d+-rc\d+$/
+              - /^\d+\.\d+\.\d+-preview\d+-rc\d+$/
+              - /^\d+\.\d+\.\d+-beta\d+-rc\d+$/
+            branches:
+              ignore: /.*/
