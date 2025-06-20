@@ -2268,6 +2268,9 @@ describe('PeerConnection', () => {
     let versionCreate;
     let versionPc;
 
+    let setCodecPreferences;
+    let tempRTCRtpReceiver;
+
     beforeEach(() => {
       params = {
         foo: 'bar',
@@ -2280,8 +2283,10 @@ describe('PeerConnection', () => {
         getParameters: sinon.spy(() => Object.assign({ }, params)),
         setParameters: sinon.spy((p) => params = p),
       };
+      setCodecPreferences = sinon.stub(),
+      tempRTCRtpReceiver = root.RTCRtpReceiver;
       transceiver = {
-        setCodecPreferences: sinon.stub(),
+        setCodecPreferences,
       };
       versionCreate = sinon.stub();
       versionPc = {
@@ -2302,6 +2307,10 @@ describe('PeerConnection', () => {
       };
       toTest = METHOD.bind(context, ICE_SERVERS);
     });
+
+    afterEach(() => {
+      root.RTCRtpReceiver = tempRTCRtpReceiver;
+    })
 
     it('Should create new version everytime', () => {
       // Make sure a new reference is created each time
@@ -2354,6 +2363,28 @@ describe('PeerConnection', () => {
       assert(context._fallbackOnAddTrack.calledOn(context));
       assert.equal(context._onAddTrack.called, false);
       assert(context._startPollingVolume.calledWithExactly());
+    });
+
+    it('Should sort codec preferences', () => {
+      root.RTCRtpReceiver = {
+        getCapabilities: () => ({
+          codecs: [
+            {"mimeType": "audio/opus"},
+            {"mimeType": "audio/red"},
+            {"mimeType": "audio/G722"},
+            {"mimeType": "audio/PCMU"},
+            {"mimeType": "audio/PCMA"},
+          ]
+        }),
+      };
+      assert.deepStrictEqual(toTest(), new rtcpcFactory());
+      assert(setCodecPreferences.calledWithExactly([
+        { mimeType: 'audio/PCMU' },
+        { mimeType: 'audio/opus' },
+        { mimeType: 'audio/red' },
+        { mimeType: 'audio/G722' },
+        { mimeType: 'audio/PCMA' },
+      ]));
     });
 
     describe('after creating audio outputs', () => {
