@@ -118,6 +118,7 @@
   },
   "dependencies": {
     "@twilio/voice-errors": "1.7.0",
+    "@types/events": "^3.0.3",
     "events": "3.3.0",
     "loglevel": "1.6.7"
   },
