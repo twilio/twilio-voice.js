@@ -10,6 +10,11 @@ Changes
 - Replaced Karma test runner with Cypress
 - Added `@types/events` as a dependency. This resolves issues regarding missing Intellisense hinting for SDK objects that extend EventEmitters.
 
+Bug Fixes
+---------
+
+- Fixed `md5` and `rtcpeerconnection-shim` build warnings (as reported in this [Github Issue](https://github.com/twilio/twilio-voice.js/issues/260)) when using the Twilio Voice JS SDK in an Angular webapp. See our [Common Issues document](./COMMON_ISSUES.md#build-warnings-with-angular) for more information.
+
 2.13.0 (May 6, 2025)
 ====================
 
