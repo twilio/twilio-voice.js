@@ -30,6 +30,7 @@ import {
 } from './regions';
 import * as rtc from './rtc';
 import getUserMedia from './rtc/getusermedia';
+import { generateVoiceEventSid } from './sid';
 import Sound from './sound';
 import {
   isLegacyEdge,
@@ -37,7 +38,6 @@ import {
   promisifyEvents,
   queryToJson,
 } from './util';
-import { generateVoiceEventSid } from './uuid';
 
 // Placeholders until we convert the respective files to TypeScript.
 /**
