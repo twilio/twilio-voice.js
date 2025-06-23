@@ -8,7 +8,7 @@ Changes
 
 - Upgraded Typescript dependency to 5.x
 - Replaced Karma test runner with Cypress
-- Added `@types/events` as a dependency. This resolves issues regarding missing Intellisense hinting for SDK objects that extend EventEmitters, as well as build issues in Angular webapps.
+- Added `@types/events` as a dependency. This resolves issues regarding missing Intellisense hinting for SDK objects that extend EventEmitters.
 
 2.13.0 (May 6, 2025)
 ====================
