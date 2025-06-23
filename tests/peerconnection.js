@@ -2310,7 +2310,7 @@ describe('PeerConnection', () => {
 
     afterEach(() => {
       root.RTCRtpReceiver = tempRTCRtpReceiver;
-    })
+    });
 
     it('Should create new version everytime', () => {
       // Make sure a new reference is created each time
