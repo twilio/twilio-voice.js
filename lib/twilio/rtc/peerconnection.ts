@@ -651,10 +651,10 @@ PeerConnection.prototype._setupPeerConnection = function(rtcConfiguration) {
   addStream(version.pc, this.stream);
 
   const supportedCodecs = RTCRtpReceiver.getCapabilities('audio').codecs;
-  this._log.debug('sorting codecs', supportedCodecs, this.codecPreferences)
+  this._log.debug('sorting codecs', supportedCodecs, this.codecPreferences);
   const sortedCodecs = util.sortByMimeTypes(supportedCodecs, this.codecPreferences);
   const [transceiver] = version.pc.getTransceivers();
-  this._log.debug('setting sorted codecs', sortedCodecs)
+  this._log.debug('setting sorted codecs', sortedCodecs);
   transceiver.setCodecPreferences(sortedCodecs);
 
   const eventName = 'ontrack' in version.pc
