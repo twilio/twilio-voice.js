@@ -1736,7 +1736,7 @@ namespace Device {
    *
    * receiverDevice.on('incoming', (call) => {
    *   // Forward this call to a new Device instance using the call.connectToken string.
-   *   forwardCall(call.connectToken, device.edge);
+   *   forwardCall(call.connectToken, receiverDevice.edge);
    * });
    *
    * // The forwardCall function may look something like the following.
