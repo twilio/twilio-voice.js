@@ -259,4 +259,44 @@ describe('Util', () => {
       assert.strictEqual(emitter.eventNames().length, 0);
     });
   });
+
+  describe('sortByMimeTypes', () => {
+    const { sortByMimeTypes } = util;
+    const codecs = [
+            { mimeType : 'audio/opus' },
+            { mimeType : 'audio/red' },
+            { mimeType : 'audio/G722' },
+            { mimeType : 'audio/PCMU' },
+            { mimeType : 'audio/PCMA' },
+          ];
+
+    it('should be case-insensitive', () => {
+      const codecPreferences = ['pCmU', 'OpUs'];
+      const sortedCodecs = [
+        { mimeType: 'audio/PCMU' },
+        { mimeType: 'audio/opus' },
+        { mimeType: 'audio/red' },
+        { mimeType: 'audio/G722' },
+        { mimeType: 'audio/PCMA' },
+      ];
+      assert.deepEqual(sortByMimeTypes(codecs, codecPreferences), sortedCodecs);
+    });
+
+    it('should handle a single preference', () => {
+      const sortedCodecs = [
+        { mimeType: 'audio/PCMU' },
+        { mimeType: 'audio/opus' },
+        { mimeType: 'audio/red' },
+        { mimeType: 'audio/G722' },
+        { mimeType: 'audio/PCMA' },
+      ];
+      const singlePreference = ['pcmu'];
+      assert.deepEqual(sortByMimeTypes(codecs, singlePreference), sortedCodecs);
+    });
+
+    it('should NOT sort if invalid codecs provided', () => {
+      const codecPreferences = ['foo', 'bar'];
+      assert.deepEqual(sortByMimeTypes(codecs, codecPreferences), codecs);
+    });
+  });
 });

@@ -72,7 +72,7 @@ RTCPC.prototype.createModernConstraints = c => {
 
   return nc;
 };
-RTCPC.prototype.createOffer = function(maxAverageBitrate, codecPreferences, constraints, onSuccess, onError) {
+RTCPC.prototype.createOffer = function(maxAverageBitrate, constraints, onSuccess, onError) {
   constraints = this.createModernConstraints(constraints);
   return promisifyCreate(this.pc.createOffer, this.pc)(constraints).then(offer => {
     if (!this.pc) { return Promise.resolve(); }
@@ -85,7 +85,7 @@ RTCPC.prototype.createOffer = function(maxAverageBitrate, codecPreferences, cons
     }));
   }).then(onSuccess, onError);
 };
-RTCPC.prototype.createAnswer = function(maxAverageBitrate, codecPreferences, constraints, onSuccess, onError) {
+RTCPC.prototype.createAnswer = function(maxAverageBitrate, constraints, onSuccess, onError) {
   constraints = this.createModernConstraints(constraints);
   return promisifyCreate(this.pc.createAnswer, this.pc)(constraints).then(answer => {
     if (!this.pc) { return Promise.resolve(); }
@@ -101,7 +101,7 @@ RTCPC.prototype.processSDP = function(maxAverageBitrate, codecPreferences, sdp, 
   sdp = setCodecPreferences(sdp, codecPreferences);
   const desc = new RTCSessionDescription({ sdp, type: 'offer' });
   return promisifySet(this.pc.setRemoteDescription, this.pc)(desc).then(() => {
-    this.createAnswer(maxAverageBitrate, codecPreferences, constraints, onSuccess, onError);
+    this.createAnswer(maxAverageBitrate, constraints, onSuccess, onError);
   });
 };
 RTCPC.prototype.getSDP = function() {
