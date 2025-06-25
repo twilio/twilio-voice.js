@@ -1,5 +1,13 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.15.0 (In Progress)
+====================
+
+Changes
+-------
+
+- Replaced SDP munging with the [setCodecPreferences](https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/setCodecPreferences) API for setting preferred codecs in the SDK.
+
 2.14.0 (In Progress)
 ====================
 
