@@ -1724,6 +1724,8 @@ namespace Device {
    *
    * **Important:** When forwarding a call, the token for target device instance needs to have
    * the same identity as the token used in the device that originally received the call.
+   * The target device instance must also have the same edge as the device that
+   * originally received the call.
    *
    * @event
    * @param call - The incoming {@link Call}.
@@ -1734,15 +1736,17 @@ namespace Device {
    *
    * receiverDevice.on('incoming', (call) => {
    *   // Forward this call to a new Device instance using the call.connectToken string.
-   *   forwardCall(call.connectToken);
+   *   forwardCall(call.connectToken, receiverDevice.edge);
    * });
    *
    * // The forwardCall function may look something like the following.
-   * async function forwardCall(connectToken) {
+   * async function forwardCall(connectToken, edge) {
    *   // For every incoming call, we create a new Device instance which we can
    *   // interact with, without affecting other calls.
    *   // IMPORTANT: The token for this new device needs to have the same identity
    *   // as the token used in the receiverDevice.
+   *   // The device must also be connected to the same edge as the receiverDevice.
+   *   const options = { ..., edge };
    *   const device = new Device(token, options);
    *   const call = await device.connect({ connectToken });
    *
