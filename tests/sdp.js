@@ -65,32 +65,6 @@ describe('setCodecPreferences', () => {
   });
 });
 
-describe('setMaxAverageBitrate', () => {
-  it('should set the maxaveragebitrate if opus rtpmap line is not found ', () => {
-    const sdp = 'foo=a\na=rtpmap:0 PCMU/8000\na=fmtp:111\nbar=b';
-    const newSdp = setMaxAverageBitrate(sdp, 12345);
-    assert.equal(newSdp, 'foo=a\na=rtpmap:0 PCMU/8000\na=fmtp:111;maxaveragebitrate=12345\nbar=b');
-  });
-
-  it('should set the maxaveragebitrate if opus rtpmap line is found ', () => {
-    const sdp = 'foo=a\na=rtpmap:0 PCMU/8000\na=rtpmap:1337 opus/48000/2\na=fmtp:1337\nbar=b';
-    const newSdp = setMaxAverageBitrate(sdp, 12345);
-    assert.equal(newSdp, 'foo=a\na=rtpmap:0 PCMU/8000\na=rtpmap:1337 opus/48000/2\na=fmtp:1337;maxaveragebitrate=12345\nbar=b');
-  });
-
-  it('should not set the maxaveragebitrate if under 6000 ', () => {
-    const sdp = 'foo=a\na=rtpmap:0 PCMU/8000\na=rtpmap:1337 opus/48000/2\na=fmtp:1337\nbar=b';
-    const newSdp = setMaxAverageBitrate(sdp, 5999);
-    assert.equal(newSdp, 'foo=a\na=rtpmap:0 PCMU/8000\na=rtpmap:1337 opus/48000/2\na=fmtp:1337\nbar=b');
-  });
-
-  it('should not set the maxaveragebitrate if over 510000 ', () => {
-    const sdp = 'foo=a\na=rtpmap:0 PCMU/8000\na=rtpmap:1337 opus/48000/2\na=fmtp:1337\nbar=b';
-    const newSdp = setMaxAverageBitrate(sdp, 510001);
-    assert.equal(newSdp, 'foo=a\na=rtpmap:0 PCMU/8000\na=rtpmap:1337 opus/48000/2\na=fmtp:1337\nbar=b');
-  });
-});
-
 describe('getPreferredCodecInfo', () => {
   it('should get the correct info for Opus', () => {
     const sdp = 'foo=a\na=rtpmap:1337 opus/48000/2\na=rtpmap:0 PCMU/8000\na=fmtp:0\na=fmtp:1337 maxaveragebitrate=12000;usedtx=0\nbar=b';

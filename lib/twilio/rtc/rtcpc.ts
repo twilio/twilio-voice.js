@@ -4,7 +4,7 @@
 
 import Log from '../log';
 import * as util from '../util';
-import { setCodecPreferences, setMaxAverageBitrate } from './sdp';
+import { setCodecPreferences } from './sdp';
 
 const RTCPeerConnectionShim = require('rtcpeerconnection-shim');
 
@@ -72,36 +72,33 @@ RTCPC.prototype.createModernConstraints = c => {
 
   return nc;
 };
-RTCPC.prototype.createOffer = function(maxAverageBitrate, constraints, onSuccess, onError) {
+RTCPC.prototype.createOffer = function(constraints, onSuccess, onError) {
   constraints = this.createModernConstraints(constraints);
   return promisifyCreate(this.pc.createOffer, this.pc)(constraints).then(offer => {
     if (!this.pc) { return Promise.resolve(); }
 
-    const sdp = setMaxAverageBitrate(offer.sdp, maxAverageBitrate);
-
     return promisifySet(this.pc.setLocalDescription, this.pc)(new RTCSessionDescription({
-      sdp,
+      sdp: offer.sdp,
       type: 'offer',
     }));
   }).then(onSuccess, onError);
 };
-RTCPC.prototype.createAnswer = function(maxAverageBitrate, constraints, onSuccess, onError) {
+RTCPC.prototype.createAnswer = function(constraints, onSuccess, onError) {
   constraints = this.createModernConstraints(constraints);
   return promisifyCreate(this.pc.createAnswer, this.pc)(constraints).then(answer => {
     if (!this.pc) { return Promise.resolve(); }
-    const sdp = setMaxAverageBitrate(answer.sdp, maxAverageBitrate);
 
     return promisifySet(this.pc.setLocalDescription, this.pc)(new RTCSessionDescription({
-      sdp,
+      sdp: answer.sdp,
       type: 'answer',
     }));
   }).then(onSuccess, onError);
 };
-RTCPC.prototype.processSDP = function(maxAverageBitrate, codecPreferences, sdp, constraints, onSuccess, onError) {
+RTCPC.prototype.processSDP = function(codecPreferences, sdp, constraints, onSuccess, onError) {
   sdp = setCodecPreferences(sdp, codecPreferences);
   const desc = new RTCSessionDescription({ sdp, type: 'offer' });
   return promisifySet(this.pc.setRemoteDescription, this.pc)(desc).then(() => {
-    this.createAnswer(maxAverageBitrate, constraints, onSuccess, onError);
+    this.createAnswer(constraints, onSuccess, onError);
   });
 };
 RTCPC.prototype.getSDP = function() {

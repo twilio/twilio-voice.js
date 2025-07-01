@@ -313,7 +313,7 @@ PeerConnection.prototype._setInputTracksForPlanB = function(shouldClone, newStre
   }
 
   return new Promise((resolve, reject) => {
-    this.version.createOffer(this.options.maxAverageBitrate, { audio: true }, () => {
+    this.version.createOffer({ audio: true }, () => {
       this.version.processAnswer(this.codecPreferences, this._answerSdp, () => {
         resolve(this.stream);
       }, reject);
@@ -657,15 +657,20 @@ PeerConnection.prototype._setupPeerConnection = function(rtcConfiguration) {
   this._log.debug('setting sorted codecs', sortedCodecs);
   transceiver.setCodecPreferences(sortedCodecs);
 
+  if (typeof version.pc.getSenders === 'function') {
+    this._sender = version.pc.getSenders()[0];
+    const params = this._sender.getParameters();
+    params.encodings ??= [{}];
+    params.encodings[0].maxBitrate = this.options.maxAverageBitrate;
+    this._log.debug('setting maxAverageBitrate', this.options.maxAverageBitrate);
+    this._sender.setParameters(params);
+  }
+
   const eventName = 'ontrack' in version.pc
     ? 'ontrack' : 'onaddstream';
 
   version.pc[eventName] = event => {
     const stream = self._remoteStream = event.stream || event.streams[0];
-
-    if (typeof version.pc.getSenders === 'function') {
-      this._sender = version.pc.getSenders()[0];
-    }
 
     if (self._isSinkSupported) {
       self._onAddTrack(self, stream);
@@ -845,7 +850,7 @@ PeerConnection.prototype._setupRTCIceTransportListener = function() {
 PeerConnection.prototype.iceRestart = function() {
   this._log.info('Attempting to restart ICE...');
   this._hasIceCandidates = false;
-  this.version.createOffer(this.options.maxAverageBitrate, { iceRestart: true }).then(() => {
+  this.version.createOffer({ iceRestart: true }).then(() => {
     this._removeReconnectionListeners();
 
     this._onAnswerOrRinging = payload => {
@@ -941,7 +946,7 @@ PeerConnection.prototype.makeOutgoingCall = function(params, signalingReconnectT
     } });
   }
 
-  this.version.createOffer(this.options.maxAverageBitrate, { audio: true }, onOfferSuccess, onOfferError);
+  this.version.createOffer({ audio: true }, onOfferSuccess, onOfferError);
 };
 PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfiguration, onMediaStarted) {
   if (!this._initializeMediaStream(rtcConfiguration)) {
@@ -969,7 +974,7 @@ PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfigur
       twilioError: new MediaErrors.ClientRemoteDescFailed(),
     } });
   }
-  this.version.processSDP(this.options.maxAverageBitrate, this.codecPreferences, sdp, { audio: true }, onAnswerSuccess, onAnswerError);
+  this.version.processSDP(this.codecPreferences, sdp, { audio: true }, onAnswerSuccess, onAnswerError);
 };
 PeerConnection.prototype.close = function() {
   if (this.version && this.version.pc) {

@@ -30,23 +30,6 @@ function setIceAggressiveNomination(sdp) {
     .join('\n');
 }
 
-function setMaxAverageBitrate(sdp, maxAverageBitrate) {
-  if (typeof maxAverageBitrate !== 'number'
-      || maxAverageBitrate < BITRATE_MIN
-      || maxAverageBitrate > BITRATE_MAX) {
-    return sdp;
-  }
-
-  const matches = /a=rtpmap:(\d+) opus/m.exec(sdp);
-  const opusId = matches && matches.length ? matches[1] : defaultOpusId;
-  const regex = new RegExp(`a=fmtp:${opusId}`);
-  const lines = sdp.split('\n').map(line => regex.test(line)
-    ? line + `;maxaveragebitrate=${maxAverageBitrate}`
-    : line);
-
-  return lines.join('\n');
-}
-
 /**
  * Return a new SDP string with the re-ordered codec preferences.
  * @param {string} sdp
@@ -183,5 +166,4 @@ export {
   getPreferredCodecInfo,
   setCodecPreferences,
   setIceAggressiveNomination,
-  setMaxAverageBitrate,
 };

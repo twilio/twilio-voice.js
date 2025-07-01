@@ -40,7 +40,7 @@ describe('PeerConnection', () => {
       cStream = createStream();
       eStream = createStream();
       version = {
-        createOffer: sinon.stub().callsArgWith(2),
+        createOffer: sinon.stub().callsArgWith(1),
         processAnswer: sinon.stub().callsArgWith(2),
         pc: {
           addTrack: sinon.stub(),
@@ -104,11 +104,11 @@ describe('PeerConnection', () => {
 
     it('Should reject when createOffer calls error callback', done => {
       eStream.getAudioTracks.returns([{track: 'track'}]);
-      version.createOffer.callsArgWith(3, MESSAGE);
+      version.createOffer.callsArgWith(2, MESSAGE);
       toTest(false, eStream).then(() => done(new Error('Should not resolve'))).catch(aMessage => {
         assert.equal(aMessage, MESSAGE);
         assert(context.mute.calledWithExactly(context.isMuted));
-        version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func);
+        version.createOffer.calledWithExactly({audio: true}, sinon.match.func, sinon.match.func);
       }).then(done, done);
     });
 
@@ -117,7 +117,7 @@ describe('PeerConnection', () => {
       version.processAnswer.callsArgWith(3, MESSAGE);
       toTest(false, eStream).then(() => done(new Error('Should not resolve'))).catch(aMessage => {
         assert.equal(aMessage, MESSAGE);
-        version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func);
+        version.createOffer.calledWithExactly({audio: true}, sinon.match.func, sinon.match.func);
         version.processAnswer.calledWithExactly(undefined, context._answerSdp, sinon.match.func, sinon.match.func);
         assert(version.createOffer.calledBefore(version.processAnswer));
       }).then(done, done);
@@ -127,7 +127,7 @@ describe('PeerConnection', () => {
       eStream.getAudioTracks.returns([{track: 'track'}]);
       toTest(false, eStream).then(aStream => {
         assert.equal(cStream, aStream);
-        assert(version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func));
+        assert(version.createOffer.calledWithExactly({audio: true}, sinon.match.func, sinon.match.func));
         assert(version.processAnswer.calledWithExactly(undefined, context._answerSdp, sinon.match.func, sinon.match.func));
         assert(version.createOffer.calledBefore(version.processAnswer));
         assert(version.processAnswer.calledBefore(context._createAnalyser));
@@ -563,7 +563,7 @@ describe('PeerConnection', () => {
       const sdp = 'foo';
       context._initializeMediaStream.returns(true);
       context._maybeSetIceAggressiveNomination = sinon.stub().returns(sdp);
-      version.processSDP.callsArgWith(4);
+      version.processSDP.callsArgWith(3);
       toTest();
       assert.equal(context._answerSdp, sdp);
       sinon.assert.calledWithExactly(context._maybeSetIceAggressiveNomination, eSDP);
@@ -571,11 +571,11 @@ describe('PeerConnection', () => {
 
     it('Should call processSDP when succeeded to initialize streams', () => {
       context._initializeMediaStream.returns(true);
-      version.processSDP.callsArgWith(4);
+      version.processSDP.callsArgWith(3);
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.processSDP.calledOnce);
-      assert(version.processSDP.calledWithExactly(undefined, undefined, eSDP, {audio: true}, sinon.match.func, sinon.match.func));
+      assert(version.processSDP.calledWithExactly(undefined, eSDP, {audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
       sinon.assert.notCalled(context._setupRTCDtlsTransportListener);
     });
@@ -584,14 +584,14 @@ describe('PeerConnection', () => {
       const sdp1 = 'sdp1';
       context._initializeMediaStream.returns(true);
       version.getSDP.returns(sdp1);
-      version.processSDP.callsArgWith(4);
+      version.processSDP.callsArgWith(3);
       context.status = false;
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(context.pstream.answer.calledWithExactly(sdp1, eCallSid));
       assert(context.pstream.answer.calledOn(context.pstream));
       assert(version.processSDP.calledOnce);
-      assert(version.processSDP.calledWithExactly(undefined, undefined, eSDP, {audio: true}, sinon.match.func, sinon.match.func));
+      assert(version.processSDP.calledWithExactly(undefined, eSDP, {audio: true}, sinon.match.func, sinon.match.func));
       assert(version.getSDP.calledWithExactly());
       assert(version.getSDP.calledOn(version));
       assert.equal(context._setEncodingParameters.callCount, 1);
@@ -605,7 +605,7 @@ describe('PeerConnection', () => {
       const error = new Error('error message');
       const expectedError = {info: {code: 31000, message: 'Error creating the answer: error message'}};
       context._initializeMediaStream.returns(true);
-      version.processSDP.callsArgWith(5, error);
+      version.processSDP.callsArgWith(4, error);
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.processSDP.calledOnce);
@@ -614,7 +614,7 @@ describe('PeerConnection', () => {
       const rVal = context.onerror.firstCall.args[0];
       assert.equal(rVal.info.twilioError.code, 53402);
 
-      assert(version.processSDP.calledWithExactly(undefined, undefined, eSDP, {audio: true}, sinon.match.func, sinon.match.func));
+      assert(version.processSDP.calledWithExactly(undefined, eSDP, {audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(context.pstream.answer.called, false);
       assert.equal(version.getSDP.called, false);
       assert.equal(callback.called, false);
@@ -623,7 +623,7 @@ describe('PeerConnection', () => {
 
     it('Should call onerror event when processSDP error callback is called and returns error message', () => {
       context._initializeMediaStream.returns(true);
-      version.processSDP.callsArgWith(5, 'error message');
+      version.processSDP.callsArgWith(4, 'error message');
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.processSDP.calledOnce);
@@ -632,7 +632,7 @@ describe('PeerConnection', () => {
       const rVal = context.onerror.firstCall.args[0];
       assert.equal(rVal.info.twilioError.code, 53402);
 
-      assert(version.processSDP.calledWithExactly(undefined, undefined, eSDP, {audio: true}, sinon.match.func, sinon.match.func));
+      assert(version.processSDP.calledWithExactly(undefined, eSDP, {audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(context.pstream.answer.called, false);
       assert.equal(version.getSDP.called, false);
       sinon.assert.notCalled(context._setEncodingParameters);
@@ -645,8 +645,8 @@ describe('PeerConnection', () => {
       version.getSDP.returns('sdp');
       context.status = false;
       toTest();
-      version.processSDP.callArg(4);
-      version.processSDP.callArg(4);
+      version.processSDP.callArg(3);
+      version.processSDP.callArg(3);
       assert(callback.calledWithExactly(version.pc));
       assert(callback.calledTwice);
       assert.equal(context.onerror.called, false);
@@ -657,8 +657,8 @@ describe('PeerConnection', () => {
       context._initializeMediaStream.returns(true);
       version.getSDP.returns('sdp');
       toTest();
-      version.processSDP.callArg(5, new Error('error message'));
-      version.processSDP.callArg(5, new Error('error message'));
+      version.processSDP.callArg(4, new Error('error message'));
+      version.processSDP.callArg(4, new Error('error message'));
       assert(context.onerror.calledWithMatch(EXPECTED_ERROR));
 
       const rVal = context.onerror.firstCall.args[0];
@@ -745,7 +745,7 @@ describe('PeerConnection', () => {
     it('Should call createOffer with iceRestart flag', () => {
       toTest();
       return wait().then(() => {
-        assert(version.createOffer.calledWithExactly(undefined, {iceRestart: true}));
+        assert(version.createOffer.calledWithExactly({iceRestart: true}));
       });
     });
 
@@ -886,17 +886,17 @@ describe('PeerConnection', () => {
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.createOffer.calledOnce);
-      assert(version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func));
+      assert(version.createOffer.calledWithExactly({audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
       assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
     });
 
     it('Should call onOfferSuccess and do nothting when createOffer calls success callback and status is closed', () => {
-      version.createOffer.callsArg(2);
+      version.createOffer.callsArg(1);
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.createOffer.calledOnce);
-      assert(version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func));
+      assert(version.createOffer.calledWithExactly({audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
       assert.equal(context.pstream.invite.called, false);
       assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
@@ -905,11 +905,11 @@ describe('PeerConnection', () => {
 
     it('Should call onOfferSuccess and pstream invite when createOffer calls success callback and status is not closed', () => {
       context.status = 'not closed';
-      version.createOffer.callsArg(2);
+      version.createOffer.callsArg(1);
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.createOffer.calledOnce);
-      assert(version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func));
+      assert(version.createOffer.calledWithExactly({audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
       assert(context.pstream.invite.calledOnce);
       assert(context.pstream.invite.calledWithExactly(eSDP, eCallSid, eParams));
@@ -921,11 +921,11 @@ describe('PeerConnection', () => {
 
     it('Should call onOfferSuccess and pstream reconnect when createOffer calls success callback and status is not closed', () => {
       context.status = 'not closed';
-      version.createOffer.callsArg(2);
+      version.createOffer.callsArg(1);
       METHOD.call(context, eParams, 'reconnectToken', eCallSid, eIceServers, callback);
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.createOffer.calledOnce);
-      assert(version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func));
+      assert(version.createOffer.calledWithExactly({audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
       assert(context.pstream.reconnect.calledOnce);
       assert(context.pstream.reconnect.calledWithExactly(eSDP, eCallSid, 'reconnectToken'));
@@ -938,11 +938,11 @@ describe('PeerConnection', () => {
     it('Should call onOfferSuccess when createOffer calls success callback and status is not closed and device token is not truthy', () => {
       context.device.token = 'this is device token';
       context.status = NOT_CLOSED;
-      version.createOffer.callsArg(2);
+      version.createOffer.callsArg(1);
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.createOffer.calledOnce);
-      assert(version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func));
+      assert(version.createOffer.calledWithExactly({audio: true}, sinon.match.func, sinon.match.func));
       assert.equal(callback.called, false);
       assert(context.pstream.invite.calledOnce);
       assert(context.pstream.invite.calledWithExactly(eSDP, eCallSid, eParams));
@@ -952,7 +952,7 @@ describe('PeerConnection', () => {
     });
 
     it('Should call onOfferError when createOffer calls error callback with error message', () => {
-      version.createOffer.callsArgWith(3, ERROR_MESSAGE);
+      version.createOffer.callsArgWith(2, ERROR_MESSAGE);
       toTest();
       assert(context.onerror.calledWithMatch(EXPECTED_OFFER_ERROR));
 
@@ -2297,6 +2297,7 @@ describe('PeerConnection', () => {
       context = {
         codecPreferences: ['pcmu', 'opus'],
         options: {
+          maxAverageBitrate: 32000,
           rtcpcFactory
         },
         stream: STREAM,
@@ -2386,6 +2387,49 @@ describe('PeerConnection', () => {
         { mimeType: 'audio/G722' },
         { mimeType: 'audio/PCMA' },
       ]));
+    });
+    
+    it('Should set maxBitrate on sender', () => {
+      assert.deepStrictEqual(toTest(), new rtcpcFactory());
+      assert(sender.getParameters.calledOnce);
+      assert(sender.setParameters.calledWithExactly({
+        foo: 'bar',
+        encodings: [
+          { priority: 'low', networkPriority: 'low', maxBitrate: 32000 },
+          { priority: 'low', networkPriority: 'low' },
+        ],
+      }));
+    });
+
+    it('Should create encodings array on sender if missing', () => {
+      params = {
+        foo: 'bar',
+      };
+      assert.deepStrictEqual(toTest(), new rtcpcFactory());
+      assert(sender.getParameters.calledOnce);
+      assert(sender.setParameters.calledWithExactly({
+        foo: 'bar',
+        encodings: [
+          { maxBitrate: 32000 },
+        ],
+      }));
+    });
+
+    it('Should overwrite existing maxBitrate if options.maxAverageBitrate provided', () => {
+      params = {
+        foo: 'bar',
+        encodings: [
+          { priority: 'low', networkPriority: 'low', maxBitrate: 45000 },
+        ]
+      };
+      assert.deepStrictEqual(toTest(), new rtcpcFactory());
+      assert(sender.getParameters.calledOnce);
+      assert(sender.setParameters.calledWithExactly({
+        foo: 'bar',
+        encodings: [
+          { priority: 'low', networkPriority: 'low', maxBitrate: 32000 },
+        ],
+      }));
     });
 
     describe('after creating audio outputs', () => {
