@@ -7,6 +7,7 @@ Changes
 -------
 
 - Replaced SDP munging with the [setCodecPreferences](https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/setCodecPreferences) API for setting preferred codecs in the SDK.
+- Replaced SDP munging with the [setParameters](https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpSender/setParameters#maxbitrate) API for setting preferred maxBitrate in the SDK.
 
 2.14.0 (In Progress)
 ====================
