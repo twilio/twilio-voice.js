@@ -1,0 +1,122 @@
+<!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>@twilio/voice-sdk</title><meta name="description" content="Documentation for @twilio/voice-sdk"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script><script async src="assets/hierarchy.js" id="tsd-hierarchy-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><a href="index.html" class="title">@twilio/voice-sdk</a><div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/><ul role="listbox" id="tsd-search-results"></ul><div id="tsd-search-status" aria-live="polite" aria-atomic="true"><div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><h1>@twilio/voice-sdk</h1></div><div class="tsd-panel tsd-typography"><h2 id="migration-from-twilio-clientjs-1x" class="tsd-anchor-link">Migration from twilio-client.js 1.x<a href="#migration-from-twilio-clientjs-1x" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><p>This product, Twilio's JavaScript Voice SDK, is the next version of Twilio's Javascript Client SDK. It is
+now in GA and we recommend all customers migrate in order to continue receiving future feature additions.
+For help on migrating from 1.x, see our <a href="https://www.twilio.com/docs/voice/client/migrating-to-js-voice-sdk-20">migration guide</a>.</p>
+<h1 id="twiliovoice-sdk" class="tsd-anchor-link">@twilio/voice-sdk<a href="#twiliovoice-sdk" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1><p><a href="https://www.npmjs.com/package/%40twilio/voice-sdk"><img src="https://img.shields.io/npm/v/%40twilio/voice-sdk.svg" alt="NPM"></a> <a href="https://circleci.com/gh/twilio/twilio-voice.js/tree/master"><img src="https://dl.circleci.com/status-badge/img/gh/twilio/twilio-voice.js/tree/master.svg?style=shield" alt="CircleCI"></a></p>
+<p>Twilio's Voice SDK allows you to add real-time voice and PSTN calling to your web apps.</p>
+<ul>
+<li><a href="https://twilio.github.io/twilio-voice.js/index.html">API Docs</a></li>
+<li><a href="https://www.twilio.com/docs/voice/sdks/javascript">More Docs</a></li>
+<li><a href="https://www.twilio.com/docs/voice/client/javascript/quickstart">Quickstart</a></li>
+<li><a href="https://www.twilio.com/docs/voice/sdks/javascript/reference-components">Reference Components</a></li>
+<li><a href="https://github.com/twilio/twilio-voice.js/blob/master/CHANGELOG.md">Changelog</a></li>
+</ul>
+<h3 id="issues-and-support" class="tsd-anchor-link">Issues and Support<a href="#issues-and-support" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>Please check out our <a href="media/COMMON_ISSUES.md">common issues</a> page or file any issues you find here on Github. For general inquiries related to the Voice SDK you can file a support ticket. Please ensure that you are not sharing any <a href="https://www.twilio.com/docs/glossary/what-is-personally-identifiable-information-pii">Personally Identifiable Information(PII)</a> or sensitive account information (API keys, credentials, etc.) when reporting an issue.</p>
+<h2 id="installation" class="tsd-anchor-link">Installation<a href="#installation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><h3 id="npm" class="tsd-anchor-link">NPM<a href="#npm" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>We recommend using <code>npm</code> to add the Voice SDK as a dependency.</p>
+<pre><code><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-0">install</span><span class="hl-1"> @</span><span class="hl-0">twilio</span><span class="hl-1">/</span><span class="hl-0">voice</span><span class="hl-1">-</span><span class="hl-0">sdk</span><span class="hl-1"> --</span><span class="hl-0">save</span>
+</code><button>Copy</button></pre>
+
+<p>Using this method, you can <code>import</code> the Voice SDK using ES Module or TypeScript syntax:</p>
+<pre><code class="js"><span class="hl-2">import</span><span class="hl-1"> { </span><span class="hl-0">Device</span><span class="hl-1"> } </span><span class="hl-2">from</span><span class="hl-1"> </span><span class="hl-3">&#39;@twilio/voice-sdk&#39;</span><span class="hl-1">;</span><br/>
+</code><button type="button">Copy</button></pre>
+
+<p>Or using CommonJS:</p>
+<pre><code class="js"><span class="hl-4">const</span><span class="hl-1"> </span><span class="hl-5">Device</span><span class="hl-1"> = </span><span class="hl-6">require</span><span class="hl-1">(</span><span class="hl-3">&#39;@twilio/voice-sdk&#39;</span><span class="hl-1">).</span><span class="hl-0">Device</span><span class="hl-1">;</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="cdn" class="tsd-anchor-link">CDN<a href="#cdn" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>As of 2.0, the Twilio Voice SDK is no longer hosted via CDN.</p>
+<h3 id="github" class="tsd-anchor-link">GitHub<a href="#github" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3><p>Although we recommend using <code>npm</code> to add the Voice SDK as a dependency, you can also get the Twilio Voice SDK code
+from GitHub and include it in your project directly. To do so, navigate to
+<a href="https://github.com/twilio/twilio-voice.js/tags">&quot;Tags&quot;</a> and find the most recent release, or
+the particular release version you'd like to use.</p>
+<blockquote>
+<p><strong>Note:</strong> releases tagged with &quot;-rc&quot; are &quot;Release Candidate&quot; versions
+and are still being tested. Unless you specifically know that you want to use a release candidate
+version, you should not use a release with &quot;-rc&quot; in the name.</p>
+</blockquote>
+<p>Download either the <code>zip</code> or the <code>tar.gz</code> and then extract the files. For example, if you downloaded the
+tarball for the <code>2.0.0</code> release, you could then extract the files with the <code>tar</code> command:</p>
+<pre><code><span class="hl-0">tar</span><span class="hl-1"> -</span><span class="hl-0">xvzf</span><span class="hl-1"> </span><span class="hl-0">twilio</span><span class="hl-1">-</span><span class="hl-0">voice</span><span class="hl-1">.</span><span class="hl-0">js</span><span class="hl-1">-</span><span class="hl-7">2.0</span><span class="hl-1">.0.</span><span class="hl-0">tar</span><span class="hl-1">.</span><span class="hl-0">gz</span><br/><span class="hl-0">cd</span><span class="hl-1"> </span><span class="hl-0">twilio</span><span class="hl-1">-</span><span class="hl-0">voice</span><span class="hl-1">.</span><span class="hl-0">js</span><span class="hl-1">-</span><span class="hl-7">2.0</span><span class="hl-1">.</span><span class="hl-7">0</span>
+</code><button>Copy</button></pre>
+
+<p>Once you've extracted the folder, the <code>twilio.js</code> and <code>twilio.min.js</code> files that
+you can include in your project will be in the <code>/dist</code> directory. <code>twilio.min.js</code> is the
+minified version of the code.</p>
+<p>You can copy either the <code>twilio.js</code> or the <code>twilio.min.js</code> file into your project and
+then provide a link to it in your html. For example:</p>
+<pre><code><span class="hl-1">&lt;</span><span class="hl-0">script</span><span class="hl-1"> </span><span class="hl-0">type</span><span class="hl-1">=</span><span class="hl-3">&quot;text/javascript&quot;</span><span class="hl-1"> </span><span class="hl-0">src</span><span class="hl-1">=</span><span class="hl-3">&quot;twilio.min.js&quot;</span><span class="hl-1">&gt;&lt;/</span><span class="hl-8">script</span><span class="hl-1">&gt;</span>
+</code><button>Copy</button></pre>
+
+<p>Using this method, you can access the SDK through the browser global:</p>
+<pre><code><span class="hl-4">const</span><span class="hl-1"> </span><span class="hl-5">Device</span><span class="hl-1"> = </span><span class="hl-0">Twilio</span><span class="hl-1">.</span><span class="hl-0">Device</span><span class="hl-1">;</span>
+</code><button>Copy</button></pre>
+
+<h2 id="testing" class="tsd-anchor-link">Testing<a href="#testing" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><p>Running unit tests requires no setup aside from installation (above). You can run unit tests via:</p>
+<pre><code><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-0">run</span><span class="hl-1"> </span><span class="hl-9">test</span><span class="hl-1">:</span><span class="hl-0">unit</span>
+</code><button>Copy</button></pre>
+
+<p>Integration tests require some set up:</p>
+<ol>
+<li>Create a TwiML App with the friendly name <code>Integration Tests</code>, using the TwiML code below.</li>
+</ol>
+<pre><code class="xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;Response&gt;
+  &lt;Dial&gt;
+    &lt;Client&gt;
+      &lt;Identity&gt;{{To}}&lt;/Identity&gt;
+      &lt;Parameter name=&quot;duplicate&quot; value=&quot;12345&quot; /&gt;
+      &lt;Parameter name=&quot;duplicate&quot; value=&quot;123456&quot; /&gt;
+      &lt;Parameter name=&quot;custom + param&quot; value=&quot;我不吃蛋&quot; /&gt;
+      &lt;Parameter name=&quot;foobar&quot; value=&quot;some + value&quot; /&gt;
+      &lt;Parameter name=&quot;custom1&quot; value=&quot;{{Custom1}}&quot; /&gt;
+      &lt;Parameter name=&quot;custom2&quot; value=&quot;{{Custom2}}&quot; /&gt;
+      &lt;Parameter name=&quot;custom3&quot; value=&quot;{{Custom3}}&quot; /&gt;
+    &lt;/Client&gt;
+  &lt;/Dial&gt;
+&lt;/Response&gt;
+</code><button type="button">Copy</button></pre>
+
+<ol start="2">
+<li>Create a second TwiML App with the friendly name <code>STIR/SHAKEN</code>, using the TwiML code below. Be sure to use your Twilio number for the <code>Dial</code> verb.</li>
+</ol>
+<pre><code class="xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;Response&gt;
+  &lt;Dial callerId=&quot;{{CallerId}}&quot;&gt;xxxxxxxxxxxxxxxx&lt;/Dial&gt;
+&lt;/Response&gt;
+</code><button type="button">Copy</button></pre>
+
+<ol start="3">
+<li>
+<p>Cypress requires <code>env</code> <code>vars</code> to be prefixed with <code>CYPRESS_</code>. Make a copy the <code>example.env</code> file with the name <code>.env</code> and populate the file with your credentials.</p>
+</li>
+<li>
+<p>Start the relay server</p>
+</li>
+</ol>
+<pre><code><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-0">run</span><span class="hl-1"> </span><span class="hl-9">test</span><span class="hl-1">:</span><span class="hl-0">relay</span><span class="hl-1">-</span><span class="hl-0">server</span>
+</code><button>Copy</button></pre>
+
+<ol start="5">
+<li>Integration tests run via Cypress, and can be run via:</li>
+</ol>
+<pre><code><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-0">run</span><span class="hl-1"> </span><span class="hl-9">test</span><span class="hl-1">:</span><span class="hl-9">integration</span><span class="hl-1">:</span><span class="hl-0">chrome</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-0">run</span><span class="hl-1"> </span><span class="hl-9">test</span><span class="hl-1">:</span><span class="hl-9">integration</span><span class="hl-1">:</span><span class="hl-0">firefox</span>
+</code><button>Copy</button></pre>
+
+<h2 id="content-security-policy-csp" class="tsd-anchor-link">Content Security Policy (CSP)<a href="#content-security-policy-csp" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><p>Use the following policy directives to enable <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP">CSP</a> that is compatible with twilio-voice.js.</p>
+<pre><code><span class="hl-0">script</span><span class="hl-1">-</span><span class="hl-0">src</span><span class="hl-1"> </span><span class="hl-9">https</span><span class="hl-1">:</span><span class="hl-10">//media.twiliocdn.com https://sdk.twilio.com</span><br/><span class="hl-0">media</span><span class="hl-1">-</span><span class="hl-0">src</span><span class="hl-1"> </span><span class="hl-9">mediastream</span><span class="hl-1">: </span><span class="hl-9">https</span><span class="hl-1">:</span><span class="hl-10">//media.twiliocdn.com https://sdk.twilio.com</span><br/><span class="hl-0">connect</span><span class="hl-1">-</span><span class="hl-0">src</span><span class="hl-1"> </span><span class="hl-9">https</span><span class="hl-1">:</span><span class="hl-10">//eventgw.twilio.com wss://voice-js.roaming.twilio.com https://media.twiliocdn.com https://sdk.twilio.com</span>
+</code><button>Copy</button></pre>
+
+<p>If you are providing a non-default value for <code>Device.ConnectOptions.edge</code> parameter, you need to add the Signaling URI <code>wss://voice-js.{edgeId}.twilio.com</code> in your <code>connect-src</code> directive where <code>edgeId</code> is the <code>Edge ID</code> as defined in this <a href="https://www.twilio.com/docs/global-infrastructure/edge-locations">page</a>. See examples below.</p>
+<p><strong>If <code>Device.ConnectOptions.edge</code> is <code>ashburn</code></strong></p>
+<pre><code><span class="hl-0">connect</span><span class="hl-1">-</span><span class="hl-0">src</span><span class="hl-1"> </span><span class="hl-9">https</span><span class="hl-1">:</span><span class="hl-10">//eventgw.twilio.com https://media.twiliocdn.com https://sdk.twilio.com wss://voice-js.ashburn.twilio.com</span>
+</code><button>Copy</button></pre>
+
+<p><strong>If <code>Device.ConnectOptions.edge</code> is <code>['ashburn', 'sydney', 'roaming']</code></strong></p>
+<pre><code><span class="hl-0">connect</span><span class="hl-1">-</span><span class="hl-0">src</span><span class="hl-1"> </span><span class="hl-9">https</span><span class="hl-1">:</span><span class="hl-10">//eventgw.twilio.com https://media.twiliocdn.com https://sdk.twilio.com wss://voice-js.ashburn.twilio.com wss://voice-js.sydney.twilio.com wss://voice-js.roaming.twilio.com</span>
+</code><button>Copy</button></pre>
+
+<p>If you are providing a home region grant into your <a href="https://www.twilio.com/docs/iam/access-tokens">Twilio access token</a>, you need to add the insights endpoint in your <code>connect-src</code> directive using <code>eventgw.{homeRegion}.twilio.com</code> format. Below is an example if your home region grant is <code>sg1</code>.</p>
+<pre><code><span class="hl-0">connect</span><span class="hl-1">-</span><span class="hl-0">src</span><span class="hl-1"> </span><span class="hl-9">https</span><span class="hl-1">:</span><span class="hl-10">//eventgw.sg1.twilio.com wss://voice-js.roaming.twilio.com https://media.twiliocdn.com https://sdk.twilio.com</span>
+</code><button>Copy</button></pre>
+
+<h2 id="license" class="tsd-anchor-link">License<a href="#license" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2><p>See <a href="https://github.com/twilio/twilio-voice.js/blob/master/LICENSE.md">LICENSE.md</a></p>
+</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><ul><li><a href="#migration-from-twilio-clientjs-1x"><span>Migration from twilio-<wbr/>client.js 1.x</span></a></li></ul><a href="#twiliovoice-sdk"><span>@twilio/voice-<wbr/>sdk</span></a><ul><li><ul><li><a href="#issues-and-support"><span>Issues and <wbr/>Support</span></a></li></ul></li></ul><a href="#installation"><span>Installation</span></a><ul><li><ul><li><a href="#npm"><span>NPM</span></a></li><li><a href="#cdn"><span>CDN</span></a></li><li><a href="#github"><span>Git<wbr/>Hub</span></a></li></ul></li></ul><a href="#testing"><span>Testing</span></a><a href="#content-security-policy-csp"><span>Content <wbr/>Security <wbr/>Policy (CSP)</span></a><a href="#license"><span>License</span></a></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="modules.html">@twilio/voice-sdk</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
