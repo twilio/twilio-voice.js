@@ -313,7 +313,7 @@ PeerConnection.prototype._setInputTracksForPlanB = function(shouldClone, newStre
   }
 
   return new Promise((resolve, reject) => {
-    this.version.createOffer(this.options.maxAverageBitrate, this.codecPreferences, { audio: true }, () => {
+    this.version.createOffer(this.options.maxAverageBitrate, { audio: true }, () => {
       this.version.processAnswer(this.codecPreferences, this._answerSdp, () => {
         resolve(this.stream);
       }, reject);
@@ -650,6 +650,13 @@ PeerConnection.prototype._setupPeerConnection = function(rtcConfiguration) {
   version.create(rtcConfiguration);
   addStream(version.pc, this.stream);
 
+  const supportedCodecs = RTCRtpReceiver.getCapabilities('audio').codecs;
+  this._log.debug('sorting codecs', supportedCodecs, this.codecPreferences);
+  const sortedCodecs = util.sortByMimeTypes(supportedCodecs, this.codecPreferences);
+  const [transceiver] = version.pc.getTransceivers();
+  this._log.debug('setting sorted codecs', sortedCodecs);
+  transceiver.setCodecPreferences(sortedCodecs);
+
   const eventName = 'ontrack' in version.pc
     ? 'ontrack' : 'onaddstream';
 
@@ -838,7 +845,7 @@ PeerConnection.prototype._setupRTCIceTransportListener = function() {
 PeerConnection.prototype.iceRestart = function() {
   this._log.info('Attempting to restart ICE...');
   this._hasIceCandidates = false;
-  this.version.createOffer(this.options.maxAverageBitrate, this.codecPreferences, { iceRestart: true }).then(() => {
+  this.version.createOffer(this.options.maxAverageBitrate, { iceRestart: true }).then(() => {
     this._removeReconnectionListeners();
 
     this._onAnswerOrRinging = payload => {
@@ -934,7 +941,7 @@ PeerConnection.prototype.makeOutgoingCall = function(params, signalingReconnectT
     } });
   }
 
-  this.version.createOffer(this.options.maxAverageBitrate, this.codecPreferences, { audio: true }, onOfferSuccess, onOfferError);
+  this.version.createOffer(this.options.maxAverageBitrate, { audio: true }, onOfferSuccess, onOfferError);
 };
 PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfiguration, onMediaStarted) {
   if (!this._initializeMediaStream(rtcConfiguration)) {

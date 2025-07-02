@@ -84,6 +84,12 @@ root.navigator ??= {
 };
 
 root.RTCPeerConnection = root.window.RTCPeerConnection = function() { };
+root.RTCRtpReceiver = root.window.RTCRtpReceiver = {
+  getCapabilities: () => ({
+    codecs: []
+  }),
+};
+
 require('./audiohelper');
 require('./outputdevicecollection');
 require('./eventpublisher');

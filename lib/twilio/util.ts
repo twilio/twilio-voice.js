@@ -162,6 +162,17 @@ function promisifyEvents(emitter, resolveEventName, rejectEventName) {
   });
 }
 
+function sortByMimeTypes(codecs, preferredOrder) {
+  const preferredCodecs = preferredOrder.map(codec => 'audio/' + codec.toLowerCase());
+  return codecs.sort((a, b) => {
+    const indexA = preferredCodecs.indexOf(a.mimeType.toLowerCase());
+    const indexB = preferredCodecs.indexOf(b.mimeType.toLowerCase());
+    const orderA = indexA >= 0 ? indexA : Number.MAX_VALUE;
+    const orderB = indexB >= 0 ? indexB : Number.MAX_VALUE;
+    return orderA - orderB;
+  });
+}
+
 const Exception = TwilioException;
 
 export {
@@ -177,4 +188,5 @@ export {
   queryToJson,
   flatMap,
   promisifyEvents,
+  sortByMimeTypes,
 };
