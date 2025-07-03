@@ -577,6 +577,53 @@ class AudioHelper extends EventEmitter {
 
   /**
    * Replace the current input device with a new device by ID.
+   *
+   * @remarks
+   * Calling `setInputDevice` sets the stream for current and future calls and
+   * will not release it automatically.
+   *
+   * While this behavior is not an issue, it will result in the application
+   * holding onto the input device, and the application may show a red
+   * "recording" symbol in the browser tab.
+   *
+   * To remove the red "recording" symbol, the device must be released. To
+   * release it, call `unsetInputDevice` after the call disconnects. Note that
+   * after calling `unsetInputDevice` future calls will then use the default
+   * input device.
+   *
+   * Consider application logic that keeps track of the user-selected device
+   * and call `setInputDevice` before calling `device.connect()` for outgoing
+   * calls and `call.accept()` for incoming calls. Furthermore, consider
+   * calling `unsetInputDevice` once a call is disconnected. Below is an
+   * example:
+   *
+   * ```ts
+   * import { Device } from '@twilio/voice-sdk';
+   * let inputDeviceId = ...;
+   * const device = new Device(...);
+   *
+   * async function makeOutgoingCall() {
+   *   await device.audio.setInputDevice(inputDeviceId);
+   *   const call = await device.connect(...);
+   *
+   *   call.on('disconnect', async () => {
+   *     inputDeviceId = ... // save the current input device id
+   *     await device.audio.unsetInputDevice();
+   *   });
+   * }
+   *
+   * async function acceptIncomingCall(incomingCall) {
+   *   await device.audio.setInputDevice(inputDeviceId);
+   *   await incomingCall.accept();
+   *
+   *   incomingCall.on('disconnect', async () => {
+   *     inputDeviceId = ... // save the current input device id
+   *     await device.audio.unsetInputDevice();
+   *   });
+   * }
+   *
+   * ```
+   *
    * @param deviceId - An ID of a device to replace the existing
    *   input device with.
    */
