@@ -621,7 +621,6 @@ class AudioHelper extends EventEmitter {
    *     await device.audio.unsetInputDevice();
    *   });
    * }
-   *
    * ```
    *
    * @param deviceId - An ID of a device to replace the existing
