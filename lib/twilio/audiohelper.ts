@@ -578,7 +578,6 @@ class AudioHelper extends EventEmitter {
   /**
    * Replace the current input device with a new device by ID.
    *
-   * @remarks
    * Calling `setInputDevice` sets the stream for current and future calls and
    * will not release it automatically.
    *
