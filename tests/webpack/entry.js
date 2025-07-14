@@ -1,1 +1,0 @@
-const Device = require('../../').Device;
