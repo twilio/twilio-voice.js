@@ -1,6 +1,0 @@
-{
-  "name": "No Framework",
-  "path": "./tests/framework/no-framework",
-  "host": "localhost",
-  "port": 5000
-}
