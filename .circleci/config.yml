@@ -24,6 +24,9 @@ parameters:
   release_workflow:
     type: boolean
     default: false
+  qe_workflow:
+    type: boolean
+    default: false
   release_command:
     type: string
     default: "echo \"no release-command specified\""
@@ -421,6 +424,7 @@ workflows:
     jobs:
       - trigger-qe-tests:
           context: sdks-qe
+          name: Trigger QE Regression Tests
           filters:
             tags:
               only:
@@ -429,3 +433,9 @@ workflows:
               - /^\d+\.\d+\.\d+-beta\d+-rc\d+$/
             branches:
               ignore: /.*/
+  qe-trigger-test:
+    when: <<pipeline.parameters.qe_workflow>>
+    jobs:
+      - trigger-qe-tests:
+          context: sdks-qe
+          name: Test QE Regression Tests Trigger          
