@@ -88,7 +88,6 @@ function PeerConnection(audioHelper, pstream, options) {
   this._remoteStream = null;
   this._shouldManageStream = true;
   this._iceState = INITIAL_ICE_CONNECTION_STATE;
-  this._isUnifiedPlan = options.isUnifiedPlan;
 
   this.options = options = options || {};
   this.navigator = options.navigator
@@ -264,74 +263,6 @@ PeerConnection.prototype._updateOutputStreamSource = function(stream) {
  * @private
  */
 PeerConnection.prototype._setInputTracksFromStream = function(shouldClone, newStream) {
-  return this._isUnifiedPlan
-    ? this._setInputTracksForUnifiedPlan(shouldClone, newStream)
-    : this._setInputTracksForPlanB(shouldClone, newStream);
-};
-
-/**
- * Replace the tracks of the current stream with new tracks using the 'plan-b' method.
- * @param {Boolean} shouldClone - Whether the stream should be cloned if it is the first
- *   stream, or set directly. As a rule of thumb, streams that are passed in externally may have
- *   their lifecycle managed externally, and should be cloned so that we do not tear it or its tracks
- *   down when the call ends. Streams that we create internally (inside PeerConnection) should be set
- *   directly so that when the call ends it is disposed of.
- * @param {MediaStream} newStream - The new stream to copy the tracks over from.
- * @private
- */
-PeerConnection.prototype._setInputTracksForPlanB = function(shouldClone, newStream) {
-  if (!newStream) {
-    return Promise.reject(new InvalidArgumentError('Can not set input stream to null while in a call'));
-  }
-
-  if (!newStream.getAudioTracks().length) {
-    return Promise.reject(new InvalidArgumentError('Supplied input stream has no audio tracks'));
-  }
-
-  const localStream = this.stream;
-
-  if (!localStream) {
-    // We can't use MediaStream.clone() here because it stopped copying over tracks
-    //   as of Chrome 61. https://bugs.chromium.org/p/chromium/issues/detail?id=770908
-    this.stream = shouldClone ? cloneStream(newStream) : newStream;
-  } else {
-    this._stopStream();
-
-    removeStream(this.version.pc, localStream);
-    localStream.getAudioTracks().forEach(localStream.removeTrack, localStream);
-    newStream.getAudioTracks().forEach(localStream.addTrack, localStream);
-    addStream(this.version.pc, newStream);
-
-    this._updateInputStreamSource(this.stream);
-  }
-
-  // Apply mute settings to new input track
-  this.mute(this.isMuted);
-
-  if (!this.version) {
-    return Promise.resolve(this.stream);
-  }
-
-  return new Promise((resolve, reject) => {
-    this.version.createOffer(this.options.maxAverageBitrate, { audio: true }, () => {
-      this.version.processAnswer(this.codecPreferences, this._answerSdp, () => {
-        resolve(this.stream);
-      }, reject);
-    }, reject);
-  });
-};
-
-/**
- * Replace the tracks of the current stream with new tracks using the 'unified-plan' method.
- * @param {Boolean} shouldClone - Whether the stream should be cloned if it is the first
- *   stream, or set directly. As a rule of thumb, streams that are passed in externally may have
- *   their lifecycle managed externally, and should be cloned so that we do not tear it or its tracks
- *   down when the call ends. Streams that we create internally (inside PeerConnection) should be set
- *   directly so that when the call ends it is disposed of.
- * @param {MediaStream} newStream - The new stream to copy the tracks over from.
- * @private
- */
-PeerConnection.prototype._setInputTracksForUnifiedPlan = function(shouldClone, newStream) {
   if (!newStream) {
     return Promise.reject(new InvalidArgumentError('Can not set input stream to null while in a call'));
   }

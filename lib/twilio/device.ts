@@ -34,7 +34,6 @@ import { generateVoiceEventSid } from './sid';
 import Sound from './sound';
 import {
   isLegacyEdge,
-  isUnifiedPlanDefault,
   promisifyEvents,
   queryToJson,
 } from './util';
@@ -257,11 +256,6 @@ class Device extends EventEmitter {
    * A DialtonePlayer to play mock DTMF sounds through.
    */
   private static _dialtonePlayer?: DialtonePlayer;
-
-  /**
-   * Whether or not the browser uses unified-plan SDP by default.
-   */
-  private static _isUnifiedPlanDefault: boolean | undefined;
 
   /**
    * Initializes the AudioContext instance shared across the Voice SDK,
@@ -516,14 +510,6 @@ class Device extends EventEmitter {
       if (!Device._dialtonePlayer) {
         Device._dialtonePlayer = new DialtonePlayer(Device._audioContext);
       }
-    }
-
-    if (typeof Device._isUnifiedPlanDefault === 'undefined') {
-      Device._isUnifiedPlanDefault = typeof window !== 'undefined'
-        && typeof RTCPeerConnection !== 'undefined'
-        && typeof RTCRtpTransceiver !== 'undefined'
-      ? isUnifiedPlanDefault(window, window.navigator, RTCPeerConnection, RTCRtpTransceiver)
-      : false;
     }
 
     this._boundDestroy = this.destroy.bind(this);
@@ -1017,10 +1003,6 @@ class Device extends EventEmitter {
    * @param options - Options to be used to instantiate the {@link Call}.
    */
   private async _makeCall(twimlParams: Record<string, string>, options?: Call.Options, isReconnect: boolean = false): Promise<Call> {
-    if (typeof Device._isUnifiedPlanDefault === 'undefined') {
-      throw new InvalidStateError('Device has not been initialized.');
-    }
-
     // Wait for the input device if it's set by the user
     const inputDevicePromise = this._audio?._getInputDevicePromise();
     if (inputDevicePromise) {
@@ -1031,7 +1013,6 @@ class Device extends EventEmitter {
 
     const config: Call.Config = {
       audioHelper: this._audio,
-      isUnifiedPlanDefault: Device._isUnifiedPlanDefault,
       onIgnore: (): void => {
         this._soundcache.get(Device.SoundName.Incoming).stop();
       },
@@ -2065,11 +2046,11 @@ namespace Device {
     /**
      * Overrides the native RTCPeerConnection class.
      *
-     * By default, the SDK will use the `unified-plan` SDP format if the browser supports it.
+     * By default, the SDK will only use the `unified-plan` SDP format.
      * Unexpected behavior may happen if the `RTCPeerConnection` parameter uses an SDP format
      * that is different than what the SDK uses.
      *
-     * For example, if the browser supports `unified-plan` and the `RTCPeerConnection`
+     * For example, if the browser only supports `unified-plan` and the `RTCPeerConnection`
      * parameter uses `plan-b` by default, the SDK will use `unified-plan`
      * which will cause conflicts with the usage of the `RTCPeerConnection`.
      *

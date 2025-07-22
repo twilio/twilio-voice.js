@@ -189,11 +189,6 @@ class Call extends EventEmitter {
   private _isRejected: boolean = false;
 
   /**
-   * Whether or not the browser uses unified-plan SDP by default.
-   */
-  private readonly _isUnifiedPlanDefault: boolean | undefined;
-
-  /**
    * The most recent public input volume value. 0 -> 1 representing -100 to -30 dB.
    */
   private _latestInputVolume: number = 0;
@@ -321,7 +316,6 @@ class Call extends EventEmitter {
   constructor(config: Call.Config, options?: Call.Options) {
     super();
 
-    this._isUnifiedPlanDefault = config.isUnifiedPlanDefault;
     this._soundcache = config.soundcache;
 
     if (typeof config.onIgnore === 'function') {
@@ -397,7 +391,6 @@ class Call extends EventEmitter {
         codecPreferences: this._options.codecPreferences,
         dscp: this._options.dscp,
         forceAggressiveIceNomination: this._options.forceAggressiveIceNomination,
-        isUnifiedPlan: this._isUnifiedPlanDefault,
         maxAverageBitrate: this._options.maxAverageBitrate,
       });
 
@@ -1891,11 +1884,6 @@ namespace Call {
      * An AudioHelper instance to be used for input/output devices.
      */
     audioHelper: IAudioHelper;
-
-    /**
-     * Whether or not the browser uses unified-plan SDP by default.
-     */
-    isUnifiedPlanDefault: boolean;
 
     /**
      * A function to be called after {@link Call.ignore} is called.

@@ -76,39 +76,6 @@ function isSafari(navigator) {
     && navigator.userAgent.indexOf('FxiOS') === -1;
 }
 
-function isUnifiedPlanDefault(window, navigator, PeerConnection, RtpTransceiver) {
-  if (typeof window === 'undefined'
-    || typeof navigator === 'undefined'
-    || typeof PeerConnection === 'undefined'
-    || typeof RtpTransceiver === 'undefined'
-    || typeof PeerConnection.prototype === 'undefined'
-    || typeof RtpTransceiver.prototype === 'undefined') {
-    return false;
-  }
-
-  if (isChrome(window, navigator) && PeerConnection.prototype.addTransceiver) {
-    const pc = new PeerConnection();
-    let isUnifiedPlan = true;
-    try {
-      pc.addTransceiver('audio');
-    } catch (e) {
-      isUnifiedPlan = false;
-    }
-    pc.close();
-    return isUnifiedPlan;
-  } else if (isFirefox(navigator)) {
-    return true;
-  } else if (isSafari(navigator)) {
-    return 'currentDirection' in RtpTransceiver.prototype;
-  }
-
-  // Edge currently does not support unified plan.
-  // https://developer.microsoft.com/en-us/microsoft-edge/platform/issues/17733189/
-  // https://wpdev.uservoice.com/forums/257854-microsoft-edge-developer/suggestions/34451998-sdp-unified-plan
-
-  return false;
-}
-
 function queryToJson(params) {
   if (!params) {
     return '';
@@ -184,7 +151,6 @@ export {
   isFirefox,
   isLegacyEdge,
   isSafari,
-  isUnifiedPlanDefault,
   queryToJson,
   flatMap,
   promisifyEvents,
