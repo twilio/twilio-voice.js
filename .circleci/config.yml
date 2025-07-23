@@ -258,7 +258,7 @@ jobs:
           name: Trigger QE tests
           command: |
             curl --fail --write-out "\nHTTP Response Code: %{http_code}\n" \
-            -u "$INTERNAL_CIRCLECI_PERSONAL_API_TOKEN": -X POST --header "Content-Type: application/json" \
+            -u "$CIRCLECI_PERSONAL_API_TOKEN": -X POST --header "Content-Type: application/json" \
             -d '{"config":{"branch":"'v${CIRCLE_TAG:0:1}'"},"checkout":{"branch":"'v${CIRCLE_TAG:0:1}'"},"definition_id":"'$SDKS_QE_CIRCLECI_VOICE_JS_SLAVE_DEFINITION_ID'","parameters":{"sdk_version":"'$CIRCLE_TAG'","is_rc":true}}' \
             $SDKS_QE_CIRCLECI_VOICE_JS_SLAVE_PIPELINE_ENDPOINT
 
@@ -423,13 +423,10 @@ workflows:
           requires:
             - hold
   release-candidate:
-    when:
-        or:
-          - equal: [true, <<pipeline.parameters.qe_workflow>>]
-          - equal: [true, <<pipeline.parameters.release_workflow>>]
     jobs:
       - trigger-qe-tests:
           context: sdks-qe
+          name: Trigger QE Regression Tests
           filters:
             tags:
               only:
@@ -438,3 +435,9 @@ workflows:
               - /^\d+\.\d+\.\d+-beta\d+-rc\d+$/
             branches:
               ignore: /.*/
+  qe-trigger-test:
+    when: <<pipeline.parameters.qe_workflow>>
+    jobs:
+      - trigger-qe-tests:
+          context: sdks-qe
+          name: Test QE Regression Tests Trigger          
