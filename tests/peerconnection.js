@@ -16,133 +16,6 @@ describe('PeerConnection', () => {
     };
   });
 
-  context('PeerConnection.prototype._setInputTracksFromStream', () => {
-    const METHOD = PeerConnection.prototype._setInputTracksFromStream;
-    const ERROR_STREAM_NOT_NULL = 'Can not set input stream to null while in a call';
-    const MESSAGE = 'This is a message';
-
-    let toTest = null;
-    let eStream = null;
-    let cStream = null;
-    let context = null;
-    let version = null;
-
-    function createStream() {
-      return {
-        getAudioTracks: sinon.stub().returns([]),
-        removeTrack: sinon.spy(),
-        addTrack: sinon.stub(),
-        clone: sinon.stub().returns('cloned stream')
-      };
-    }
-
-    beforeEach(() => {
-      cStream = createStream();
-      eStream = createStream();
-      version = {
-        createOffer: sinon.stub().callsArgWith(2),
-        processAnswer: sinon.stub().callsArgWith(2),
-        pc: {
-          addTrack: sinon.stub(),
-          removeTrack: sinon.stub(),
-          getSenders: sinon.stub().returns([])
-        }
-      };
-      context = {
-        isMuted: 'isMuted',
-        mute: sinon.stub(),
-        options: { },
-        stream: cStream,
-        version,
-        _answerSdp: '_answerSdp',
-        _audioContext: {
-          createMediaStreamSource: () => { return { connect: sinon.stub() }; },
-        },
-        _createAnalyser: sinon.stub().returns('_createAnalyser'),
-        _updateInputStreamSource: PeerConnection.prototype._updateInputStreamSource,
-        _updateOutnputStreamSource: PeerConnection.prototype._updateOutputStreamSource,
-        _setInputTracksForPlanB: PeerConnection.prototype._setInputTracksForPlanB,
-        _setInputTracksForUnifiedPlan: PeerConnection.prototype._setInputTracksForUnifiedPlan,
-        _stopStream: sinon.stub(),
-      };
-      toTest = METHOD.bind(context);
-    });
-
-    it('Should reject when stream is null', done => {
-      toTest(false, null).catch(aError => {
-        assert.equal(aError.message, ERROR_STREAM_NOT_NULL);
-      }).then(done).catch(done);
-    });
-
-    it('Should reject when stream has no audio tracks', done => {
-      toTest(false, eStream).catch(aError => {
-        assert(eStream.getAudioTracks.calledOnce);
-        assert(eStream.getAudioTracks.calledWithExactly());
-        assert.equal(aError.message, 'Supplied input stream has no audio tracks');
-      }).then(done).catch(done);
-    });
-
-    it('Should resolve when getAudioTracks returns array with one track', done => {
-      eStream.getAudioTracks.returns([{track: 'track'}]);
-      cStream.getAudioTracks.returns([{}]);
-      toTest(false, eStream).then(aStream => {
-        assert.equal(aStream, cStream);
-        assert(cStream.addTrack.calledOnce);
-        assert(context.mute.calledWithExactly(context.isMuted));
-      }).then(done).catch(done);
-    });
-
-    it('Should resolve with cloned stream when there is no local stream', done => {
-      context.stream = null;
-      eStream.getAudioTracks.returns([{track: 'track'}]);
-      cStream.getAudioTracks.returns([{}]);
-      toTest(false, eStream).then(aStream => {
-        assert.equal(aStream, eStream);
-        assert(context.mute.calledWithExactly(context.isMuted));
-      }).then(done).catch(done);
-    });
-
-    it('Should reject when createOffer calls error callback', done => {
-      eStream.getAudioTracks.returns([{track: 'track'}]);
-      version.createOffer.callsArgWith(3, MESSAGE);
-      toTest(false, eStream).then(() => done(new Error('Should not resolve'))).catch(aMessage => {
-        assert.equal(aMessage, MESSAGE);
-        assert(context.mute.calledWithExactly(context.isMuted));
-        version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func);
-      }).then(done, done);
-    });
-
-    it('Should reject when processAnswer calls error callback', done => {
-      eStream.getAudioTracks.returns([{track: 'track'}]);
-      version.processAnswer.callsArgWith(3, MESSAGE);
-      toTest(false, eStream).then(() => done(new Error('Should not resolve'))).catch(aMessage => {
-        assert.equal(aMessage, MESSAGE);
-        version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func);
-        version.processAnswer.calledWithExactly(undefined, context._answerSdp, sinon.match.func, sinon.match.func);
-        assert(version.createOffer.calledBefore(version.processAnswer));
-      }).then(done, done);
-    });
-
-    it('Should resolve when createOffer and processAnswer calls success callbacks', done => {
-      eStream.getAudioTracks.returns([{track: 'track'}]);
-      toTest(false, eStream).then(aStream => {
-        assert.equal(cStream, aStream);
-        assert(version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func));
-        assert(version.processAnswer.calledWithExactly(undefined, context._answerSdp, sinon.match.func, sinon.match.func));
-        assert(version.createOffer.calledBefore(version.processAnswer));
-        assert(version.processAnswer.calledBefore(context._createAnalyser));
-      }).then(done).catch(done);
-    });
-
-    it('should remove any existing tracks from the stream', () => {
-      context.stream.getAudioTracks = sinon.stub().returns([{ track: 'foo' }, { track: 'bar' }]);
-      eStream.getAudioTracks.returns([{track: 'track'}]);
-      return toTest(false, eStream).then(aStream => {
-        assert.equal(cStream.removeTrack.callCount, 2);
-      });
-    });
-  });
-
   context('PeerConnection.prototype.openDefaultDeviceWithConstraints', () => {
     const METHOD = PeerConnection.prototype.openDefaultDeviceWithConstraints;
     const USER_MEDIA_RESULT = 'foobar';
@@ -188,7 +61,6 @@ describe('PeerConnection', () => {
         assert(context._audioHelper._openDefaultDeviceWithConstraints.calledWithExactly(undefined));
       }).then(done).catch(done);
     });
-
   });
 
   context('PeerConnection.prototype.setInputTracksFromStream', () => {
@@ -224,21 +96,37 @@ describe('PeerConnection', () => {
     });
   });
 
-  context('PeerConnection.prototype._setInputTracksForUnifiedPlan', () => {
-    const METHOD = PeerConnection.prototype._setInputTracksForUnifiedPlan;
+  context('PeerConnection.prototype._setInputTracksFromStream', () => {
+    const METHOD = PeerConnection.prototype._setInputTracksFromStream;
     const STREAM = { id: 1 };
-    const NEW_STREAM = { getAudioTracks: () => ['foo'], id: 2 };
 
+    let newStream = null;
     let context = null;
     let toTest = null;
 
     beforeEach(() => {
+      newStream = { getAudioTracks: sinon.stub().returns(['foo']), id: 2 };
       context = {
         stream: STREAM,
         mute: sinon.stub(),
         _sender: {}
       };
       toTest = METHOD.bind(context);
+    });
+
+    it('Should reject when stream is null', done => {
+      toTest(false, null).catch(aError => {
+        assert.equal(aError.message, 'Can not set input stream to null while in a call');
+      }).then(done).catch(done);
+    });
+
+    it('Should reject when stream has no audio tracks', done => {
+      newStream = { getAudioTracks: sinon.stub().returns([]), id: 2 };
+      toTest(false, newStream).catch(aError => {
+        assert(newStream.getAudioTracks.calledOnce);
+        assert(newStream.getAudioTracks.calledWithExactly());
+        assert.equal(aError.message, 'Supplied input stream has no audio tracks');
+      }).then(done).catch(done);
     });
 
     it('Should replace tracks before returning the new stream', done => {
@@ -249,10 +137,10 @@ describe('PeerConnection', () => {
         return cb();
       }})
 
-      toTest(false, NEW_STREAM).then((result) => {
+      toTest(false, newStream).then((result) => {
         assert(context._updateInputStreamSource.calledOnce);
         assert(replaceTrackCb.calledOnce);
-        assert.strictEqual(result.id, NEW_STREAM.id);
+        assert.strictEqual(result.id, newStream.id);
       }).then(done).catch(done);
     });
     
@@ -277,7 +165,7 @@ describe('PeerConnection', () => {
         return cb();
       }})
       
-      toTest(true, NEW_STREAM).then(() => {
+      toTest(true, newStream).then(() => {
         assert(mediaStream.calledOnce);
         assert(context._updateInputStreamSource.calledOnce);
       }).then(done).catch(done);
@@ -295,7 +183,7 @@ describe('PeerConnection', () => {
       };
       toTest = METHOD.bind(context);
       
-      toTest(true, NEW_STREAM).then(() => {
+      toTest(true, newStream).then(() => {
         assert(mediaStream.calledOnce);
       }).then(done).catch(done);
     });

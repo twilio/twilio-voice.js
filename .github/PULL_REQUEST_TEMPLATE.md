@@ -8,9 +8,7 @@
 
 ## Pull Request Details
 
-### JIRA link(s):
-
-- [CLIENT-0000](https://issues.corp.twilio.com/browse/CLIENT-0000)
+A description of what this PR does including issue links (JIRA, github, etc) if applicable.
 
 ### Description
 
@@ -25,8 +23,3 @@ A description of what this PR does.
 * [ ] Verified locally with `npm test`
 * [ ] Manually sanity tested running locally
 * [ ] Ready for review
-
-### Before merge
-* [ ] Got one or more +1s
-* [ ] Squashed erroneous commits if necessary
-* [ ] Re-tested if necessary
