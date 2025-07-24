@@ -94,19 +94,6 @@ describe('Device', function() {
   });
 
   describe('constructor', () => {
-    it('should set _isUnifiedPlanDefault once', () => {
-      Device['_isUnifiedPlanDefault'] = undefined;
-
-      assert.equal(Device['_isUnifiedPlanDefault'], undefined);
-      const tempDev1 = new Device(token);
-      assert.notEqual(Device['_isUnifiedPlanDefault'], undefined);
-
-      const isUnifiedPlan = Device['_isUnifiedPlanDefault'];
-      Device['_isUnifiedPlanDefault'] = !isUnifiedPlan;
-      const tempDev2 = new Device(token);
-      assert.equal(Device['_isUnifiedPlanDefault'], !isUnifiedPlan);
-    });
-
     describe('should always call updateOptions', () => {
       it('when passed options', () => {
         stub = sinon.createStubInstance(Device);

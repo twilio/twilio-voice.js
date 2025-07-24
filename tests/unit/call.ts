@@ -74,7 +74,6 @@ describe('Call', function() {
 
     config = {
       audioHelper,
-      isUnifiedPlanDefault: false,
       onIgnore,
       publisher,
       pstream,
