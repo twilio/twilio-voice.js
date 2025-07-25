@@ -510,26 +510,33 @@ PeerConnection.prototype._removeAudioOutput = function removeAudioOutput(id) {
  *   track of its ID because we must replace it if we lose its initial device.
  */
 PeerConnection.prototype._onAddTrack = function onAddTrack(pc, stream) {
-  const audio = pc._masterAudio = this._createAudio();
-  setAudioSource(audio, stream);
-  audio.play();
+  const process =
+    pc._audioHelper && pc._audioHelper.maybeProcessInboundStream
+      ? pc._audioHelper.maybeProcessInboundStream(stream)
+      : Promise.resolve(stream);
+  process.then(function (processedStream) {
+    const audio = (pc._masterAudio = pc._createAudio());
+    setAudioSource(audio, processedStream);
+    audio.play();
 
-  // Assign the initial master audio element to a random active output device
-  const activeDeviceId = Array.from(pc.outputs.keys())[0];
-  // The audio device key could also be '' on Chrome if no media device permissions are allowed
-  const deviceId = typeof activeDeviceId === 'string' ? activeDeviceId : 'default';
-  pc._masterAudioDeviceId = deviceId;
-  pc.outputs.set(deviceId, { audio });
+    // Assign the initial master audio element to a random active output device
+    const activeDeviceId = Array.from(pc.outputs.keys())[0];
+    const deviceId =
+      typeof activeDeviceId === 'string' ? activeDeviceId : 'default';
+    pc._masterAudioDeviceId = deviceId;
+    pc.outputs.set(deviceId, { audio });
 
-  try {
-    pc._mediaStreamSource = pc._audioContext.createMediaStreamSource(stream);
-  } catch (ex) {
-    this._log.warn('Unable to create a MediaStreamSource from onAddTrack', ex);
-    this._mediaStreamSource = null;
-  }
+    try {
+      pc._mediaStreamSource =
+        pc._audioContext.createMediaStreamSource(processedStream);
+    } catch (ex) {
+      pc._log.warn('Unable to create a MediaStreamSource from onAddTrack', ex);
+      pc._mediaStreamSource = null;
+    }
 
-  pc.pcStream = stream;
-  pc._updateAudioOutputs();
+    pc.pcStream = processedStream;
+    pc._updateAudioOutputs();
+  });
 };
 
 /**
