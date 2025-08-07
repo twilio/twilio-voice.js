@@ -1654,6 +1654,18 @@ describe('Call', function() {
 
         assert(callback.calledOnce);
       });
+
+      it('should publish a reconnecting event if reconnectToken is set', () => {
+        publisher.info.reset();
+        conn = new Call(config, Object.assign({
+          callParameters: { CallSid: 'CA123' },
+          reconnectToken: 'testReconnectToken',
+        }, options));
+
+        pstream.emit('transportClose');
+
+        sinon.assert.calledWith(publisher.info, 'connection', 'reconnecting');
+      });
     });
 
     describe('pstream.cancel event', () => {

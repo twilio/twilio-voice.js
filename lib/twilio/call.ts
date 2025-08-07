@@ -1500,6 +1500,7 @@ class Call extends EventEmitter {
     if (this._signalingReconnectToken) {
       this._status = Call.State.Reconnecting;
       this._signalingStatus = Call.State.Reconnecting;
+      this._publisher.info('connection', 'reconnecting', null, this);
       this._log.debug('#reconnecting');
       this.emit('reconnecting', new SignalingErrors.ConnectionDisconnected());
     } else {
