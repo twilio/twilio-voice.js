@@ -1,40 +1,51 @@
+'use strict';
+
+// @ts-check
+
 import commonjs from '@rollup/plugin-commonjs';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import typescript from '@rollup/plugin-typescript';
+import pkg from './package.json' with { type: 'json' };
 
-const input = 'lib/twilio.ts';
-const sourcemap = 'inline';
-const preferBuiltins = false;
-const tsconfig = './tsconfig.json';
+const input = './lib/twilio.ts';
+
+const createOutput = (dir, exports, format) => ({
+  dir,
+  format,
+  exports,
+  sourcemap: 'inline',
+  preserveModules: true,
+  preserveModulesRoot: './lib',
+});
+
+const createPlugins = (outDir, target) => [
+  commonjs(),
+  nodeResolve({
+    preferBuiltins: false,
+  }),
+  typescript({
+    outDir,
+    target,
+    tsconfig: './tsconfig.json',
+  }),
+];
+
+const createExternal = () => [
+  ...Object.keys(pkg.dependencies),
+];
 
 const commonJsConfig = {
   input,
-  output: { dir: './es5', format: 'cjs', sourcemap },
-  plugins: [
-    commonjs(),
-    nodeResolve({ preferBuiltins, }),
-    typescript({ outDir: './es5', target: 'es5', tsconfig }),
-  ],
+  output: createOutput('./es5', 'named', 'cjs'),
+  external: createExternal(),
+  plugins: createPlugins('./es5', 'es5'),
 };
 
 const esmConfig = {
   input,
-  output: { dir: './esm', format: 'es', sourcemap },
-  plugins: [
-    commonjs(),
-    nodeResolve({ preferBuiltins }),
-    typescript({ outDir: './esm', target: 'es6', tsconfig }),
-  ],
+  output: createOutput('./esm', 'auto', 'es'),
+  external: createExternal(),
+  plugins: createPlugins('./esm', 'es6'),
 };
 
-const umdConfig = {
-  input,
-  output: { dir: './umd', format: 'umd', name: 'Twilio', sourcemap },
-  plugins: [
-    commonjs(),
-    nodeResolve({ preferBuiltins }),
-    typescript({ outDir: './umd', target: 'es6', tsconfig }),
-  ],
-};
-
-export default [commonJsConfig, esmConfig, umdConfig];
+export default [commonJsConfig, esmConfig];
