@@ -4,7 +4,7 @@ import { TwilioError } from '../../lib/twilio/errors';
 import { PreflightTest } from '../../lib/twilio/preflight/preflight';
 import { EventEmitter } from 'events';
 import { SinonFakeTimers } from 'sinon';
-import * as assert from 'assert';
+import assert from 'assert';
 import * as sinon from 'sinon';
 import { inherits } from 'util';
 import RTCSample from '../../lib/twilio/rtc/sample';

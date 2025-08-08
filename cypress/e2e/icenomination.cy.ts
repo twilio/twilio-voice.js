@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import assert from 'assert';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../../tests/lib/token';
