@@ -7,7 +7,6 @@ coverage
 dist
 es5
 esm
-umd
 node_modules
 docs
 lib/twilio/constants.ts
