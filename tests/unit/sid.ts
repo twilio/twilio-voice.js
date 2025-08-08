@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import assert from 'assert';
 import * as sinon from 'sinon';
 import { NotSupportedError } from '../../lib/twilio/errors';
 import { generateVoiceEventSid } from '../../lib/twilio/sid';

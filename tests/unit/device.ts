@@ -1,4 +1,4 @@
-import { levels as LogLevels } from 'loglevel';
+import loglevel from 'loglevel';
 import CallType from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { GeneralErrors, InvalidArgumentError } from '../../lib/twilio/errors';
@@ -9,7 +9,7 @@ import {
   regionToEdge,
 } from '../../lib/twilio/regions';
 
-import * as assert from 'assert';
+import assert from 'assert';
 import { EventEmitter } from 'events';
 import { SinonFakeTimers, SinonSpy, SinonStubbedInstance } from 'sinon';
 import * as sinon from 'sinon';
@@ -718,7 +718,7 @@ describe('Device', function() {
             setDefaultLevelStub = sinon.stub();
           });
 
-          Object.entries(LogLevels).forEach(([level, number]) => {
+          Object.entries(loglevel.levels).forEach(([level, number]) => {
             level = level.toLowerCase();
 
             it(`should set log level to '${number}'`, () => {
