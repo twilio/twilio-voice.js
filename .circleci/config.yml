@@ -340,14 +340,15 @@ workflows:
               browser: ["chrome", "firefox"]
               bver: ["beta", "unstable", "stable"]
               build_label: ["Integration tests"]
-      - run-chrome-extension-tests:
-          name: Chrome extension tests <<matrix.browser>> <<matrix.bver>>
-          context: 
-            - vblocks-js
-          matrix:
-            parameters:
-              browser: ["chrome"]
-              bver: ["beta", "stable"]
+      # NOTE(kchoy): Temporarily disable until time to investigate: https://twilio-engineering.atlassian.net/browse/VBLOCKS-5144
+      # - run-chrome-extension-tests:
+      #     name: Chrome extension tests <<matrix.browser>> <<matrix.bver>>
+      #     context: 
+      #       - vblocks-js
+      #     matrix:
+      #       parameters:
+      #         browser: ["chrome"]
+      #         bver: ["beta", "stable"]
       # NOTE(csantos): Will be addressed on a future epic
       # - run-network-tests:
       #     name: Network Tests <<matrix.browser>> <<matrix.bver>>
