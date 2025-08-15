@@ -28,8 +28,8 @@ describe('Chrome extension tests', function () {
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-web-security',
-      ]
-    })
+      ],
+    });
     extensionId = await browser.installExtension(pathToExtension);
     page = await browser.newPage();
     await page.goto(`chrome-extension://${extensionId}/popup/popup.html`, { waitUntil: 'load' });
