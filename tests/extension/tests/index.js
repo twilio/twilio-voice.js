@@ -1,6 +1,7 @@
 const puppeteer = require('puppeteer');
 const EXTENSION_PATH = 'tests/extension/app';
 const assert = require('assert');
+const path = require('path');
 
 function delay(time) {
   return new Promise(function (resolve) {
@@ -10,55 +11,28 @@ function delay(time) {
 
 let browser;
 let page;
+let extensionId;
 
 describe('Chrome extension tests', function () {
   this.timeout(10000);
   beforeEach(async () => {
+    const pathToExtension = path.join(process.cwd(), EXTENSION_PATH);
     browser = await puppeteer.launch({
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+      pipe: true,
       dumpio: true,
+      enableExtensions: true,
       headless: true,
       args: [
-        `--disable-extensions-except=${EXTENSION_PATH}`,
-        `--load-extension=${EXTENSION_PATH}`,
         `--use-fake-ui-for-media-stream`,
         '--use-fake-device-for-media-stream',
         '--no-sandbox',
         '--disable-setuid-sandbox',
-      ],
-    });
-
-    async function getBaseURL(browser) {
-      const extensionTarget = await browser.waitForTarget(
-        (target) => target.type() === 'service_worker'
-      );
-
-      const partialExtensionUrl = extensionTarget?.url() || '';
-      const [, , extensionId] = partialExtensionUrl.split('/');
-
-      return `chrome-extension://${extensionId}`;
-    }
-
-    async function getPage(browser) {
-      const page = await browser.newPage();
-      const baseURL = await getBaseURL(browser);
-      await page.goto(`${baseURL}/popup/popup.html`, { waitUntil: 'load' });
-      await page.bringToFront();
-      await page.setViewport({
-        width: 1200,
-        height: 800,
-      });
-      return page;
-    }
-
-    async function setUpBrowser() {
-      const page = await getPage(browser);
-      // [e2e-testing]: Log errors to terminal
-      page.on('console', (msg) => console.log('PAGE LOG:', msg.text()));
-
-      return { browser, page };
-    }
-    ({ page } = await setUpBrowser());
+        '--disable-web-security',
+      ]
+    })
+    extensionId = await browser.installExtension(pathToExtension);
+    page = await browser.newPage();
+    await page.goto(`chrome-extension://${extensionId}/popup/popup.html`, { waitUntil: 'load' });
   });
 
   afterEach(async () => {
@@ -96,6 +70,7 @@ describe('Chrome extension tests', function () {
   it('should allow device to be destroyed', async () => {
     const initButton = await page.waitForSelector('#init', { visible: true });
     await initButton.click();
+    await delay(2000) // allow time for device to initialize
     const destroyButton = await page.$('#destroy');
     await destroyButton.click();
     await page.waitForSelector('#init', { visible: true });
