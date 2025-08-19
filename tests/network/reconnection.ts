@@ -2,8 +2,7 @@ import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../lib/token';
 import { expectEvent, isFirefox, runDockerCommand, waitFor } from '../lib/util';
-import * as assert from 'assert';
-import { EventEmitter } from 'events';
+import assert from 'assert';
 
 type CB = any;
 
