@@ -928,7 +928,7 @@ export namespace PreflightTest {
     callQuality?: CallQuality;
 
     /**
-     * CallSid generaged during the test.
+     * CallSid generated during the test.
      */
     callSid: string | undefined;
 
