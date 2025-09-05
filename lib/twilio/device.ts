@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { levels as LogLevels, LogLevelDesc } from 'loglevel';
+import loglevel from 'loglevel';
 import AudioHelper from './audiohelper';
 import { AudioProcessorEventObserver } from './audioprocessoreventobserver';
 import Call from './call';
@@ -329,7 +329,7 @@ class Device extends EventEmitter {
     dscp: true,
     enableImprovedSignalingErrorPrecision: false,
     forceAggressiveIceNomination: false,
-    logLevel: LogLevels.ERROR,
+    logLevel: loglevel.levels.ERROR,
     maxCallSignalingTimeoutMs: 0,
     preflight: false,
     sounds: { },
@@ -1471,10 +1471,10 @@ class Device extends EventEmitter {
   /**
    * Setup logger's loglevel
    */
-  private _setupLoglevel(logLevel?: LogLevelDesc): void {
+  private _setupLoglevel(logLevel?: loglevel.LogLevelDesc): void {
     const level = typeof logLevel === 'number' ||
       typeof logLevel === 'string' ?
-      logLevel : LogLevels.ERROR;
+      logLevel : loglevel.levels.ERROR;
 
     this._log.setDefaultLevel(level);
     this._log.info('Set logger default level to', level);
@@ -2003,7 +2003,7 @@ namespace Device {
      * <br/>'trace', 'debug', 'info', 'warn', 'error', 'silent'
      * <br/>'TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'SILENT'
      */
-    logLevel?: LogLevelDesc;
+    logLevel?: loglevel.LogLevelDesc;
 
     /**
      * The maximum average audio bitrate to use, in bits per second (bps) based on

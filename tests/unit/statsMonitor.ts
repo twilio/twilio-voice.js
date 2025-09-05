@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import assert from 'assert';
 import * as sinon from 'sinon';
 import { SinonFakeTimers } from 'sinon';
 import StatsMonitor from '../../lib/twilio/statsMonitor';
