@@ -208,10 +208,10 @@ call until the timeout has expired. Please take this into consideration if your 
 contains webhooks that relies on <a href="https://www.twilio.com/docs/voice/twiml#callstatus-values">call status callbacks</a>.</p>
 </div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="mediastream"><code class="tsd-tag">Optional</code><span>Media<wbr/>Stream</span><a href="#mediastream" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">MediaStream</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">any</span></div><div class="tsd-comment tsd-typography"><p>Overrides the native MediaStream class.</p>
 </div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="rtcpeerconnection"><code class="tsd-tag">Optional</code><span>RTCPeer<wbr/>Connection</span><a href="#rtcpeerconnection" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">RTCPeerConnection</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">any</span></div><div class="tsd-comment tsd-typography"><p>Overrides the native RTCPeerConnection class.</p>
-<p>By default, the SDK will use the <code>unified-plan</code> SDP format if the browser supports it.
+<p>By default, the SDK will only use the <code>unified-plan</code> SDP format.
 Unexpected behavior may happen if the <code>RTCPeerConnection</code> parameter uses an SDP format
 that is different than what the SDK uses.</p>
-<p>For example, if the browser supports <code>unified-plan</code> and the <code>RTCPeerConnection</code>
+<p>For example, if the browser only supports <code>unified-plan</code> and the <code>RTCPeerConnection</code>
 parameter uses <code>plan-b</code> by default, the SDK will use <code>unified-plan</code>
 which will cause conflicts with the usage of the <code>RTCPeerConnection</code>.</p>
 <p>In order to avoid this issue, you need to explicitly set the SDP format that you want
