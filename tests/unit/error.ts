@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import assert from 'assert';
 import * as errors from '../../lib/twilio/errors';
 
 describe('Errors', () => {

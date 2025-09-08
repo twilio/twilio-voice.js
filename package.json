@@ -31,7 +31,7 @@
     "build:dist": "node ./scripts/build.js ./lib/browser.js ./LICENSE.md ./dist/twilio.js",
     "build:dist-min": "uglifyjs ./dist/twilio.js -o ./dist/twilio.min.js --comments \"/^! twilio-voice.js/\" -b beautify=false,ascii_only=true",
     "build:release": "npm-run-all lint build test:es5 test:esm status",
-    "build:ts": "./node_modules/typescript/bin/tsc && ./node_modules/typescript/bin/tsc --project tsconfig-esm.json && renamer --find twilio --replace index esm/twilio.*",
+    "build:ts": "rollup -c",
     "build:constants": "node ./scripts/constants.js",
     "clean": "rimraf ./coverage ./dist ./es5 ./esm ./reports",
     "coverage": "nyc ./node_modules/mocha/bin/mocha -r ts-node/register ./tests/index.ts",
@@ -57,7 +57,7 @@
     "test:integration:edge": "npm run test:integration -- --browser edge",
     "test:integration:firefox": "npm run test:integration -- --browser firefox",
     "test:relay-server": "node ./tests/relay/server.js",
-    "test:typecheck": "./node_modules/typescript/bin/tsc tests/typecheck/*.ts --noEmit",
+    "test:typecheck": "./node_modules/typescript/bin/tsc tests/typecheck/*.ts --esModuleInterop --noEmit",
     "test:unit": "nyc mocha -r ts-node/register ./tests/index.ts"
   },
   "pre-commit": [
@@ -69,6 +69,9 @@
   "devDependencies": {
     "@datadog/datadog-ci": "3.2.0",
     "@ngrok/ngrok": "1.2.0",
+    "@rollup/plugin-commonjs": "28.0.6",
+    "@rollup/plugin-node-resolve": "16.0.1",
+    "@rollup/plugin-typescript": "12.1.4",
     "@types/mime": "3.0.0",
     "@types/mocha": "5.2.7",
     "@types/node": "22.15.3",
@@ -97,6 +100,7 @@
     "pre-commit": "1.2.2",
     "puppeteer": "24.16.2",
     "renamer": "4.0.0",
+    "rollup": "4.46.3",
     "sinon": "9.0.3",
     "ts-node": "10.9.2",
     "tslint": "6.1.3",
@@ -113,7 +117,8 @@
     "@twilio/voice-errors": "1.7.0",
     "@types/events": "^3.0.3",
     "events": "3.3.0",
-    "loglevel": "1.6.7"
+    "loglevel": "1.6.7",
+    "tslib": "2.8.1"
   },
   "overrides": {
     "tough-cookie": "4.1.4"

@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import assert from 'assert';
 import mos from '../lib/twilio/rtc/mos';
 
 describe('MOS', () => {

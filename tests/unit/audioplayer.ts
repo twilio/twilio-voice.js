@@ -1,6 +1,6 @@
 /* tslint:disable:max-classes-per-file no-empty */
 
-import * as assert from 'assert';
+import assert from 'assert';
 import * as sinon from 'sinon';
 import { SinonSpy } from 'sinon';
 
