@@ -17,8 +17,10 @@
     "node": ">= 12"
   },
   "exports": {
-    ".": "./es5/twilio.js",
-    "./esm": "./esm/index.js"
+    ".": {
+      "import": "./esm/index.js",
+      "require": "./es5/index.js"
+    }
   },
   "repository": {
     "type": "git",
