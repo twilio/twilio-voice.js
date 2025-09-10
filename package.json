@@ -3,7 +3,7 @@
   "version": "2.15.1-dev",
   "description": "Twilio's JavaScript Voice SDK",
   "main": "./es5/twilio.js",
-  "module": "./esm/index.js",
+  "module": "./esm/twilio.js",
   "types": "./es5/twilio.d.ts",
   "license": "Apache-2.0",
   "keywords": [
@@ -18,8 +18,8 @@
   },
   "exports": {
     ".": {
-      "import": "./esm/index.js",
-      "require": "./es5/index.js"
+      "import": "./esm/twilio.js",
+      "require": "./es5/twilio.js"
     }
   },
   "repository": {
