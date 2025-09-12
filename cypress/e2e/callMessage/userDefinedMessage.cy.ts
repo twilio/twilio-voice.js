@@ -1,4 +1,4 @@
-import assert from 'assert';
+import * as assert from 'assert';
 import axios from 'axios';
 import Device from '../../../lib/twilio/device';
 import type Call from '../../../lib/twilio/call';

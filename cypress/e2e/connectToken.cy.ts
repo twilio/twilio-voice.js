@@ -1,4 +1,4 @@
-import assert from 'assert';
+import * as assert from 'assert';
 import * as sinon from 'sinon';
 import Device from '../../lib/twilio/device';
 import Call from '../../lib/twilio/call';

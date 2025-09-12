@@ -1,4 +1,4 @@
-import assert from 'assert';
+import * as assert from 'assert';
 import { EventEmitter } from 'events';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';

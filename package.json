@@ -59,7 +59,7 @@
     "test:integration:edge": "npm run test:integration -- --browser edge",
     "test:integration:firefox": "npm run test:integration -- --browser firefox",
     "test:relay-server": "node ./tests/relay/server.js",
-    "test:typecheck": "./node_modules/typescript/bin/tsc tests/typecheck/*.ts --esModuleInterop --noEmit",
+    "test:typecheck": "./node_modules/typescript/bin/tsc tests/typecheck/*.ts --noEmit",
     "test:unit": "nyc mocha -r ts-node/register ./tests/index.ts"
   },
   "pre-commit": [
@@ -119,7 +119,7 @@
     "@twilio/voice-errors": "1.7.0",
     "@types/events": "^3.0.3",
     "events": "3.3.0",
-    "loglevel": "1.6.7",
+    "loglevel": "1.9.2",
     "tslib": "2.8.1"
   },
   "overrides": {

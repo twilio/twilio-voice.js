@@ -1,4 +1,4 @@
-import { Call, Device, PreflightTest } from '../../';
+import { Call, Device, PreflightTest } from '../../lib/twilio';
 
 const checkPreflight = async () => {
   const preflight: PreflightTest = Device.runPreflight('foo', {

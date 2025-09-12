@@ -1,4 +1,4 @@
-import loglevel from 'loglevel';
+import * as loglevel from 'loglevel';
 import { PACKAGE_NAME } from './constants';
 
 /**

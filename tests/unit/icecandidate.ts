@@ -1,5 +1,5 @@
 import { IceCandidate } from '../../lib/twilio/rtc/icecandidate';
-import assert from 'assert';
+import * as assert from 'assert';
 
 describe('Candidate', () => {
   let data: any;

@@ -1,5 +1,5 @@
 //@ts-nocheck
-import assert from 'assert';
+import * as assert from 'assert';
 import * as sinon from 'sinon';
 import Backoff from '../../lib/twilio/backoff';
 

@@ -1,4 +1,4 @@
-import assert from 'assert';
+import * as assert from 'assert';
 import { Logger } from '../../lib/twilio';
 
 describe('Logger', () => {
