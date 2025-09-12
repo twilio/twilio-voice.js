@@ -1,4 +1,4 @@
-import { AudioProcessor, Device } from '../../';
+import { AudioProcessor, Device } from '../../lib/twilio';
 
 class MyCustomAudioProcessor {
   createProcessedStream(stream: MediaStream): Promise<MediaStream> {

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import loglevel from 'loglevel';
+import * as loglevel from 'loglevel';
 import AudioHelper from './audiohelper';
 import { AudioProcessorEventObserver } from './audioprocessoreventobserver';
 import Call from './call';

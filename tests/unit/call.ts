@@ -1,6 +1,6 @@
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
-import assert from 'assert';
+import * as assert from 'assert';
 import { EventEmitter } from 'events';
 import { SinonFakeTimers, SinonSpy, SinonStubbedInstance } from 'sinon';
 import * as sinon from 'sinon';

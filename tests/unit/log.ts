@@ -1,5 +1,5 @@
 import Log from '../../lib/twilio/log';
-import assert from 'assert';
+import * as assert from 'assert';
 import * as sinon from 'sinon';
 
 const packageName = require('../../package.json').name;

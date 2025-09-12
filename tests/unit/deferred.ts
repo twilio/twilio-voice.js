@@ -1,5 +1,5 @@
 import Deferred from '../../lib/twilio/deferred';
-import assert from 'assert';
+import * as assert from 'assert';
 import * as sinon from 'sinon';
 
 describe('Deferred', () => {

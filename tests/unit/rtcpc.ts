@@ -1,4 +1,4 @@
-import assert from 'assert';
+import * as assert from 'assert';
 import * as sinon from 'sinon';
 import * as LogModule from '../../lib/twilio/log';
 import RTCPC from '../../lib/twilio/rtc/rtcpc';
