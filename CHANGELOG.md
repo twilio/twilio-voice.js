@@ -1,7 +1,15 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
-2.x.x (In progress)
+2.16.0 (In progress)
 ======================
+
+ECMAScript Module Support GA
+----------------------------
+
+The experimental ESM support introduced in `2.7.0` has been improved upon and ESM support is now included by default in the SDK. ESM support is now considered GA and not experimental. It is no longer required to import a separate path for ESM support. Now, the following will work for ESM workflows:
+```
+import { Device } from '@twilio/voice-sdk';
+```
 
 Changes
 -------
