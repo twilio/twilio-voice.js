@@ -6,8 +6,8 @@
 ECMAScript Module Support GA
 ----------------------------
 
-The experimental ESM support introduced in `2.7.0` has been improved upon and ESM support is now included by default in the SDK. ESM support is now considered GA and not experimental. It is no longer required to import a separate path for ESM support. Now, the following will work for ESM workflows:
-```
+The experimental ESM support introduced in `2.7.0` has been fully integrated is now included by default in the SDK. ESM is no longer experimental and now considered Generally Available (GA). You no longer need to import a separate path and should now work with the standard import:
+```typescript
 import { Device } from '@twilio/voice-sdk';
 ```
 
