@@ -1,4 +1,4 @@
-import { Call, Device, PreflightTest } from '../../';
+import { Call, Device, PreflightTest } from '../../lib/twilio';
 
 const checkDevice = async () => {
   const options: Device.Options = {

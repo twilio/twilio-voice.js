@@ -1,4 +1,4 @@
-import * as LogLevelModule from 'loglevel';
+import * as loglevel from 'loglevel';
 import { PACKAGE_NAME } from './constants';
 
 /**
@@ -21,17 +21,17 @@ class Log {
   /**
    * Log levels
    */
-  static levels: LogLevelModule.LogLevel = LogLevelModule.levels;
+  static levels: loglevel.LogLevel = loglevel.levels;
 
   /**
    * Return the `loglevel` instance maintained internally.
    * @param [options] - Optional settings
    * @returns The `loglevel` instance.
    */
-  static getLogLevelInstance(options?: LogOptions): LogLevelModule.Logger {
+  static getLogLevelInstance(options?: LogOptions): loglevel.Logger {
     if (!Log.loglevelInstance) {
       try {
-        Log.loglevelInstance = (options && options.LogLevelModule ? options.LogLevelModule : LogLevelModule).getLogger(PACKAGE_NAME);
+        Log.loglevelInstance = (options && options.LogLevelModule ? options.LogLevelModule : loglevel).getLogger(PACKAGE_NAME);
       } catch {
         // tslint:disable-next-line
         console.warn('Cannot create custom logger');
@@ -44,12 +44,12 @@ class Log {
   /**
    * The loglevel singleton instance
    */
-  private static loglevelInstance: LogLevelModule.Logger;
+  private static loglevelInstance: loglevel.Logger;
 
   /**
    * The loglevel logger instance that will be used in this {@link Log}
    */
-  private _log: LogLevelModule.Logger;
+  private _log: loglevel.Logger;
 
   /**
    * Prefix to use for this log instance
@@ -93,7 +93,7 @@ class Log {
   /**
    * Set a default log level to disable all logging below the given level
    */
-  setDefaultLevel(level: LogLevelModule.LogLevelDesc): void {
+  setDefaultLevel(level: loglevel.LogLevelDesc): void {
     if (this._log.setDefaultLevel) {
       this._log.setDefaultLevel(level);
     } else {

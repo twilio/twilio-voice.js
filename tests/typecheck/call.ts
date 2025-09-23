@@ -1,4 +1,4 @@
-import { Call, Device } from '../../';
+import { Call, Device } from '../../lib/twilio';
 
 const checkCall = async () => {
   const call: Call = await (new Device('foo', {})).connect();
