@@ -1,17 +1,19 @@
-const assert = require('assert');
-const sinon = require('sinon');
-const EventTarget = require('./eventtarget');
-const AudioHelper = require('../lib/twilio/audiohelper').default;
-const { AudioProcessorEventObserver } = require('../lib/twilio/audioprocessoreventobserver');
+const assert = require("assert");
+const sinon = require("sinon");
+const EventTarget = require("./eventtarget");
+const AudioHelper = require("../lib/twilio/audiohelper").default;
+const {
+  AudioProcessorEventObserver,
+} = require("../lib/twilio/audioprocessoreventobserver");
 
 function getUserMedia() {
-  return Promise.resolve({ id: 'default', getTracks: () => [] });
+  return Promise.resolve({ id: "default", getTracks: () => [] });
 }
 
-describe('AudioHelper', () => {
-  const wait = () => new Promise(res => res());
+describe("AudioHelper", () => {
+  const wait = () => new Promise((res) => res());
 
-  context('when enumerateDevices is not supported', () => {
+  context("when enumerateDevices is not supported", () => {
     const noop = () => {};
 
     let audio;
@@ -22,17 +24,16 @@ describe('AudioHelper', () => {
       audio = new AudioHelper(noop, noop, {
         getUserMedia,
         mediaDevices: {
-          enumerateDevices: function(){
+          enumerateDevices: function () {
             return Promise.resolve();
-          }
-        }
+          },
+        },
       });
     });
 
     before(() => {
-      oldHTMLAudioElement = typeof HTMLAudioElement !== 'undefined'
-        ? HTMLAudioElement
-        : undefined;
+      oldHTMLAudioElement =
+        typeof HTMLAudioElement !== "undefined" ? HTMLAudioElement : undefined;
       HTMLAudioElement = undefined;
 
       oldMediaDevices = navigator.mediaDevices;
@@ -44,17 +45,17 @@ describe('AudioHelper', () => {
       navigator.mediaDevices = oldMediaDevices;
     });
 
-    describe('constructor', () => {
-      it('should set .isOutputSelectionSupported to false', () => {
+    describe("constructor", () => {
+      it("should set .isOutputSelectionSupported to false", () => {
         assert.equal(audio.isOutputSelectionSupported, false);
       });
-      it('should set availableDevices to an empty Map', () => {
+      it("should set availableDevices to an empty Map", () => {
         assert.equal(audio.availableOutputDevices.size, 0);
       });
     });
   });
 
-  context('when enumerateDevices is supported', () => {
+  context("when enumerateDevices is supported", () => {
     let audio;
     let eventObserver;
     let createProcessedStream;
@@ -63,10 +64,10 @@ describe('AudioHelper', () => {
     let processor;
     let onActiveOutputsChanged;
     let onActiveInputChanged;
-    const deviceDefault = { deviceId: 'default', kind: 'audiooutput' };
-    const deviceFoo = { deviceId: 'foo', kind: 'audiooutput' };
-    const deviceBar = { deviceId: 'bar', kind: 'audiooutput' };
-    const deviceInput = { deviceId: 'input', kind: 'audioinput' };
+    const deviceDefault = { deviceId: "default", kind: "audiooutput" };
+    const deviceFoo = { deviceId: "foo", kind: "audiooutput" };
+    const deviceBar = { deviceId: "bar", kind: "audiooutput" };
+    const deviceInput = { deviceId: "input", kind: "audioinput" };
     let availableDevices;
     let handlers;
     let mediaDevices;
@@ -75,14 +76,19 @@ describe('AudioHelper', () => {
     beforeEach(() => {
       eventObserver = new AudioProcessorEventObserver();
       processedStreamStopStub = sinon.stub();
-      createProcessedStream = sinon.stub().returns(new Promise(res => res({
-        id: 'processedstream', getTracks: () => [{ stop: processedStreamStopStub }]
-      })));
+      createProcessedStream = sinon.stub().returns(
+        new Promise((res) =>
+          res({
+            id: "processedstream",
+            getTracks: () => [{ stop: processedStreamStopStub }],
+          })
+        )
+      );
       destroyProcessedStream = sinon.stub();
       processor = { createProcessedStream, destroyProcessedStream };
 
       handlers = new Map();
-      availableDevices = [ deviceDefault, deviceFoo, deviceBar, deviceInput ];
+      availableDevices = [deviceDefault, deviceFoo, deviceBar, deviceInput];
 
       mediaDevices = {
         addEventListener: sinon.spy((event, handler) => {
@@ -92,64 +98,74 @@ describe('AudioHelper', () => {
         removeEventListener: sinon.stub(),
       };
 
-      onActiveOutputsChanged = sinon.spy(stream => Promise.resolve());
-      onActiveInputChanged = sinon.spy(stream => Promise.resolve());
+      onActiveOutputsChanged = sinon.spy((stream) => Promise.resolve());
+      onActiveInputChanged = sinon.spy((stream) => Promise.resolve());
 
       audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
         audioProcessorEventObserver: eventObserver,
         getUserMedia,
         mediaDevices,
-        setSinkId: () => {}
+        setSinkId: () => {},
       });
-      
+
       oldMediaDevices = navigator.mediaDevices;
       navigator.mediaDevices = {
-        enumerateDevices() { return Promise.resolve([]) },
+        enumerateDevices() {
+          return Promise.resolve([]);
+        },
       };
     });
 
     afterEach(() => {
       navigator.mediaDevices = oldMediaDevices;
-    })
+    });
 
-    describe('constructor', () => {
-      it('should set .isOutputSelectionSupported to true', () => {
+    describe("constructor", () => {
+      it("should set .isOutputSelectionSupported to true", () => {
         assert.equal(audio.isOutputSelectionSupported, true);
       });
 
-      it('should use default enumerateDevices', async () => {
-        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {});
+      it("should use default enumerateDevices", async () => {
+        audio = new AudioHelper(
+          onActiveOutputsChanged,
+          onActiveInputChanged,
+          {}
+        );
         const result = await audio._enumerateDevices();
         assert.deepStrictEqual(result, []);
       });
 
-      it('should use enumerateDevices override', async () => {
-        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, { enumerateDevices: () => Promise.resolve(['foo']) });
+      it("should use enumerateDevices override", async () => {
+        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
+          enumerateDevices: () => Promise.resolve(["foo"]),
+        });
         const result = await audio._enumerateDevices();
-        assert.deepStrictEqual(result, ['foo']);
+        assert.deepStrictEqual(result, ["foo"]);
       });
 
-      it('should use getUserMedia override', async () => {
-        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, { getUserMedia: () => Promise.resolve(['bar']) });
+      it("should use getUserMedia override", async () => {
+        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
+          getUserMedia: () => Promise.resolve(["bar"]),
+        });
         const result = await audio._getUserMedia();
-        assert.deepStrictEqual(result, ['bar']);
+        assert.deepStrictEqual(result, ["bar"]);
       });
     });
 
-    describe('navigator.permissions', () => {
+    describe("navigator.permissions", () => {
       let oldMicPerm;
       let mockMicPerm;
       let mockEventTarget;
       let enumerateDevices;
 
       beforeEach(() => {
-        enumerateDevices = sinon.stub().returns(new Promise(res => res([])));
+        enumerateDevices = sinon.stub().returns(new Promise((res) => res([])));
         oldMicPerm = navigator.permissions;
         mockEventTarget = new EventTarget();
         mockMicPerm = {
-          query: function() {
+          query: function () {
             return Promise.resolve(mockEventTarget);
-          }
+          },
         };
         navigator.permissions = mockMicPerm;
       });
@@ -158,48 +174,58 @@ describe('AudioHelper', () => {
         navigator.permissions = oldMicPerm;
       });
 
-      it('should update list of devices when microphone state is not granted', async () => {
-        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, { enumerateDevices });
+      it("should update list of devices when microphone state is not granted", async () => {
+        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
+          enumerateDevices,
+        });
         await wait();
-        mockEventTarget.dispatchEvent({ type: 'change' });
+        mockEventTarget.dispatchEvent({ type: "change" });
         sinon.assert.calledTwice(enumerateDevices);
       });
 
-      it('should update list of devices only once', async () => {
-        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, { enumerateDevices });
+      it("should update list of devices only once", async () => {
+        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
+          enumerateDevices,
+        });
         await wait();
-        mockEventTarget.dispatchEvent({ type: 'change' });
-        mockEventTarget.dispatchEvent({ type: 'change' });
+        mockEventTarget.dispatchEvent({ type: "change" });
+        mockEventTarget.dispatchEvent({ type: "change" });
         sinon.assert.calledTwice(enumerateDevices);
       });
 
-      it('should not update list of devices when microphone state is granted', async () => {
-        mockEventTarget.state = 'granted';
-        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, { enumerateDevices });
+      it("should not update list of devices when microphone state is granted", async () => {
+        mockEventTarget.state = "granted";
+        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
+          enumerateDevices,
+        });
         await wait();
-        mockEventTarget.dispatchEvent({ type: 'change' });
+        mockEventTarget.dispatchEvent({ type: "change" });
         sinon.assert.calledOnce(enumerateDevices);
       });
 
-      it('should remove the onchange handler on destroy', async () => {
-        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, { enumerateDevices });
+      it("should remove the onchange handler on destroy", async () => {
+        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
+          enumerateDevices,
+        });
         await wait();
         audio._destroy();
-        mockEventTarget.dispatchEvent({ type: 'change' });
+        mockEventTarget.dispatchEvent({ type: "change" });
         sinon.assert.calledOnce(enumerateDevices);
       });
 
-      it('should not update list of devices if navigator permissions is undefined', async () => {
-        navigator.permissions = undefined
-        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, { enumerateDevices });
+      it("should not update list of devices if navigator permissions is undefined", async () => {
+        navigator.permissions = undefined;
+        audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
+          enumerateDevices,
+        });
         await wait();
-        mockEventTarget.dispatchEvent({ type: 'change' });
+        mockEventTarget.dispatchEvent({ type: "change" });
         sinon.assert.calledOnce(enumerateDevices);
-      })
+      });
     });
 
-    describe('._destroy', () => {
-      it('should properly dispose the audio instance', () => {
+    describe("._destroy", () => {
+      it("should properly dispose the audio instance", () => {
         audio._stopDefaultInputDeviceStream = sinon.stub();
         audio._stopSelectedInputDeviceStream = sinon.stub();
         audio._destroyProcessedStream = sinon.stub();
@@ -213,7 +239,7 @@ describe('AudioHelper', () => {
         sinon.assert.calledOnce(mediaDevices.removeEventListener);
       });
 
-      it('should allow enumerateDevices and mediaDevices to be undefined', () => {
+      it("should allow enumerateDevices and mediaDevices to be undefined", () => {
         navigator.enumerateDevices = undefined;
         navigator.mediaDevices = undefined;
         audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged);
@@ -230,156 +256,175 @@ describe('AudioHelper', () => {
       });
     });
 
-    describe('._updateUserOptions', () => {
-      it('should update enumerateDevices', async () => {
-        audio._updateUserOptions({ enumerateDevices: () => Promise.resolve(['foo']) });
+    describe("._updateUserOptions", () => {
+      it("should update enumerateDevices", async () => {
+        audio._updateUserOptions({
+          enumerateDevices: () => Promise.resolve(["foo"]),
+        });
         const result = await audio._enumerateDevices();
-        assert.deepStrictEqual(result, ['foo']);
+        assert.deepStrictEqual(result, ["foo"]);
       });
 
-      it('should update getUserMedia', async () => {
-        audio._updateUserOptions({ getUserMedia: () => Promise.resolve(['bar']) });
+      it("should update getUserMedia", async () => {
+        audio._updateUserOptions({
+          getUserMedia: () => Promise.resolve(["bar"]),
+        });
         const result = await audio._getUserMedia();
-        assert.deepStrictEqual(result, ['bar']);
+        assert.deepStrictEqual(result, ["bar"]);
       });
     });
 
-    describe('adding and removing audio processors', () => {
+    describe("adding and removing audio processors", () => {
       let getUserMedia;
       let stopStub;
 
       beforeEach(() => {
         stopStub = sinon.stub();
-        getUserMedia = sinon.stub().returns(new Promise(res => res({id: 'default',getTracks: () => [{stop: stopStub}]})));
+        getUserMedia = sinon
+          .stub()
+          .returns(
+            new Promise((res) =>
+              res({ id: "default", getTracks: () => [{ stop: stopStub }] })
+            )
+          );
         audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
           audioProcessorEventObserver: eventObserver,
           getUserMedia,
           mediaDevices,
-          setSinkId: () => {}
+          setSinkId: () => {},
         });
       });
 
-      describe('.addProcessor', () => {
+      describe(".addProcessor", () => {
         [
           undefined,
           null,
           true,
           false,
-          '',
+          "",
           1,
           0,
           {},
           { createProcessedStream: () => {} },
           { destroyProcessedStream: () => {} },
-        ].forEach(param => {
+        ].forEach((param) => {
           it(`should reject if parameter is ${param}`, () => {
             assert.rejects(async () => await audio.addProcessor(param));
           });
         });
 
-        it('should add one processor', async () => {
+        it("should add one processor", async () => {
           await audio.addProcessor(processor);
         });
 
-        it('should not allow adding more than one processor', async () => {
+        it("should not allow adding more than one processor", async () => {
           await audio.addProcessor(processor);
           assert.rejects(async () => await audio.addProcessor(processor));
         });
 
-        it('should emit add insights event', async () => {
+        it("should emit add insights event", async () => {
           const stub = sinon.stub();
-          eventObserver.on('event', stub);
+          eventObserver.on("event", stub);
           await audio.addProcessor(processor);
-          sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'add' });
+          sinon.assert.calledWithExactly(stub, {
+            group: "audio-processor",
+            name: "add",
+          });
         });
 
-        it('should not restart any device streams if none exists', async () => {
+        it("should not restart any device streams if none exists", async () => {
           await audio.addProcessor(processor);
           sinon.assert.notCalled(getUserMedia);
         });
 
-        it('should restart default device if default stream exists', async () => {
+        it("should restart default device if default stream exists", async () => {
           await audio._openDefaultDeviceWithConstraints();
           sinon.assert.calledOnce(getUserMedia);
           await audio.addProcessor(processor);
           sinon.assert.calledTwice(getUserMedia);
-          assert.equal(audio._getUserMedia.args[1][0].audio.deviceId.exact, 'input');
+          assert.equal(
+            audio._getUserMedia.args[1][0].audio.deviceId.exact,
+            "input"
+          );
           sinon.assert.calledOnce(createProcessedStream);
         });
 
-        it('should restart default device if a selected stream exists', async () => {
-          await audio.setInputDevice('input');
+        it("should restart default device if a selected stream exists", async () => {
+          await audio.setInputDevice("input");
           sinon.assert.calledOnce(getUserMedia);
           await audio.addProcessor(processor);
           sinon.assert.calledTwice(getUserMedia);
-          assert.equal(audio._getUserMedia.args[1][0].audio.deviceId.exact, 'input');
+          assert.equal(
+            audio._getUserMedia.args[1][0].audio.deviceId.exact,
+            "input"
+          );
           sinon.assert.calledOnce(createProcessedStream);
         });
       });
 
-      describe('.removeProcessor', () => {
+      describe(".removeProcessor", () => {
         beforeEach(async () => {
           await audio.addProcessor(processor);
         });
 
-        [
-          undefined,
-          null,
-          true,
-          false,
-          '',
-          1,
-          0,
-          {},
-        ].forEach(param => {
+        [undefined, null, true, false, "", 1, 0, {}].forEach((param) => {
           it(`should reject if parameter is ${param}`, () => {
             assert.rejects(async () => await audio.removeProcessor(param));
           });
         });
 
-        it('should emit remove insights event', async () => {
+        it("should emit remove insights event", async () => {
           const stub = sinon.stub();
-          eventObserver.on('event', stub);
+          eventObserver.on("event", stub);
           await audio.removeProcessor(processor);
-          sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'remove' });
+          sinon.assert.calledWithExactly(stub, {
+            group: "audio-processor",
+            name: "remove",
+          });
         });
 
-        it('should be able to add a new processor after removing the old one', async () => {
+        it("should be able to add a new processor after removing the old one", async () => {
           await audio.removeProcessor(processor);
           await audio.addProcessor(processor);
         });
 
-        it('should not restart any device streams if none exists', async () => {
+        it("should not restart any device streams if none exists", async () => {
           await audio.removeProcessor(processor);
           sinon.assert.notCalled(getUserMedia);
         });
 
-        it('should restart default device if default stream exists', async () => {
+        it("should restart default device if default stream exists", async () => {
           await audio._openDefaultDeviceWithConstraints();
           sinon.assert.calledOnce(getUserMedia);
           await audio.removeProcessor(processor);
           sinon.assert.calledTwice(getUserMedia);
-          assert.equal(audio._getUserMedia.args[1][0].audio.deviceId.exact, 'input');
+          assert.equal(
+            audio._getUserMedia.args[1][0].audio.deviceId.exact,
+            "input"
+          );
           sinon.assert.calledOnce(createProcessedStream);
         });
 
-        it('should restart default device if a selected stream exists', async () => {
-          await audio.setInputDevice('input');
+        it("should restart default device if a selected stream exists", async () => {
+          await audio.setInputDevice("input");
           sinon.assert.calledOnce(getUserMedia);
           await audio.removeProcessor(processor);
           sinon.assert.calledTwice(getUserMedia);
-          assert.equal(audio._getUserMedia.args[1][0].audio.deviceId.exact, 'input');
+          assert.equal(
+            audio._getUserMedia.args[1][0].audio.deviceId.exact,
+            "input"
+          );
           sinon.assert.calledOnce(createProcessedStream);
         });
 
-        it('should destroy and stop processed tracks', async () => {
+        it("should destroy and stop processed tracks", async () => {
           await audio._openDefaultDeviceWithConstraints();
           await audio.removeProcessor(processor);
           sinon.assert.calledOnce(processedStreamStopStub);
           sinon.assert.calledOnce(destroyProcessedStream);
         });
 
-        it('should be noop when stopping and processed track does not exists', async () => {
+        it("should be noop when stopping and processed track does not exists", async () => {
           await audio.removeProcessor(processor);
           sinon.assert.notCalled(processedStreamStopStub);
           sinon.assert.notCalled(destroyProcessedStream);
@@ -387,70 +432,79 @@ describe('AudioHelper', () => {
       });
     });
 
-    describe('default device', () => {
+    describe("default device", () => {
       let enumerateDevices;
       let getUserMedia;
       let stopStub;
 
       beforeEach(() => {
         stopStub = sinon.stub();
-        enumerateDevices = sinon.stub().returns(new Promise(res => res([])));
-        getUserMedia = sinon.stub().returns(new Promise(res => res({id: 'default', getTracks: () => [{stop: stopStub}]})));
+        enumerateDevices = sinon.stub().returns(new Promise((res) => res([])));
+        getUserMedia = sinon
+          .stub()
+          .returns(
+            new Promise((res) =>
+              res({ id: "default", getTracks: () => [{ stop: stopStub }] })
+            )
+          );
         audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
           audioProcessorEventObserver: eventObserver,
           enumerateDevices,
           getUserMedia,
           mediaDevices,
-          setSinkId: () => {}
+          setSinkId: () => {},
         });
       });
 
-      it('should use constraints parameter', async () => {
-        await audio._openDefaultDeviceWithConstraints({ audio: 'foo' });
-        sinon.assert.calledWithExactly(getUserMedia, { audio: 'foo' });
+      it("should use constraints parameter", async () => {
+        await audio._openDefaultDeviceWithConstraints({ audio: "foo" });
+        sinon.assert.calledWithExactly(getUserMedia, { audio: "foo" });
       });
 
-      it('should update device list', async () => {
+      it("should update device list", async () => {
         await audio._openDefaultDeviceWithConstraints();
         sinon.assert.called(getUserMedia);
         sinon.assert.called(enumerateDevices);
         sinon.assert.callOrder(getUserMedia, enumerateDevices);
       });
 
-      it('should not create a processed stream if a audio processor does not exists', async () => {
+      it("should not create a processed stream if a audio processor does not exists", async () => {
         sinon.assert.notCalled(createProcessedStream);
         await audio._openDefaultDeviceWithConstraints();
         sinon.assert.notCalled(createProcessedStream);
       });
 
-      it('should create a processed stream if a audio processor exists', async () => {
+      it("should create a processed stream if a audio processor exists", async () => {
         await audio.addProcessor(processor);
         sinon.assert.notCalled(createProcessedStream);
         await audio._openDefaultDeviceWithConstraints();
         sinon.assert.calledOnce(createProcessedStream);
       });
 
-      it('should emit create insights event', async () => {
+      it("should emit create insights event", async () => {
         const stub = sinon.stub();
-        eventObserver.on('event', stub);
+        eventObserver.on("event", stub);
         await audio.addProcessor(processor);
         await audio._openDefaultDeviceWithConstraints();
-        sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'create-processed-stream' });
+        sinon.assert.calledWithExactly(stub, {
+          group: "audio-processor",
+          name: "create-processed-stream",
+        });
       });
 
-      it('should stop default tracks', async () => {
+      it("should stop default tracks", async () => {
         await audio._openDefaultDeviceWithConstraints();
         sinon.assert.notCalled(stopStub);
         audio._stopDefaultInputDeviceStream();
         sinon.assert.calledOnce(stopStub);
       });
 
-      it('should be noop when stopping and default track does not exists', async () => {
+      it("should be noop when stopping and default track does not exists", async () => {
         audio._stopDefaultInputDeviceStream();
         sinon.assert.notCalled(stopStub);
       });
 
-      it('should destroy stop processed tracks', async () => {
+      it("should destroy stop processed tracks", async () => {
         await audio.addProcessor(processor);
         await audio._openDefaultDeviceWithConstraints();
         audio._stopDefaultInputDeviceStream();
@@ -458,16 +512,19 @@ describe('AudioHelper', () => {
         sinon.assert.calledOnce(destroyProcessedStream);
       });
 
-      it('should emit destroy insights event', async () => {
+      it("should emit destroy insights event", async () => {
         const stub = sinon.stub();
-        eventObserver.on('event', stub);
+        eventObserver.on("event", stub);
         await audio.addProcessor(processor);
         await audio._openDefaultDeviceWithConstraints();
         audio._stopDefaultInputDeviceStream();
-        sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'destroy-processed-stream' });
+        sinon.assert.calledWithExactly(stub, {
+          group: "audio-processor",
+          name: "destroy-processed-stream",
+        });
       });
 
-      it('should be noop when stopping and processed track does not exists', async () => {
+      it("should be noop when stopping and processed track does not exists", async () => {
         await audio._openDefaultDeviceWithConstraints();
         audio._stopDefaultInputDeviceStream();
         sinon.assert.notCalled(processedStreamStopStub);
@@ -475,18 +532,27 @@ describe('AudioHelper', () => {
       });
     });
 
-    describe('device labels', () => {
-      const deviceLabeled = { deviceId: '123', kind: 'audiooutput', label: 'foo' };
-      const deviceUnlabeled = { deviceId: '456', kind: 'audiooutput' };
+    describe("device labels", () => {
+      const deviceLabeled = {
+        deviceId: "123",
+        kind: "audiooutput",
+        label: "foo",
+      };
+      const deviceUnlabeled = { deviceId: "456", kind: "audiooutput" };
       let getUserMedia;
       let fakeStream;
       let stopStub;
 
-      beforeEach(done => {
+      beforeEach((done) => {
         let isDone = false;
         stopStub = sinon.stub();
-        fakeStream = {id: 'fakestream', getTracks: () => [{stop: stopStub}]};
-        getUserMedia = sinon.stub().returns(new Promise(res => res(fakeStream)));
+        fakeStream = {
+          id: "fakestream",
+          getTracks: () => [{ stop: stopStub }],
+        };
+        getUserMedia = sinon
+          .stub()
+          .returns(new Promise((res) => res(fakeStream)));
 
         onActiveOutputsChanged = sinon.spy(() => {
           if (!isDone) {
@@ -495,123 +561,151 @@ describe('AudioHelper', () => {
           }
         });
 
-        onActiveInputChanged = sinon.spy(stream => Promise.resolve());
+        onActiveInputChanged = sinon.spy((stream) => Promise.resolve());
 
         audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
           audioProcessorEventObserver: eventObserver,
           getUserMedia,
           mediaDevices,
-          setSinkId: () => {}
+          setSinkId: () => {},
         });
       });
 
-      context('when a new audiooutput device with a label is available', () => {
-        it('should should contain its own label', () => new Promise((resolve, reject) => {
-          audio.on('deviceChange', lostActiveDevices => {
-            resolve(lostActiveDevices);
-          });
+      context("when a new audiooutput device with a label is available", () => {
+        it("should should contain its own label", () =>
+          new Promise((resolve, reject) => {
+            audio.on("deviceChange", (lostActiveDevices) => {
+              resolve(lostActiveDevices);
+            });
 
-          availableDevices.push(deviceLabeled);
-          handlers.get('devicechange')();
-        }).then(() => {
-          const device = audio.availableOutputDevices.get('123');
-          assert.equal(device.label, 'foo');
-          assert.equal(device.deviceId, '123');
-          assert.equal(device.kind, 'audiooutput');
-        }));
+            availableDevices.push(deviceLabeled);
+            handlers.get("devicechange")();
+          }).then(() => {
+            const device = audio.availableOutputDevices.get("123");
+            assert.equal(device.label, "foo");
+            assert.equal(device.deviceId, "123");
+            assert.equal(device.kind, "audiooutput");
+          }));
       });
 
-      context('when a new audiooutput device without a label is available', () => {
-        it('should should contain a non-empty label', () => new Promise(resolve => {
-          audio.on('deviceChange', () => {
-            resolve();
-          });
+      context(
+        "when a new audiooutput device without a label is available",
+        () => {
+          it("should should contain a non-empty label", () =>
+            new Promise((resolve) => {
+              audio.on("deviceChange", () => {
+                resolve();
+              });
 
-          availableDevices.push(deviceUnlabeled);
-          handlers.get('devicechange')();
-        }).then(() => {
-          const device = audio.availableOutputDevices.get('456');
-          assert(device.label.length > 0);
-          assert.equal(device.deviceId, '456');
-          assert.equal(device.kind, 'audiooutput');
-        }));
-      });
+              availableDevices.push(deviceUnlabeled);
+              handlers.get("devicechange")();
+            }).then(() => {
+              const device = audio.availableOutputDevices.get("456");
+              assert(device.label.length > 0);
+              assert.equal(device.deviceId, "456");
+              assert.equal(device.kind, "audiooutput");
+            }));
+        }
+      );
 
-      describe('setInputDevice', () => {
-        it('should wait for the beforeSetInputDevice to resolve', async () => {
+      describe("setInputDevice", () => {
+        it("should wait for the beforeSetInputDevice to resolve", async () => {
           const stub = sinon.stub();
-          audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
-            audioProcessorEventObserver: eventObserver,
-            beforeSetInputDevice: () => new Promise(res => res(stub())),
-            getUserMedia,
-            mediaDevices,
-            setSinkId: () => {}
-          });
-          await audio.setInputDevice('input');
+          audio = new AudioHelper(
+            onActiveOutputsChanged,
+            onActiveInputChanged,
+            {
+              audioProcessorEventObserver: eventObserver,
+              beforeSetInputDevice: () => new Promise((res) => res(stub())),
+              getUserMedia,
+              mediaDevices,
+              setSinkId: () => {},
+            }
+          );
+          await audio.setInputDevice("input");
           sinon.assert.calledOnce(stub);
         });
-        
-        it('should reject if beforeSetInputDevice rejects', async () => {
-          audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged, {
-            audioProcessorEventObserver: eventObserver,
-            beforeSetInputDevice: () => new Promise((resolve, reject) => reject()),
-            getUserMedia,
-            mediaDevices,
-            setSinkId: () => {}
-          });
-          await assert.rejects(() => audio.setInputDevice('input'));
+
+        it("should reject if beforeSetInputDevice rejects", async () => {
+          audio = new AudioHelper(
+            onActiveOutputsChanged,
+            onActiveInputChanged,
+            {
+              audioProcessorEventObserver: eventObserver,
+              beforeSetInputDevice: () =>
+                new Promise((resolve, reject) => reject()),
+              getUserMedia,
+              mediaDevices,
+              setSinkId: () => {},
+            }
+          );
+          await assert.rejects(() => audio.setInputDevice("input"));
         });
 
-        it('should return a rejected Promise if no deviceId is passed', () => audio.setInputDevice().then(() => {
-          throw new Error('Expected a rejection, got resolved');
-        }, () => { }));
+        it("should return a rejected Promise if no deviceId is passed", () =>
+          audio.setInputDevice().then(
+            () => {
+              throw new Error("Expected a rejection, got resolved");
+            },
+            () => {}
+          ));
 
-        it('should return a rejected Promise if an unfound deviceId is passed', () => audio.setInputDevice('nonexistant').then(() => {
-          throw new Error('Expected a rejection, got resolved');
-        }, () => { }));
+        it("should return a rejected Promise if an unfound deviceId is passed", () =>
+          audio.setInputDevice("nonexistant").then(
+            () => {
+              throw new Error("Expected a rejection, got resolved");
+            },
+            () => {}
+          ));
 
-        it('should return a resolved Promise if the ID passed is already active', () => {
+        it("should return a resolved Promise if the ID passed is already active", () => {
           audio._selectedInputDeviceStream = true;
           audio._inputDevice = deviceInput;
-          return audio.setInputDevice('input');
+          return audio.setInputDevice("input");
         });
 
-        it('should call _getUserMedia if ID passed is already active but forceGetUserMedia is true', () => {
-          audio._selectedInputDeviceStream = { getTracks() { return []; } };
+        it("should call _getUserMedia if ID passed is already active but forceGetUserMedia is true", () => {
+          audio._selectedInputDeviceStream = {
+            getTracks() {
+              return [];
+            },
+          };
           audio._inputDevice = deviceInput;
-          return audio._setInputDevice('input', true).then(() => {
+          return audio._setInputDevice("input", true).then(() => {
             sinon.assert.calledOnce(audio._getUserMedia);
           });
         });
 
-        describe('inputDevicePromise', () => {
-          [0, null, undefined, {}, false, true, 'non-existent'].forEach((id) => {
-            it(`should reject if id is ${id} and set the internal promise to null`, async () => {
-              audio.setInputDevice(id);
-              const promise = audio._getInputDevicePromise();
-              assert(!!promise);
-              const stub = sinon.stub();
-              try {
-                await promise;
-              } catch {
-                stub();
-              }
-              sinon.assert.calledOnce(stub);
-              assert.strictEqual(audio._getInputDevicePromise(), null);
-            });
-          });
+        describe("inputDevicePromise", () => {
+          [0, null, undefined, {}, false, true, "non-existent"].forEach(
+            (id) => {
+              it(`should reject if id is ${id} and set the internal promise to null`, async () => {
+                audio.setInputDevice(id);
+                const promise = audio._getInputDevicePromise();
+                assert(!!promise);
+                const stub = sinon.stub();
+                try {
+                  await promise;
+                } catch {
+                  stub();
+                }
+                sinon.assert.calledOnce(stub);
+                assert.strictEqual(audio._getInputDevicePromise(), null);
+              });
+            }
+          );
 
-          it('should resolve and set the internal promise to null', async () => {
-            audio.setInputDevice('input');
+          it("should resolve and set the internal promise to null", async () => {
+            audio.setInputDevice("input");
             const promise = audio._getInputDevicePromise();
             assert(!!promise);
             await promise;
             assert.strictEqual(audio._getInputDevicePromise(), null);
           });
 
-          it('should resolve and set the internal promise to null when called multiple times with the same id', async () => {
-            for(let i = 0; i < 5; i++) {
-              audio.setInputDevice('input');
+          it("should resolve and set the internal promise to null when called multiple times with the same id", async () => {
+            for (let i = 0; i < 5; i++) {
+              audio.setInputDevice("input");
               const promise = audio._getInputDevicePromise();
               assert(!!promise);
               await promise;
@@ -620,105 +714,117 @@ describe('AudioHelper', () => {
           });
         });
 
-        context('when the ID passed is new and valid', () => {
-          it('should return a resolved Promise', () => audio.setInputDevice('input'));
+        context("when the ID passed is new and valid", () => {
+          it("should return a resolved Promise", () =>
+            audio.setInputDevice("input"));
 
-          it('should call getUserMedia with the passed ID', async () => {
-            await audio.setInputDevice('input');
-            assert.equal(audio._getUserMedia.args[0][0].audio.deviceId.exact, 'input');
+          it("should call getUserMedia with the passed ID", async () => {
+            await audio.setInputDevice("input");
+            assert.equal(
+              audio._getUserMedia.args[0][0].audio.deviceId.exact,
+              "input"
+            );
           });
 
-          it('should call _onActiveInputChanged with stream from getUserMedia', () => audio.setInputDevice('input').then(() => {
-            sinon.assert.calledWith(onActiveInputChanged, fakeStream);
-          }));
+          it("should call _onActiveInputChanged with stream from getUserMedia", () =>
+            audio.setInputDevice("input").then(() => {
+              sinon.assert.calledWith(onActiveInputChanged, fakeStream);
+            }));
 
-          it('should update _selectedInputDeviceStream with stream from getUserMedia', () => audio.setInputDevice('input').then(() => {
-            assert.equal(audio._selectedInputDeviceStream.id, 'fakestream');
-          }));
+          it("should update _selectedInputDeviceStream with stream from getUserMedia", () =>
+            audio.setInputDevice("input").then(() => {
+              assert.equal(audio._selectedInputDeviceStream.id, "fakestream");
+            }));
 
-          it('should create a processed stream if an audio processor exists', async () => {
+          it("should create a processed stream if an audio processor exists", async () => {
             await audio.addProcessor(processor);
-            await audio.setInputDevice('input');
+            await audio.setInputDevice("input");
             sinon.assert.calledOnce(createProcessedStream);
           });
 
-          it('should emit create insights event', async () => {
+          it("should emit create insights event", async () => {
             const stub = sinon.stub();
-            eventObserver.on('event', stub);
+            eventObserver.on("event", stub);
             await audio.addProcessor(processor);
-            await audio.setInputDevice('input');
-            sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'create-processed-stream' });
+            await audio.setInputDevice("input");
+            sinon.assert.calledWithExactly(stub, {
+              group: "audio-processor",
+              name: "create-processed-stream",
+            });
           });
 
-          it('should stop default tracks if it exists', async () => {
+          it("should stop default tracks if it exists", async () => {
             await audio._openDefaultDeviceWithConstraints();
-            await audio.setInputDevice('input');
+            await audio.setInputDevice("input");
             sinon.assert.calledOnce(stopStub);
           });
 
-          it('should destroy stop processed tracks if it exists', async () => {
+          it("should destroy stop processed tracks if it exists", async () => {
             await audio.addProcessor(processor);
             await audio._openDefaultDeviceWithConstraints();
-            await audio.setInputDevice('input');
+            await audio.setInputDevice("input");
             sinon.assert.calledOnce(processedStreamStopStub);
             sinon.assert.calledOnce(destroyProcessedStream);
           });
 
-          it('should emit destroy insights event', async () => {
+          it("should emit destroy insights event", async () => {
             const stub = sinon.stub();
-            eventObserver.on('event', stub);
+            eventObserver.on("event", stub);
             await audio.addProcessor(processor);
             await audio._openDefaultDeviceWithConstraints();
-            await audio.setInputDevice('input');
-            sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'destroy-processed-stream' });
+            await audio.setInputDevice("input");
+            sinon.assert.calledWithExactly(stub, {
+              group: "audio-processor",
+              name: "destroy-processed-stream",
+            });
           });
         });
       });
 
-      describe('unsetInputDevice', () => {
-        context('when no input device is set', () => {
-          it('should resolve immediately', () => audio.unsetInputDevice().then(() => {
-            assert.equal(onActiveInputChanged.callCount, 0);
-          }));
+      describe("unsetInputDevice", () => {
+        context("when no input device is set", () => {
+          it("should resolve immediately", () =>
+            audio.unsetInputDevice().then(() => {
+              assert.equal(onActiveInputChanged.callCount, 0);
+            }));
         });
 
-        context('when an input device is set', () => {
+        context("when an input device is set", () => {
           let spy;
           beforeEach(async () => {
             spy = sinon.spy();
 
             const fakeStream = {
               spy,
-              getTracks() { return [
-                { stop: spy },
-                { stop: spy },
-              ]; }
+              getTracks() {
+                return [{ stop: spy }, { stop: spy }];
+              },
             };
 
             await audio.addProcessor(processor);
-            return audio.setInputDevice('input').then(() => {
+            return audio.setInputDevice("input").then(() => {
               audio._selectedInputDeviceStream = fakeStream;
               return audio.unsetInputDevice();
             });
           });
 
-          it('should call _onActiveInputChanged with null', () => {
+          it("should call _onActiveInputChanged with null", () => {
             assert(onActiveInputChanged.calledWith(null));
           });
 
-          it('should set _inputDevice to null', () => {
+          it("should set _inputDevice to null", () => {
             assert.equal(audio._inputDevice, null);
           });
 
-          it('should set _selectedInputDeviceStream to null', () => {
+          it("should set _selectedInputDeviceStream to null", () => {
             assert.equal(audio._selectedInputDeviceStream, null);
           });
 
-          it('should stop all tracks if _selectedInputDeviceStream was set', () => {
+          it("should stop all tracks if _selectedInputDeviceStream was set", () => {
             assert(spy.calledTwice);
           });
 
-          it('should stop processed tracks', async () => {
+          it("should stop processed tracks", async () => {
             sinon.assert.calledOnce(processedStreamStopStub);
             sinon.assert.calledOnce(destroyProcessedStream);
           });
@@ -726,33 +832,33 @@ describe('AudioHelper', () => {
       });
     });
 
-    describe('.inputStream', () => {
-      it('should return the selected input stream', async () => {
-        await audio.setInputDevice('input');
-        assert.strictEqual(audio.inputStream.id, 'default');
+    describe(".inputStream", () => {
+      it("should return the selected input stream", async () => {
+        await audio.setInputDevice("input");
+        assert.strictEqual(audio.inputStream.id, "default");
       });
 
-      it('should return the processed stream', async () => {
+      it("should return the processed stream", async () => {
         await audio.addProcessor(processor);
-        await audio.setInputDevice('input');
-        assert.strictEqual(audio.inputStream.id, 'processedstream');
+        await audio.setInputDevice("input");
+        assert.strictEqual(audio.inputStream.id, "processedstream");
       });
     });
 
-    describe('.processedStream', () => {
-      it('should return the processed stream', async () => {
+    describe(".processedStream", () => {
+      it("should return the processed stream", async () => {
         await audio.addProcessor(processor);
-        await audio.setInputDevice('input');
-        assert.strictEqual(audio.processedStream.id, 'processedstream');
+        await audio.setInputDevice("input");
+        assert.strictEqual(audio.processedStream.id, "processedstream");
       });
 
-      it('should return null', async () => {
-        await audio.setInputDevice('input');
+      it("should return null", async () => {
+        await audio.setInputDevice("input");
         assert.strictEqual(audio.processedStream, null);
       });
     });
 
-    ['disconnect', 'incoming', 'outgoing'].forEach(soundName => {
+    ["disconnect", "incoming", "outgoing"].forEach((soundName) => {
       describe(`.${soundName}`, () => {
         let testFn;
 
@@ -760,16 +866,16 @@ describe('AudioHelper', () => {
           testFn = audio[soundName].bind(audio);
         });
 
-        it('should return true as default', () => {
+        it("should return true as default", () => {
           assert.strictEqual(testFn(), true);
         });
 
-        it('should return false after setting to false', () => {
+        it("should return false after setting to false", () => {
           assert.strictEqual(testFn(false), false);
           assert.strictEqual(testFn(), false);
         });
 
-        it('should return true after setting to true', () => {
+        it("should return true after setting to true", () => {
           assert.strictEqual(testFn(false), false);
           assert.strictEqual(testFn(), false);
           assert.strictEqual(testFn(true), true);
@@ -778,78 +884,78 @@ describe('AudioHelper', () => {
       });
     });
 
-    describe('.setAudioConstraints', () => {
-      context('when no input device is active', () => {
-        it('should set .audioConstraints', () => {
-          audio.setAudioConstraints({ foo: 'bar' });
-          assert.deepEqual(audio.audioConstraints, { foo: 'bar' });
+    describe(".setAudioConstraints", () => {
+      context("when no input device is active", () => {
+        it("should set .audioConstraints", () => {
+          audio.setAudioConstraints({ foo: "bar" });
+          assert.deepEqual(audio.audioConstraints, { foo: "bar" });
         });
 
-        it('should return a resolved promise', () => {
-          return audio.setAudioConstraints({ foo: 'bar' });
+        it("should return a resolved promise", () => {
+          return audio.setAudioConstraints({ foo: "bar" });
         });
       });
 
-      context('when an input device is active', () => {
+      context("when an input device is active", () => {
         beforeEach(() => {
-          return audio.setInputDevice('input');
+          return audio.setInputDevice("input");
         });
 
-        it('should set .audioConstraints', () => {
-          audio.setAudioConstraints({ foo: 'bar' });
-          assert.deepEqual(audio.audioConstraints, { foo: 'bar' });
+        it("should set .audioConstraints", () => {
+          audio.setAudioConstraints({ foo: "bar" });
+          assert.deepEqual(audio.audioConstraints, { foo: "bar" });
         });
 
-        it('should return the result of _setInputDevice', () => {
-          audio._setInputDevice = sinon.spy(() => Promise.resolve('success'));
-          return audio.setAudioConstraints({ foo: 'bar' }).then(res => {
-            assert.equal(res, 'success');
+        it("should return the result of _setInputDevice", () => {
+          audio._setInputDevice = sinon.spy(() => Promise.resolve("success"));
+          return audio.setAudioConstraints({ foo: "bar" }).then((res) => {
+            assert.equal(res, "success");
           });
         });
       });
     });
 
-    describe('.unsetAudioConstraints', () => {
+    describe(".unsetAudioConstraints", () => {
       beforeEach(() => {
-        audio.setAudioConstraints({ foo: 'bar' });
+        audio.setAudioConstraints({ foo: "bar" });
       });
 
-      context('when no input device is active', () => {
-        it('should set .audioConstraints to null', () => {
+      context("when no input device is active", () => {
+        it("should set .audioConstraints to null", () => {
           audio.unsetAudioConstraints();
           assert.equal(audio.audioConstraints, null);
         });
 
-        it('should return a resolved promise', () => {
+        it("should return a resolved promise", () => {
           return audio.unsetAudioConstraints();
         });
       });
 
-      context('when an input device is active', () => {
+      context("when an input device is active", () => {
         beforeEach(() => {
-          return audio.setInputDevice('input');
+          return audio.setInputDevice("input");
         });
 
-        it('should set .audioConstraints to null', () => {
+        it("should set .audioConstraints to null", () => {
           audio.unsetAudioConstraints();
           assert.equal(audio.audioConstraints, null);
         });
 
-        it('should return the result of _setInputDevice', () => {
-          audio._setInputDevice = sinon.spy(() => Promise.resolve('success'));
-          return audio.unsetAudioConstraints().then(res => {
-            assert.equal(res, 'success');
+        it("should return the result of _setInputDevice", () => {
+          audio._setInputDevice = sinon.spy(() => Promise.resolve("success"));
+          return audio.unsetAudioConstraints().then((res) => {
+            assert.equal(res, "success");
           });
         });
       });
     });
 
-    describe('event:deviceChange', () => {
-      const deviceBaz = { deviceId: 'baz', kind: 'audiooutput' };
-      const deviceQux = { deviceId: 'qux', kind: 'audioinput' };
-      const deviceQuux = { deviceId: 'quux', kind: 'whoknows' };
+    describe("event:deviceChange", () => {
+      const deviceBaz = { deviceId: "baz", kind: "audiooutput" };
+      const deviceQux = { deviceId: "qux", kind: "audioinput" };
+      const deviceQuux = { deviceId: "quux", kind: "whoknows" };
 
-      beforeEach(done => {
+      beforeEach((done) => {
         let isDone = false;
 
         onActiveOutputsChanged = sinon.spy(() => {
@@ -862,146 +968,242 @@ describe('AudioHelper', () => {
         audio = new AudioHelper(onActiveOutputsChanged, null, {
           getUserMedia,
           mediaDevices,
-          setSinkId: () => {}
+          setSinkId: () => {},
         });
       });
 
-      context('when a new audiooutput device is available', () => {
-        it('should be fired with an empty array', () => new Promise((resolve, reject) => {
-          audio.on('deviceChange', lostActiveDevices => {
-            resolve(lostActiveDevices);
-          });
+      context("when a new audiooutput device is available", () => {
+        it("should be fired with an empty array", () =>
+          new Promise((resolve, reject) => {
+            audio.on("deviceChange", (lostActiveDevices) => {
+              resolve(lostActiveDevices);
+            });
 
-          availableDevices.push(deviceBaz);
-          handlers.get('devicechange')();
-        }).then(lostActiveDevices => {
-          assert.deepEqual(lostActiveDevices, []);
-        }));
+            availableDevices.push(deviceBaz);
+            handlers.get("devicechange")();
+          }).then((lostActiveDevices) => {
+            assert.deepEqual(lostActiveDevices, []);
+          }));
       });
 
-      context('when a new audioinput device is available', () => {
-        it('should be fired with an empty array', () => new Promise((resolve, reject) => {
-          audio.on('deviceChange', lostActiveDevices => {
-            resolve(lostActiveDevices);
-          });
+      context("when a new audioinput device is available", () => {
+        it("should be fired with an empty array", () =>
+          new Promise((resolve, reject) => {
+            audio.on("deviceChange", (lostActiveDevices) => {
+              resolve(lostActiveDevices);
+            });
 
-          availableDevices.push(deviceQux);
-          handlers.get('devicechange')();
-        }).then(lostActiveDevices => {
-          assert.deepEqual(lostActiveDevices, []);
-        }));
+            availableDevices.push(deviceQux);
+            handlers.get("devicechange")();
+          }).then((lostActiveDevices) => {
+            assert.deepEqual(lostActiveDevices, []);
+          }));
       });
 
-      context('when a new device of a different kind is available', () => {
-        it('should not be fired', () => new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            resolve();
-          }, 10);
+      context("when a new device of a different kind is available", () => {
+        it("should not be fired", () =>
+          new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              resolve();
+            }, 10);
 
-          audio.on('deviceChange', foundDevice => {
-            clearTimeout(timeout);
-            reject(new Error('Event was fired unexpectedly'));
-          });
+            audio.on("deviceChange", (foundDevice) => {
+              clearTimeout(timeout);
+              reject(new Error("Event was fired unexpectedly"));
+            });
 
-          availableDevices.push(deviceQuux);
-          handlers.get('devicechange')();
-        }));
+            availableDevices.push(deviceQuux);
+            handlers.get("devicechange")();
+          }));
       });
 
-      context('when an existing audiooutput device changes labels', () => {
-        it('should be fired with an empty array', () => new Promise((resolve, reject) => {
-          audio.on('deviceChange', lostActiveDevices => {
-            resolve(lostActiveDevices);
-          });
+      context("when an existing audiooutput device changes labels", () => {
+        it("should be fired with an empty array", () =>
+          new Promise((resolve, reject) => {
+            audio.on("deviceChange", (lostActiveDevices) => {
+              resolve(lostActiveDevices);
+            });
 
-          availableDevices[1].label = 'abc';
-          handlers.get('devicechange')();
-        }).then(lostActiveDevices => {
-          assert.deepEqual(lostActiveDevices, []);
-        }));
+            availableDevices[1].label = "abc";
+            handlers.get("devicechange")();
+          }).then((lostActiveDevices) => {
+            assert.deepEqual(lostActiveDevices, []);
+          }));
       });
 
-      context('when an existing audioinput device changes labels', () => {
-        it('should be fired with an empty array', () => new Promise((resolve, reject) => {
-          audio.on('deviceChange', lostActiveDevices => {
-            resolve(lostActiveDevices);
-          });
+      context("when an existing audioinput device changes labels", () => {
+        it("should be fired with an empty array", () =>
+          new Promise((resolve, reject) => {
+            audio.on("deviceChange", (lostActiveDevices) => {
+              resolve(lostActiveDevices);
+            });
 
-          availableDevices[2].label = 'abc';
-          handlers.get('devicechange')();
-        }).then(lostActiveDevices => {
-          assert.deepEqual(lostActiveDevices, []);
-        }));
+            availableDevices[2].label = "abc";
+            handlers.get("devicechange")();
+          }).then((lostActiveDevices) => {
+            assert.deepEqual(lostActiveDevices, []);
+          }));
       });
 
-      context('when an existing active device is lost', () => {
-        it('should be fired with the lost deviceInfo', () => audio.speakerDevices.set(['foo', 'bar']).then(() => new Promise((resolve, reject) => {
-          audio.on('deviceChange', lostActiveDevices => {
-            resolve(lostActiveDevices);
-          });
+      context("when an existing active device is lost", () => {
+        it("should be fired with the lost deviceInfo", () =>
+          audio.speakerDevices.set(["foo", "bar"]).then(() =>
+            new Promise((resolve, reject) => {
+              audio.on("deviceChange", (lostActiveDevices) => {
+                resolve(lostActiveDevices);
+              });
 
-          availableDevices.splice(1, 1);
-          handlers.get('devicechange')();
-        }).then(result => {
-          assert.equal(result.length, 1);
-          assert.equal(result[0].deviceId, deviceFoo.deviceId);
-        })));
+              availableDevices.splice(1, 1);
+              handlers.get("devicechange")();
+            }).then((result) => {
+              assert.equal(result.length, 1);
+              assert.equal(result[0].deviceId, deviceFoo.deviceId);
+            })
+          ));
 
-        describe('and the active device is the default device', () => {
+        describe("and the active device is the default device", () => {
           let clock;
 
           beforeEach(() => {
             clock = sinon.useFakeTimers();
-            audio.availableInputDevices.set('default', {});
+            audio.availableInputDevices.set("default", {});
             audio._setInputDevice = sinon.stub();
-            availableDevices[2].label = 'abc';
+            availableDevices[2].label = "abc";
           });
 
           afterEach(() => {
             clock.restore();
-            audio.availableInputDevices.delete('default');
+            audio.availableInputDevices.delete("default");
           });
 
-          context('and the input device was selected manually', () => {
-            it('should update the active device to the new default device in a setTimeout', (done) => {
-              audio.on('deviceChange', () => {
+          context("and the input device was selected manually", () => {
+            it("should update the active device to the new default device in a setTimeout", (done) => {
+              audio.on("deviceChange", () => {
                 sinon.assert.notCalled(audio._setInputDevice);
                 clock.tick(1);
-                sinon.assert.calledWithExactly(audio._setInputDevice, 'default', true);
+                sinon.assert.calledWithExactly(
+                  audio._setInputDevice,
+                  "default",
+                  true
+                );
                 done();
               });
-              audio._inputDevice = { deviceId: 'default' };
-              handlers.get('devicechange')();
+              audio._inputDevice = { deviceId: "default" };
+              handlers.get("devicechange")();
             });
           });
 
-          context('and the input device was not selected manually (uses default)', () => {
-            it('should update the active device to the new default device in a setTimeout', (done) => {
-              audio.on('deviceChange', () => {
-                sinon.assert.notCalled(audio._setInputDevice);
-                clock.tick(1);
-                sinon.assert.calledWithExactly(audio._setInputDevice, 'default', true);
-                done();
+          context(
+            "and the input device was not selected manually (uses default)",
+            () => {
+              it("should update the active device to the new default device in a setTimeout", (done) => {
+                audio.on("deviceChange", () => {
+                  sinon.assert.notCalled(audio._setInputDevice);
+                  clock.tick(1);
+                  sinon.assert.calledWithExactly(
+                    audio._setInputDevice,
+                    "default",
+                    true
+                  );
+                  done();
+                });
+                audio._defaultInputDeviceStream = { id: "foo" };
+                handlers.get("devicechange")();
               });
-              audio._defaultInputDeviceStream = { id: 'foo' };
-              handlers.get('devicechange')();
-            });
-          });
+            }
+          );
         });
       });
 
-      context('when an existing non-active device is lost', () => {
-        it('should be fired with the lost deviceInfo and false', () => audio.speakerDevices.set(['bar']).then(() => new Promise((resolve, reject) => {
-          audio.on('deviceChange', lostActiveDevices => {
-            resolve(lostActiveDevices);
-          });
+      context("when an existing non-active device is lost", () => {
+        it("should be fired with the lost deviceInfo and false", () =>
+          audio.speakerDevices.set(["bar"]).then(() =>
+            new Promise((resolve, reject) => {
+              audio.on("deviceChange", (lostActiveDevices) => {
+                resolve(lostActiveDevices);
+              });
 
-          availableDevices.splice(1, 1);
-          handlers.get('devicechange')();
-        }).then(result => {
-          assert.deepEqual(result, []);
-        })));
+              availableDevices.splice(1, 1);
+              handlers.get("devicechange")();
+            }).then((result) => {
+              assert.deepEqual(result, []);
+            })
+          ));
       });
+    });
+  });
+});
+
+describe("Inbound AudioProcessor", () => {
+  let audio;
+  let processor;
+  let createProcessedStream;
+  let destroyProcessedStream;
+  let stream;
+
+  beforeEach(() => {
+    createProcessedStream = sinon.stub().resolves("processed");
+    destroyProcessedStream = sinon.stub();
+    processor = { createProcessedStream, destroyProcessedStream };
+    audio = new AudioHelper(
+      () => {},
+      () => {},
+      {
+        getUserMedia,
+        mediaDevices: { enumerateDevices: () => Promise.resolve([]) },
+        audioProcessorEventObserver: new AudioProcessorEventObserver(),
+      }
+    );
+    stream = {};
+  });
+
+  it("adds and removes inbound processor", () => {
+    audio.addInboundProcessor(processor);
+    assert.equal(audio._inboundProcessor, processor);
+    audio.removeInboundProcessor(processor);
+    assert.equal(audio._inboundProcessor, null);
+  });
+
+  it("throws if adding twice", () => {
+    audio.addInboundProcessor(processor);
+    assert.throws(() => audio.addInboundProcessor(processor));
+  });
+
+  it("throws if removing wrong processor", () => {
+    audio.addInboundProcessor(processor);
+    assert.throws(() => audio.removeInboundProcessor({}));
+  });
+
+  it("maybeProcessInboundStream applies processor", async () => {
+    audio.addInboundProcessor(processor);
+    const result = await audio.maybeProcessInboundStream(stream);
+    assert.equal(result, "processed");
+    assert(createProcessedStream.calledWith(stream));
+  });
+
+  it("maybeProcessInboundStream returns original if no processor", async () => {
+    const result = await audio.maybeProcessInboundStream(stream);
+    assert.equal(result, stream);
+  });
+
+  it("emits add event on addInboundProcessor", () => {
+    const stub = sinon.stub();
+    audio._audioProcessorEventObserver.on("event", stub);
+    audio.addInboundProcessor(processor);
+    sinon.assert.calledWithExactly(stub, {
+      group: "inbound-audio-processor",
+      name: "add",
+    });
+  });
+
+  it("emits remove event on removeInboundProcessor", () => {
+    const stub = sinon.stub();
+    audio.addInboundProcessor(processor);
+    audio._audioProcessorEventObserver.on("event", stub);
+    audio.removeInboundProcessor(processor);
+    sinon.assert.calledWithExactly(stub, {
+      group: "inbound-audio-processor",
+      name: "remove",
     });
   });
 });
