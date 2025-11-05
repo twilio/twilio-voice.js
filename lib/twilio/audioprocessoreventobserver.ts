@@ -13,19 +13,30 @@ export class AudioProcessorEventObserver extends EventEmitter {
   constructor() {
     super();
     this._log.info('Creating AudioProcessorEventObserver instance');
-    this.on('enabled', () => this._reEmitEvent('enabled'));
-    this.on('add', () => this._reEmitEvent('add'));
-    this.on('remove', () => this._reEmitEvent('remove'));
-    this.on('create', () => this._reEmitEvent('create-processed-stream'));
-    this.on('destroy', () => this._reEmitEvent('destroy-processed-stream'));
+
+    this.on('local-enabled', () => this._reEmitLocalEvent('enabled'));
+    this.on('local-add', () => this._reEmitLocalEvent('add'));
+    this.on('local-remove', () => this._reEmitLocalEvent('remove'));
+    this.on('local-create', () => this._reEmitLocalEvent('create-processed-stream'));
+    this.on('local-destroy', () => this._reEmitLocalEvent('destroy-processed-stream'));
+
+    this.on('remote-add', () => this._reEmitRemoteEvent('add'));
+    this.on('remote-remove', () => this._reEmitRemoteEvent('remove'));
+    this.on('remote-create', () => this._reEmitRemoteEvent('create-processed-stream'));
+    this.on('remote-destroy', () => this._reEmitRemoteEvent('destroy-processed-stream'));
   }
 
   destroy(): void {
     this.removeAllListeners();
   }
 
-  private _reEmitEvent(name: string): void {
-    this._log.info(`AudioProcessor:${name}`);
-    this.emit('event', { name, group: 'audio-processor' });
+  private _reEmitLocalEvent(name: string): void {
+    this._log.info(`Local AudioProcessor:${name}`);
+    this.emit('event', { name, group: 'audio-processor', isRemote: false });
+  }
+
+  private _reEmitRemoteEvent(name: string): void {
+    this._log.info(`Remote AudioProcessor:${name}`);
+    this.emit('event', { name, group: 'audio-processor', isRemote: true });
   }
 }

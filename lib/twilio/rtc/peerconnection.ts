@@ -73,6 +73,7 @@ function PeerConnection(audioHelper, pstream, options) {
   // In order to get around it, we are re-using the Device's AudioContext.
   this._audioContext = AudioContext && audioHelper._audioContext;
   this._audioHelper = audioHelper;
+  this._audioProcessorEventObserver = audioHelper._audioProcessorEvent;
   this._hasIceCandidates = false;
   this._hasIceGatheringFailures = false;
   this._iceGatheringTimeoutId = null;
@@ -94,6 +95,11 @@ function PeerConnection(audioHelper, pstream, options) {
     || (typeof navigator !== 'undefined' ? navigator : null);
   this.util = options.util || util;
   this.codecPreferences = options.codecPreferences;
+
+  this._audioProcessorEventObserver.on('remote-add', () =>
+    this._onRemoteAudioProcessorAdded());
+  this._audioProcessorEventObserver.on('remote-remove', () =>
+    this._onRemoteAudioProcessorRemoved());
 
   return this;
 }
@@ -416,15 +422,20 @@ PeerConnection.prototype._createAudioOutput = function createAudioOutput(id) {
   }
 
   const audio = this._createAudio();
-  setAudioSource(audio, dest && dest.stream ? dest.stream : this.pcStream);
-
-  const self = this;
-  return audio.setSinkId(id).then(() => audio.play()).then(() => {
-    self.outputs.set(id, {
-      audio,
-      dest,
+  setAudioSource(audio, dest && dest.stream ? dest.stream : this.pcStream, this._audioHelper)
+    .then((setAudioSourceSuccess) => {
+      if (setAudioSourceSuccess) {
+        const self = this;
+        return audio.setSinkId(id).then(() => audio.play()).then(() => {
+          self.outputs.set(id, {
+            audio,
+            dest,
+          });
+        });
+      } else {
+        pc._log.info('Error attaching stream to element.');
+      }
     });
-  });
 };
 
 PeerConnection.prototype._removeAudioOutputs = function removeAudioOutputs() {
@@ -511,8 +522,13 @@ PeerConnection.prototype._removeAudioOutput = function removeAudioOutput(id) {
  */
 PeerConnection.prototype._onAddTrack = function onAddTrack(pc, stream) {
   const audio = pc._masterAudio = this._createAudio();
-  setAudioSource(audio, stream);
-  audio.play();
+  setAudioSource(audio, stream, this._audioHelper).then((setAudioSourceSuccess) => {
+    if (setAudioSourceSuccess) {
+      audio.play();
+    } else {
+      pc._log.info('Error attaching stream to element.');
+    }
+  });
 
   // Assign the initial master audio element to a random active output device
   const activeDeviceId = Array.from(pc.outputs.keys())[0];
@@ -539,11 +555,13 @@ PeerConnection.prototype._onAddTrack = function onAddTrack(pc, stream) {
  */
 PeerConnection.prototype._fallbackOnAddTrack = function fallbackOnAddTrack(pc, stream) {
   const audio = document && document.createElement('audio');
-  audio.autoplay = true;
-
-  if (!setAudioSource(audio, stream)) {
-    pc._log.info('Error attaching stream to element.');
-  }
+  setAudioSource(audio, stream, this._audioHelper).then((setAudioSourceSuccess) => {
+    if (setAudioSourceSuccess) {
+      audio.play();
+    } else {
+      pc._log.info('Error attaching stream to element.');
+    }
+  });
 
   pc.outputs.set('default', { audio });
 };
@@ -1043,6 +1061,43 @@ PeerConnection.prototype._getRTCIceTransport = function _getRTCIceTransport() {
 // Is PeerConnection.protocol used outside of our SDK? We should remove this if not.
 PeerConnection.protocol = ((() => RTCPC.test() ? new RTCPC() : null))();
 
+// Handle add remote audio processor during stream.
+PeerConnection.prototype._onRemoteAudioProcessorAdded = function () {
+  if (this._remoteStream && this._masterAudio) {
+    setAudioSource(this._masterAudio, this._remoteStream, this._audioHelper)
+      .then((setAudioSourceSuccess) => {
+        if (setAudioSourceSuccess) {
+          this._log.info('Successfully updated audio source with processed stream');
+          // If the audio was paused, resume playback
+          if (this._masterAudio.paused) {
+            this._masterAudio.play();
+          }
+        } else {
+          this._log.error('Failed to update audio source');
+        }
+      });
+  }
+};
+
+// Handle remove remote audio processor during stream.
+PeerConnection.prototype._onRemoteAudioProcessorRemoved = function () {
+  if (this._remoteStream && this._masterAudio) {
+    setAudioSource(this._masterAudio, this._remoteStream, this._audioHelper)
+      .then((setAudioSourceSuccess) => {
+        if (setAudioSourceSuccess) {
+          this._audioProcessorEventObserver.emit('remote-destroy');
+          this._log.info('Successfully reverted audio source to original stream');
+          // If the audio was paused, resume playback
+          if (this._masterAudio.paused) {
+            this._masterAudio.play();
+          }
+        } else {
+          this._log.error('Failed to revert audio source');
+        }
+      });
+  }
+};
+
 function addStream(pc, stream) {
   if (typeof pc.addTrack === 'function') {
     stream.getAudioTracks().forEach(track => {
@@ -1083,19 +1138,21 @@ function removeStream(pc, stream) {
  * @param {MediaStream} stream
  * @returns {boolean} Whether the audio source was set successfully
  */
-function setAudioSource(audio, stream) {
-  if (typeof audio.srcObject !== 'undefined') {
-    audio.srcObject = stream;
-  } else if (typeof audio.mozSrcObject !== 'undefined') {
-    audio.mozSrcObject = stream;
-  } else if (typeof audio.src !== 'undefined') {
-    const _window = audio.options.window || window;
-    audio.src = (_window.URL || _window.webkitURL).createObjectURL(stream);
-  } else {
-    return false;
-  }
+function setAudioSource(audio, stream, audioHelper) {
+  return audioHelper._maybeCreateRemoteProcessedStream(stream).then(maybeProcessedStream => {
+    if (typeof audio.srcObject !== 'undefined') {
+      audio.srcObject = maybeProcessedStream;
+    } else if (typeof audio.mozSrcObject !== 'undefined') {
+      audio.mozSrcObject = maybeProcessedStream;
+    } else if (typeof audio.src !== 'undefined') {
+      const _window = audio.options.window || window;
+      audio.src = (_window.URL || _window.webkitURL).createObjectURL(maybeProcessedStream);
+    } else {
+      return false;
+    }
 
-  return true;
+    return true;
+  });
 }
 
 PeerConnection.enabled = RTCPC.test();

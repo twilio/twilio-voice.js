@@ -1088,8 +1088,8 @@ class Device extends EventEmitter {
 
       this._publisher.info('settings', 'edge', data, call);
 
-      if (this._audio?.processedStream) {
-        this._audioProcessorEventObserver?.emit('enabled');
+      if (this._audio?.localProcessedStream) {
+        this._audioProcessorEventObserver?.emit('local-enabled');
       }
     });
 
@@ -1421,8 +1421,8 @@ class Device extends EventEmitter {
   private _setupAudioHelper(): void {
     if (!this._audioProcessorEventObserver) {
       this._audioProcessorEventObserver = new AudioProcessorEventObserver();
-      this._audioProcessorEventObserver.on('event', ({ name, group }) => {
-        this._publisher.info(group, name, {}, this._activeCall);
+      this._audioProcessorEventObserver.on('event', ({ name, group, isRemote }) => {
+        this._publisher.info(group, name, { is_remote: isRemote }, this._activeCall);
       });
     }
 
