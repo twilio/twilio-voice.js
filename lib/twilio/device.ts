@@ -1089,7 +1089,7 @@ class Device extends EventEmitter {
       this._publisher.info('settings', 'edge', data, call);
 
       if (this._audio?.localProcessedStream) {
-        this._audioProcessorEventObserver?.emit('local-enabled');
+        this._audioProcessorEventObserver?.emit('enabled', false);
       }
     });
 

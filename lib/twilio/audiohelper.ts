@@ -61,8 +61,22 @@ class AudioHelper extends EventEmitter {
 
   /**
    * The processed stream if a local {@link AudioProcessor} was previously added.
+   * @deprecated Use {@link AudioHelper#localProcessedStream} instead.
+   */
+  get processedStream(): MediaStream | null {
+    this._log.warn('AudioHelper#processedStream is deprecated. Please use AudioHelper#localProcessedStream instead.');
+    return this._localProcessedStream;
+  }
+
+  /**
+   * The processed stream if a local {@link AudioProcessor} was previously added.
    */
   get localProcessedStream(): MediaStream | null { return this._localProcessedStream; }
+
+  /**
+   * The processed stream if a remote {@link AudioProcessor} was previously added.
+   */
+  get remoteProcessedStream(): MediaStream | null { return this._remoteProcessedStream; }
 
   /**
    * The current set of output devices that incoming ringtone audio is routed through.
@@ -94,13 +108,6 @@ class AudioHelper extends EventEmitter {
    * The AudioProcessorEventObserver instance to use.
    */
   private _audioProcessorEventObserver: AudioProcessorEventObserver;
-
-  /**
-   * The current AudioProcessorEventObserver instance.
-   */
-  get _audioProcessorEvent(): AudioProcessorEventObserver {
-    return this._audioProcessorEventObserver;
-  }
 
   /**
    * Promise to wait for before setting the input device.
@@ -193,6 +200,11 @@ class AudioHelper extends EventEmitter {
    * Internal reference to the added local AudioProcessor.
   */
   private _localProcessor: AudioProcessor | null;
+
+  /**
+   * Internal reference to the remote processed stream.
+   */
+  private _remoteProcessedStream: MediaStream | null = null;
 
   /**
    * Internal reference to the added remote AudioProcessor
@@ -326,10 +338,26 @@ class AudioHelper extends EventEmitter {
     this._stopDefaultInputDeviceStream();
     this._stopSelectedInputDeviceStream();
     this._destroyLocalProcessedStream();
+    this._destroyRemoteProcessedStream();
     this._maybeStopPollingVolume();
     this.removeAllListeners();
     this._stopMicrophonePermissionListener();
     this._unbind();
+  }
+
+  /**
+   * Destroys the remote processed stream and updates references.
+   * @internal
+   */
+  _destroyRemoteProcessedStream(): void {
+    if (this._remoteProcessor && this._remoteProcessedStream) {
+      this._log.info('destroying remote processed stream');
+      const remoteProcessedStream = this._remoteProcessedStream;
+      this._remoteProcessedStream.getTracks().forEach(track => track.stop());
+      this._remoteProcessedStream = null;
+      this._remoteProcessor.destroyProcessedStream(remoteProcessedStream);
+      this._audioProcessorEventObserver.emit('destroy', true);
+    }
   }
 
   /**
@@ -338,6 +366,30 @@ class AudioHelper extends EventEmitter {
    */
   _getInputDevicePromise(): Promise<void> | null {
     return this._inputDevicePromise;
+  }
+
+  /**
+   * The current AudioProcessorEventObserver instance.
+   * @internal
+   */
+  _getAudioProcessorEventObserver(): AudioProcessorEventObserver {
+    return this._audioProcessorEventObserver;
+  }
+
+  /**
+   * Route remote stream to the processor if it exists.
+   * @internal
+   */
+  _maybeCreateRemoteProcessedStream(stream: MediaStream): Promise<MediaStream> {
+    if (this._remoteProcessor) {
+      this._log.info('Creating remote processed stream');
+      return this._remoteProcessor.createProcessedStream(stream).then((processedStream: MediaStream) => {
+        this._remoteProcessedStream = processedStream;
+        this._audioProcessorEventObserver.emit('create', true);
+        return this._remoteProcessedStream;
+      });
+    }
+    return Promise.resolve(stream);
   }
 
   /**
@@ -487,7 +539,8 @@ class AudioHelper extends EventEmitter {
    * See the {@link AudioProcessor} interface for an example.
    *
    * @param processor The AudioProcessor to add.
-   * @param isRemote Defaults to false, if true adds the processor as a remote processor.
+   * @param isRemote If set to true, the processor will be applied to the remote
+   * audio track. Default value is false.
    * @returns
    */
   addProcessor(processor: AudioProcessor, isRemote: boolean = false): Promise<void> {
@@ -515,11 +568,11 @@ class AudioHelper extends EventEmitter {
 
     if (isRemote) {
       this._remoteProcessor = processor;
-      this._audioProcessorEventObserver.emit('remote-add');
+      this._audioProcessorEventObserver.emit('add', true);
       return Promise.resolve();
     } else {
       this._localProcessor = processor;
-      this._audioProcessorEventObserver.emit('local-add');
+      this._audioProcessorEventObserver.emit('add', false);
       return this._restartInputStreams();
     }
   }
@@ -562,6 +615,8 @@ class AudioHelper extends EventEmitter {
    * the audio stream from the selected input device for existing or future calls.
    *
    * @param processor The AudioProcessor to remove.
+   * @param isRemote If set to true, the processor will be applied to the remote
+   * audio track. Default value is false.
    * @returns
    */
   removeProcessor(processor: AudioProcessor, isRemote: boolean = false): Promise<void> {
@@ -579,13 +634,14 @@ class AudioHelper extends EventEmitter {
     }
 
     if (isRemote) {
+      this._destroyRemoteProcessedStream();
       this._remoteProcessor = null;
-      this._audioProcessorEventObserver.emit('remote-remove');
+      this._audioProcessorEventObserver.emit('remove', true);
       return Promise.resolve();
     } else {
       this._destroyLocalProcessedStream();
       this._localProcessor = null;
-      this._audioProcessorEventObserver.emit('local-remove');
+      this._audioProcessorEventObserver.emit('remove', false);
       return this._restartInputStreams();
     }
   }
@@ -702,7 +758,7 @@ class AudioHelper extends EventEmitter {
       this._localProcessedStream.getTracks().forEach(track => track.stop());
       this._localProcessedStream = null;
       this._localProcessor.destroyProcessedStream(localProcessedStream);
-      this._audioProcessorEventObserver.emit('local-destroy');
+      this._audioProcessorEventObserver.emit('destroy', false);
     }
   }
 
@@ -756,22 +812,8 @@ class AudioHelper extends EventEmitter {
       this._log.info('Creating local processed stream');
       return this._localProcessor.createProcessedStream(stream).then((processedStream: MediaStream) => {
         this._localProcessedStream = processedStream;
-        this._audioProcessorEventObserver.emit('local-create');
+        this._audioProcessorEventObserver.emit('create', false);
         return this._localProcessedStream;
-      });
-    }
-    return Promise.resolve(stream);
-  }
-
-  /**
-   * Route remote stream to the processor if it exists.
-   */
-  private _maybeCreateRemoteProcessedStream(stream: MediaStream): Promise<MediaStream> {
-    if (this._remoteProcessor) {
-      this._log.info('Creating remote processed stream');
-      return this._remoteProcessor.createProcessedStream(stream).then((processedStream: MediaStream) => {
-        this._audioProcessorEventObserver.emit('remote-create');
-        return processedStream;
       });
     }
     return Promise.resolve(stream);

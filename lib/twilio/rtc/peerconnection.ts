@@ -73,7 +73,7 @@ function PeerConnection(audioHelper, pstream, options) {
   // In order to get around it, we are re-using the Device's AudioContext.
   this._audioContext = AudioContext && audioHelper._audioContext;
   this._audioHelper = audioHelper;
-  this._audioProcessorEventObserver = audioHelper._audioProcessorEvent;
+  this._audioProcessorEventObserver = audioHelper._getAudioProcessorEventObserver();
   this._hasIceCandidates = false;
   this._hasIceGatheringFailures = false;
   this._iceGatheringTimeoutId = null;
@@ -96,10 +96,10 @@ function PeerConnection(audioHelper, pstream, options) {
   this.util = options.util || util;
   this.codecPreferences = options.codecPreferences;
 
-  this._audioProcessorEventObserver.on('remote-add', () =>
-    this._onRemoteAudioProcessorAdded());
-  this._audioProcessorEventObserver.on('remote-remove', () =>
-    this._onRemoteAudioProcessorRemoved());
+  this._audioProcessorEventObserver.on('add', (isRemote) =>
+    isRemote && this._onRemoteAudioProcessorAdded());
+  this._audioProcessorEventObserver.on('remove', (isRemote) =>
+    isRemote && this._onRemoteAudioProcessorRemoved());
 
   return this;
 }
@@ -935,6 +935,7 @@ PeerConnection.prototype.close = function() {
   this.stream = null;
   this._removeReconnectionListeners();
   this._stopIceGatheringTimeout();
+  this._audioHelper._destroyRemoteProcessedStream();
 
   Promise.all(this._removeAudioOutputs()).catch(() => {
     // We don't need to alert about failures here.
@@ -1085,7 +1086,6 @@ PeerConnection.prototype._onRemoteAudioProcessorRemoved = function () {
     setAudioSource(this._masterAudio, this._remoteStream, this._audioHelper)
       .then((setAudioSourceSuccess) => {
         if (setAudioSourceSuccess) {
-          this._audioProcessorEventObserver.emit('remote-destroy');
           this._log.info('Successfully reverted audio source to original stream');
           // If the audio was paused, resume playback
           if (this._masterAudio.paused) {
