@@ -422,19 +422,15 @@ PeerConnection.prototype._createAudioOutput = function createAudioOutput(id) {
   }
 
   const audio = this._createAudio();
-  setAudioSource(audio, dest && dest.stream ? dest.stream : this.pcStream, this._audioHelper)
-    .then((setAudioSourceSuccess) => {
-      if (setAudioSourceSuccess) {
-        const self = this;
-        return audio.setSinkId(id).then(() => audio.play()).then(() => {
-          self.outputs.set(id, {
-            audio,
-            dest,
-          });
+  return setAudioSource(audio, dest && dest.stream ? dest.stream : this.pcStream, this._audioHelper)
+    .then(() => {
+      const self = this;
+      return audio.setSinkId(id).then(() => audio.play()).then(() => {
+        self.outputs.set(id, {
+          audio,
+          dest,
         });
-      } else {
-        pc._log.info('Error attaching stream to element.');
-      }
+      });
     });
 };
 

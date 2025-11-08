@@ -207,7 +207,7 @@ class AudioHelper extends EventEmitter {
   private _remoteProcessedStream: MediaStream | null = null;
 
   /**
-   * Internal reference to the added remote AudioProcessor
+   * Internal reference to the added remote AudioProcessor.
    */
   private _remoteProcessor: AudioProcessor | null;
 
@@ -361,7 +361,7 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Promise to wait for the input device, if setInputDevice is called outside of the SDK
+   * Promise to wait for the input device, if setInputDevice is called outside of the SDK.
    * @internal
    */
   _getInputDevicePromise(): Promise<void> | null {
