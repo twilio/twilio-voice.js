@@ -615,7 +615,7 @@ class AudioHelper extends EventEmitter {
    * the audio stream from the selected input device for existing or future calls.
    *
    * @param processor The AudioProcessor to remove.
-   * @param isRemote If set to true, the processor will be applied to the remote
+   * @param isRemote If set to true, the processor will be removed from the remote
    * audio track. Default value is false.
    * @returns
    */

@@ -1091,6 +1091,9 @@ class Device extends EventEmitter {
       if (this._audio?.localProcessedStream) {
         this._audioProcessorEventObserver?.emit('enabled', false);
       }
+      if (this._audio?.remoteProcessedStream) {
+        this._audioProcessorEventObserver?.emit('enabled', true);
+      }
     });
 
     call.addListener('error', (error: TwilioError) => {

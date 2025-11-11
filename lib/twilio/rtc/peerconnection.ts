@@ -96,10 +96,14 @@ function PeerConnection(audioHelper, pstream, options) {
   this.util = options.util || util;
   this.codecPreferences = options.codecPreferences;
 
-  this._audioProcessorEventObserver.on('add', (isRemote) =>
-    isRemote && this._onRemoteAudioProcessorAdded());
-  this._audioProcessorEventObserver.on('remove', (isRemote) =>
-    isRemote && this._onRemoteAudioProcessorRemoved());
+  this._onAudioProcessorAdded = (isRemote) => {
+    this._handleAudioProcessorEvent(isRemote, true);
+  };
+  this._onAudioProcessorRemoved = (isRemote) => {
+    this._handleAudioProcessorEvent(isRemote, false);
+  };
+  this._audioProcessorEventObserver.on('add', this._onAudioProcessorAdded);
+  this._audioProcessorEventObserver.on('remove', this._onAudioProcessorRemoved);
 
   return this;
 }
@@ -522,7 +526,7 @@ PeerConnection.prototype._onAddTrack = function onAddTrack(pc, stream) {
     if (setAudioSourceSuccess) {
       audio.play();
     } else {
-      pc._log.info('Error attaching stream to element.');
+      Promise.reject('Error attaching stream to element.');
     }
   });
 
@@ -555,7 +559,7 @@ PeerConnection.prototype._fallbackOnAddTrack = function fallbackOnAddTrack(pc, s
     if (setAudioSourceSuccess) {
       audio.play();
     } else {
-      pc._log.info('Error attaching stream to element.');
+      Promise.reject('Error attaching stream to element.');
     }
   });
 
@@ -932,6 +936,8 @@ PeerConnection.prototype.close = function() {
   this._removeReconnectionListeners();
   this._stopIceGatheringTimeout();
   this._audioHelper._destroyRemoteProcessedStream();
+  this._audioProcessorEventObserver.removeListener('add', this._onAudioProcessorAdded);
+  this._audioProcessorEventObserver.removeListener('remove', this._onAudioProcessorRemoved);
 
   Promise.all(this._removeAudioOutputs()).catch(() => {
     // We don't need to alert about failures here.
@@ -1058,37 +1064,27 @@ PeerConnection.prototype._getRTCIceTransport = function _getRTCIceTransport() {
 // Is PeerConnection.protocol used outside of our SDK? We should remove this if not.
 PeerConnection.protocol = ((() => RTCPC.test() ? new RTCPC() : null))();
 
-// Handle add remote audio processor during stream.
-PeerConnection.prototype._onRemoteAudioProcessorAdded = function () {
-  if (this._remoteStream && this._masterAudio) {
-    setAudioSource(this._masterAudio, this._remoteStream, this._audioHelper)
-      .then((setAudioSourceSuccess) => {
-        if (setAudioSourceSuccess) {
-          this._log.info('Successfully updated audio source with processed stream');
-          // If the audio was paused, resume playback
-          if (this._masterAudio.paused) {
-            this._masterAudio.play();
-          }
-        } else {
-          this._log.error('Failed to update audio source');
-        }
-      });
+PeerConnection.prototype._handleAudioProcessorEvent = function(isRemote, isAddProcessor) {
+  if (!isRemote) {
+    return;
   }
-};
-
-// Handle remove remote audio processor during stream.
-PeerConnection.prototype._onRemoteAudioProcessorRemoved = function () {
   if (this._remoteStream && this._masterAudio) {
     setAudioSource(this._masterAudio, this._remoteStream, this._audioHelper)
       .then((setAudioSourceSuccess) => {
         if (setAudioSourceSuccess) {
-          this._log.info('Successfully reverted audio source to original stream');
+          const successLog = isAddProcessor
+            ? 'Successfully updated audio source with processed stream'
+            : 'Successfully reverted audio source to original stream';
+          this._log.info(successLog);
           // If the audio was paused, resume playback
           if (this._masterAudio.paused) {
             this._masterAudio.play();
           }
         } else {
-          this._log.error('Failed to revert audio source');
+          const errorLog = isAddProcessor
+            ? 'Failed to update audio source'
+            : 'Failed to revert audio source';
+          Promise.reject(errorLog);
         }
       });
   }
@@ -1129,7 +1125,8 @@ function removeStream(pc, stream) {
 }
 
 /**
- * Set the source of an HTMLAudioElement to the specified MediaStream
+ * Sets the source of an HTMLAudioElement to the specified MediaStream and
+ * applies a remote audio processor if available
  * @param {HTMLAudioElement} audio
  * @param {MediaStream} stream
  * @returns {boolean} Whether the audio source was set successfully
