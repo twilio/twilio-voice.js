@@ -427,7 +427,7 @@ PeerConnection.prototype._createAudioOutput = function createAudioOutput(id) {
 
   const audio = this._createAudio();
   setAudioSource(audio, dest && dest.stream ? dest.stream : this.pcStream, this._audioHelper)
-    .catch(() => this._log.error('Error attaching stream to element.'));
+    .catch(() => this._log.error('Error attaching stream to element (_createAudioOutput).'));
 
   const self = this;
   return audio.setSinkId(id).then(() => audio.play()).then(() => {
@@ -524,7 +524,7 @@ PeerConnection.prototype._onAddTrack = function onAddTrack(pc, stream) {
   const audio = pc._masterAudio = this._createAudio();
   setAudioSource(audio, stream, this._audioHelper)
     .then(() => audio.play())
-    .catch(() => pc._log.error('Error attaching stream to element.'));
+    .catch(() => pc._log.error('Error attaching stream to element (_onAddTrack).'));
 
   // Assign the initial master audio element to a random active output device
   const activeDeviceId = Array.from(pc.outputs.keys())[0];
@@ -550,10 +550,10 @@ PeerConnection.prototype._onAddTrack = function onAddTrack(pc, stream) {
  *   and/or HTMLAudioElement.setSinkId() is not available to the client.
  */
 PeerConnection.prototype._fallbackOnAddTrack = function fallbackOnAddTrack(pc, stream) {
-  const audio = document && document.createElement('audio');
+  const audio = pc._masterAudio = document && document.createElement('audio');
   setAudioSource(audio, stream, this._audioHelper)
     .then(() => audio.play())
-    .catch(() => pc._log.error('Error attaching stream to element.'));
+    .catch(() => pc._log.error('Error attaching stream to element (_fallbackOnAddTrack).'));
 
   pc.outputs.set('default', { audio });
 };
@@ -1069,6 +1069,7 @@ PeerConnection.prototype._handleAudioProcessorEvent = function(isRemote, isAddPr
           this._log.info(successLog);
           // If the audio was paused, resume playback
           if (this._masterAudio.paused) {
+            this._log.info('Resuming audio playback');
             this._masterAudio.play();
           }
         })
