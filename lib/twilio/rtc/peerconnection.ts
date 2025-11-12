@@ -426,16 +426,16 @@ PeerConnection.prototype._createAudioOutput = function createAudioOutput(id) {
   }
 
   const audio = this._createAudio();
-  return setAudioSource(audio, dest && dest.stream ? dest.stream : this.pcStream, this._audioHelper)
-    .then(() => {
-      const self = this;
-      return audio.setSinkId(id).then(() => audio.play()).then(() => {
-        self.outputs.set(id, {
-          audio,
-          dest,
-        });
-      });
+  setAudioSource(audio, dest && dest.stream ? dest.stream : this.pcStream, this._audioHelper)
+    .catch(() => this._log.error('Error attaching stream to element.'));
+
+  const self = this;
+  return audio.setSinkId(id).then(() => audio.play()).then(() => {
+    self.outputs.set(id, {
+      audio,
+      dest,
     });
+  });
 };
 
 PeerConnection.prototype._removeAudioOutputs = function removeAudioOutputs() {
@@ -522,13 +522,9 @@ PeerConnection.prototype._removeAudioOutput = function removeAudioOutput(id) {
  */
 PeerConnection.prototype._onAddTrack = function onAddTrack(pc, stream) {
   const audio = pc._masterAudio = this._createAudio();
-  setAudioSource(audio, stream, this._audioHelper).then((setAudioSourceSuccess) => {
-    if (setAudioSourceSuccess) {
-      audio.play();
-    } else {
-      Promise.reject('Error attaching stream to element.');
-    }
-  });
+  setAudioSource(audio, stream, this._audioHelper)
+    .then(() => audio.play())
+    .catch(() => pc._log.error('Error attaching stream to element.'));
 
   // Assign the initial master audio element to a random active output device
   const activeDeviceId = Array.from(pc.outputs.keys())[0];
@@ -555,13 +551,9 @@ PeerConnection.prototype._onAddTrack = function onAddTrack(pc, stream) {
  */
 PeerConnection.prototype._fallbackOnAddTrack = function fallbackOnAddTrack(pc, stream) {
   const audio = document && document.createElement('audio');
-  setAudioSource(audio, stream, this._audioHelper).then((setAudioSourceSuccess) => {
-    if (setAudioSourceSuccess) {
-      audio.play();
-    } else {
-      Promise.reject('Error attaching stream to element.');
-    }
-  });
+  setAudioSource(audio, stream, this._audioHelper)
+    .then(() => audio.play())
+    .catch(() => pc._log.error('Error attaching stream to element.'));
 
   pc.outputs.set('default', { audio });
 };
@@ -1070,8 +1062,7 @@ PeerConnection.prototype._handleAudioProcessorEvent = function(isRemote, isAddPr
   }
   if (this._remoteStream && this._masterAudio) {
     setAudioSource(this._masterAudio, this._remoteStream, this._audioHelper)
-      .then((setAudioSourceSuccess) => {
-        if (setAudioSourceSuccess) {
+      .then(() => {
           const successLog = isAddProcessor
             ? 'Successfully updated audio source with processed stream'
             : 'Successfully reverted audio source to original stream';
@@ -1080,13 +1071,13 @@ PeerConnection.prototype._handleAudioProcessorEvent = function(isRemote, isAddPr
           if (this._masterAudio.paused) {
             this._masterAudio.play();
           }
-        } else {
+        })
+      .catch(() => {
           const errorLog = isAddProcessor
             ? 'Failed to update audio source'
             : 'Failed to revert audio source';
-          Promise.reject(errorLog);
-        }
-      });
+          this._log.error(errorLog);
+        });
   }
 };
 
@@ -1129,7 +1120,7 @@ function removeStream(pc, stream) {
  * applies a remote audio processor if available
  * @param {HTMLAudioElement} audio
  * @param {MediaStream} stream
- * @returns {boolean} Whether the audio source was set successfully
+ * @returns {Promise} Fulfilled if the audio source was set successfully
  */
 function setAudioSource(audio, stream, audioHelper) {
   return audioHelper._maybeCreateRemoteProcessedStream(stream).then(maybeProcessedStream => {
@@ -1141,10 +1132,10 @@ function setAudioSource(audio, stream, audioHelper) {
       const _window = audio.options.window || window;
       audio.src = (_window.URL || _window.webkitURL).createObjectURL(maybeProcessedStream);
     } else {
-      return false;
+      return Promise.reject();
     }
 
-    return true;
+    return Promise.resolve();
   });
 }
 
