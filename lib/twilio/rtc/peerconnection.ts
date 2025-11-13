@@ -550,7 +550,7 @@ PeerConnection.prototype._onAddTrack = function onAddTrack(pc, stream) {
  *   and/or HTMLAudioElement.setSinkId() is not available to the client.
  */
 PeerConnection.prototype._fallbackOnAddTrack = function fallbackOnAddTrack(pc, stream) {
-  const audio = pc._masterAudio = document && document.createElement('audio');
+  const audio = document && document.createElement('audio');
   setAudioSource(audio, stream, this._audioHelper)
     .then(() => audio.play())
     .catch(() => pc._log.error('Error attaching stream to element (_fallbackOnAddTrack).'));
@@ -1057,29 +1057,33 @@ PeerConnection.prototype._getRTCIceTransport = function _getRTCIceTransport() {
 PeerConnection.protocol = ((() => RTCPC.test() ? new RTCPC() : null))();
 
 PeerConnection.prototype._handleAudioProcessorEvent = function(isRemote, isAddProcessor) {
-  if (!isRemote) {
+  if (!isRemote || !this._remoteStream) {
     return;
   }
-  if (this._remoteStream && this._masterAudio) {
-    setAudioSource(this._masterAudio, this._remoteStream, this._audioHelper)
-      .then(() => {
-          const successLog = isAddProcessor
-            ? 'Successfully updated audio source with processed stream'
-            : 'Successfully reverted audio source to original stream';
-          this._log.info(successLog);
-          // If the audio was paused, resume playback
-          if (this._masterAudio.paused) {
-            this._log.info('Resuming audio playback');
-            this._masterAudio.play();
-          }
-        })
-      .catch(() => {
-          const errorLog = isAddProcessor
-            ? 'Failed to update audio source'
-            : 'Failed to revert audio source';
-          this._log.error(errorLog);
-        });
+
+  const audio = this._masterAudio || this.outputs.get('default')?.audio;
+  if (!audio) {
+    return;
   }
+
+  setAudioSource(audio, this._remoteStream, this._audioHelper)
+    .then(() => {
+        const successLog = isAddProcessor
+          ? 'Successfully updated audio source with processed stream'
+          : 'Successfully reverted audio source to original stream';
+        this._log.info(successLog);
+        // If the audio was paused, resume playback
+        if (audio.paused) {
+          this._log.info('Resuming audio playback');
+          audio.play();
+        }
+      })
+    .catch(() => {
+        const errorLog = isAddProcessor
+          ? 'Failed to update audio source'
+          : 'Failed to revert audio source';
+        this._log.error(errorLog);
+      });
 };
 
 function addStream(pc, stream) {
