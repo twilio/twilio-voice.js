@@ -1061,9 +1061,13 @@ PeerConnection.prototype._handleAudioProcessorEvent = function(isRemote, isAddPr
     return;
   }
 
-  const audio = this._masterAudio || this.outputs.get('default')?.audio;
-  if (!audio) {
-    return;
+  let audio = null;
+  if (this._masterAudio) {
+    this._log.info('Setting audio source for master audio.')
+    audio = this._masterAudio;
+  } else {
+    this._log.info('No master audio. Setting audio source for default audio output.')
+    audio = this.outputs.get('default').audio;
   }
 
   setAudioSource(audio, this._remoteStream, this._audioHelper)
