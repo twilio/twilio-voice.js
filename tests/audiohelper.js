@@ -59,8 +59,10 @@ describe('AudioHelper', () => {
     let eventObserver;
     let createProcessedStream;
     let destroyProcessedStream;
-    let processedStreamStopStub;
-    let processor;
+    let localProcessedStreamStopStub;
+    let remoteProcessedStreamStopStub;
+    let localProcessor;
+    let remoteProcessor;
     let onActiveOutputsChanged;
     let onActiveInputChanged;
     const deviceDefault = { deviceId: 'default', kind: 'audiooutput' };
@@ -74,12 +76,13 @@ describe('AudioHelper', () => {
 
     beforeEach(() => {
       eventObserver = new AudioProcessorEventObserver();
-      processedStreamStopStub = sinon.stub();
+      localProcessedStreamStopStub = sinon.stub();
       createProcessedStream = sinon.stub().returns(new Promise(res => res({
-        id: 'processedstream', getTracks: () => [{ stop: processedStreamStopStub }]
+        id: 'processedstream', getTracks: () => [{ stop: localProcessedStreamStopStub }]
       })));
       destroyProcessedStream = sinon.stub();
-      processor = { createProcessedStream, destroyProcessedStream };
+      localProcessor = { createProcessedStream, destroyProcessedStream };
+      remoteProcessor = { createProcessedStream, destroyProcessedStream };
 
       handlers = new Map();
       availableDevices = [ deviceDefault, deviceFoo, deviceBar, deviceInput ];
@@ -202,13 +205,15 @@ describe('AudioHelper', () => {
       it('should properly dispose the audio instance', () => {
         audio._stopDefaultInputDeviceStream = sinon.stub();
         audio._stopSelectedInputDeviceStream = sinon.stub();
-        audio._destroyProcessedStream = sinon.stub();
+        audio._destroyLocalProcessedStream = sinon.stub();
+        audio._destroyRemoteProcessedStream = sinon.stub();
         audio._maybeStopPollingVolume = sinon.stub();
         audio._destroy();
         assert.strictEqual(audio.eventNames().length, 0);
         sinon.assert.calledOnce(audio._stopDefaultInputDeviceStream);
         sinon.assert.calledOnce(audio._stopSelectedInputDeviceStream);
-        sinon.assert.calledOnce(audio._destroyProcessedStream);
+        sinon.assert.calledOnce(audio._destroyLocalProcessedStream);
+        sinon.assert.calledOnce(audio._destroyRemoteProcessedStream);
         sinon.assert.calledOnce(audio._maybeStopPollingVolume);
         sinon.assert.calledOnce(mediaDevices.removeEventListener);
       });
@@ -219,13 +224,15 @@ describe('AudioHelper', () => {
         audio = new AudioHelper(onActiveOutputsChanged, onActiveInputChanged);
         audio._stopDefaultInputDeviceStream = sinon.stub();
         audio._stopSelectedInputDeviceStream = sinon.stub();
-        audio._destroyProcessedStream = sinon.stub();
+        audio._destroyLocalProcessedStream = sinon.stub();
+        audio._destroyRemoteProcessedStream = sinon.stub();
         audio._maybeStopPollingVolume = sinon.stub();
         audio._destroy();
         assert.strictEqual(audio.eventNames().length, 0);
         sinon.assert.calledOnce(audio._stopDefaultInputDeviceStream);
         sinon.assert.calledOnce(audio._stopSelectedInputDeviceStream);
-        sinon.assert.calledOnce(audio._destroyProcessedStream);
+        sinon.assert.calledOnce(audio._destroyLocalProcessedStream);
+        sinon.assert.calledOnce(audio._destroyRemoteProcessedStream);
         sinon.assert.calledOnce(audio._maybeStopPollingVolume);
       });
     });
@@ -259,7 +266,7 @@ describe('AudioHelper', () => {
         });
       });
 
-      describe('.addProcessor', () => {
+      describe('.addProcessor isRemote=false', () => {
         [
           undefined,
           null,
@@ -278,30 +285,30 @@ describe('AudioHelper', () => {
         });
 
         it('should add one processor', async () => {
-          await audio.addProcessor(processor);
+          await audio.addProcessor(localProcessor);
         });
 
         it('should not allow adding more than one processor', async () => {
-          await audio.addProcessor(processor);
-          assert.rejects(async () => await audio.addProcessor(processor));
+          await audio.addProcessor(localProcessor);
+          assert.rejects(async () => await audio.addProcessor(localProcessor));
         });
 
         it('should emit add insights event', async () => {
           const stub = sinon.stub();
           eventObserver.on('event', stub);
-          await audio.addProcessor(processor);
-          sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'add' });
+          await audio.addProcessor(localProcessor);
+          sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'add', isRemote: false });
         });
 
         it('should not restart any device streams if none exists', async () => {
-          await audio.addProcessor(processor);
+          await audio.addProcessor(localProcessor);
           sinon.assert.notCalled(getUserMedia);
         });
 
         it('should restart default device if default stream exists', async () => {
           await audio._openDefaultDeviceWithConstraints();
           sinon.assert.calledOnce(getUserMedia);
-          await audio.addProcessor(processor);
+          await audio.addProcessor(localProcessor);
           sinon.assert.calledTwice(getUserMedia);
           assert.equal(audio._getUserMedia.args[1][0].audio.deviceId.exact, 'input');
           sinon.assert.calledOnce(createProcessedStream);
@@ -310,16 +317,61 @@ describe('AudioHelper', () => {
         it('should restart default device if a selected stream exists', async () => {
           await audio.setInputDevice('input');
           sinon.assert.calledOnce(getUserMedia);
-          await audio.addProcessor(processor);
+          await audio.addProcessor(localProcessor);
           sinon.assert.calledTwice(getUserMedia);
           assert.equal(audio._getUserMedia.args[1][0].audio.deviceId.exact, 'input');
           sinon.assert.calledOnce(createProcessedStream);
         });
+
+        it('should be able to add a local and remote processor', async () => {
+          await audio.addProcessor(localProcessor, false);
+          await audio.addProcessor(remoteProcessor, true);          
+        });
       });
 
-      describe('.removeProcessor', () => {
+      describe('.addProcessor isRemote=true', () => {
+        [
+          undefined,
+          null,
+          true,
+          false,
+          '',
+          1,
+          0,
+          {},
+          { createProcessedStream: () => {} },
+          { destroyProcessedStream: () => {} },
+        ].forEach(param => {
+          it(`should reject if parameter is ${param}`, () => {
+            assert.rejects(async () => await audio.addProcessor(param, true));
+          });
+        });
+
+        it('should add one processor', async () => {
+          await audio.addProcessor(remoteProcessor, true);
+        });
+
+        it('should not allow adding more than one processor', async () => {
+          await audio.addProcessor(remoteProcessor, true);
+          assert.rejects(async () => await audio.addProcessor(remoteProcessor, true));
+        });
+
+        it('should emit add insights event', async () => {
+          const stub = sinon.stub();
+          eventObserver.on('event', stub);
+          await audio.addProcessor(remoteProcessor, true);
+          sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'add', isRemote: true });
+        });
+
+        it('should not restart any device streams if none exists', async () => {
+          await audio.addProcessor(remoteProcessor, true);
+          sinon.assert.notCalled(getUserMedia);
+        });
+      });
+
+      describe('.removeProcessor isRemote=false', () => {
         beforeEach(async () => {
-          await audio.addProcessor(processor);
+          await audio.addProcessor(localProcessor);
         });
 
         [
@@ -340,24 +392,24 @@ describe('AudioHelper', () => {
         it('should emit remove insights event', async () => {
           const stub = sinon.stub();
           eventObserver.on('event', stub);
-          await audio.removeProcessor(processor);
-          sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'remove' });
+          await audio.removeProcessor(localProcessor);
+          sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'remove', isRemote: false });
         });
 
         it('should be able to add a new processor after removing the old one', async () => {
-          await audio.removeProcessor(processor);
-          await audio.addProcessor(processor);
+          await audio.removeProcessor(localProcessor);
+          await audio.addProcessor(localProcessor);
         });
 
         it('should not restart any device streams if none exists', async () => {
-          await audio.removeProcessor(processor);
+          await audio.removeProcessor(localProcessor);
           sinon.assert.notCalled(getUserMedia);
         });
 
         it('should restart default device if default stream exists', async () => {
           await audio._openDefaultDeviceWithConstraints();
           sinon.assert.calledOnce(getUserMedia);
-          await audio.removeProcessor(processor);
+          await audio.removeProcessor(localProcessor);
           sinon.assert.calledTwice(getUserMedia);
           assert.equal(audio._getUserMedia.args[1][0].audio.deviceId.exact, 'input');
           sinon.assert.calledOnce(createProcessedStream);
@@ -366,7 +418,7 @@ describe('AudioHelper', () => {
         it('should restart default device if a selected stream exists', async () => {
           await audio.setInputDevice('input');
           sinon.assert.calledOnce(getUserMedia);
-          await audio.removeProcessor(processor);
+          await audio.removeProcessor(localProcessor);
           sinon.assert.calledTwice(getUserMedia);
           assert.equal(audio._getUserMedia.args[1][0].audio.deviceId.exact, 'input');
           sinon.assert.calledOnce(createProcessedStream);
@@ -374,15 +426,82 @@ describe('AudioHelper', () => {
 
         it('should destroy and stop processed tracks', async () => {
           await audio._openDefaultDeviceWithConstraints();
-          await audio.removeProcessor(processor);
-          sinon.assert.calledOnce(processedStreamStopStub);
+          await audio.removeProcessor(localProcessor);
+          sinon.assert.calledOnce(localProcessedStreamStopStub);
           sinon.assert.calledOnce(destroyProcessedStream);
         });
 
         it('should be noop when stopping and processed track does not exists', async () => {
-          await audio.removeProcessor(processor);
-          sinon.assert.notCalled(processedStreamStopStub);
+          await audio.removeProcessor(localProcessor);
+          sinon.assert.notCalled(localProcessedStreamStopStub);
           sinon.assert.notCalled(destroyProcessedStream);
+        });
+
+        it('should only remove local processor', async () => {
+          remoteProcessedStreamStopStub = sinon.stub();
+          audio._remoteProcessedStream = {id: 'remoteStream', getTracks: () => [{ stop: remoteProcessedStreamStopStub }]};
+          await audio._openDefaultDeviceWithConstraints();
+          await audio.removeProcessor(localProcessor);
+          sinon.assert.calledOnce(localProcessedStreamStopStub);
+          sinon.assert.calledOnce(destroyProcessedStream);
+          sinon.assert.notCalled(remoteProcessedStreamStopStub);
+        });
+      });
+
+      describe('.removeProcessor isRemote=true', () => {
+        beforeEach(async () => {
+          remoteProcessedStreamStopStub = sinon.stub();
+          await audio.addProcessor(remoteProcessor, true);
+          audio._remoteProcessedStream = {id: 'remoteStream', getTracks: () => [{ stop: remoteProcessedStreamStopStub }]};
+        });
+
+        [
+          undefined,
+          null,
+          true,
+          false,
+          '',
+          1,
+          0,
+          {},
+        ].forEach(param => {
+          it(`should reject if parameter is ${param}`, () => {
+            assert.rejects(async () => await audio.removeProcessor(param, true));
+          });
+        });
+
+        it('should emit remove insights event', async () => {
+          const stub = sinon.stub();
+          eventObserver.on('event', stub);
+          await audio.removeProcessor(remoteProcessor, true);
+          sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'remove', isRemote: true });
+        });
+
+        it('should be able to add a new processor after removing the old one', async () => {
+          await audio.removeProcessor(remoteProcessor, true);
+          await audio.addProcessor(remoteProcessor, true);
+        });
+
+        it('should destroy and stop remote processed tracks', async () => {
+          await audio._openDefaultDeviceWithConstraints();
+          await audio.removeProcessor(remoteProcessor, true);
+          sinon.assert.calledOnce(remoteProcessedStreamStopStub);
+          sinon.assert.calledOnce(destroyProcessedStream);
+        });
+        
+        it('should be noop when stopping and remote processed track does not exists', async () => {
+          audio._remoteProcessedStream = null;
+          await audio.removeProcessor(remoteProcessor, true);
+          sinon.assert.notCalled(remoteProcessedStreamStopStub);
+          sinon.assert.notCalled(destroyProcessedStream);
+        });
+        
+        it('should only remove remote processor', async () => {
+          await audio._openDefaultDeviceWithConstraints();
+          await audio.removeProcessor(remoteProcessor, true);
+          sinon.assert.calledOnce(remoteProcessedStreamStopStub);
+          sinon.assert.calledOnce(destroyProcessedStream);
+          sinon.assert.notCalled(localProcessedStreamStopStub);
         });
       });
     });
@@ -424,7 +543,7 @@ describe('AudioHelper', () => {
       });
 
       it('should create a processed stream if a audio processor exists', async () => {
-        await audio.addProcessor(processor);
+        await audio.addProcessor(localProcessor);
         sinon.assert.notCalled(createProcessedStream);
         await audio._openDefaultDeviceWithConstraints();
         sinon.assert.calledOnce(createProcessedStream);
@@ -433,9 +552,9 @@ describe('AudioHelper', () => {
       it('should emit create insights event', async () => {
         const stub = sinon.stub();
         eventObserver.on('event', stub);
-        await audio.addProcessor(processor);
+        await audio.addProcessor(localProcessor);
         await audio._openDefaultDeviceWithConstraints();
-        sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'create-processed-stream' });
+        sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'create-processed-stream', isRemote: false });
       });
 
       it('should stop default tracks', async () => {
@@ -451,26 +570,26 @@ describe('AudioHelper', () => {
       });
 
       it('should destroy stop processed tracks', async () => {
-        await audio.addProcessor(processor);
+        await audio.addProcessor(localProcessor);
         await audio._openDefaultDeviceWithConstraints();
         audio._stopDefaultInputDeviceStream();
-        sinon.assert.calledOnce(processedStreamStopStub);
+        sinon.assert.calledOnce(localProcessedStreamStopStub);
         sinon.assert.calledOnce(destroyProcessedStream);
       });
 
       it('should emit destroy insights event', async () => {
         const stub = sinon.stub();
         eventObserver.on('event', stub);
-        await audio.addProcessor(processor);
+        await audio.addProcessor(localProcessor);
         await audio._openDefaultDeviceWithConstraints();
         audio._stopDefaultInputDeviceStream();
-        sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'destroy-processed-stream' });
+        sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'destroy-processed-stream', isRemote: false });
       });
 
       it('should be noop when stopping and processed track does not exists', async () => {
         await audio._openDefaultDeviceWithConstraints();
         audio._stopDefaultInputDeviceStream();
-        sinon.assert.notCalled(processedStreamStopStub);
+        sinon.assert.notCalled(localProcessedStreamStopStub);
         sinon.assert.notCalled(destroyProcessedStream);
       });
     });
@@ -637,7 +756,7 @@ describe('AudioHelper', () => {
           }));
 
           it('should create a processed stream if an audio processor exists', async () => {
-            await audio.addProcessor(processor);
+            await audio.addProcessor(localProcessor);
             await audio.setInputDevice('input');
             sinon.assert.calledOnce(createProcessedStream);
           });
@@ -645,9 +764,9 @@ describe('AudioHelper', () => {
           it('should emit create insights event', async () => {
             const stub = sinon.stub();
             eventObserver.on('event', stub);
-            await audio.addProcessor(processor);
+            await audio.addProcessor(localProcessor);
             await audio.setInputDevice('input');
-            sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'create-processed-stream' });
+            sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'create-processed-stream', isRemote: false });
           });
 
           it('should stop default tracks if it exists', async () => {
@@ -657,20 +776,20 @@ describe('AudioHelper', () => {
           });
 
           it('should destroy stop processed tracks if it exists', async () => {
-            await audio.addProcessor(processor);
+            await audio.addProcessor(localProcessor);
             await audio._openDefaultDeviceWithConstraints();
             await audio.setInputDevice('input');
-            sinon.assert.calledOnce(processedStreamStopStub);
+            sinon.assert.calledOnce(localProcessedStreamStopStub);
             sinon.assert.calledOnce(destroyProcessedStream);
           });
 
           it('should emit destroy insights event', async () => {
             const stub = sinon.stub();
             eventObserver.on('event', stub);
-            await audio.addProcessor(processor);
+            await audio.addProcessor(localProcessor);
             await audio._openDefaultDeviceWithConstraints();
             await audio.setInputDevice('input');
-            sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'destroy-processed-stream' });
+            sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'destroy-processed-stream', isRemote: false });
           });
         });
       });
@@ -695,7 +814,7 @@ describe('AudioHelper', () => {
               ]; }
             };
 
-            await audio.addProcessor(processor);
+            await audio.addProcessor(localProcessor);
             return audio.setInputDevice('input').then(() => {
               audio._selectedInputDeviceStream = fakeStream;
               return audio.unsetInputDevice();
@@ -719,7 +838,7 @@ describe('AudioHelper', () => {
           });
 
           it('should stop processed tracks', async () => {
-            sinon.assert.calledOnce(processedStreamStopStub);
+            sinon.assert.calledOnce(localProcessedStreamStopStub);
             sinon.assert.calledOnce(destroyProcessedStream);
           });
         });
@@ -733,22 +852,22 @@ describe('AudioHelper', () => {
       });
 
       it('should return the processed stream', async () => {
-        await audio.addProcessor(processor);
+        await audio.addProcessor(localProcessor);
         await audio.setInputDevice('input');
         assert.strictEqual(audio.inputStream.id, 'processedstream');
       });
     });
 
-    describe('.processedStream', () => {
+    describe('.localProcessedStream', () => {
       it('should return the processed stream', async () => {
-        await audio.addProcessor(processor);
+        await audio.addProcessor(localProcessor);
         await audio.setInputDevice('input');
-        assert.strictEqual(audio.processedStream.id, 'processedstream');
+        assert.strictEqual(audio.localProcessedStream.id, 'processedstream');
       });
 
       it('should return null', async () => {
         await audio.setInputDevice('input');
-        assert.strictEqual(audio.processedStream, null);
+        assert.strictEqual(audio.localProcessedStream, null);
       });
     });
 
@@ -1001,6 +1120,60 @@ describe('AudioHelper', () => {
         }).then(result => {
           assert.deepEqual(result, []);
         })));
+      });
+    });
+
+    describe('_destroyRemoteProcessedStream', () => {
+      it('should destroy and stop remote processed tracks', async () => {
+        remoteProcessedStreamStopStub = sinon.stub();
+        audio._remoteProcessor = remoteProcessor;
+        audio._remoteProcessedStream = {id: 'remoteStream', getTracks: () => [{ stop: remoteProcessedStreamStopStub }]};
+        await audio._destroyRemoteProcessedStream();
+        sinon.assert.calledOnce(remoteProcessedStreamStopStub);
+        sinon.assert.calledOnce(destroyProcessedStream);
+        assert.strictEqual(audio._remoteProcessedStream, null);
+      });
+      
+      it('should be noop when stopping and remote processed track does not exists', async () => {
+        audio._remoteProcessedStream = null;
+        audio._remoteProcessor = remoteProcessor;
+        await audio._destroyRemoteProcessedStream();
+        sinon.assert.notCalled(destroyProcessedStream);
+      });
+
+      it('should be noop when remote processor does not exists', async () => {
+        remoteProcessedStreamStopStub = sinon.stub();
+        audio._remoteProcessedStream = {id: 'remoteStream', getTracks: () => [{ stop: remoteProcessedStreamStopStub }]};
+        audio._remoteProcessor = null;
+        await audio._destroyRemoteProcessedStream();
+        sinon.assert.notCalled(remoteProcessedStreamStopStub);
+        sinon.assert.notCalled(destroyProcessedStream);
+      });
+    });
+
+    describe('_maybeCreateRemoteProcessedStream', () => {
+      it('should create a remote processed stream', async () => {
+        audio._remoteProcessor = remoteProcessor;
+        const stream = await audio._maybeCreateRemoteProcessedStream('foo');
+        sinon.assert.calledOnce(createProcessedStream);
+        assert.strictEqual(audio._remoteProcessedStream.id, 'processedstream');
+        assert.strictEqual(stream.id, 'processedstream');
+        assert.notStrictEqual(stream, 'foo');
+      });
+      
+      it('should be noop if remoteProcessor does not exists', async () => {
+        audio._remoteProcessor = null;
+        const stream = await audio._maybeCreateRemoteProcessedStream('foo');
+        sinon.assert.notCalled(createProcessedStream);
+        assert.strictEqual(stream, 'foo')
+      });
+
+      it('should emit create insights event', async () => {
+        const stub = sinon.stub();
+        eventObserver.on('event', stub);
+        audio._remoteProcessor = remoteProcessor;
+        await audio._maybeCreateRemoteProcessedStream();
+        sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'create-processed-stream', isRemote: true });
       });
     });
   });

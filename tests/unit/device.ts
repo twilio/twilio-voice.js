@@ -1152,16 +1152,35 @@ describe('Device', function() {
             sinon.assert.calledOnce(spyIncomingSound.stop);
           });
 
-          it('should emit audio processor enabled event if a processedStream exists', async () => {
-            device['_audio']!['_processedStream'] = 'foo' as any;
+          it('should emit audio processor enabled event if a localProcessedStream exists', async () => {
+            device['_audio']!['_localProcessedStream'] = 'foo' as any;
             const callback = sinon.stub();
             device['_audioProcessorEventObserver']!.on('enabled', callback);
             const call = device.calls[0];
             call.emit('accept');
             sinon.assert.calledOnce(callback);
+            sinon.assert.calledWithExactly(callback, false);
           });
 
-          it('should not emit audio processor enabled event if a processedStream does not exists', async () => {
+          it('should not emit audio processor enabled event if a localProcessedStream does not exists', async () => {
+            const callback = sinon.stub();
+            device['_audioProcessorEventObserver']!.on('enabled', callback);
+            const call = device.calls[0];
+            call.emit('accept');
+            sinon.assert.notCalled(callback);
+          });
+
+          it('should emit audio processor enabled event if a remoteProcessedStream exists', async () => {
+            device['_audio']!['_remoteProcessedStream'] = 'foo' as any;
+            const callback = sinon.stub();
+            device['_audioProcessorEventObserver']!.on('enabled', callback);
+            const call = device.calls[0];
+            call.emit('accept');
+            sinon.assert.calledOnce(callback);
+            sinon.assert.calledWithExactly(callback, true);
+          });
+
+          it('should not emit audio processor enabled event if a remoteProcessedStream does not exists', async () => {
             const callback = sinon.stub();
             device['_audioProcessorEventObserver']!.on('enabled', callback);
             const call = device.calls[0];

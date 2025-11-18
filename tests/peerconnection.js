@@ -206,6 +206,14 @@ describe('PeerConnection', () => {
         name: 'this is a stream'
       };
       context = {
+        _audioHelper: {
+          _destroyRemoteProcessedStream: sinon.stub()
+        },
+        _audioProcessorEventObserver: {
+          removeListener: sinon.stub()
+        },
+        _onAudioProcessorAdded: sinon.stub(),
+        _onAudioProcessorRemoved: sinon.stub(),
         _onAnswer: 'this is on answer',
         _removeAudioOutputs: sinon.stub(),
         _shouldManaageStream: true,
@@ -235,7 +243,7 @@ describe('PeerConnection', () => {
       toTest = METHOD.bind(context);
     });
 
-    it('Should stop everyhting, removeListeners, disconnect analysers, close sockets, etc..', () => {
+    it('Should stop everything, removeListeners, disconnect analysers, close sockets, etc..', () => {
       toTest();
       assert(context._outputAnalyser.disconnect.calledOnce);
       assert(context._outputAnalyser.disconnect.calledWithExactly());
@@ -244,6 +252,9 @@ describe('PeerConnection', () => {
       assert(context._mediaStreamSource.disconnect.calledOnce);
       assert(context._mediaStreamSource.disconnect.calledWithExactly());
       assert(context._stopStream.calledOnce);
+      assert(context._audioHelper._destroyRemoteProcessedStream.calledOnce);
+      assert(context._audioProcessorEventObserver.removeListener.calledWithExactly('add', context._onAudioProcessorAdded));
+      assert(context._audioProcessorEventObserver.removeListener.calledWithExactly('remove', context._onAudioProcessorRemoved));
       assert(context.mute.calledWithExactly(false));
       assert(context._removeReconnectionListeners.calledOnce);
       assert(pc.close.calledOnce);
@@ -1570,7 +1581,10 @@ describe('PeerConnection', () => {
           }
         },
         _audioContext: {
-          createMediaStreamDestination: sinon.stub().returns(dest)
+          createMediaStreamDestination: sinon.stub().returns(dest),
+        },
+        _audioHelper: {
+          _maybeCreateRemoteProcessedStream: sinon.stub().returns(Promise.resolve(DEST_STREAM))
         },
         _mediaStreamSource: {
           connect: sinon.stub()
@@ -2183,6 +2197,9 @@ describe('PeerConnection', () => {
         getTransceivers: () => [transceiver],
       };
       context = {
+        _audioHelper: {
+          _maybeCreateRemoteProcessedStream: sinon.stub(),
+        },
         codecPreferences: ['pcmu', 'opus'],
         options: {
           rtcpcFactory
@@ -2406,6 +2423,121 @@ describe('PeerConnection', () => {
       assert(!context.stream.audioTracks[0].enabled);
       toTest(false);
       assert(context.stream.audioTracks[0].enabled);
+    });
+  });
+
+  describe('PeerConnection.prototype._handleAudioProcessorEvent', () => {
+    const METHOD = PeerConnection.prototype._handleAudioProcessorEvent;
+
+    let toTest = null;
+    let context = null;
+    let maybeCreateRemoteProcessedStream = null;
+    let masterAudioPlay = null;
+    let defaultAudioPlay = null;
+
+    beforeEach(() => {
+      maybeCreateRemoteProcessedStream = sinon.stub().returns(Promise.resolve('processed stream'));
+      masterAudioPlay = sinon.stub();
+      defaultAudioPlay = sinon.stub();
+      context = {
+        _audioHelper: {
+          _maybeCreateRemoteProcessedStream: maybeCreateRemoteProcessedStream,
+        },
+        _log: log,
+        _masterAudio: {
+          paused: true,
+          play: masterAudioPlay,
+          srcObject: null,
+        }, 
+        _remoteStream: {},
+        outputs: new Map([
+          ['default',
+            {
+              audio: {
+                paused: true,
+                play: defaultAudioPlay,
+                srcObject: null,
+              },
+            }
+          ],
+        ]),
+      };
+      toTest = METHOD.bind(context);
+      wait = () => new Promise(r => setTimeout(r, 0));
+    });
+
+    describe('when isRemote is false', () => {
+      it('should return without processing if addProcessor is true', () => {
+        toTest(false, true);
+        sinon.assert.notCalled(maybeCreateRemoteProcessedStream);
+      });
+      it('should return without processing if addProcessor is false', () => {
+        toTest(false, false);
+        sinon.assert.notCalled(maybeCreateRemoteProcessedStream);
+      });
+    });
+
+    describe('when isRemote is true', () => {
+      it('should return without processing if no remote stream', () => {
+        context._remoteStream = null;
+        toTest(true, true);
+        sinon.assert.notCalled(maybeCreateRemoteProcessedStream);
+      });
+
+      it('should set audio source for master audio', () => {
+        toTest(true, true);
+        return wait().then(() => {
+          sinon.assert.calledWith(context._log.info,
+            'Setting audio source for master audio.');
+          sinon.assert.calledOnce(maybeCreateRemoteProcessedStream);
+          sinon.assert.calledOnce(masterAudioPlay);
+        });
+      });
+
+      it('should set default audio source when master audio does not exist', () => {
+        context._masterAudio = null;
+        toTest(true, true);
+        return wait().then(() => {
+          sinon.assert.calledWith(context._log.info,
+            'No master audio. Setting audio source for default audio output.');
+          sinon.assert.calledOnce(maybeCreateRemoteProcessedStream);
+          sinon.assert.calledOnce(defaultAudioPlay);
+        });
+      });
+
+      it('should update audio source when addProcessor is true', () => {
+        toTest(true, true);
+        return wait().then(() => {
+          sinon.assert.calledWith(context._log.info,
+            'Successfully updated audio source with processed stream');
+        });
+      });
+
+      it('should update audio source when addProcessor is false', () => {
+        toTest(true, false);
+        return wait().then(() => {
+          sinon.assert.calledWith(context._log.info,
+            'Successfully reverted audio source to original stream');
+        });
+      });
+
+      it('should log error when setAudioSource fails, and addProcessor is true', () => {
+        context._masterAudio.srcObject = undefined;
+        toTest(true, true);
+        return wait().then(() => {
+          sinon.assert.calledWith(context._log.error,
+            'Failed to update audio source');
+        });
+      });
+
+      it('should log error when setAudioSource fails, and addProcessor is false', () => {
+        context._masterAudio.srcObject = undefined;
+        toTest(true, false);
+        return wait().then(() => {
+          sinon.assert.calledWith(context._log.error,
+            'Failed to revert audio source');
+        });
+      });
     });
   });
 });
