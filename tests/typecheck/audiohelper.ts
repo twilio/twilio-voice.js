@@ -48,9 +48,12 @@ const checkAudioHelper = async () => {
   await audio.unsetAudioConstraints();
   await audio.unsetInputDevice();
 
-  const processor = new MyCustomAudioProcessor();
-  audio.addProcessor(processor);
-  audio.removeProcessor(processor);
+  const localProcessor = new MyCustomAudioProcessor();
+  audio.addProcessor(localProcessor, false);
+  audio.removeProcessor(localProcessor, false);
+  const remoteProcessor = new MyCustomAudioProcessor();
+  audio.addProcessor(remoteProcessor, true);
+  audio.removeProcessor(remoteProcessor, true);
 };
 
 export default checkAudioHelper;
