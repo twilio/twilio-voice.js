@@ -1,5 +1,48 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.17.0 (work in progress)
+=========================
+
+New Features
+------------
+
+### Remote Audio Processor APIs
+
+In version 2.9.0, the SDK introduced the Audio Processor APIs, allowing access to raw audio input and enabling modifications to audio data before it is sent to Twilio. This release also extends similar capabilities to remote audio streams, giving developers the ability to modify audio before it is played on the speaker.
+
+With these enhancements, a range of client-side audio use cases can now be implemented more easily, including:
+
+- Background noise removal using any noise cancellation library of your choice
+- Custom audio filters
+- AI-powered audio classification
+- ...and much more!
+
+Please visit this [page](https://twilio.github.io/twilio-voice.js/interfaces/AudioProcessor.html) for more details about the Audio Processor APIs.
+
+**Example**
+
+```ts
+import { AudioProcessor, Device } from '@twilio/voice-sdk';
+
+class OutputAudioProcessor implements AudioProcessor {
+  async createProcessedStream(stream: MediaStream): Promise<MediaStream> {
+    // Implementation 
+  }
+
+  async destroyProcessedStream(stream: MediaStream): Promise<void> {
+    // Cleanup
+  }
+}
+
+const processor = new OutputAudioProcessor();
+const device = new Device(token, options);
+
+// Pass “true” as second argument to apply processor to remote output audio stream
+await device.audio.addProcessor(processor, true);
+// To remove it later:
+// device.audio.removeProcessor(processor, true);
+```
+
 2.16.0 (September 25, 2025)
 ===========================
 

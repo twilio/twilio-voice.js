@@ -25,6 +25,8 @@ const checkAudioHelper = async () => {
   const inputDevice: MediaDeviceInfo | null = audio.inputDevice;
   const inputStream: MediaStream | null = audio.inputStream;
   const processedStream: MediaStream | null = audio.processedStream;
+  const localProcessedStream: MediaStream | null = audio.localProcessedStream;
+  const remoteProcessedStream: MediaStream | null = audio.remoteProcessedStream;
 
   [audio.ringtoneDevices, audio.speakerDevices].forEach(deviceCollection => {
     let d: Set<MediaDeviceInfo> = deviceCollection.get();
@@ -49,6 +51,12 @@ const checkAudioHelper = async () => {
   const processor = new MyCustomAudioProcessor();
   audio.addProcessor(processor);
   audio.removeProcessor(processor);
+  const localProcessor = new MyCustomAudioProcessor();
+  audio.addProcessor(localProcessor, false);
+  audio.removeProcessor(localProcessor, false);
+  const remoteProcessor = new MyCustomAudioProcessor();
+  audio.addProcessor(remoteProcessor, true);
+  audio.removeProcessor(remoteProcessor, true);
 };
 
 export default checkAudioHelper;
