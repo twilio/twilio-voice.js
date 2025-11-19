@@ -198,7 +198,7 @@ class AudioHelper extends EventEmitter {
 
   /**
    * Internal reference to the added local AudioProcessor.
-  */
+   */
   private _localProcessor: AudioProcessor | null;
 
   /**
