@@ -8,7 +8,14 @@ New Features
 
 ### Remote Audio Processor APIs
 
-The SDK now includes Remote Audio Processor APIs, which allows users to add an audio processor to their remote output audio stream, right before it is rendered on the speaker. Users can now add or remove a Remote Audio Processor with the `isRemote` boolean when utilizing `addProcessor` and `removeProcessor`.
+In version 2.9.0, the SDK introduced the Audio Processor APIs, allowing access to raw audio input and enabling modifications to audio data before it is sent to Twilio. This release also extends similar capabilities to remote audio streams, giving developers the ability to modify audio before it is played on the speaker.
+
+With these enhancements, a range of client-side audio use cases can now be implemented more easily, including:
+
+- Background noise removal using any noise cancellation library of your choice
+- Custom audio filters
+- AI-powered audio classification
+- ...and much more!
 
 Please visit this [page](https://twilio.github.io/twilio-voice.js/interfaces/AudioProcessor.html) for more details about the Audio Processor APIs.
 
