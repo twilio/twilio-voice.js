@@ -10,6 +10,7 @@ const CONNECT_TIMEOUT = 5000;
 const HEARTBEAT_TIMEOUT = 15000;
 const MAX_PREFERRED_DURATION = 15000;
 const MAX_PRIMARY_DURATION = Infinity;
+const MAX_RETRY_AFTER_DURATION = 300000;
 const MAX_PREFERRED_DELAY = 1000;
 const MAX_PRIMARY_DELAY = 20000;
 
@@ -59,7 +60,7 @@ export interface IWSTransportConstructorOptions {
   maxPreferredDurationMs?: number;
 
   /**
-   * The maximum delay for the rimary backoff to make a connection attempt.
+   * The maximum delay for the primary backoff to make a connection attempt.
    */
   maxPrimaryDelayMs?: number;
 
@@ -67,6 +68,11 @@ export interface IWSTransportConstructorOptions {
    * Max duration to attempt connecting to a preferred URI.
    */
   maxPrimaryDurationMs?: number;
+
+  /**
+   * The maximum delay for the signaling retryAfter backoff to make a connection attempt.
+   */
+  maxRetryAfterDurationMs?: number;
 
   /**
    * A WebSocket factory to use instead of WebSocket.
@@ -90,6 +96,7 @@ export default class WSTransport extends EventEmitter {
     maxPreferredDurationMs: MAX_PREFERRED_DURATION,
     maxPrimaryDelayMs: MAX_PRIMARY_DELAY,
     maxPrimaryDurationMs: MAX_PRIMARY_DURATION,
+    maxRetryAfterDurationMs: MAX_RETRY_AFTER_DURATION,
   };
 
   /**
@@ -111,9 +118,11 @@ export default class WSTransport extends EventEmitter {
   private _backoffStartTime: {
     preferred: number | null;
     primary: number | null;
+    retryAfter: number | null;
   } = {
     preferred: null,
     primary: null,
+    retryAfter: null,
   };
 
   /**
@@ -159,6 +168,11 @@ export default class WSTransport extends EventEmitter {
    * Previous state of the connection
    */
   private _previousState: WSTransportState;
+
+  /**
+   * Number of retryAfter attempts made.
+   */
+  private _retryAfterAttempt: number = 0;
 
   /**
    * Whether we should attempt to fallback if we receive an applicable error
@@ -448,6 +462,11 @@ export default class WSTransport extends EventEmitter {
 
     if (message && typeof message.data === 'string') {
       this._log.debug(`Received: ${message.data}`);
+
+      const { type, payload = {} } = JSON.parse(message.data);
+      if (type === 'error' && payload.error && payload.error.retryAfter) {
+        this._retryAfterBackoff(payload.error.retryAfter);
+      }
     }
 
     this.emit('message', message);
@@ -484,7 +503,7 @@ export default class WSTransport extends EventEmitter {
   }
 
   /**
-   * Reset both primary and preferred backoff mechanisms.
+   * Reset both primary, preferred, and retryAfter backoff mechanisms.
    */
   private _resetBackoffs() {
     this._backoff.preferred.reset();
@@ -492,6 +511,9 @@ export default class WSTransport extends EventEmitter {
 
     this._backoffStartTime.preferred = null;
     this._backoffStartTime.primary = null;
+    this._backoffStartTime.retryAfter = null;
+
+    this._retryAfterAttempt = 0;
   }
 
   /**
@@ -513,6 +535,34 @@ export default class WSTransport extends EventEmitter {
   private _setState(state: WSTransportState): void {
     this._previousState = this.state;
     this.state = state;
+  }
+
+  /**
+   * Perform a backoff based on the signaling retryAfter value.
+   */
+  private _retryAfterBackoff(retryAfter: number): void {
+    if (this.state === WSTransportState.Closed) {
+      this._log.info('RetryAfter backoff initiated but transport state is closed; not attempting a connection.');
+      return;
+    }
+    if (!this._backoffStartTime.retryAfter) {
+      this._log.info('Initializing retryAfter backoff');
+      this._backoffStartTime.retryAfter = Date.now();
+      this._log.info(`RetryAfter backoff start; ${this._backoffStartTime.retryAfter}`);
+    }
+    if (Date.now() - this._backoffStartTime.retryAfter > this._options.maxRetryAfterDurationMs) {
+      this._log.info('Max retryAfter backoff attempt time exceeded; not attempting a connection.');
+      return;
+    }
+
+    this._log.info(`Received retryAfter from signaling server: ${retryAfter}(s)`);
+    if (this._preferredUri) {
+      this._log.info('Preferred URI set; backing off using retryAfter.');
+      this._connect(this._preferredUri, this._retryAfterAttempt++);
+    } else {
+      this._log.info('Preferred URI not set; backing off using retryAfter.');
+      this._connect(this._uris[this._uriIndex], this._retryAfterAttempt++);
+    }
   }
 
   /**
