@@ -14,6 +14,8 @@ class Backoff extends EventEmitter {
    */
   constructor(options) {
     super();
+    this._min = options.min || 100;
+    this._isRetryAfterSet = false;
     Object.defineProperties(this, {
       _attempts: {
         value: 0,
@@ -22,6 +24,11 @@ class Backoff extends EventEmitter {
       _duration: {
         enumerable: false,
         get() {
+          if (this._isRetryAfterSet) {
+            this._isRetryAfterSet = false;
+            return this._min;
+          }
+
           let ms = this._min * Math.pow(this._factor, this._attempts);
           if (this._jitter) {
             const rand =  Math.random();
@@ -36,7 +43,6 @@ class Backoff extends EventEmitter {
       _factor: { value: options.factor || 2 },
       _jitter: { value: options.jitter > 0 && options.jitter <= 1 ? options.jitter : 0 },
       _max: { value: options.max || 10000 },
-      _min: { value: options.min || 100 },
       _timeoutID: {
         value: null,
         writable: true,
@@ -64,6 +70,12 @@ class Backoff extends EventEmitter {
       clearTimeout(this._timeoutID);
       this._timeoutID = null;
     }
+  }
+
+  setRetryAfter(retryAfter: number) {
+    // retryAfter is in seconds, convert to ms
+    this._min = retryAfter * 1000;
+    this._isRetryAfterSet = true;
   }
 }
 
