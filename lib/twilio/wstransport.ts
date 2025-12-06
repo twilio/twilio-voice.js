@@ -459,7 +459,7 @@ export default class WSTransport extends EventEmitter {
 
       const { type, payload = {} } = JSON.parse(message.data);
       if (type === 'error' && payload.error && payload.error.retryAfter) {
-        this._retryAfter = payload.error.retryAfter;
+        this._retryAfter = payload.error.retryAfter * 1000; // convert to milliseconds
       }
     }
 
@@ -526,10 +526,10 @@ export default class WSTransport extends EventEmitter {
   private _setRetryAfter(): void {
     if (this._preferredUri) {
       this._log.info('Setting retryAfter on preferred backoff mechanism.');
-      this._backoff.preferred.setRetryAfter(this._retryAfter);
+      this._backoff.preferred.setInitialValue(this._retryAfter);
     } else {
       this._log.info('Setting retryAfter on primary backoff mechanism.');
-      this._backoff.primary.setRetryAfter(this._retryAfter);
+      this._backoff.primary.setInitialValue(this._retryAfter);
     }
     this._retryAfter = null;
   }
