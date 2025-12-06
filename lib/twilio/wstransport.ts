@@ -8,10 +8,10 @@ const WebSocket = globalThis.WebSocket;
 const CONNECT_SUCCESS_TIMEOUT = 10000;
 const CONNECT_TIMEOUT = 5000;
 const HEARTBEAT_TIMEOUT = 15000;
-const MAX_PREFERRED_DURATION = 15000;
+const MAX_PREFERRED_DURATION = 75000;
 const MAX_PRIMARY_DURATION = Infinity;
-const MAX_PREFERRED_DELAY = 1000;
-const MAX_PRIMARY_DELAY = 20000;
+const MAX_PREFERRED_DELAY = 60000;
+const MAX_PRIMARY_DELAY = 60000;
 
 export interface IMessageEvent {
   data: string;
@@ -59,7 +59,7 @@ export interface IWSTransportConstructorOptions {
   maxPreferredDurationMs?: number;
 
   /**
-   * The maximum delay for the rimary backoff to make a connection attempt.
+   * The maximum delay for the primary backoff to make a connection attempt.
    */
   maxPrimaryDelayMs?: number;
 
@@ -159,6 +159,11 @@ export default class WSTransport extends EventEmitter {
    * Previous state of the connection
    */
   private _previousState: WSTransportState;
+
+  /**
+   * The retryAfter value from signaling error, in seconds.
+   */
+  private _retryAfter: number | null = null;
 
   /**
    * Whether we should attempt to fallback if we receive an applicable error
@@ -315,6 +320,9 @@ export default class WSTransport extends EventEmitter {
     }
 
     if (this.state !== WSTransportState.Closed) {
+      if (this._retryAfter) {
+        this._setRetryAfter();
+      }
       this._performBackoff();
     }
     delete this._socket;
@@ -448,6 +456,11 @@ export default class WSTransport extends EventEmitter {
 
     if (message && typeof message.data === 'string') {
       this._log.debug(`Received: ${message.data}`);
+
+      const { type, payload = {} } = JSON.parse(message.data);
+      if (type === 'error' && payload.error && payload.error.retryAfter) {
+        this._retryAfter = payload.error.retryAfter * 1000; // convert to milliseconds
+      }
     }
 
     this.emit('message', message);
@@ -484,7 +497,7 @@ export default class WSTransport extends EventEmitter {
   }
 
   /**
-   * Reset both primary and preferred backoff mechanisms.
+   * Reset both primary, preferred, and retryAfter backoff mechanisms.
    */
   private _resetBackoffs() {
     this._backoff.preferred.reset();
@@ -505,6 +518,20 @@ export default class WSTransport extends EventEmitter {
       this._shouldFallback = true;
       this._closeSocket();
     }, HEARTBEAT_TIMEOUT);
+  }
+
+  /**
+   * Set the retryAfter value on the appropriate backoff mechanism.
+   */
+  private _setRetryAfter(): void {
+    if (this._preferredUri) {
+      this._log.info('Setting retryAfter on preferred backoff mechanism.');
+      this._backoff.preferred.setInitialValue(this._retryAfter);
+    } else {
+      this._log.info('Setting retryAfter on primary backoff mechanism.');
+      this._backoff.primary.setInitialValue(this._retryAfter);
+    }
+    this._retryAfter = null;
   }
 
   /**

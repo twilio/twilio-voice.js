@@ -293,16 +293,16 @@ describe('WSTransport', () => {
     context('when receiving a message', () => {
       it('should not respond with a heartbeat', () => {
         socket._readyState = WebSocket.OPEN;
-        socket.dispatchEvent({ type: 'message', data: 'foo' });
+        socket.dispatchEvent({ type: 'message', data: { foo: 'bar'} });
         assert.equal((socket as any).send.callCount, 0);
       });
 
       it('should emit the message', () => {
         transport.emit = sinon.spy();
         socket._readyState = WebSocket.OPEN;
-        socket.dispatchEvent({ type: 'message', data: 'foo' });
+        socket.dispatchEvent({ type: 'message', data: { foo: 'bar'} });
         assert.equal((transport as any).emit.callCount, 1);
-        assert.equal((transport as any).emit.args[0][1].data, 'foo');
+        assert.equal((transport as any).emit.args[0][1].data.foo, 'bar');
       });
     });
   });
