@@ -100,10 +100,10 @@ export default class WSTransport extends EventEmitter {
   /**
    * The backoff instance used to schedule reconnection attempts.
    */
-  private readonly _backoff: {
+  private _backoff: {
     preferred: any;
     primary: any;
-  };
+  } | null;
 
   /**
    * Start timestamp values for backoffs.
@@ -203,7 +203,7 @@ export default class WSTransport extends EventEmitter {
 
     this._uris = uris;
 
-    this._backoff = this._setupBackoffs();
+    this._backoff = null;
   }
 
   /**
@@ -315,13 +315,13 @@ export default class WSTransport extends EventEmitter {
     }
 
     // Reset backoff counter if connection was open for long enough to be considered successful
-    if (this._timeOpened && Date.now() - this._timeOpened > CONNECT_SUCCESS_TIMEOUT) {
+    if (this._backoff && this._timeOpened && Date.now() - this._timeOpened > CONNECT_SUCCESS_TIMEOUT) {
       this._resetBackoffs();
     }
 
     if (this.state !== WSTransportState.Closed) {
-      if (this._retryAfter) {
-        this._setRetryAfter();
+      if (!this._backoff) {
+        this._backoff = this._setupBackoffs();
       }
       this._performBackoff();
     }
@@ -476,7 +476,9 @@ export default class WSTransport extends EventEmitter {
     this._setState(WSTransportState.Open);
     clearTimeout(this._connectTimeout);
 
-    this._resetBackoffs();
+    if (this._backoff) {
+      this._resetBackoffs();
+    }
 
     this._setHeartbeatTimeout();
     this.emit('open');
@@ -487,6 +489,10 @@ export default class WSTransport extends EventEmitter {
    * using the preferred mechanism. Otherwise, use the primary mechanism.
    */
   private _performBackoff(): void {
+    if (!this._backoff) {
+      this._log.info('No backoff instance to perform backoff.');
+      return;
+    }
     if (this._preferredUri) {
       this._log.info('Preferred URI set; backing off.');
       this._backoff.preferred.backoff();
@@ -500,8 +506,15 @@ export default class WSTransport extends EventEmitter {
    * Reset both primary, preferred, and retryAfter backoff mechanisms.
    */
   private _resetBackoffs() {
-    this._backoff.preferred.reset();
-    this._backoff.primary.reset();
+    if (!this._backoff) {
+      this._log.info('No backoff instance to reset.');
+      return;
+    }
+    this._backoff.preferred.removeAllListeners('backoff');
+    this._backoff.preferred.removeAllListeners('ready');
+    this._backoff.primary.removeAllListeners('backoff');
+    this._backoff.primary.removeAllListeners('ready');
+    this._backoff = null;
 
     this._backoffStartTime.preferred = null;
     this._backoffStartTime.primary = null;
@@ -521,20 +534,6 @@ export default class WSTransport extends EventEmitter {
   }
 
   /**
-   * Set the retryAfter value on the appropriate backoff mechanism.
-   */
-  private _setRetryAfter(): void {
-    if (this._preferredUri) {
-      this._log.info('Setting retryAfter on preferred backoff mechanism.');
-      this._backoff.preferred.setInitialValue(this._retryAfter);
-    } else {
-      this._log.info('Setting retryAfter on primary backoff mechanism.');
-      this._backoff.primary.setInitialValue(this._retryAfter);
-    }
-    this._retryAfter = null;
-  }
-
-  /**
    * Set the current and previous state
    */
   private _setState(state: WSTransportState): void {
@@ -546,11 +545,21 @@ export default class WSTransport extends EventEmitter {
    * Set up the primary and preferred backoff mechanisms.
    */
   private _setupBackoffs(): typeof WSTransport.prototype._backoff {
+    const preferredRetryAfter = this._retryAfter && this._preferredUri ? this._retryAfter : null;
+    const primaryRetryAfter = this._retryAfter && !this._preferredUri ? this._retryAfter : null;
+    if (preferredRetryAfter) {
+      this._log.info(`Setting initial preferred backoff value to retryAfter: ${preferredRetryAfter}ms`);
+    }
+    if (primaryRetryAfter) {
+      this._log.info(`Setting initial primary backoff value to retryAfter: ${primaryRetryAfter}ms`);
+    }
+
     const preferredBackoffConfig = {
       factor: 2.0,
       jitter: 0.40,
       max: this._options.maxPreferredDelayMs,
-      min: 100,
+      min: preferredRetryAfter || 100,
+      useInitialValue: preferredRetryAfter ? true : false,
     };
     this._log.info('Initializing preferred transport backoff using config: ', preferredBackoffConfig);
     const preferredBackoff = new Backoff(preferredBackoffConfig);
@@ -576,6 +585,10 @@ export default class WSTransport extends EventEmitter {
         this._log.info('Preferred backoff start time invalid; not attempting a connection.');
         return;
       }
+      if (!this._backoff) {
+        this._log.info('Preferred backoff instance invalid; not attempting a connection.');
+        return;
+      }
       if (Date.now() - this._backoffStartTime.preferred > this._options.maxPreferredDurationMs) {
         this._log.info('Max preferred backoff attempt time exceeded; falling back to primary backoff.');
         this._preferredUri = null;
@@ -597,9 +610,10 @@ export default class WSTransport extends EventEmitter {
       max: this._options.maxPrimaryDelayMs,
       // We only want a random initial delay if there are any fallback edges
       // Initial delay between 1s and 5s both inclusive
-      min: this._uris && this._uris.length > 1
+      min: primaryRetryAfter || (this._uris && this._uris.length > 1
         ? Math.floor(Math.random() * (5000 - 1000 + 1)) + 1000
-        : 100,
+        : 100),
+      useInitialValue: primaryRetryAfter ? true : false,
     };
     this._log.info('Initializing primary transport backoff using config: ', primaryBackoffConfig);
     const primaryBackoff = new Backoff(primaryBackoffConfig);
