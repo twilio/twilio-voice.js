@@ -1,12 +1,12 @@
 /**
- * A Local AudioProcessor can be added to the SDK, providing access to the audio input stream
- * and the ability to process or analyze the stream before sending it to Twilio.
- * A Remote AudioProcessor can also be added to the SDK, providing access to the audio output
- * stream and the ability to process or analyze the stream before it is rendered on the speaker.
- * To add the processor, you must implement the AudioProcessor interface and use
- * {@link AudioHelper.addProcessor}. You can use {@link AudioHelper.removeProcessor} to remove it.
- * To specify whether the processor is local or remote, use the optional `isRemote` parameter.
- * Use cases include the following:</br>
+ * You can add a local AudioProcessor to the SDK to access and process the audio input stream before
+ * sending it to Twilio. Similarly, you can add a remote AudioProcessor to access and process the
+ * audio output stream before it is rendered on the speaker.</br>
+ * </br>&nbsp;&nbsp;&bull; To add a processor, implement the AudioProcessor interface and use {@link AudioHelper.addProcessor}.
+ * </br>&nbsp;&nbsp;&bull; To remove a processor, use {@link AudioHelper.removeProcessor}.
+ * </br>&nbsp;&nbsp;&bull; To specify whether the processor is local or remote, use the optional isRemote parameter.
+ *
+ * Use cases include:</br>
  * </br>&nbsp;&nbsp;&bull; Background noise removal using a noise cancellation library of your choice
  * </br>&nbsp;&nbsp;&bull; Music playback when putting the call on hold
  * </br>&nbsp;&nbsp;&bull; Audio filters
