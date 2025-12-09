@@ -354,6 +354,7 @@ describe('WSTransport', () => {
     beforeEach(() => {
       transport.open();
       socket = wsManager.instances[0];
+      transport['_backoff'] = transport['_setupBackoffs']();
     });
 
     afterEach(() => {
@@ -472,7 +473,7 @@ describe('WSTransport', () => {
         transport['_closeSocket'] = sinon.spy();
       });
 
-      ['connecting', 'closed', 'open'].forEach((prevState: WSTransportState) => {
+      [WSTransportState.Connecting, WSTransportState.Closed, WSTransportState.Open].forEach((prevState: WSTransportState) => {
         it(`should not move uri to next index if error is fallback-able, state is open, and previous state is ${prevState}`, async () => {
           transport.state = WSTransportState.Open;
           transport['_previousState'] = prevState;
@@ -484,7 +485,7 @@ describe('WSTransport', () => {
         });
       });
 
-      ['connecting', 'closed', 'open'].forEach((currentState: WSTransportState) => {
+      [WSTransportState.Connecting, WSTransportState.Closed, WSTransportState.Open].forEach((currentState: WSTransportState) => {
         it(`should not move uri to next index if error is fallback-able, previous state is open, and current state is ${currentState}`, async () => {
           transport.state = currentState;
           transport['_previousState'] = WSTransportState.Open;
@@ -523,7 +524,8 @@ describe('WSTransport', () => {
 
     beforeEach(() => {
       spy = transport['_connect'] = sinon.spy(transport['_connect']);
-      backoff = transport['_backoff'].primary;
+      transport['_backoff'] = transport['_setupBackoffs']();
+      backoff = transport['_backoff']?.primary;
     });
 
     it('should not attempt to reconnect if the state is closed', () => {

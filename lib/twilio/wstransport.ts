@@ -503,7 +503,7 @@ export default class WSTransport extends EventEmitter {
   }
 
   /**
-   * Reset both primary, preferred, and retryAfter backoff mechanisms.
+   * Reset both primary and preferred backoff mechanisms.
    */
   private _resetBackoffs() {
     if (!this._backoff) {
