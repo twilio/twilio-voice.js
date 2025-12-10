@@ -8,10 +8,12 @@ const WebSocket = globalThis.WebSocket;
 const CONNECT_SUCCESS_TIMEOUT = 10000;
 const CONNECT_TIMEOUT = 5000;
 const HEARTBEAT_TIMEOUT = 15000;
-const MAX_PREFERRED_DURATION = 75000;
+const MAX_PREFERRED_DURATION = 15000;
 const MAX_PRIMARY_DURATION = Infinity;
-const MAX_PREFERRED_DELAY = 60000;
-const MAX_PRIMARY_DELAY = 60000;
+const MAX_RETRY_AFTER_DURATION = 75000;
+const MAX_PREFERRED_DELAY = 1000;
+const MAX_PRIMARY_DELAY = 20000;
+const MAX_RETRY_AFTER_DELAY = 60000;
 
 export interface IMessageEvent {
   data: string;
@@ -69,6 +71,16 @@ export interface IWSTransportConstructorOptions {
   maxPrimaryDurationMs?: number;
 
   /**
+   * The maximum delay for the retryAfter backoff to make a connection attempt.
+   */
+  maxRetryAfterDelayMs?: number;
+
+  /**
+   * Max duration to attempt connecting to a preferred URI with a retryAfter value.
+   */
+  maxRetryAfterDurationMs?: number;
+
+  /**
    * A WebSocket factory to use instead of WebSocket.
    */
   WebSocket?: typeof WebSocket;
@@ -90,6 +102,8 @@ export default class WSTransport extends EventEmitter {
     maxPreferredDurationMs: MAX_PREFERRED_DURATION,
     maxPrimaryDelayMs: MAX_PRIMARY_DELAY,
     maxPrimaryDurationMs: MAX_PRIMARY_DURATION,
+    maxRetryAfterDelayMs: MAX_RETRY_AFTER_DELAY,
+    maxRetryAfterDurationMs: MAX_RETRY_AFTER_DURATION,
   };
 
   /**
@@ -515,6 +529,7 @@ export default class WSTransport extends EventEmitter {
     this._backoff.primary.removeAllListeners('backoff');
     this._backoff.primary.removeAllListeners('ready');
     this._backoff = null;
+    this._retryAfter = null;
 
     this._backoffStartTime.preferred = null;
     this._backoffStartTime.primary = null;
@@ -545,19 +560,19 @@ export default class WSTransport extends EventEmitter {
    * Set up the primary and preferred backoff mechanisms.
    */
   private _setupBackoffs(): typeof WSTransport.prototype._backoff {
-    const preferredRetryAfter = this._retryAfter && this._preferredUri ? this._retryAfter : null;
-    const primaryRetryAfter = this._retryAfter && !this._preferredUri ? this._retryAfter : null;
+    const preferredRetryAfter = this._retryAfter !== null && this._preferredUri ? this._retryAfter : null;
     if (preferredRetryAfter) {
       this._log.info(`Setting initial preferred backoff value to retryAfter: ${preferredRetryAfter}ms`);
     }
-    if (primaryRetryAfter) {
-      this._log.info(`Setting initial primary backoff value to retryAfter: ${primaryRetryAfter}ms`);
-    }
+
+    const maxPreferredDurationMs = preferredRetryAfter
+      ? this._options.maxRetryAfterDurationMs
+      : this._options.maxPreferredDurationMs;
 
     const preferredBackoffConfig = {
       factor: 2.0,
       jitter: 0.40,
-      max: this._options.maxPreferredDelayMs,
+      max: preferredRetryAfter ? this._options.maxRetryAfterDelayMs : this._options.maxPreferredDelayMs,
       min: preferredRetryAfter || 100,
       useInitialValue: preferredRetryAfter ? true : false,
     };
@@ -589,7 +604,7 @@ export default class WSTransport extends EventEmitter {
         this._log.info('Preferred backoff instance invalid; not attempting a connection.');
         return;
       }
-      if (Date.now() - this._backoffStartTime.preferred > this._options.maxPreferredDurationMs) {
+      if (Date.now() - this._backoffStartTime.preferred > maxPreferredDurationMs) {
         this._log.info('Max preferred backoff attempt time exceeded; falling back to primary backoff.');
         this._preferredUri = null;
         this._backoff.primary.backoff();
@@ -610,10 +625,9 @@ export default class WSTransport extends EventEmitter {
       max: this._options.maxPrimaryDelayMs,
       // We only want a random initial delay if there are any fallback edges
       // Initial delay between 1s and 5s both inclusive
-      min: primaryRetryAfter || (this._uris && this._uris.length > 1
+      min: this._uris && this._uris.length > 1
         ? Math.floor(Math.random() * (5000 - 1000 + 1)) + 1000
-        : 100),
-      useInitialValue: primaryRetryAfter ? true : false,
+        : 100,
     };
     this._log.info('Initializing primary transport backoff using config: ', primaryBackoffConfig);
     const primaryBackoff = new Backoff(primaryBackoffConfig);
