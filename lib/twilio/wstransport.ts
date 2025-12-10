@@ -329,7 +329,7 @@ export default class WSTransport extends EventEmitter {
     }
 
     // Reset backoff counter if connection was open for long enough to be considered successful
-    if (this._backoff && this._timeOpened && Date.now() - this._timeOpened > CONNECT_SUCCESS_TIMEOUT) {
+    if (this._backoff && this._timeOpened && ((Date.now() - this._timeOpened) > CONNECT_SUCCESS_TIMEOUT)) {
       this._resetBackoffs();
     }
 
@@ -574,7 +574,7 @@ export default class WSTransport extends EventEmitter {
       jitter: 0.40,
       max: preferredRetryAfter ? this._options.maxRetryAfterDelayMs : this._options.maxPreferredDelayMs,
       min: preferredRetryAfter || 100,
-      useInitialValue: preferredRetryAfter ? true : false,
+      useInitialValue: Boolean(preferredRetryAfter),
     };
     this._log.info('Initializing preferred transport backoff using config: ', preferredBackoffConfig);
     const preferredBackoff = new Backoff(preferredBackoffConfig);
