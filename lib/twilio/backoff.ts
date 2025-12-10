@@ -9,8 +9,9 @@ class Backoff extends EventEmitter {
    * @param {object} options
    * @property {number} min - Initial timeout in milliseconds [100]
    * @property {number} max - Max timeout [10000]
-   * @property {boolean} jitter - Apply jitter [0]
+   * @property {number} jitter - Apply jitter [0]
    * @property {number} factor - Multiplication factor for Backoff operation [2]
+   * @property {boolean} useInitialValue - Whether to use the initial value on the first backoff call [false]
    */
   constructor(options) {
     super();
@@ -22,6 +23,10 @@ class Backoff extends EventEmitter {
       _duration: {
         enumerable: false,
         get() {
+          if (this._useInitialValue && this._attempts === 0) {
+            return this._min;
+          }
+
           let ms = this._min * Math.pow(this._factor, this._attempts);
           if (this._jitter) {
             const rand =  Math.random();
@@ -40,6 +45,9 @@ class Backoff extends EventEmitter {
       _timeoutID: {
         value: null,
         writable: true,
+      },
+      _useInitialValue: {
+        value: options.useInitialValue || false,
       },
     });
   }
