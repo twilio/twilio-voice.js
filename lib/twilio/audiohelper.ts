@@ -532,9 +532,13 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Adds an {@link AudioProcessor} object. Once added, the AudioHelper will route
-   * the input audio stream through the processor before sending the audio
-   * stream to Twilio. Only one AudioProcessor can be added at this time.
+   * Adds an {@link AudioProcessor} object and returns a Promise representing the result.
+   * To add a remote AudioProcessor, pass `true`. To add a local AudioProcessor, pass `false`.
+   * The default value is `false`.
+   *
+   * If `isRemote` is `false`, the AudioHelper routes the input audio stream through the
+   * processor before sending the audio stream to Twilio. If `isRemote` is `true`, the AudioHelper
+   * routes the output audio stream through the processor before playing it on the speaker.
    *
    * See the {@link AudioProcessor} interface for an example.
    *
@@ -611,8 +615,13 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Removes an {@link AudioProcessor}. Once removed, the AudioHelper will start using
-   * the audio stream from the selected input device for existing or future calls.
+   * Removes an {@link AudioProcessor} and returns a Promise representing the result.
+   * To remove a remote AudioProcessor, pass `true`. To remove a local AudioProcessor,
+   * pass `false`. The default value is `false`.
+   *
+   * If `isRemote` is `false`, the AudioHelper uses the audio stream from the selected
+   * input device for existing or future calls. If `isRemote` is `true`, the AudioHelper
+   * uses the audio stream from the selected output device for existing or future calls.
    *
    * @param processor The AudioProcessor to remove.
    * @param isRemote If set to true, the processor will be removed from the remote
