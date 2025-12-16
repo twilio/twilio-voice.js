@@ -123,6 +123,12 @@ describe('Backoff', () => {
         options: { min: 200, max: 20000, factor: 3 },
         numberCallbackExpected: 6
       },
+      {
+        tickCount: 80000,
+        testName: 'with useInitialValue true',
+        options: { min: 10000, max: 750000, useInitialValue: true },
+        numberCallbackExpected: 4
+      },
     ].forEach(testCase => {
       it(testCase.testName, () => {
         const backoff = new Backoff(testCase.options);
@@ -138,6 +144,36 @@ describe('Backoff', () => {
 
         assert.strictEqual(callbacks, testCase.numberCallbackExpected);
       });
+    });
+  });
+
+  describe('useInitialValue', () => {
+    it('should use initial value on first backoff, when useInitialValue is true', () => {
+      const durations = [];
+      const options = { min: 1000, jitter: 0.3, useInitialValue: true };
+      const backoff = new Backoff(options);
+      backoff.on('ready', (a, d) => {
+        durations.push(d);
+        backoff.backoff();
+      });
+
+      backoff.backoff();
+      clock.tick(1010);
+      assert.strictEqual(durations[0], 1000);
+    });
+
+    it('should NOT use initial value on first backoff, when useInitialValue is false', () => {
+      const durations = [];
+      const options = { min: 1000, jitter: 0.3, useInitialValue: false };
+      const backoff = new Backoff(options);
+      backoff.on('ready', (a, d) => {
+        durations.push(d);
+        backoff.backoff();
+      });
+
+      backoff.backoff();
+      clock.tick(1010);
+      assert.notDeepEqual(durations[0], 1000);
     });
   });
 });

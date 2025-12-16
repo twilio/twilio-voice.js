@@ -36,6 +36,10 @@ describe('WSTransport', () => {
     it('does not construct a WebSocket', () => {
       assert.equal(wsManager.instances.length, 0);
     });
+
+    it('returns this._backoff as null', () => {
+      assert.equal(transport['_backoff'], null);
+    });
   });
 
   describe('#close', () => {
@@ -293,16 +297,52 @@ describe('WSTransport', () => {
     context('when receiving a message', () => {
       it('should not respond with a heartbeat', () => {
         socket._readyState = WebSocket.OPEN;
-        socket.dispatchEvent({ type: 'message', data: 'foo' });
+        socket.dispatchEvent({ type: 'message', data: { foo: 'bar'} });
         assert.equal((socket as any).send.callCount, 0);
       });
 
       it('should emit the message', () => {
         transport.emit = sinon.spy();
         socket._readyState = WebSocket.OPEN;
-        socket.dispatchEvent({ type: 'message', data: 'foo' });
+        socket.dispatchEvent({ type: 'message', data: { foo: 'bar'} });
         assert.equal((transport as any).emit.callCount, 1);
-        assert.equal((transport as any).emit.args[0][1].data, 'foo');
+        assert.equal((transport as any).emit.args[0][1].data.foo, 'bar');
+      });
+    });
+
+    context('when receiving a retryAfter', () => {
+      it('should set and convert the retryAfter value to milliseconds', () => {
+        socket._readyState = WebSocket.OPEN;
+        socket.dispatchEvent({
+          type: 'message',
+          data: JSON.stringify({
+            type: 'error',
+            payload: {
+              error: {
+                code: 31902,
+                retryAfter: 30,
+                message: 'Please retry after 30 seconds',
+              },
+            },
+          }),
+        });
+        assert.equal(transport['_retryAfter'], 30000);
+      });
+
+      it('should not set retryAfter if not present', () => {
+        socket._readyState = WebSocket.OPEN;
+        socket.dispatchEvent({
+          type: 'message',
+          data: JSON.stringify({
+            type: 'error',
+            payload: {
+              error: {
+                message: 'foo',
+              },
+            },
+          }),
+        });
+        assert.equal(transport['_retryAfter'], null);
       });
     });
   });
@@ -334,6 +374,32 @@ describe('WSTransport', () => {
       assert.equal((transport as any).emit.callCount, 1);
       assert.equal((transport as any).emit.args[0][0], WSTransportState.Open);
     });
+
+    it('should reset backoff if backoff exists', () => {
+      transport['_backoff'] = transport['_setupBackoffs']();
+      const spy = transport['_resetBackoffs'] = sinon.spy(transport['_resetBackoffs']);
+      socket.dispatchEvent({ type: WSTransportState.Open });
+      sinon.assert.calledOnce(spy);
+      assert.equal(transport['_backoff'], null);
+      assert.equal(transport['_backoffStartTime']['preferred'], null);
+      assert.equal(transport['_backoffStartTime']['primary'], null);
+    });
+
+    it('should set retryAfter to null after successful backoff timer reset', () => {
+      transport['_backoff'] = transport['_setupBackoffs']();
+      transport['_retryAfter'] = 30000;
+      const spy = transport['_resetBackoffs'] = sinon.spy(transport['_resetBackoffs']);
+      socket.dispatchEvent({ type: WSTransportState.Open });
+      sinon.assert.calledOnce(spy);
+      assert.equal(transport['_retryAfter'], null);
+    });
+
+    it('should not call _resetBackoffs if backoff is null', () => {
+      transport['_backoff'] = null;
+      const spy = transport['_resetBackoffs'] = sinon.spy(transport['_resetBackoffs']);
+      socket.dispatchEvent({ type: WSTransportState.Open });
+      sinon.assert.notCalled(spy);
+    });
   });
 
   describe('onSocketError', () => {
@@ -354,6 +420,7 @@ describe('WSTransport', () => {
     beforeEach(() => {
       transport.open();
       socket = wsManager.instances[0];
+      transport['_backoff'] = transport['_setupBackoffs']();
     });
 
     afterEach(() => {
@@ -372,6 +439,18 @@ describe('WSTransport', () => {
       assert.equal(transport['_previousState'], WSTransportState.Open);
     });
 
+    it('should initialize backoff if backoff does not exist', () => {
+      transport['_backoff'] = null;
+      socket.dispatchEvent({ type: 'close' });
+      assert.notEqual(transport['_backoff'], null);
+    });
+
+    it('should not initialize backoff if backoff exists', () => {
+      const backoff = transport['_backoff'];
+      socket.dispatchEvent({ type: 'close' });
+      assert.equal(transport['_backoff'], backoff);
+    });
+
     it('should attempt to reconnect by setting a backoff', () => {
       const spy = transport['_performBackoff'] = sinon.spy(transport['_performBackoff']);
       socket.dispatchEvent({ type: 'close' });
@@ -385,8 +464,35 @@ describe('WSTransport', () => {
       sinon.assert.calledOnce(spy);
     });
 
+    it('should set backoff to null if WSTransport is closed and websocket was open longer than 10 seconds', () => {
+      transport['_timeOpened'] = Date.now() - 11000;
+      transport.state = WSTransportState.Closed;
+      const spy = transport['_resetBackoffs'] = sinon.spy(transport['_resetBackoffs']);
+      socket.dispatchEvent({ type: 'close' });
+      sinon.assert.calledOnce(spy);
+      assert.equal(transport['_backoff'], null);
+      assert.equal(transport['_backoffStartTime']['preferred'], null);
+      assert.equal(transport['_backoffStartTime']['primary'], null);
+    });
+
+    it('should set retryAfter to null after successful backoff timer reset', () => {
+      transport['_timeOpened'] = Date.now() - 11000;
+      transport['_retryAfter'] = 30000;
+      const spy = transport['_resetBackoffs'] = sinon.spy(transport['_resetBackoffs']);
+      socket.dispatchEvent({ type: 'close' });
+      sinon.assert.calledOnce(spy);
+      assert.equal(transport['_retryAfter'], null);
+    });
+
     it('should not reset the backoff timer if the websocket was open less than 10 seconds', () => {
       transport['_timeOpened'] = Date.now() - 9000;
+      const spy = transport['_resetBackoffs'] = sinon.spy(transport['_resetBackoffs']);
+      socket.dispatchEvent({ type: 'close' });
+      sinon.assert.notCalled(spy);
+    });
+
+    it('should not reset the backoff timer if the backoff is null', () => {
+      transport['_backoff'] = null;
       const spy = transport['_resetBackoffs'] = sinon.spy(transport['_resetBackoffs']);
       socket.dispatchEvent({ type: 'close' });
       sinon.assert.notCalled(spy);
@@ -407,6 +513,21 @@ describe('WSTransport', () => {
       assert.equal(ee.listenerCount('error'), 0);
       assert.equal(ee.listenerCount('message'), 0);
       assert.equal(ee.listenerCount('open'), 0);
+    });
+
+    it('should unbind all backoff listeners', () => {
+      transport['_timeOpened'] = Date.now() - 11000;
+      const preferredBackoff = transport['_backoff']?.['preferred'];
+      const primaryBackoff = transport['_backoff']?.['primary'];
+      socket.dispatchEvent({ type: 'close' });
+      if (preferredBackoff) {
+        assert.equal(preferredBackoff.listenerCount('ready'), 0);
+        assert.equal(preferredBackoff.listenerCount('backoff'), 0);
+      }
+      if (primaryBackoff) {
+        assert.equal(primaryBackoff.listenerCount('ready'), 0);
+        assert.equal(primaryBackoff.listenerCount('backoff'), 0);
+      }
     });
 
     it('should emit an error if the socket was closed abnormally (with code 1006)', async () => {
@@ -472,7 +593,7 @@ describe('WSTransport', () => {
         transport['_closeSocket'] = sinon.spy();
       });
 
-      ['connecting', 'closed', 'open'].forEach((prevState: WSTransportState) => {
+      [WSTransportState.Connecting, WSTransportState.Closed, WSTransportState.Open].forEach((prevState: WSTransportState) => {
         it(`should not move uri to next index if error is fallback-able, state is open, and previous state is ${prevState}`, async () => {
           transport.state = WSTransportState.Open;
           transport['_previousState'] = prevState;
@@ -484,7 +605,7 @@ describe('WSTransport', () => {
         });
       });
 
-      ['connecting', 'closed', 'open'].forEach((currentState: WSTransportState) => {
+      [WSTransportState.Connecting, WSTransportState.Closed, WSTransportState.Open].forEach((currentState: WSTransportState) => {
         it(`should not move uri to next index if error is fallback-able, previous state is open, and current state is ${currentState}`, async () => {
           transport.state = currentState;
           transport['_previousState'] = WSTransportState.Open;
@@ -517,13 +638,69 @@ describe('WSTransport', () => {
     });
   });
 
+  describe('retryAfter backoff', () => {
+    beforeEach(() => {
+      transport.open();
+      socket = wsManager.instances[0];
+    });
+
+    afterEach(() => {
+      transport.close();
+    });
+
+    it('should use retryAfter for preferred backoff', () => {
+      const retryAfter = 150000;
+      transport['_retryAfter'] = retryAfter;
+      transport['_preferredUri'] = 'foo';
+      transport['_backoff'] = transport['_setupBackoffs']();
+      //@ts-expect-error
+      assert.equal(transport['_backoff']['preferred']['_useInitialValue'], true);
+      //@ts-expect-error
+      assert.equal(transport['_backoff']['preferred']['_min'], retryAfter);
+    });
+
+    it('should not use retryAfter for preferred backoff if no preferredUri is set', () => {
+      const retryAfter = 150000;
+      transport['_retryAfter'] = retryAfter;
+      transport['_preferredUri'] = null;
+      transport['_backoff'] = transport['_setupBackoffs']();
+      //@ts-expect-error
+      assert.equal(transport['_backoff']['preferred']['_useInitialValue'], false);
+      //@ts-expect-error
+      assert.notEqual(transport['_backoff']['preferred']['_min'], retryAfter);
+    });
+
+    it('should not use retryAfter for primary backoff if preferredUri is set', () => {
+      const retryAfter = 150000;
+      transport['_retryAfter'] = retryAfter;
+      transport['_preferredUri'] = 'foo';
+      transport['_backoff'] = transport['_setupBackoffs']();
+      //@ts-expect-error
+      assert.equal(transport['_backoff']['primary']['_useInitialValue'], false);
+      //@ts-expect-error
+      assert.notEqual(transport['_backoff']['primary']['_min'], retryAfter);
+    });
+
+    it('should not use retryAfter for primary backoff if no preferredUri is set', () => {
+      const retryAfter = 150000;
+      transport['_retryAfter'] = retryAfter;
+      transport['_preferredUri'] = null;
+      transport['_backoff'] = transport['_setupBackoffs']();
+      //@ts-expect-error
+      assert.equal(transport['_backoff']['primary']['_useInitialValue'], false);
+      //@ts-expect-error
+      assert.notEqual(transport['_backoff']['primary']['_min'], retryAfter);
+    });
+  });
+
   describe('after backoff', () => {
     let backoff: any;
     let spy: any;
 
     beforeEach(() => {
       spy = transport['_connect'] = sinon.spy(transport['_connect']);
-      backoff = transport['_backoff'].primary;
+      transport['_backoff'] = transport['_setupBackoffs']();
+      backoff = transport['_backoff']?.primary;
     });
 
     it('should not attempt to reconnect if the state is closed', () => {
