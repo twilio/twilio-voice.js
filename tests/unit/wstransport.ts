@@ -319,13 +319,13 @@ describe('WSTransport', () => {
             type: 'error',
             payload: {
               error: {
-                  code: 31902,
-                  retryAfter: 30,
-                  message: 'Please retry after 30 seconds',
-                }
-              }
-            })
-          });
+                code: 31902,
+                retryAfter: 30,
+                message: 'Please retry after 30 seconds',
+              },
+            },
+          }),
+        });
         assert.equal(transport['_retryAfter'], 30000);
       });
 
@@ -337,11 +337,11 @@ describe('WSTransport', () => {
             type: 'error',
             payload: {
               error: {
-                  message: 'foo',
-                }
-              }
-            })
-          });
+                message: 'foo',
+              },
+            },
+          }),
+        });
         assert.equal(transport['_retryAfter'], null);
       });
     });
