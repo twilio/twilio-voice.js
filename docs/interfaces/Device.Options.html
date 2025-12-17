@@ -1,0 +1,228 @@
+<!DOCTYPE html><html class="default" lang="en" data-base="../"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>Options | @twilio/voice-sdk</title><meta name="description" content="Documentation for @twilio/voice-sdk"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="../assets/style.css"/><link rel="stylesheet" href="../assets/highlight.css"/><script defer src="../assets/main.js"></script><script async src="../assets/icons.js" id="tsd-icons-script"></script><script async src="../assets/search.js" id="tsd-search-script"></script><script async src="../assets/navigation.js" id="tsd-nav-script"></script><script async src="../assets/hierarchy.js" id="tsd-hierarchy-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><a href="../index.html" class="title">@twilio/voice-sdk</a><div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/><ul role="listbox" id="tsd-search-results"></ul><div id="tsd-search-status" aria-live="polite" aria-atomic="true"><div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-menu"></use></svg></a></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><ul class="tsd-breadcrumb" aria-label="Breadcrumb"><li><a href="../classes/Device.html">Device</a></li><li><a href="" aria-current="page">Options</a></li></ul><h1>Interface Options</h1></div><section class="tsd-panel tsd-comment"><div class="tsd-comment tsd-typography"><p>Options that may be passed to the <a href="../classes/Device.html" class="tsd-kind-class">Device</a> constructor, or Device.setup via public API</p>
+</div><div class="tsd-comment tsd-typography"></div></section><div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">Options</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#allowincomingwhilebusy">allowIncomingWhileBusy</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#appname">appName</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#appversion">appVersion</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#closeprotection">closeProtection</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#codecpreferences">codecPreferences</a><span class="tsd-signature-symbol">?:</span> <a href="../enums/Call.Codec.html" class="tsd-signature-type tsd-kind-enum">Codec</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#disableaudiocontextsounds">disableAudioContextSounds</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#dscp">dscp</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#edge">edge</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#enableimprovedsignalingerrorprecision">enableImprovedSignalingErrorPrecision</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#enumeratedevices">enumerateDevices</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#forceaggressiveicenomination">forceAggressiveIceNomination</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#getusermedia">getUserMedia</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#loglevel">logLevel</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">LogLevelDesc</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#maxaveragebitrate">maxAverageBitrate</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#maxcallsignalingtimeoutms">maxCallSignalingTimeoutMs</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#mediastream">MediaStream</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#rtcpeerconnection">RTCPeerConnection</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#sounds">sounds</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">Partial</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><a href="../enums/Device.SoundName.html" class="tsd-signature-type tsd-kind-enum">SoundName</a><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#tokenrefreshms">tokenRefreshMs</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><section class="tsd-panel-group tsd-index-group"><section class="tsd-panel tsd-index-panel"><details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronSmall"></use></svg><h5 class="tsd-index-heading uppercase">Index</h5></summary><div class="tsd-accordion-details"><section class="tsd-index-section"><h3 class="tsd-index-heading">Properties</h3><div class="tsd-index-list"><a href="#allowincomingwhilebusy" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>allow<wbr/>Incoming<wbr/>While<wbr/>Busy?</span></a>
+<a href="#appname" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>app<wbr/>Name?</span></a>
+<a href="#appversion" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>app<wbr/>Version?</span></a>
+<a href="#closeprotection" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>close<wbr/>Protection?</span></a>
+<a href="#codecpreferences" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>codec<wbr/>Preferences?</span></a>
+<a href="#disableaudiocontextsounds" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>disable<wbr/>Audio<wbr/>Context<wbr/>Sounds?</span></a>
+<a href="#dscp" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>dscp?</span></a>
+<a href="#edge" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>edge?</span></a>
+<a href="#enableimprovedsignalingerrorprecision" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>enable<wbr/>Improved<wbr/>Signaling<wbr/>Error<wbr/>Precision?</span></a>
+<a href="#enumeratedevices" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>enumerate<wbr/>Devices?</span></a>
+<a href="#forceaggressiveicenomination" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>force<wbr/>Aggressive<wbr/>Ice<wbr/>Nomination?</span></a>
+<a href="#getusermedia" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>get<wbr/>User<wbr/>Media?</span></a>
+<a href="#loglevel" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>log<wbr/>Level?</span></a>
+<a href="#maxaveragebitrate" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>max<wbr/>Average<wbr/>Bitrate?</span></a>
+<a href="#maxcallsignalingtimeoutms" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>max<wbr/>Call<wbr/>Signaling<wbr/>Timeout<wbr/>Ms?</span></a>
+<a href="#mediastream" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>Media<wbr/>Stream?</span></a>
+<a href="#rtcpeerconnection" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>RTCPeer<wbr/>Connection?</span></a>
+<a href="#sounds" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>sounds?</span></a>
+<a href="#tokenrefreshms" class="tsd-index-link"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>token<wbr/>Refresh<wbr/>Ms?</span></a>
+</div></section></div></details></section></section><details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg><h2>Properties</h2></summary><section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="allowincomingwhilebusy"><code class="tsd-tag">Optional</code><span>allow<wbr/>Incoming<wbr/>While<wbr/>Busy</span><a href="#allowincomingwhilebusy" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">allowIncomingWhileBusy</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div><div class="tsd-comment tsd-typography"><p>Whether the Device should raise the <a href="../functions/Device.incomingEvent.html" class="tsd-kind-function">incomingEvent</a> event when a new call invite is
+received while already on an active call. Default behavior is false.</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="appname"><code class="tsd-tag">Optional</code><span>app<wbr/>Name</span><a href="#appname" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">appName</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div><div class="tsd-comment tsd-typography"><p>A name for the application that is instantiating the <a href="../classes/Device.html" class="tsd-kind-class">Device</a>. This is used to improve logging
+in Insights by associating Insights data with a specific application, particularly in the case where
+one account may be connected to by multiple applications.</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="appversion"><code class="tsd-tag">Optional</code><span>app<wbr/>Version</span><a href="#appversion" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">appVersion</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div><div class="tsd-comment tsd-typography"><p>A version for the application that is instantiating the <a href="../classes/Device.html" class="tsd-kind-class">Device</a>. This is used to improve logging
+in Insights by associating Insights data with a specific version of the given application. This can help
+track down when application-level bugs were introduced.</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="closeprotection"><code class="tsd-tag">Optional</code><span>close<wbr/>Protection</span><a href="#closeprotection" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">closeProtection</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">boolean</span></div><div class="tsd-comment tsd-typography"><p>Whether to enable close protection, to prevent users from accidentally
+navigating away from the page during a call. If string, the value will
+be used as a custom message.</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="codecpreferences"><code class="tsd-tag">Optional</code><span>codec<wbr/>Preferences</span><a href="#codecpreferences" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">codecPreferences</span><span class="tsd-signature-symbol">?:</span> <a href="../enums/Call.Codec.html" class="tsd-signature-type tsd-kind-enum">Codec</a><span class="tsd-signature-symbol">[]</span></div><div class="tsd-comment tsd-typography"><p>An ordered array of codec names, from most to least preferred.</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="disableaudiocontextsounds"><code class="tsd-tag">Optional</code><span>disable<wbr/>Audio<wbr/>Context<wbr/>Sounds</span><a href="#disableaudiocontextsounds" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">disableAudioContextSounds</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div><div class="tsd-comment tsd-typography"><p>Whether AudioContext sounds should be disabled. Useful for trouble shooting sound issues
+that may be caused by AudioContext-specific sounds. If set to true, will fall back to
+HTMLAudioElement sounds.</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="dscp"><code class="tsd-tag">Optional</code><span>dscp</span><a href="#dscp" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">dscp</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div><div class="tsd-comment tsd-typography"><p>Whether to use googDscp in RTC constraints.</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="edge"><code class="tsd-tag">Optional</code><span>edge</span><a href="#edge" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">edge</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></div><div class="tsd-comment tsd-typography"><p>The edge value corresponds to the geographic location that the client
+will use to connect to Twilio infrastructure. The default value is
+&quot;roaming&quot; which automatically selects an edge based on the latency of the
+client relative to available edges.</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="enableimprovedsignalingerrorprecision"><code class="tsd-tag">Optional</code><span>enable<wbr/>Improved<wbr/>Signaling<wbr/>Error<wbr/>Precision</span><a href="#enableimprovedsignalingerrorprecision" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">enableImprovedSignalingErrorPrecision</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div><div class="tsd-comment tsd-typography"><p>Enhance the precision of errors emitted by <code>Device</code> and <code>Call</code> objects.</p>
+<p>The default value of this option is <code>false</code>.</p>
+<p>When this flag is enabled, some errors that would have been described
+with a generic error code, namely <code>53000</code> and <code>31005</code>, are now described
+with a more precise error code. With this feature, the following errors
+now have their own error codes. Please see this
+<a href="https://www.twilio.com/docs/api/errors">page</a> for more details about
+each error.</p>
+<ul>
+<li>Device Error Changes</li>
+</ul>
+</div><div class="tsd-comment tsd-typography"><div class="tsd-tag-example"><h4 class="tsd-anchor-link" id="example">Example<a href="#example" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h4><pre><code class="ts"><span class="hl-4">const</span><span class="hl-1"> </span><span class="hl-5">device</span><span class="hl-1"> = </span><span class="hl-4">new</span><span class="hl-1"> </span><span class="hl-6">Device</span><span class="hl-1">(</span><span class="hl-0">token</span><span class="hl-1">, {</span><br/><span class="hl-1">  </span><span class="hl-0">enableImprovedSignalingErrorPrecision:</span><span class="hl-1"> </span><span class="hl-4">true</span><span class="hl-1">,</span><br/><span class="hl-1">});</span><br/><span class="hl-0">device</span><span class="hl-1">.</span><span class="hl-6">on</span><span class="hl-1">(</span><span class="hl-3">&#39;error&#39;</span><span class="hl-1">, (</span><span class="hl-0">deviceError</span><span class="hl-1">) </span><span class="hl-4">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-10">// the following table describes how deviceError will change with this feature flag</span><br/><span class="hl-1">});</span>
+</code><button type="button">Copy</button></pre>
+
+<table>
+<thead>
+<tr>
+<th>Device Error Name</th>
+<th>Device Error Code with Feature Flag Enabled</th>
+<th>Device Error Code with Feature Flag Disabled</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GeneralErrors.ApplicationNotFoundError</code></td>
+<td><code>31001</code></td>
+<td><code>53000</code></td>
+</tr>
+<tr>
+<td><code>GeneralErrors.ConnectionDeclinedError</code></td>
+<td><code>31002</code></td>
+<td><code>53000</code></td>
+</tr>
+<tr>
+<td><code>GeneralErrors.ConnectionTimeoutError</code></td>
+<td><code>31003</code></td>
+<td><code>53000</code></td>
+</tr>
+<tr>
+<td><code>MalformedRequestErrors.MissingParameterArrayError</code></td>
+<td><code>31101</code></td>
+<td><code>53000</code></td>
+</tr>
+<tr>
+<td><code>MalformedRequestErrors.AuthorizationTokenMissingError</code></td>
+<td><code>31102</code></td>
+<td><code>53000</code></td>
+</tr>
+<tr>
+<td><code>MalformedRequestErrors.MaxParameterLengthExceededError</code></td>
+<td><code>31103</code></td>
+<td><code>53000</code></td>
+</tr>
+<tr>
+<td><code>MalformedRequestErrors.InvalidBridgeTokenError</code></td>
+<td><code>31104</code></td>
+<td><code>53000</code></td>
+</tr>
+<tr>
+<td><code>MalformedRequestErrors.InvalidClientNameError</code></td>
+<td><code>31105</code></td>
+<td><code>53000</code></td>
+</tr>
+<tr>
+<td><code>MalformedRequestErrors.ReconnectParameterInvalidError</code></td>
+<td><code>31107</code></td>
+<td><code>53000</code></td>
+</tr>
+<tr>
+<td><code>SignatureValidationErrors.AccessTokenSignatureValidationFailed</code></td>
+<td><code>31202</code></td>
+<td><code>53000</code></td>
+</tr>
+<tr>
+<td><code>AuthorizationErrors.NoValidAccountError</code></td>
+<td><code>31203</code></td>
+<td><code>53000</code></td>
+</tr>
+<tr>
+<td><code>AuthorizationErrors.JWTTokenExpirationTooLongError</code></td>
+<td><code>31207</code></td>
+<td><code>53000</code></td>
+</tr>
+<tr>
+<td><code>ClientErrors.NotFound</code></td>
+<td><code>31404</code></td>
+<td><code>53000</code></td>
+</tr>
+<tr>
+<td><code>ClientErrors.TemporarilyUnavilable</code></td>
+<td><code>31480</code></td>
+<td><code>53000</code></td>
+</tr>
+<tr>
+<td><code>ClientErrors.BusyHere</code></td>
+<td><code>31486</code></td>
+<td><code>53000</code></td>
+</tr>
+<tr>
+<td><code>SIPServerErrors.Decline</code></td>
+<td><code>31603</code></td>
+<td><code>53000</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Call Error Changes</li>
+</ul>
+</div><div class="tsd-tag-example"><h4 class="tsd-anchor-link" id="example-1">Example<a href="#example-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h4><pre><code class="ts"><span class="hl-4">const</span><span class="hl-1"> </span><span class="hl-5">device</span><span class="hl-1"> = </span><span class="hl-4">new</span><span class="hl-1"> </span><span class="hl-6">Device</span><span class="hl-1">(</span><span class="hl-0">token</span><span class="hl-1">, {</span><br/><span class="hl-1">  </span><span class="hl-0">enableImprovedSignalingErrorPrecision:</span><span class="hl-1"> </span><span class="hl-4">true</span><span class="hl-1">,</span><br/><span class="hl-1">});</span><br/><span class="hl-4">const</span><span class="hl-1"> </span><span class="hl-5">call</span><span class="hl-1"> = </span><span class="hl-0">device</span><span class="hl-1">.</span><span class="hl-6">connect</span><span class="hl-1">(...);</span><br/><span class="hl-0">call</span><span class="hl-1">.</span><span class="hl-6">on</span><span class="hl-1">(</span><span class="hl-3">&#39;error&#39;</span><span class="hl-1">, (</span><span class="hl-0">callError</span><span class="hl-1">) </span><span class="hl-4">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-10">// the following table describes how callError will change with this feature flag</span><br/><span class="hl-1">});</span>
+</code><button type="button">Copy</button></pre>
+
+<table>
+<thead>
+<tr>
+<th>Call Error Name</th>
+<th>Call Error Code with Feature Flag Enabled</th>
+<th>Call Error Code with Feature Flag Disabled</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GeneralErrors.ConnectionDeclinedError</code></td>
+<td><code>31002</code></td>
+<td><code>31005</code></td>
+</tr>
+<tr>
+<td><code>AuthorizationErrors.InvalidJWTTokenError</code></td>
+<td><code>31204</code></td>
+<td><code>31005</code></td>
+</tr>
+<tr>
+<td><code>AuthorizationErrors.JWTTokenExpiredError</code></td>
+<td><code>31205</code></td>
+<td><code>31005</code></td>
+</tr>
+</tbody>
+</table>
+</div></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="enumeratedevices"><code class="tsd-tag">Optional</code><span>enumerate<wbr/>Devices</span><a href="#enumeratedevices" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">enumerateDevices</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">any</span></div><div class="tsd-comment tsd-typography"><p>Overrides the native MediaDevices.enumerateDevices API.</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="forceaggressiveicenomination"><code class="tsd-tag">Optional</code><span>force<wbr/>Aggressive<wbr/>Ice<wbr/>Nomination</span><a href="#forceaggressiveicenomination" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">forceAggressiveIceNomination</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div><div class="tsd-comment tsd-typography"><p>Experimental feature.
+Whether to use ICE Aggressive nomination.</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="getusermedia"><code class="tsd-tag">Optional</code><span>get<wbr/>User<wbr/>Media</span><a href="#getusermedia" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">getUserMedia</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">any</span></div><div class="tsd-comment tsd-typography"><p>Overrides the native MediaDevices.getUserMedia API.</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="loglevel"><code class="tsd-tag">Optional</code><span>log<wbr/>Level</span><a href="#loglevel" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">logLevel</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">LogLevelDesc</span></div><div class="tsd-comment tsd-typography"><p>Sets the log level.</p>
+<p>Possible values include any of the following numbers:
+<br/>0 = trace, 1 = debug, 2 = info, 3 = warn, 4 = error, 5 = silent</p>
+<p>Or any of the following strings:
+<br/>'trace', 'debug', 'info', 'warn', 'error', 'silent'
+<br/>'TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'SILENT'</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="maxaveragebitrate"><code class="tsd-tag">Optional</code><span>max<wbr/>Average<wbr/>Bitrate</span><a href="#maxaveragebitrate" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">maxAverageBitrate</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div><div class="tsd-comment tsd-typography"><p>The maximum average audio bitrate to use, in bits per second (bps) based on
+<a href="https://tools.ietf.org/html/rfc7587#section-7.1">RFC-7587 7.1</a>. By default, the setting
+is not used. If you specify 0, then the setting is not used. Any positive integer is allowed,
+but values outside the range 6000 to 510000 are ignored and treated as 0. The recommended
+bitrate for speech is between 8000 and 40000 bps as noted in
+<a href="https://tools.ietf.org/html/rfc7587#section-3.1.1">RFC-7587 3.1.1</a>.</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="maxcallsignalingtimeoutms"><code class="tsd-tag">Optional</code><span>max<wbr/>Call<wbr/>Signaling<wbr/>Timeout<wbr/>Ms</span><a href="#maxcallsignalingtimeoutms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">maxCallSignalingTimeoutMs</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div><div class="tsd-comment tsd-typography"><p>The maximum duration to attempt to reconnect to a preferred URI.
+This is used by signaling reconnection in that during the existence of
+any call, edge-fallback is disabled until this length of time has
+elapsed.</p>
+<p>Using a value of 30000 as an example: while a call exists, the Device
+will attempt to reconnect to the edge that the call was established on
+for approximately 30 seconds. After the next failure to connect, the
+Device will use edge-fallback.</p>
+<p>This feature is opt-in, and will not work until a number greater than 0
+is explicitly specified within the Device options.</p>
+<p>Read more about edge fallback and signaling reconnection on the
+<a href="https://www.twilio.com/docs/voice/sdks/javascript/edges#edge-fallback-and-signaling-reconnection">Edge Locations page</a>.</p>
+<p><strong>Note:</strong> Setting this option to a value greater than zero means Twilio will not terminate the
+call until the timeout has expired. Please take this into consideration if your application
+contains webhooks that relies on <a href="https://www.twilio.com/docs/voice/twiml#callstatus-values">call status callbacks</a>.</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="mediastream"><code class="tsd-tag">Optional</code><span>Media<wbr/>Stream</span><a href="#mediastream" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">MediaStream</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">any</span></div><div class="tsd-comment tsd-typography"><p>Overrides the native MediaStream class.</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="rtcpeerconnection"><code class="tsd-tag">Optional</code><span>RTCPeer<wbr/>Connection</span><a href="#rtcpeerconnection" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">RTCPeerConnection</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">any</span></div><div class="tsd-comment tsd-typography"><p>Overrides the native RTCPeerConnection class.</p>
+<p>By default, the SDK will only use the <code>unified-plan</code> SDP format.
+Unexpected behavior may happen if the <code>RTCPeerConnection</code> parameter uses an SDP format
+that is different than what the SDK uses.</p>
+<p>For example, if the browser only supports <code>unified-plan</code> and the <code>RTCPeerConnection</code>
+parameter uses <code>plan-b</code> by default, the SDK will use <code>unified-plan</code>
+which will cause conflicts with the usage of the <code>RTCPeerConnection</code>.</p>
+<p>In order to avoid this issue, you need to explicitly set the SDP format that you want
+the SDK to use with the <code>RTCPeerConnection</code> via [[Device.ConnectOptions.rtcConfiguration]] for outgoing calls.
+Or [[Call.AcceptOptions.rtcConfiguration]] for incoming calls.</p>
+<p>See the example below. Assuming the <code>RTCPeerConnection</code> you provided uses <code>plan-b</code> by default, the following
+code sets the SDP format to <code>unified-plan</code> instead.</p>
+<pre><code class="ts"><span class="hl-10">// Outgoing calls</span><br/><span class="hl-4">const</span><span class="hl-1"> </span><span class="hl-5">call</span><span class="hl-1"> = </span><span class="hl-2">await</span><span class="hl-1"> </span><span class="hl-0">device</span><span class="hl-1">.</span><span class="hl-6">connect</span><span class="hl-1">({</span><br/><span class="hl-1">  </span><span class="hl-0">rtcConfiguration:</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-0">sdpSemantics:</span><span class="hl-1"> </span><span class="hl-3">&#39;unified-plan&#39;</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">  </span><span class="hl-10">// Other options</span><br/><span class="hl-1">});</span><br/><br/><span class="hl-10">// Incoming calls</span><br/><span class="hl-0">device</span><span class="hl-1">.</span><span class="hl-6">on</span><span class="hl-1">(</span><span class="hl-3">&#39;incoming&#39;</span><span class="hl-1">, </span><span class="hl-0">call</span><span class="hl-1"> </span><span class="hl-4">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-0">call</span><span class="hl-1">.</span><span class="hl-6">accept</span><span class="hl-1">({</span><br/><span class="hl-1">    </span><span class="hl-0">rtcConfiguration:</span><span class="hl-1"> {</span><br/><span class="hl-1">      </span><span class="hl-0">sdpSemantics:</span><span class="hl-1"> </span><span class="hl-3">&#39;unified-plan&#39;</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">    </span><span class="hl-10">// Other options</span><br/><span class="hl-1">  });</span><br/><span class="hl-1">});</span>
+</code><button type="button">Copy</button></pre>
+
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="sounds"><code class="tsd-tag">Optional</code><span>sounds</span><a href="#sounds" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">sounds</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">Partial</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><a href="../enums/Device.SoundName.html" class="tsd-signature-type tsd-kind-enum">SoundName</a><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">&gt;</span></div><div class="tsd-comment tsd-typography"><p>A mapping of custom sound URLs by sound name.</p>
+</div><div class="tsd-comment tsd-typography"></div></section><section class="tsd-panel tsd-member"><h3 class="tsd-anchor-link" id="tokenrefreshms"><code class="tsd-tag">Optional</code><span>token<wbr/>Refresh<wbr/>Ms</span><a href="#tokenrefreshms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3><div class="tsd-signature"><span class="tsd-kind-property">tokenRefreshMs</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div><div class="tsd-comment tsd-typography"><p>Number of milliseconds fewer than the token's TTL to emit the tokenWillExpire event.
+Default is 10000 (10 seconds).</p>
+</div><div class="tsd-comment tsd-typography"></div></section></section></details></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Properties</summary><div><a href="#allowincomingwhilebusy"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>allow<wbr/>Incoming<wbr/>While<wbr/>Busy</span></a><a href="#appname"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>app<wbr/>Name</span></a><a href="#appversion"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>app<wbr/>Version</span></a><a href="#closeprotection"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>close<wbr/>Protection</span></a><a href="#codecpreferences"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>codec<wbr/>Preferences</span></a><a href="#disableaudiocontextsounds"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>disable<wbr/>Audio<wbr/>Context<wbr/>Sounds</span></a><a href="#dscp"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>dscp</span></a><a href="#edge"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>edge</span></a><a href="#enableimprovedsignalingerrorprecision"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>enable<wbr/>Improved<wbr/>Signaling<wbr/>Error<wbr/>Precision</span></a><a href="#enumeratedevices"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>enumerate<wbr/>Devices</span></a><a href="#forceaggressiveicenomination"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>force<wbr/>Aggressive<wbr/>Ice<wbr/>Nomination</span></a><a href="#getusermedia"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>get<wbr/>User<wbr/>Media</span></a><a href="#loglevel"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>log<wbr/>Level</span></a><a href="#maxaveragebitrate"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>max<wbr/>Average<wbr/>Bitrate</span></a><a href="#maxcallsignalingtimeoutms"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>max<wbr/>Call<wbr/>Signaling<wbr/>Timeout<wbr/>Ms</span></a><a href="#mediastream"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>Media<wbr/>Stream</span></a><a href="#rtcpeerconnection"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>RTCPeer<wbr/>Connection</span></a><a href="#sounds"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>sounds</span></a><a href="#tokenrefreshms"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>token<wbr/>Refresh<wbr/>Ms</span></a></div></details></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="../modules.html">@twilio/voice-sdk</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
