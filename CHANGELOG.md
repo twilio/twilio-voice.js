@@ -6,7 +6,7 @@
 Improvements
 ------------
 
-- Improved websocket connection rate limiting by honoring `retryAfter` parameter during signaling connection degradation
+Previously, the SDK relied solely on a backoff mechanism when reconnecting the signaling connection. With this update, the SDK will use a server-provided `Retry-After` value, if available, when a connection attempt is rejected.
 
 2.17.0 (December 1, 2025)
 =========================
