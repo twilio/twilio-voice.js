@@ -21,9 +21,9 @@ app.use((req, res, next) => {
 app.get('/token', (req, res) => {
   const identity = req.query.identity;
   const twimlAppSid = process.env.APPLICATION_SID_EXTENSION;
-  const twilioAccountSid = process.env.ACCOUNT_SID;
-  const twilioApiKey = process.env.API_KEY_SID;
-  const twilioApiSecret = process.env.API_KEY_SECRET;
+  const twilioAccountSid = process.env.CYPRESS_ACCOUNT_SID;
+  const twilioApiKey = process.env.CYPRESS_API_KEY_SID;
+  const twilioApiSecret = process.env.CYPRESS_API_KEY_SECRET;
   console.log("applicationsid", twimlAppSid)
   const voiceGrant = new Twilio.jwt.AccessToken.VoiceGrant({
     outgoingApplicationSid: twimlAppSid,
