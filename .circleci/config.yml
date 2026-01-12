@@ -137,7 +137,7 @@ commands:
           command: ./node_modules/.bin/cypress install
       - run:
           name: Running integration tests
-          command: bash scripts/run-integration-tests.sh <<parameters.browser>> <<parameters.integration_test_files>>
+          command: circleci tests run --split-by=timings --command="bash scripts/run-integration-tests.sh <<parameters.browser>> <<parameters.integration_test_files>>"
       - run:
           name: Upload test results to Datadog
           command: |
@@ -188,6 +188,7 @@ jobs:
       BVER: <<parameters.bver>>
     steps: [network-tests]
   run-integration-tests:
+    parallelism: <<parameters.parallelism>>
     parameters:
       bver:
         type: string
@@ -201,6 +202,9 @@ jobs:
       integration_test_files:
         type: string
         default: ""
+      parallelism:
+        type: integer
+        default: 6
       start_relay_server:
         type: boolean
         default: false
@@ -283,7 +287,7 @@ workflows:
           start_relay_server: false
           browser: <<matrix.browser>>
           datadog-test-service: "healthcheck-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
-          integration_test_files: "cypress/e2e/edges.cy.ts"
+          integration_test_files: "cypress/e2e/edges/**/*.cy.ts"
           matrix:
             parameters:
               browser: ["chrome"]

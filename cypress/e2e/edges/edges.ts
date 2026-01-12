@@ -1,10 +1,10 @@
 import * as assert from 'assert';
-import Call from '../../lib/twilio/call';
-import Device from '../../lib/twilio/device';
-import { generateAccessToken } from '../../tests/lib/token';
+import Call from '../../../lib/twilio/call';
+import Device from '../../../lib/twilio/device';
+import { generateAccessToken } from '../../../tests/lib/token';
 
-describe('Edges', function() {
-  ['roaming', 'sydney', 'sao-paulo', 'dublin', 'frankfurt', 'tokyo', 'singapore', 'ashburn', 'umatilla'].forEach(edge => {
+export function edgesTest(edge: string) {
+  describe('Edges', function () {
     describe(`in edge: ${edge}`, () => {
       let device1: Device;
       let device2: Device;
@@ -23,7 +23,7 @@ describe('Edges', function() {
 
         return Promise.all([
           device1.register(),
-          device2.register(),
+          device2.register()
         ]);
       });
 
@@ -96,7 +96,7 @@ describe('Edges', function() {
                 ['custom3', '我不吃蛋'],
                 ['duplicate', '123456'],
                 ['foobar', 'some + value'],
-              ],
+              ]
             );
           });
 
@@ -108,4 +108,4 @@ describe('Edges', function() {
       });
     });
   });
-});
+}
