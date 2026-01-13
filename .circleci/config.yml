@@ -146,6 +146,8 @@ commands:
           when: always
       - store_artifacts:
           path: /home/circleci/project/cypress/screenshots
+      - store_test_results:
+          path: ./reports
   network-tests:
     steps:
       - get-code
