@@ -54,7 +54,7 @@
     "test:es5": "es-check es5 \"./es5/**/*.js\" ./dist/*.js",
     "test:extension": "mocha tests/extension/tests",
     "test:esm": "es-check es6 \"./esm/**/*.js\" --module",
-    "test:integration": "cypress run --reporter list",
+    "test:integration": "cypress run",
     "test:integration:chrome": "npm run test:integration -- --browser chrome",
     "test:integration:edge": "npm run test:integration -- --browser edge",
     "test:integration:firefox": "npm run test:integration -- --browser firefox",
