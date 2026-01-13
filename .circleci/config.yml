@@ -206,7 +206,7 @@ jobs:
         default: ""
       parallelism:
         type: integer
-        default: 6
+        default: 2
       start_relay_server:
         type: boolean
         default: false
