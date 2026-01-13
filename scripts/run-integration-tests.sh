@@ -2,7 +2,7 @@
 
 if [ "$CIRCLECI" = "true" ]; then
   echo "Asking circleci to pick tests based on timings..."
-  TESTFILES=$(circleci tests glob "cypress/e2e/**/*.cy.js" | circleci tests split --split-by=timings)
+  TESTFILES=$(circleci tests glob "cypress/e2e/**/*.cy.ts" | circleci tests split --split-by=timings)
   echo $TESTFILES
 fi
 
