@@ -289,7 +289,7 @@ workflows:
           start_relay_server: false
           browser: <<matrix.browser>>
           datadog-test-service: "healthcheck-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
-          integration_test_files: "cypress/e2e/edges/**/*.cy.ts"
+          integration_test_files: "cypress/e2e/edges.cy.ts"
           matrix:
             parameters:
               browser: ["chrome"]
