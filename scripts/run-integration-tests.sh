@@ -1,5 +1,9 @@
 #!/bin/bash
 
+echo "Asking circleci to pick tests based on timings..."
+export TEST_FILES=$(circleci tests glob "$PWD/cypress/e2e/**/*.cy.ts" | circleci tests split --split-by=timings)
+echo $TEST_FILES
+
 if [[ "$1" == "chrome" && -n "$2" ]]; then
   npm run test:integration:chrome -- --spec "$2" && echo "$2 tests passed" || bash scripts/report-failure.sh "$2 tests"
 elif [[ "$1" == "chrome" ]]; then

@@ -137,9 +137,7 @@ commands:
           command: ./node_modules/.bin/cypress install
       - run:
           name: Running integration tests
-          command: |
-            $(circleci tests glob "cypress/e2e/**/*.cy.ts" | circleci tests split --split-by=timings)
-            bash scripts/run-integration-tests.sh <<parameters.browser>> <<parameters.integration_test_files>>
+          command: bash scripts/run-integration-tests.sh <<parameters.browser>> <<parameters.integration_test_files>>
       - run:
           name: Upload test results to Datadog
           command: |
