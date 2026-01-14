@@ -146,6 +146,8 @@ commands:
           when: always
       - store_artifacts:
           path: /home/circleci/project/cypress/screenshots
+      - store_test_results:
+          path: ./reports
   network-tests:
     steps:
       - get-code
@@ -188,6 +190,7 @@ jobs:
       BVER: <<parameters.bver>>
     steps: [network-tests]
   run-integration-tests:
+    parallelism: <<parameters.parallelism>>
     parameters:
       bver:
         type: string
@@ -201,6 +204,9 @@ jobs:
       integration_test_files:
         type: string
         default: ""
+      parallelism:
+        type: integer
+        default: 4
       start_relay_server:
         type: boolean
         default: false
