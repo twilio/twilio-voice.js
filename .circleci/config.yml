@@ -295,6 +295,7 @@ workflows:
               browser: ["chrome"]
               bver: ["stable"]
               build_label: ["Healthcheck"]
+          parallelism: 1
   daily-build-workflow:
     triggers:
       - schedule:
