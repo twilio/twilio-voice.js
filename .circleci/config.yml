@@ -126,12 +126,6 @@ commands:
                 background: true
                 command: bash scripts/run-relay-server.sh
       - run:
-          name: Install xvfb
-          command: |
-            sudo apt update
-            sudo apt install xvfb
-            sudo apt install -y libgbm-dev
-      - run:
           # NOTE(kchoy): Addresses following pipeline cypress install issue: https://app.circleci.com/pipelines/github/twilio/twilio-voice.js/18965/workflows/b8248669-0a6b-4b30-a946-da636ff70382/jobs/33516
           name: Install cypress
           command: ./node_modules/.bin/cypress install
