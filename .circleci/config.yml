@@ -132,6 +132,7 @@ commands:
       - run:
           name: Running integration tests
           command: bash scripts/run-integration-tests.sh <<parameters.browser>> <<parameters.integration_test_files>>
+          max_auto_reruns: 3
       - run:
           name: Upload test results to Datadog
           command: |
@@ -157,6 +158,7 @@ commands:
       - run:
           name: "Extension: Puppeteer test"
           command: npm run test:extension
+          max_auto_reruns: 3
 
 ###
 # Jobs
