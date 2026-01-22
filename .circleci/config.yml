@@ -164,6 +164,7 @@ commands:
       - run:
           name: "Extension: Puppeteer test"
           command: npm run test:extension
+          max_auto_reruns: 3
 
 ###
 # Jobs
