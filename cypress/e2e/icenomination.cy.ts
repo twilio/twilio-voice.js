@@ -3,6 +3,7 @@ import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../../tests/lib/token';
 import { expectEvent, isFirefox } from '../../tests/lib/util';
+import { endpoints, isStage } from '../utils/endpoints';
 
 const CONNECTION_DELAY_THRESHOLD = 1000;
 const SUITE_TIMEOUT = 20000;
@@ -10,7 +11,7 @@ const MAX_TIMEOUT = 300000;
 
 const maybeSkip = isFirefox() ? describe.skip : describe;
 
-maybeSkip('ICE Nomination', function() {
+(isStage ? describe.skip : maybeSkip)('ICE Nomination', function() {
   Cypress.config('defaultCommandTimeout', MAX_TIMEOUT);
   this.timeout(MAX_TIMEOUT);
 
@@ -30,8 +31,8 @@ maybeSkip('ICE Nomination', function() {
     const token1 = generateAccessToken(identity1);
     const token2 = generateAccessToken(identity2);
 
-    device1 = new Device(token1, device1Options);
-    device2 = new Device(token2, device2Options);
+    device1 = new Device(token1, { ...device1Options, ...endpoints });
+    device2 = new Device(token2, { ...device2Options, ...endpoints });
 
     const devicePromises = Promise.all([
       expectEvent(Device.EventName.Registered, device1),

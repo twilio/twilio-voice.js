@@ -3,12 +3,13 @@ import * as sinon from 'sinon';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../../tests/lib/token';
+import { endpoints, getEndpoints, isStage } from '../utils/endpoints';
 
 function waitFor(n: number, reject?: boolean) {
   return new Promise((res, rej) => setTimeout(reject ? rej : res, n));
 }
 
-describe('mutable options', function() {
+(isStage ? describe.skip : describe)('mutable options', function() {
   let device: Device | null = null;
   let token: string;
 
@@ -28,7 +29,9 @@ describe('mutable options', function() {
   it('should update edge', async function() {
     this.timeout(10000);
 
-    const dev = device = new Device(token, { edge: 'sydney' });
+    const edge = 'sydney';
+    const options = isStage ? getEndpoints(edge) : { edge };
+    const dev = device = new Device(token, options as any);
 
     await dev.register();
     assert.equal(dev.edge, 'sydney');
@@ -48,7 +51,9 @@ describe('mutable options', function() {
   it('should not throw during re-registration', async function() {
     this.timeout(10000);
 
-    const dev = device = new Device(token, { edge: 'sydney' });
+    const edge = 'sydney';
+    const options = isStage ? getEndpoints(edge) : { edge };
+    const dev = device = new Device(token, options as any);
 
     await dev.register();
 
@@ -95,7 +100,7 @@ describe('mutable options', function() {
       ] = await Promise.all(['caller', 'receiver'].map(async (n): Promise<[Device, string, string]> => {
         const id = `device-${n}-${timestamp}`;
         const t = generateAccessToken(id);
-        const dev = new Device(t);
+        const dev = new Device(t, endpoints as any);
         await dev.register();
         return [dev, id, t];
       }));
