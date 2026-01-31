@@ -124,6 +124,7 @@ export function attemptCall(
 
     // Initiate the call
     (device1['connect'] as any)({ params }).then((call: Call) => {
+      console.log(`[attemptCall] call1 callSid: ${(call as any).parameters?.CallSid || call.outboundConnectionId}`);
       if (resolved) return;
       call1 = call;
       tryResolve();
