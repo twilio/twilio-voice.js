@@ -8,7 +8,7 @@ export const CALL_SETUP_TIMEOUT = 30000;
 export const POST_REGISTRATION_DELAY = 2000;
 // Number of times to retry the call if it fails
 export const CALL_RETRY_ATTEMPTS = 3;
-// Delay between retry attempts
+// Delay between retry attempts (ms)
 export const CALL_RETRY_DELAY = 2000;
 
 // Default call params used in tests
@@ -43,6 +43,18 @@ export async function attemptCallWithRetry(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
+      // Verify devices are still registered before attempting
+      if (device1.state !== Device.State.Registered) {
+        console.log(`Attempt ${attempt}: device1 not registered, re-registering...`);
+        await device1.register();
+        await wait(POST_REGISTRATION_DELAY);
+      }
+      if (device2.state !== Device.State.Registered) {
+        console.log(`Attempt ${attempt}: device2 not registered, re-registering...`);
+        await device2.register();
+        await wait(POST_REGISTRATION_DELAY);
+      }
+
       const result = await attemptCall(device1, device2, identity2, attemptTimeout, options);
       return result;
     } catch (err) {
@@ -76,9 +88,23 @@ export function attemptCall(
     let call2: Call | null = null;
     let resolved = false;
 
+    const cleanup = () => {
+      device2.removeListener(Device.EventName.Incoming, incomingHandler);
+    };
+
+    const tryResolve = () => {
+      if (!resolved && call1 && call2) {
+        resolved = true;
+        clearTimeout(timeout);
+        cleanup();
+        resolve({ call1, call2 });
+      }
+    };
+
     const timeout = setTimeout(() => {
       if (!resolved) {
         resolved = true;
+        cleanup();
         // Clean up if call1 was established but call2 never received
         if (call1) {
           try { call1.disconnect(); } catch (e) { /* ignore */ }
@@ -90,30 +116,22 @@ export function attemptCall(
     const incomingHandler = (call: Call) => {
       if (resolved) return;
       call2 = call;
-      if (call1 && call2) {
-        resolved = true;
-        clearTimeout(timeout);
-        resolve({ call1, call2 });
-      }
+      tryResolve();
     };
 
+    // Set up listener BEFORE initiating the call
     device2.once(Device.EventName.Incoming, incomingHandler);
 
     // Initiate the call
     (device1['connect'] as any)({ params }).then((call: Call) => {
+      if (resolved) return;
       call1 = call;
-      if (call1 && call2) {
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeout);
-          resolve({ call1, call2 });
-        }
-      }
+      tryResolve();
     }).catch((err: Error) => {
       if (!resolved) {
         resolved = true;
         clearTimeout(timeout);
-        device2.removeListener(Device.EventName.Incoming, incomingHandler);
+        cleanup();
         reject(new Error(`Failed to initiate call: ${err.message}`));
       }
     });
