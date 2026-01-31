@@ -62,7 +62,10 @@ const createTwilioUserDefinedMessageActions = (
   apiKeySid,
   apiKeySecret,
 ) => {
-  const baseUrl = 'https://api.twilio.com/2010-04-01';
+  const isStage = process.env.STAGE === 'true';
+  const baseUrl = isStage
+    ? 'https://api.stage.twilio.com/2010-04-01'
+    : 'https://api.twilio.com/2010-04-01';
   const extendedUrl = `${baseUrl}/Accounts/${accountSid}/Calls`;
 
   /**
