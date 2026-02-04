@@ -1,4 +1,4 @@
-export const isStage = Cypress.env('STAGE') === 'true';
+export const isStage = Cypress.env('ENV') === 'stage';
 
 export const getEndpoints = (edge: string) => isStage ? {
   chunderw: `voice-js.${edge}.stage.twilio.com`,

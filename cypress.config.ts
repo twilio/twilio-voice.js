@@ -5,9 +5,9 @@ module.exports = defineConfig({
     defaultCommandTimeout: 15000,
     supportFile: false,
     setupNodeEvents(on, config) {
-      // Pass STAGE environment variable to Cypress
-      config.env.STAGE = process.env.STAGE;
-      
+      // Pass ENV environment variable to Cypress
+      config.env.ENV = process.env.ENV;
+
       on('before:browser:launch', (browser, launchOptions) => {
         if (browser.family === 'firefox') {
           launchOptions.preferences['media.navigator.streams.fake'] = true;
@@ -20,7 +20,7 @@ module.exports = defineConfig({
           return null;
         },
       });
-      
+
       return config;
     },
     specPattern: 'cypress/e2e/**/*.cy.ts',

@@ -3,8 +3,6 @@
 # When running in stage environment, remap STAGE_ prefixed env vars to their standard names
 if [ "$ENV" = "stage" ]; then
   echo "Running in stage environment, remapping STAGE_ prefixed env vars..."
-  export STAGE=true
-  echo "  Set STAGE=true for Cypress"
   for var in $(env | grep '^STAGE_' | cut -d= -f1); do
     new_var=${var#STAGE_}
     export "$new_var=${!var}"
