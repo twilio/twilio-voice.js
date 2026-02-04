@@ -8,6 +8,9 @@ import { endpoints, getEndpoints, isStage } from '../utils/endpoints';
 function waitFor(n: number, reject?: boolean) {
   return new Promise((res, rej) => setTimeout(reject ? rej : res, n));
 }
+function deviceOptions(edge: string) {
+  return isStage ? getEndpoints(edge) : { edge };
+}
 
 (isStage ? describe.skip : describe)('mutable options', function() {
   let device: Device | null = null;
@@ -29,14 +32,12 @@ function waitFor(n: number, reject?: boolean) {
   it('should update edge', async function() {
     this.timeout(10000);
 
-    const edge = 'sydney';
-    const options = isStage ? getEndpoints(edge) : { edge };
-    const dev = device = new Device(token, options as any);
+    const dev = device = new Device(token, deviceOptions('sydney') as any);
 
     await dev.register();
     assert.equal(dev.edge, 'sydney');
 
-    dev.updateOptions({ edge: 'ashburn' });
+    dev.updateOptions(deviceOptions('ashburn') as any);
     return new Promise((resolve, reject) => {
       dev.once('registered', () => {
         if (dev.edge === 'ashburn') {
@@ -51,9 +52,7 @@ function waitFor(n: number, reject?: boolean) {
   it('should not throw during re-registration', async function() {
     this.timeout(10000);
 
-    const edge = 'sydney';
-    const options = isStage ? getEndpoints(edge) : { edge };
-    const dev = device = new Device(token, options as any);
+    const dev = device = new Device(token, deviceOptions('sydney') as any);
 
     await dev.register();
 
@@ -69,7 +68,7 @@ function waitFor(n: number, reject?: boolean) {
       dev.once(Device.EventName.Registered, resolve);
     });
 
-    dev.updateOptions({ edge: 'ashburn' });
+    dev.updateOptions(deviceOptions('ashburn') as any);
 
     await registeredPromise;
 
@@ -131,7 +130,7 @@ function waitFor(n: number, reject?: boolean) {
       caller['_log'].warn = logSpy;
 
       try {
-        caller.updateOptions({ edge: 'ashburn' });
+        caller.updateOptions(deviceOptions('ashburn') as any);
       } catch (e) {
         assert.equal(e.message, 'Cannot change Edge while on an active Call');
       }
