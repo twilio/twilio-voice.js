@@ -197,15 +197,16 @@ jobs:
       datadog-test-service:
         type: string
         default: ""
+      env:
+        type: enum
+        enum: ["prod", "stage"]
+        default: "prod"
       integration_test_files:
         type: string
         default: ""
       parallelism:
         type: integer
         default: 4
-      stage:
-        type: boolean
-        default: false
       start_relay_server:
         type: boolean
         default: false
@@ -217,7 +218,7 @@ jobs:
       BROWSER: <<parameters.browser>>
       BVER: <<parameters.bver>>
       BUILD_LABEL: <<parameters.build_label>>
-      STAGE: <<parameters.stage>>
+      ENV: <<parameters.env>>
     steps:
       - integration-tests:
           browser: <<parameters.browser>>
@@ -281,39 +282,20 @@ workflows:
               only:
                 - master
     jobs:
-      # Production
       - run-integration-tests:
-          name: Prod Integration tests <<matrix.browser>> <<matrix.bver>>
+          name: <<matrix.env>> Integration tests <<matrix.browser>> <<matrix.bver>>
           context:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: false
-          browser: <<matrix.browser>>
-          datadog-test-service: "healthcheck-prod-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
+          datadog-test-service: "healthcheck-<<matrix.env>>-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
           integration_test_files: "cypress/e2e/edges.cy.ts"
           matrix:
             parameters:
               browser: ["chrome"]
               bver: ["stable"]
-              build_label: ["Healthcheck Prod"]
-          parallelism: 1
-      # Stage
-      - run-integration-tests:
-          name: Stage Integration tests <<matrix.browser>> <<matrix.bver>>
-          context:
-            - dockerhub-pulls
-            - vblocks-js
-            - vblocks-voice-js-stage
-          stage: true
-          start_relay_server: false
-          browser: <<matrix.browser>>
-          datadog-test-service: "healthcheck-stage-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
-          integration_test_files: "cypress/e2e/edges.cy.ts"
-          matrix:
-            parameters:
-              browser: ["chrome"]
-              bver: ["stable"]
-              build_label: ["Healthcheck Stage"]
+              env: ["prod", "stage"]
+              build_label: ["Healthcheck"]
           parallelism: 1
   daily-build-workflow:
     triggers:
@@ -324,47 +306,24 @@ workflows:
               only:
                 - master
     jobs:
-      # Production
       - run-build-checks:
           context:
             - vblocks-js
-          name: Build Checks Prod
-          datadog-test-service: "daily-build-prod-unit-tests"
+          name: Build Checks
+          datadog-test-service: "daily-build-unit-tests"
       - run-integration-tests:
-          name: Prod Integration tests <<matrix.browser>> <<matrix.bver>>
+          name: <<matrix.env>> Integration tests <<matrix.browser>> <<matrix.bver>>
           context:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: true
-          browser: <<matrix.browser>>
-          datadog-test-service: "daily-build-prod-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
+          datadog-test-service: "daily-build-<<matrix.env>>-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
               bver: ["beta", "unstable", "stable"]
-              build_label: ["Daily build Prod"]
-      # Stage
-      - run-build-checks:
-          context:
-            - vblocks-js
-            - vblocks-voice-js-stage
-          name: Build Checks Stage
-          datadog-test-service: "daily-build-stage-unit-tests"
-      - run-integration-tests:
-          name: Stage Integration tests <<matrix.browser>> <<matrix.bver>>
-          context:
-            - dockerhub-pulls
-            - vblocks-js
-            - vblocks-voice-js-stage
-          stage: true
-          start_relay_server: true
-          browser: <<matrix.browser>>
-          datadog-test-service: "daily-build-stage-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
-          matrix:
-            parameters:
-              browser: ["chrome", "firefox"]
-              bver: ["beta", "unstable", "stable"]
-              build_label: ["Daily build Stage"]
+              env: ["prod", "stage"]
+              build_label: ["Daily build"]
   pull-request-workflow:
     when:
         and:
@@ -377,33 +336,18 @@ workflows:
           name: Build Checks
           datadog-test-service: "pull-request-unit-tests"
       - run-integration-tests:
-          name: Prod Integration tests <<matrix.browser>> <<matrix.bver>>
+          name: <<matrix.env>> Integration tests <<matrix.browser>> <<matrix.bver>>
           context:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: true
-          browser: <<matrix.browser>>
-          datadog-test-service: "pull-request-prod-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
+          datadog-test-service: "pull-request-<<matrix.env>>-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
           matrix:
             parameters:
               browser: ["chrome", "firefox"]
               bver: ["beta", "unstable", "stable"]
+              env: ["prod", "stage"]
               build_label: ["Integration tests"]
-      - run-integration-tests:
-          name: Stage Integration tests <<matrix.browser>> <<matrix.bver>>
-          context:
-            - dockerhub-pulls
-            - vblocks-js
-            - vblocks-voice-js-stage
-          stage: true
-          start_relay_server: true
-          browser: <<matrix.browser>>
-          datadog-test-service: "pull-request-stage-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
-          matrix:
-            parameters:
-              browser: ["chrome", "firefox"]
-              bver: ["beta", "unstable", "stable"]
-              build_label: ["Stage Integration tests"]
       - run-chrome-extension-tests:
           name: Chrome extension tests <<matrix.browser>> <<matrix.bver>>
           context: 
@@ -436,7 +380,6 @@ workflows:
             - dockerhub-pulls
             - vblocks-js
           start_relay_server: true
-          browser: <<matrix.browser>>
           datadog-test-service: "release-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
           matrix:
             parameters:
