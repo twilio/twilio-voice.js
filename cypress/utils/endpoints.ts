@@ -1,4 +1,4 @@
-import Device from "../../lib/twilio/device";
+import Device from '../../lib/twilio/device';
 
 export const isStage = Cypress.env('ENV') === 'stage';
 
