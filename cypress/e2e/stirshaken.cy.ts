@@ -21,8 +21,8 @@ import { defaultEndpoints, isStage } from '../utils/endpoints';
     identity2 = 'aliceStir';
     token1 = generateAccessToken(identity1, undefined, (env as any).appSidStir);
     token2 = generateAccessToken(identity2, undefined, (env as any).appSidStir);
-    device1 = new Device(token1, defaultEndpoints as any);
-    device2 = new Device(token2, defaultEndpoints as any);
+    device1 = new Device(token1, defaultEndpoints);
+    device2 = new Device(token2, defaultEndpoints);
 
     return Promise.all([
       device1.register(),

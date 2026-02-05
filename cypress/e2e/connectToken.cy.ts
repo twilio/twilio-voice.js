@@ -35,11 +35,11 @@ import { defaultEndpoints, isStage } from '../utils/endpoints';
     const reconnectDeviceTokenA = generateAccessToken(identity);
     const reconnectDeviceTokenB = generateAccessToken(identity);
 
-    callerDeviceA = new Device(callerTokenA, defaultEndpoints as any);
-    callerDeviceB = new Device(callerTokenB, defaultEndpoints as any);
-    receiverDevice = new Device(receiverDeviceToken, defaultEndpoints as any);
-    reconnectDeviceA = new Device(reconnectDeviceTokenA, defaultEndpoints as any);
-    reconnectDeviceB = new Device(reconnectDeviceTokenB, defaultEndpoints as any);
+    callerDeviceA = new Device(callerTokenA, defaultEndpoints);
+    callerDeviceB = new Device(callerTokenB, defaultEndpoints);
+    receiverDevice = new Device(receiverDeviceToken, defaultEndpoints);
+    reconnectDeviceA = new Device(reconnectDeviceTokenA, defaultEndpoints);
+    reconnectDeviceB = new Device(reconnectDeviceTokenB, defaultEndpoints);
 
     // Only register the device that receives the incoming
     receiverDevice.register();

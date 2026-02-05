@@ -34,8 +34,8 @@ describe('Edges', function() {
         token1 = generateAccessToken(identity1);
         token2 = generateAccessToken(identity2);
         const options = isStage ? getEndpoints(edge) : { edge };
-        device1 = new Device(token1, options as any);
-        device2 = new Device(token2, options as any);
+        device1 = new Device(token1, options);
+        device2 = new Device(token2, options);
 
         await registerDevices(device1, device2);
       });

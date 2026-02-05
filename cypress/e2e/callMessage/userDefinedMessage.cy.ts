@@ -22,11 +22,11 @@ function waitFor(n: number, reject?: boolean) {
 
     const aliceId = `client-id-call-message-tests-alice-${Date.now()}`;
     const aliceToken = generateAccessToken(aliceId, tokenTtl);
-    const aliceDevice = new Device(aliceToken, defaultEndpoints as any);
+    const aliceDevice = new Device(aliceToken, defaultEndpoints);
 
     const bobId = `client-id-call-message-tests-bob-${Date.now()}`;
     const bobToken = generateAccessToken(bobId, tokenTtl);
-    const bobDevice = new Device(bobToken, defaultEndpoints as any);
+    const bobDevice = new Device(bobToken, defaultEndpoints);
 
     await bobDevice.register();
     const bobCallPromise: Promise<Call> = expectEvent(

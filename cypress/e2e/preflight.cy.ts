@@ -43,7 +43,7 @@ const MAX_TIMEOUT = 300000;
 
     const receiverToken = generateAccessToken(receiverIdentity);
     callerToken = generateAccessToken(callerIdentity);
-    receiverDevice = new Device(receiverToken, defaultEndpoints as any);
+    receiverDevice = new Device(receiverToken, defaultEndpoints);
     receiverDevice.on('error', () => { });
     await receiverDevice.register();
   };

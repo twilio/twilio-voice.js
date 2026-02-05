@@ -29,8 +29,8 @@ describe('Device', function() {
     identity2 = 'id2-' + Date.now();
     token1 = generateAccessToken(identity1);
     token2 = generateAccessToken(identity2);
-    device1 = new Device(token1, defaultEndpoints as any);
-    device2 = new Device(token2, defaultEndpoints as any);
+    device1 = new Device(token1, defaultEndpoints);
+    device2 = new Device(token2, defaultEndpoints);
 
     await registerDevices(device1, device2);
   });
@@ -42,7 +42,7 @@ describe('Device', function() {
   describe('tokenWillExpire event', () => {
     const setupDevice = (tokenTtl: number, tokenRefreshMs: number) => {
       const accessToken = generateAccessToken(`device-tokenWillExpire-${Date.now()}`, tokenTtl);
-      const device = new Device(accessToken, { tokenRefreshMs, ...defaultEndpoints } as any);
+      const device = new Device(accessToken, { tokenRefreshMs, ...defaultEndpoints });
       device.on(Device.EventName.Error, () => { /* no-op */ });
       return device;
     };

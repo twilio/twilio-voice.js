@@ -17,8 +17,8 @@ import { defaultEndpoints, isStage } from '../utils/endpoints';
     const token1 = generateAccessToken(identity1);
     const token2 = generateAccessToken(identity2);
 
-    device1 = new Device(token1, { ...device1Options, ...defaultEndpoints as any });
-    device2 = new Device(token2, { ...device2Options, ...defaultEndpoints as any });
+    device1 = new Device(token1, { ...device1Options, ...defaultEndpoints });
+    device2 = new Device(token2, { ...device2Options, ...defaultEndpoints });
 
     const devicePromises = Promise.all([
       expectEvent(Device.EventName.Registered, device1),

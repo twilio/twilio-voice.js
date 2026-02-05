@@ -32,12 +32,12 @@ function getDeviceOptionsWithEdge(edge: string) {
   it('should update edge', async function() {
     this.timeout(10000);
 
-    const dev = device = new Device(token, getDeviceOptionsWithEdge('sydney') as any);
+    const dev = device = new Device(token, getDeviceOptionsWithEdge('sydney'));
 
     await dev.register();
     assert.equal(dev.edge, 'sydney');
 
-    dev.updateOptions(getDeviceOptionsWithEdge('ashburn') as any);
+    dev.updateOptions(getDeviceOptionsWithEdge('ashburn'));
     return new Promise((resolve, reject) => {
       dev.once('registered', () => {
         if (dev.edge === 'ashburn') {
@@ -52,7 +52,7 @@ function getDeviceOptionsWithEdge(edge: string) {
   it('should not throw during re-registration', async function() {
     this.timeout(10000);
 
-    const dev = device = new Device(token, getDeviceOptionsWithEdge('sydney') as any);
+    const dev = device = new Device(token, getDeviceOptionsWithEdge('sydney'));
 
     await dev.register();
 
@@ -68,7 +68,7 @@ function getDeviceOptionsWithEdge(edge: string) {
       dev.once(Device.EventName.Registered, resolve);
     });
 
-    dev.updateOptions(getDeviceOptionsWithEdge('ashburn') as any);
+    dev.updateOptions(getDeviceOptionsWithEdge('ashburn'));
 
     await registeredPromise;
 
@@ -99,7 +99,7 @@ function getDeviceOptionsWithEdge(edge: string) {
       ] = await Promise.all(['caller', 'receiver'].map(async (n): Promise<[Device, string, string]> => {
         const id = `device-${n}-${timestamp}`;
         const t = generateAccessToken(id);
-        const dev = new Device(t, defaultEndpoints as any);
+        const dev = new Device(t, defaultEndpoints);
         await dev.register();
         return [dev, id, t];
       }));
@@ -130,7 +130,7 @@ function getDeviceOptionsWithEdge(edge: string) {
       caller['_log'].warn = logSpy;
 
       try {
-        caller.updateOptions(getDeviceOptionsWithEdge('ashburn') as any);
+        caller.updateOptions(getDeviceOptionsWithEdge('ashburn'));
       } catch (e) {
         assert.equal(e.message, 'Cannot change Edge while on an active Call');
       }
