@@ -4,6 +4,7 @@ import Device from '../../../lib/twilio/device';
 import type Call from '../../../lib/twilio/call';
 import { generateAccessToken } from '../../../tests/lib/token';
 import { expectEvent } from '../../../tests/lib/util';
+import { defaultEndpoints, isStage } from '../../utils/endpoints';
 
 const RELAY_SERVER_URL = 'http://localhost:3030';
 
@@ -11,7 +12,7 @@ function waitFor(n: number, reject?: boolean) {
   return new Promise((res, rej) => setTimeout(reject ? rej : res, n));
 }
 
-describe('userDefinedMessage', function() {
+(isStage ? describe.skip : describe)('userDefinedMessage', function() {
   const MAX_TIMEOUT = 1000 * 60 * 10; // 10 minute timeout for the whole suite
   this.timeout(MAX_TIMEOUT); 
   Cypress.config('defaultCommandTimeout', MAX_TIMEOUT);
@@ -21,11 +22,11 @@ describe('userDefinedMessage', function() {
 
     const aliceId = `client-id-call-message-tests-alice-${Date.now()}`;
     const aliceToken = generateAccessToken(aliceId, tokenTtl);
-    const aliceDevice = new Device(aliceToken);
+    const aliceDevice = new Device(aliceToken, defaultEndpoints);
 
     const bobId = `client-id-call-message-tests-bob-${Date.now()}`;
     const bobToken = generateAccessToken(bobId, tokenTtl);
-    const bobDevice = new Device(bobToken);
+    const bobDevice = new Device(bobToken, defaultEndpoints);
 
     await bobDevice.register();
     const bobCallPromise: Promise<Call> = expectEvent(

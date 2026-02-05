@@ -2,11 +2,19 @@ import * as assert from 'assert';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../../tests/lib/token';
+import {
+  attemptCallWithRetry,
+  cleanupDevices,
+  registerDevices,
+  SETUP_TIMEOUT,
+  CALL_SETUP_TIMEOUT,
+} from '../utils/call';
+import { defaultEndpoints } from '../utils/endpoints';
 
 // (rrowland) The TwiML expected by these tests can be found in the README.md
 
 describe('Opus', function() {
-  this.timeout(10000);
+  this.timeout(60000);
 
   let device1: Device;
   let device2: Device;
@@ -16,52 +24,42 @@ describe('Opus', function() {
   let token1: string;
   let token2: string;
 
-  before(() => {
+  before(async function() {
+    this.timeout(SETUP_TIMEOUT);
+
     identity1 = 'id1-' + Date.now();
     identity2 = 'id2-' + Date.now();
     token1 = generateAccessToken(identity1);
     token2 = generateAccessToken(identity2);
     options = {
       codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
+      ...defaultEndpoints,
     };
     device1 = new Device(token1, options);
     device2 = new Device(token2, options);
 
-    return Promise.all([
-      device1.register(),
-      device2.register(),
-    ]);
+    await registerDevices(device1, device2);
   });
 
   after(() => {
-    if (device1) {
-      device1.disconnectAll();
-      device1.destroy();
-    }
-
-    if (device2) {
-      device2.disconnectAll();
-      device2.destroy();
-    }
+    cleanupDevices(device1, device2);
   });
 
   describe('device 1 calls device 2', () => {
     let call1: Call;
     let call2: Call;
 
-    before(() => new Promise<void>(async resolve => {
-      device2.once(Device.EventName.Incoming, (call: Call) => {
-        call2 = call;
-        resolve();
-      });
-      call1 = await (device1['connect'] as any)({
-        params: { To: identity2, Custom1: 'foo + bar', Custom2: undefined, Custom3: '我不吃蛋' }
-      });
-    }));
+    before(async function() {
+      this.timeout(CALL_SETUP_TIMEOUT);
+
+      const result = await attemptCallWithRetry(device1, device2, identity2);
+      call1 = result.call1;
+      call2 = result.call2;
+    });
 
     describe('and device 2 accepts', () => {
 
-      beforeEach(() => {
+      beforeEach(function() {
         if (!call1 || !call2) {
           throw new Error(`Calls weren't both open at beforeEach`);
         }

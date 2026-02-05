@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# When running in stage environment, remap STAGE_ prefixed env vars to their standard names
+if [ "$ENV" = "stage" ]; then
+  echo "Running in stage environment, remapping STAGE_ prefixed env vars..."
+  for var in $(env | grep '^STAGE_' | cut -d= -f1); do
+    new_var=${var#STAGE_}
+    export "$new_var=${!var}"
+    echo "  Remapped $var -> $new_var"
+  done
+fi
+
 if [ "$CIRCLECI" = "true" ]; then
   echo "Asking circleci to pick tests based on timings..."
   TESTFILES=$(circleci tests glob "cypress/e2e/**/*.cy.ts" | circleci tests split --split-by=timings)

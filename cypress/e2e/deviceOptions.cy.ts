@@ -1,8 +1,9 @@
 import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../../tests/lib/token';
 import { expectEvent } from '../../tests/lib/util';
+import { defaultEndpoints, isStage } from '../utils/endpoints';
 
-describe('DeviceOptions', function() {
+(isStage ? describe.skip : describe)('DeviceOptions', function() {
   this.timeout(10000);
 
   let device1: Device;
@@ -16,8 +17,8 @@ describe('DeviceOptions', function() {
     const token1 = generateAccessToken(identity1);
     const token2 = generateAccessToken(identity2);
 
-    device1 = new Device(token1, device1Options);
-    device2 = new Device(token2, device2Options);
+    device1 = new Device(token1, { ...device1Options, ...defaultEndpoints });
+    device2 = new Device(token2, { ...device2Options, ...defaultEndpoints });
 
     const devicePromises = Promise.all([
       expectEvent(Device.EventName.Registered, device1),

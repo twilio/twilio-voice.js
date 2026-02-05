@@ -5,12 +5,13 @@ import { EventEmitter } from 'events';
 import { PreflightTest } from '../../lib/twilio/preflight/preflight';
 import Call from '../../lib/twilio/call';
 import { TwilioError } from '../../lib/twilio/errors';
+import { defaultEndpoints, isStage } from '../utils/endpoints';
 
 const DURATION_PADDING = 3000;
 const EVENT_TIMEOUT = 30000;
 const MAX_TIMEOUT = 300000;
 
-describe('Preflight Test', function() {
+(isStage ? describe.skip : describe)('Preflight Test', function() {
   this.timeout(MAX_TIMEOUT);
   Cypress.config('defaultCommandTimeout', MAX_TIMEOUT);
 
@@ -42,7 +43,7 @@ describe('Preflight Test', function() {
 
     const receiverToken = generateAccessToken(receiverIdentity);
     callerToken = generateAccessToken(callerIdentity);
-    receiverDevice = new Device(receiverToken);
+    receiverDevice = new Device(receiverToken, defaultEndpoints);
     receiverDevice.on('error', () => { });
     await receiverDevice.register();
   };
