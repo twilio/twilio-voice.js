@@ -4,7 +4,7 @@ import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import * as env from '../../tests/env';
 import { generateAccessToken } from '../../tests/lib/token';
-import { endpoints, isStage } from '../utils/endpoints';
+import { defaultEndpoints, isStage } from '../utils/endpoints';
 
 (isStage ? describe.skip : describe)('SHAKEN/STIR', function() {
   this.timeout(10000);
@@ -21,8 +21,8 @@ import { endpoints, isStage } from '../utils/endpoints';
     identity2 = 'aliceStir';
     token1 = generateAccessToken(identity1, undefined, (env as any).appSidStir);
     token2 = generateAccessToken(identity2, undefined, (env as any).appSidStir);
-    device1 = new Device(token1, endpoints as any);
-    device2 = new Device(token2, endpoints as any);
+    device1 = new Device(token1, defaultEndpoints as any);
+    device2 = new Device(token2, defaultEndpoints as any);
 
     return Promise.all([
       device1.register(),

@@ -3,12 +3,12 @@ import * as sinon from 'sinon';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../../tests/lib/token';
-import { endpoints, getEndpoints, isStage } from '../utils/endpoints';
+import { defaultEndpoints, getEndpoints, isStage } from '../utils/endpoints';
 
 function waitFor(n: number, reject?: boolean) {
   return new Promise((res, rej) => setTimeout(reject ? rej : res, n));
 }
-function deviceOptions(edge: string) {
+function getDeviceOptionsWithEdge(edge: string) {
   return isStage ? getEndpoints(edge) : { edge };
 }
 
@@ -32,12 +32,12 @@ function deviceOptions(edge: string) {
   it('should update edge', async function() {
     this.timeout(10000);
 
-    const dev = device = new Device(token, deviceOptions('sydney') as any);
+    const dev = device = new Device(token, getDeviceOptionsWithEdge('sydney') as any);
 
     await dev.register();
     assert.equal(dev.edge, 'sydney');
 
-    dev.updateOptions(deviceOptions('ashburn') as any);
+    dev.updateOptions(getDeviceOptionsWithEdge('ashburn') as any);
     return new Promise((resolve, reject) => {
       dev.once('registered', () => {
         if (dev.edge === 'ashburn') {
@@ -52,7 +52,7 @@ function deviceOptions(edge: string) {
   it('should not throw during re-registration', async function() {
     this.timeout(10000);
 
-    const dev = device = new Device(token, deviceOptions('sydney') as any);
+    const dev = device = new Device(token, getDeviceOptionsWithEdge('sydney') as any);
 
     await dev.register();
 
@@ -68,7 +68,7 @@ function deviceOptions(edge: string) {
       dev.once(Device.EventName.Registered, resolve);
     });
 
-    dev.updateOptions(deviceOptions('ashburn') as any);
+    dev.updateOptions(getDeviceOptionsWithEdge('ashburn') as any);
 
     await registeredPromise;
 
@@ -99,7 +99,7 @@ function deviceOptions(edge: string) {
       ] = await Promise.all(['caller', 'receiver'].map(async (n): Promise<[Device, string, string]> => {
         const id = `device-${n}-${timestamp}`;
         const t = generateAccessToken(id);
-        const dev = new Device(t, endpoints as any);
+        const dev = new Device(t, defaultEndpoints as any);
         await dev.register();
         return [dev, id, t];
       }));
@@ -130,7 +130,7 @@ function deviceOptions(edge: string) {
       caller['_log'].warn = logSpy;
 
       try {
-        caller.updateOptions(deviceOptions('ashburn') as any);
+        caller.updateOptions(getDeviceOptionsWithEdge('ashburn') as any);
       } catch (e) {
         assert.equal(e.message, 'Cannot change Edge while on an active Call');
       }

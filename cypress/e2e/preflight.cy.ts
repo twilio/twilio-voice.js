@@ -5,7 +5,7 @@ import { EventEmitter } from 'events';
 import { PreflightTest } from '../../lib/twilio/preflight/preflight';
 import Call from '../../lib/twilio/call';
 import { TwilioError } from '../../lib/twilio/errors';
-import { endpoints, isStage } from '../utils/endpoints';
+import { defaultEndpoints, isStage } from '../utils/endpoints';
 
 const DURATION_PADDING = 3000;
 const EVENT_TIMEOUT = 30000;
@@ -43,7 +43,7 @@ const MAX_TIMEOUT = 300000;
 
     const receiverToken = generateAccessToken(receiverIdentity);
     callerToken = generateAccessToken(callerIdentity);
-    receiverDevice = new Device(receiverToken, endpoints as any);
+    receiverDevice = new Device(receiverToken, defaultEndpoints as any);
     receiverDevice.on('error', () => { });
     await receiverDevice.register();
   };

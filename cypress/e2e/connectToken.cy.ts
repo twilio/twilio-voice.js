@@ -4,7 +4,7 @@ import Device from '../../lib/twilio/device';
 import Call from '../../lib/twilio/call';
 import { generateAccessToken } from '../../tests/lib/token';
 import { expectEvent } from '../../tests/lib/util';
-import { endpoints, isStage } from '../utils/endpoints';
+import { defaultEndpoints, isStage } from '../utils/endpoints';
 
 (isStage ? describe.skip : describe)('connectToken', function() {
   this.timeout(10000);
@@ -35,11 +35,11 @@ import { endpoints, isStage } from '../utils/endpoints';
     const reconnectDeviceTokenA = generateAccessToken(identity);
     const reconnectDeviceTokenB = generateAccessToken(identity);
 
-    callerDeviceA = new Device(callerTokenA, endpoints as any);
-    callerDeviceB = new Device(callerTokenB, endpoints as any);
-    receiverDevice = new Device(receiverDeviceToken, endpoints as any);
-    reconnectDeviceA = new Device(reconnectDeviceTokenA, endpoints as any);
-    reconnectDeviceB = new Device(reconnectDeviceTokenB, endpoints as any);
+    callerDeviceA = new Device(callerTokenA, defaultEndpoints as any);
+    callerDeviceB = new Device(callerTokenB, defaultEndpoints as any);
+    receiverDevice = new Device(receiverDeviceToken, defaultEndpoints as any);
+    reconnectDeviceA = new Device(reconnectDeviceTokenA, defaultEndpoints as any);
+    reconnectDeviceB = new Device(reconnectDeviceTokenB, defaultEndpoints as any);
 
     // Only register the device that receives the incoming
     receiverDevice.register();

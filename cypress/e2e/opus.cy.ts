@@ -9,7 +9,7 @@ import {
   SETUP_TIMEOUT,
   CALL_SETUP_TIMEOUT,
 } from '../utils/call';
-import { endpoints } from '../utils/endpoints';
+import { defaultEndpoints } from '../utils/endpoints';
 
 // (rrowland) The TwiML expected by these tests can be found in the README.md
 
@@ -33,7 +33,7 @@ describe('Opus', function() {
     token2 = generateAccessToken(identity2);
     options = {
       codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
-      ...endpoints,
+      ...defaultEndpoints,
     };
     device1 = new Device(token1, options);
     device2 = new Device(token2, options);

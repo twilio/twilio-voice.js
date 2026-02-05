@@ -5,7 +5,7 @@ export const getEndpoints = (edge: string) => isStage ? {
   eventgw: 'eventgw.stage.twilio.com',
 } : {};
 
-export const endpoints = isStage ? {
+export const defaultEndpoints = isStage ? {
   chunderw: 'voice-js.roaming.stage.twilio.com',
   eventgw: 'eventgw.stage.twilio.com',
 } : {};

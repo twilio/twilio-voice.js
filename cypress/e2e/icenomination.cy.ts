@@ -3,7 +3,7 @@ import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../../tests/lib/token';
 import { expectEvent, isFirefox } from '../../tests/lib/util';
-import { endpoints, isStage } from '../utils/endpoints';
+import { defaultEndpoints, isStage } from '../utils/endpoints';
 
 const CONNECTION_DELAY_THRESHOLD = 1000;
 const SUITE_TIMEOUT = 20000;
@@ -31,8 +31,8 @@ const maybeSkip = isFirefox() ? describe.skip : describe;
     const token1 = generateAccessToken(identity1);
     const token2 = generateAccessToken(identity2);
 
-    device1 = new Device(token1, { ...device1Options, ...endpoints });
-    device2 = new Device(token2, { ...device2Options, ...endpoints });
+    device1 = new Device(token1, { ...device1Options, ...defaultEndpoints });
+    device2 = new Device(token2, { ...device2Options, ...defaultEndpoints });
 
     const devicePromises = Promise.all([
       expectEvent(Device.EventName.Registered, device1),

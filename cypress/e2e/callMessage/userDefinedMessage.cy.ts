@@ -4,7 +4,7 @@ import Device from '../../../lib/twilio/device';
 import type Call from '../../../lib/twilio/call';
 import { generateAccessToken } from '../../../tests/lib/token';
 import { expectEvent } from '../../../tests/lib/util';
-import { endpoints, isStage } from '../../utils/endpoints';
+import { defaultEndpoints, isStage } from '../../utils/endpoints';
 
 const RELAY_SERVER_URL = 'http://localhost:3030';
 
@@ -22,11 +22,11 @@ function waitFor(n: number, reject?: boolean) {
 
     const aliceId = `client-id-call-message-tests-alice-${Date.now()}`;
     const aliceToken = generateAccessToken(aliceId, tokenTtl);
-    const aliceDevice = new Device(aliceToken, endpoints as any);
+    const aliceDevice = new Device(aliceToken, defaultEndpoints as any);
 
     const bobId = `client-id-call-message-tests-bob-${Date.now()}`;
     const bobToken = generateAccessToken(bobId, tokenTtl);
-    const bobDevice = new Device(bobToken, endpoints as any);
+    const bobDevice = new Device(bobToken, defaultEndpoints as any);
 
     await bobDevice.register();
     const bobCallPromise: Promise<Call> = expectEvent(
