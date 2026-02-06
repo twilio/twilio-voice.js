@@ -32,10 +32,10 @@ const getEnvVar = (envVarKey) => {
  * }}
  */
 const getEnvVars = () => {
-  const apiKeySid = getEnvVar('CYPRESS_API_KEY_SID');
-  const apiKeySecret = getEnvVar('CYPRESS_API_KEY_SECRET');
-  const accountSid = getEnvVar('CYPRESS_ACCOUNT_SID');
-  const authToken = getEnvVar('CYPRESS_AUTH_TOKEN');
+  const apiKeySid = getEnvVar('API_KEY_SID');
+  const apiKeySecret = getEnvVar('API_KEY_SECRET');
+  const accountSid = getEnvVar('ACCOUNT_SID');
+  const authToken = getEnvVar('AUTH_TOKEN');
   return { apiKeySid, apiKeySecret, accountSid, authToken };
 };
 
