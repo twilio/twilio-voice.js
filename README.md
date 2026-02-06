@@ -122,7 +122,7 @@ Integration tests require some set up:
 </Response>
 ```
 
-3. Cypress requires `env` `vars` to be prefixed with `CYPRESS_`. Make a copy the `example.env` file with the name `.env` and populate the file with your credentials.
+3. Make a copy of the `example.env` file with the name `.env` and populate the file with your credentials.
 
 4. Start the relay server
 
