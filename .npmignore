@@ -8,11 +8,14 @@
 .release.json
 BUILD.md
 build.yaml
+catalog-info.yaml
 config.example.yaml
 config.yaml
 coverage
 cypress
+cypress.config.ts
 docs
+example.env
 extension
 node_modules
 nodemon.json
@@ -22,4 +25,5 @@ server.js
 templates
 tests
 tslint.json
+typedoc.json
 reports
