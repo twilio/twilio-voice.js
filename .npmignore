@@ -11,6 +11,7 @@ build.yaml
 config.example.yaml
 config.yaml
 coverage
+cypress
 docs
 extension
 node_modules
