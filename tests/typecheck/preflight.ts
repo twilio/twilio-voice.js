@@ -1,4 +1,4 @@
-import { Call, Device, PreflightTest } from '../../lib/twilio';
+import { Call, Device, PreflightTest, RTCSample, TwilioError } from '../../lib/twilio';
 
 const checkPreflight = async () => {
   const preflight: PreflightTest = Device.runPreflight('foo', {
@@ -9,6 +9,8 @@ const checkPreflight = async () => {
     logLevel: 'debug',
     signalingTimeoutMs: 1,
   });
+
+  // --- Properties ---
 
   const callSid: string | undefined = preflight.callSid;
   const endTime: number | undefined = preflight.endTime;
@@ -40,7 +42,7 @@ const checkPreflight = async () => {
     const edge: string | undefined = report.edge;
     const iceCandidateStats: PreflightTest.RTCIceCandidateStats[] = report.iceCandidateStats;
     const isTurnRequired: undefined | false | true = report.isTurnRequired;
-    
+
     const dtlsStart: number | undefined = report.networkTiming.dtls?.start;
     const dtlsEnd: number | undefined = report.networkTiming.dtls?.end;
     const dtlsDuration: number | undefined = report.networkTiming.dtls?.duration;
@@ -91,6 +93,55 @@ const checkPreflight = async () => {
   const startTime: number = preflight.startTime;
   const status: PreflightTest.Status = preflight.status;
   preflight.stop();
+
+  // --- Events ---
+
+  preflight.on('completed', (report: PreflightTest.Report) => {
+    const callQuality: PreflightTest.CallQuality | undefined = report.callQuality;
+    const callSid: string | undefined = report.callSid;
+  });
+
+  preflight.on('connected', () => {});
+
+  preflight.on('failed', (error: TwilioError.TwilioError | DOMException) => {
+    if (error instanceof DOMException) {
+      const msg: string = error.message;
+    } else {
+      const code: number = error.code;
+    }
+  });
+
+  preflight.on('sample', (sample: RTCSample) => {
+    const audioInputLevel: number = sample.audioInputLevel;
+  });
+
+  preflight.on('warning', (name: string, data: PreflightTest.Warning) => {
+    const warningName: string = name;
+    const warningDescription: string = data.description;
+  });
+
+  // --- PreflightTest.Events enum ---
+
+  const evtCompleted: PreflightTest.Events = PreflightTest.Events.Completed;
+  const evtConnected: PreflightTest.Events = PreflightTest.Events.Connected;
+  const evtFailed: PreflightTest.Events = PreflightTest.Events.Failed;
+  const evtSample: PreflightTest.Events = PreflightTest.Events.Sample;
+  const evtWarning: PreflightTest.Events = PreflightTest.Events.Warning;
+
+  // --- PreflightTest.Status enum ---
+
+  const statusConnecting: PreflightTest.Status = PreflightTest.Status.Connecting;
+  const statusConnected: PreflightTest.Status = PreflightTest.Status.Connected;
+  const statusCompleted: PreflightTest.Status = PreflightTest.Status.Completed;
+  const statusFailed: PreflightTest.Status = PreflightTest.Status.Failed;
+
+  // --- PreflightTest.CallQuality enum ---
+
+  const cqExcellent: PreflightTest.CallQuality = PreflightTest.CallQuality.Excellent;
+  const cqGreat: PreflightTest.CallQuality = PreflightTest.CallQuality.Great;
+  const cqGood: PreflightTest.CallQuality = PreflightTest.CallQuality.Good;
+  const cqFair: PreflightTest.CallQuality = PreflightTest.CallQuality.Fair;
+  const cqDegraded: PreflightTest.CallQuality = PreflightTest.CallQuality.Degraded;
 };
 
 export default checkPreflight;
