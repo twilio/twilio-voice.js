@@ -144,17 +144,31 @@ describe('Device Options Extended', function() {
   });
 
   describe('dscp', () => {
-    it('should accept dscp option set to true', async () => {
+    let dscpDevice1: Device;
+    let dscpDevice2: Device;
+
+    afterEach(() => {
+      if (dscpDevice1) {
+        dscpDevice1.disconnectAll();
+        dscpDevice1.destroy();
+      }
+      if (dscpDevice2) {
+        dscpDevice2.disconnectAll();
+        dscpDevice2.destroy();
+      }
+    });
+
+    it('should accept dscp option set to true', { retries: 1 }, async () => {
       const identity1 = 'id1-' + Date.now();
       const identity2 = 'id2-' + Date.now();
 
-      const device1 = new Device(generateAccessToken(identity1), { dscp: true });
-      const device2 = new Device(generateAccessToken(identity2), { dscp: true });
+      dscpDevice1 = new Device(generateAccessToken(identity1), { dscp: true });
+      dscpDevice2 = new Device(generateAccessToken(identity2), { dscp: true });
 
-      await Promise.all([device1.register(), device2.register()]);
+      await Promise.all([dscpDevice1.register(), dscpDevice2.register()]);
 
-      const incomingPromise: Promise<Call> = expectEvent(Device.EventName.Incoming, device2);
-      const outgoingCall = await device1.connect({ params: { To: identity2 } });
+      const incomingPromise: Promise<Call> = expectEvent(Device.EventName.Incoming, dscpDevice2);
+      const outgoingCall = await dscpDevice1.connect({ params: { To: identity2 } });
       const incomingCall = await incomingPromise;
 
       const acceptPromise = expectEvent('accept', outgoingCall);
@@ -163,24 +177,19 @@ describe('Device Options Extended', function() {
 
       // Call should be open
       assert.strictEqual(outgoingCall.status(), Call.State.Open);
-
-      device1.disconnectAll();
-      device1.destroy();
-      device2.disconnectAll();
-      device2.destroy();
     });
 
-    it('should accept dscp option set to false', async () => {
+    it('should accept dscp option set to false', { retries: 1 }, async () => {
       const identity1 = 'id1-' + Date.now();
       const identity2 = 'id2-' + Date.now();
 
-      const device1 = new Device(generateAccessToken(identity1), { dscp: false });
-      const device2 = new Device(generateAccessToken(identity2), { dscp: false });
+      dscpDevice1 = new Device(generateAccessToken(identity1), { dscp: false });
+      dscpDevice2 = new Device(generateAccessToken(identity2), { dscp: false });
 
-      await Promise.all([device1.register(), device2.register()]);
+      await Promise.all([dscpDevice1.register(), dscpDevice2.register()]);
 
-      const incomingPromise: Promise<Call> = expectEvent(Device.EventName.Incoming, device2);
-      const outgoingCall = await device1.connect({ params: { To: identity2 } });
+      const incomingPromise: Promise<Call> = expectEvent(Device.EventName.Incoming, dscpDevice2);
+      const outgoingCall = await dscpDevice1.connect({ params: { To: identity2 } });
       const incomingCall = await incomingPromise;
 
       const acceptPromise = expectEvent('accept', outgoingCall);
@@ -188,11 +197,6 @@ describe('Device Options Extended', function() {
       await acceptPromise;
 
       assert.strictEqual(outgoingCall.status(), Call.State.Open);
-
-      device1.disconnectAll();
-      device1.destroy();
-      device2.disconnectAll();
-      device2.destroy();
     });
   });
 

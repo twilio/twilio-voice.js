@@ -54,17 +54,15 @@ describe('Call postFeedback', function() {
   });
 
   it('should post feedback with a valid score', async () => {
-    await assert.doesNotReject(() => call1.postFeedback(Call.FeedbackScore.Five));
+    await call1.postFeedback(Call.FeedbackScore.Five);
   });
 
   it('should post feedback with a score and issue', async () => {
-    await assert.doesNotReject(() =>
-      call1.postFeedback(Call.FeedbackScore.Three, Call.FeedbackIssue.ChoppyAudio),
-    );
+    await call1.postFeedback(Call.FeedbackScore.Three, Call.FeedbackIssue.ChoppyAudio);
   });
 
   it('should post feedback declined when called without a score', async () => {
-    await assert.doesNotReject(() => call1.postFeedback());
+    await call1.postFeedback();
   });
 
   it('should throw on an invalid score', () => {

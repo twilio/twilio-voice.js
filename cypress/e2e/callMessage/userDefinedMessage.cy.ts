@@ -11,9 +11,18 @@ function waitFor(n: number, reject?: boolean) {
   return new Promise((res, rej) => setTimeout(reject ? rej : res, n));
 }
 
+async function isRelayServerAvailable(): Promise<boolean> {
+  try {
+    const response = await fetch(RELAY_SERVER_URL, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 describe('userDefinedMessage', function() {
   const MAX_TIMEOUT = 1000 * 60 * 10; // 10 minute timeout for the whole suite
-  this.timeout(MAX_TIMEOUT); 
+  this.timeout(MAX_TIMEOUT);
   Cypress.config('defaultCommandTimeout', MAX_TIMEOUT);
 
   const createCallTest = async () => {
@@ -77,6 +86,10 @@ describe('userDefinedMessage', function() {
 
     it('should successfully send a message to the customer server',
       async function() {
+        if (!await isRelayServerAvailable()) {
+          this.skip();
+          return;
+        }
         const { call } = alice;
 
         const CallSid = call.parameters.CallSid;
@@ -127,6 +140,10 @@ describe('userDefinedMessage', function() {
     );
 
     it('should successfully receive an incoming message', async function() {
+      if (!await isRelayServerAvailable()) {
+        this.skip();
+        return;
+      }
       const { call } = alice;
 
       const messageReceivedPromise: Promise<Call.Message> = expectEvent(
