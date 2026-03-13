@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { EventEmitter } from 'events';
 import * as C from './constants';
 import { GeneralErrors, SignalingErrors } from './errors';
@@ -9,6 +8,13 @@ const PSTREAM_VERSION = '1.6';
 
 // In seconds
 const MAX_RECONNECT_TIMEOUT_ALLOWED = 30;
+
+interface PStreamOptions {
+  TransportFactory?: any;
+  backoffMaxMs?: number;
+  maxPreferredDurationMs?: number;
+  [key: string]: any;
+}
 
 /**
  * Constructor for PStream objects.
@@ -26,13 +32,32 @@ const MAX_RECONNECT_TIMEOUT_ALLOWED = 30;
  * @config {boolean} [options.backoffMaxMs=20000] Enable debugging
  */
 class PStream extends EventEmitter {
-  constructor(token, uris, options) {
+  options: PStreamOptions;
+  token: string;
+  status: string;
+  gateway: string | null;
+  region: string | null;
+  transport: any;
+  _messageQueue: any[];
+  _preferredUri: string | null;
+  _uris: string[];
+  _log: Log;
+
+  get uri(): string {
+    return this.transport.uri;
+  }
+
+  /**
+   * @return {string}
+   */
+  static toString(): string {
+    return '[Twilio.PStream class]';
+  }
+
+  constructor(token: string, uris: string[], options?: PStreamOptions) {
     super();
 
-    if (!(this instanceof PStream)) {
-      return new PStream(token, uris, options);
-    }
-    const defaults = {
+    const defaults: PStreamOptions = {
       TransportFactory: WSTransport,
     };
     options = options || {};
@@ -40,7 +65,7 @@ class PStream extends EventEmitter {
       if (prop in options) {
         continue;
       }
-      options[prop] = defaults[prop];
+      (options as any)[prop] = (defaults as any)[prop];
     }
     this.options = options;
     this.token = token || '';
@@ -98,218 +123,205 @@ class PStream extends EventEmitter {
       maxPreferredDurationMs: this.options.maxPreferredDurationMs,
     });
 
-    Object.defineProperties(this, {
-      uri: {
-        enumerable: true,
-        get() {
-          return this.transport.uri;
-        },
-      },
-    });
-
     this.transport.on('close', this._handleTransportClose);
     this.transport.on('error', this._handleTransportError);
     this.transport.on('message', this._handleTransportMessage);
     this.transport.on('open', this._handleTransportOpen);
     this.transport.open();
+  }
 
+  toString(): string {
+    return '[Twilio.PStream instance]';
+  }
+
+  _handleTransportClose(): void {
+    this.emit('transportClose');
+
+    if (this.status !== 'disconnected') {
+      if (this.status !== 'offline') {
+        this.emit('offline', this);
+      }
+      this.status = 'disconnected';
+    }
+  }
+
+  _handleTransportError(error: any): void {
+    if (!error) {
+      this.emit('error', { error: {
+        code: 31000,
+        message: 'Websocket closed without a provided reason',
+        twilioError: new SignalingErrors.ConnectionDisconnected(),
+      } });
+      return;
+    }
+    // We receive some errors without call metadata (just the error). We need to convert these
+    // to be contained within the 'error' field so that these errors match the expected format.
+    this.emit('error', typeof error.code !== 'undefined' ?  { error } : error);
+  }
+
+  _handleTransportMessage(msg: any): void {
+    if (!msg || !msg.data || typeof msg.data !== 'string') {
+      return;
+    }
+
+    const { type, payload = {} } = JSON.parse(msg.data);
+    this.gateway = payload.gateway || this.gateway;
+    this.region = payload.region || this.region;
+
+    if (type === 'error' && payload.error) {
+      payload.error.twilioError = new SignalingErrors.ConnectionError();
+    }
+
+    this.emit(type, payload);
+  }
+
+  _handleTransportOpen(): void {
+    this.status = 'connected';
+    this.setToken(this.token);
+
+    this.emit('transportOpen');
+
+    const messages = this._messageQueue.splice(0, this._messageQueue.length);
+    messages.forEach((message: any[]) => this._publish(message[0], message[1], message[2]));
+  }
+
+  setToken(token: string): void {
+    this._log.info('Setting token and publishing listen');
+    this.token = token;
+
+    let reconnectTimeout = 0;
+    const t = this.options.maxPreferredDurationMs;
+    this._log.info(`maxPreferredDurationMs:${t}`);
+    if (typeof t === 'number' && t >= 0) {
+      reconnectTimeout = Math.min(Math.ceil(t / 1000), MAX_RECONNECT_TIMEOUT_ALLOWED);
+    }
+
+    this._log.info(`reconnectTimeout:${reconnectTimeout}`);
+    const payload = {
+      browserinfo: getBrowserInfo(),
+      reconnectTimeout,
+      token,
+    };
+
+    this._publish('listen', payload);
+  }
+
+  sendMessage(
+    callsid: string,
+    content: string,
+    contenttype: string = 'application/json',
+    messagetype: string,
+    voiceeventsid: string,
+  ): void {
+    const payload = {
+      callsid,
+      content,
+      contenttype,
+      messagetype,
+      voiceeventsid,
+    };
+    this._publish('message', payload, true);
+  }
+
+  register(mediaCapabilities: any): void {
+    const regPayload = { media: mediaCapabilities };
+    this._publish('register', regPayload, true);
+  }
+
+  invite(sdp: string, callsid: string, params: any): void {
+    const payload: any = {
+      callsid,
+      sdp,
+      twilio: params ? { params } : {},
+    };
+    this._publish('invite', payload, true);
+  }
+
+  reconnect(sdp: string, callsid: string, reconnect: string): void {
+    const payload = {
+      callsid,
+      reconnect,
+      sdp,
+      twilio: {},
+    };
+    this._publish('invite', payload, true);
+  }
+
+  answer(sdp: string, callsid: string): void {
+    this._publish('answer', { sdp, callsid }, true);
+  }
+
+  dtmf(callsid: string, digits: string): void {
+    this._publish('dtmf', { callsid, dtmf: digits }, true);
+  }
+
+  hangup(callsid: string, message?: any): void {
+    const payload = message ? { callsid, message } : { callsid };
+    this._publish('hangup', payload, true);
+  }
+
+  reject(callsid: string): void {
+    this._publish('reject', { callsid }, true);
+  }
+
+  reinvite(sdp: string, callsid: string): void {
+    this._publish('reinvite', { sdp, callsid }, false);
+  }
+
+  _destroy(): void {
+    this.transport.removeListener('close', this._handleTransportClose);
+    this.transport.removeListener('error', this._handleTransportError);
+    this.transport.removeListener('message', this._handleTransportMessage);
+    this.transport.removeListener('open', this._handleTransportOpen);
+    this.transport.close();
+
+    this.emit('offline', this);
+  }
+
+  destroy(): this {
+    this._log.info('PStream.destroy() called...');
+    this._destroy();
     return this;
+  }
+
+  updatePreferredURI(uri: string): void {
+    this._preferredUri = uri;
+    this.transport.updatePreferredURI(uri);
+  }
+
+  updateURIs(uris: string[]): void {
+    this._uris = uris;
+    this.transport.updateURIs(this._uris);
+  }
+
+  publish(type: string, payload: any): void {
+    return this._publish(type, payload, true);
+  }
+
+  _publish(type: string, payload: any, shouldRetry?: boolean): void {
+    const msg = JSON.stringify({
+      payload,
+      type,
+      version: PSTREAM_VERSION,
+    });
+    const isSent = !!this.transport.send(msg);
+
+    if (!isSent) {
+      this.emit('error', { error: {
+        code: 31009,
+        message: 'No transport available to send or receive messages',
+        twilioError: new GeneralErrors.TransportError(),
+      } });
+
+      if (shouldRetry) {
+        this._messageQueue.push([type, payload, true]);
+      }
+    }
   }
 }
 
-PStream.prototype._handleTransportClose = function() {
-  this.emit('transportClose');
-
-  if (this.status !== 'disconnected') {
-    if (this.status !== 'offline') {
-      this.emit('offline', this);
-    }
-    this.status = 'disconnected';
-  }
-};
-
-PStream.prototype._handleTransportError = function(error) {
-  if (!error) {
-    this.emit('error', { error: {
-      code: 31000,
-      message: 'Websocket closed without a provided reason',
-      twilioError: new SignalingErrors.ConnectionDisconnected(),
-    } });
-    return;
-  }
-  // We receive some errors without call metadata (just the error). We need to convert these
-  // to be contained within the 'error' field so that these errors match the expected format.
-  this.emit('error', typeof error.code !== 'undefined' ?  { error } : error);
-};
-
-PStream.prototype._handleTransportMessage = function(msg) {
-  if (!msg || !msg.data || typeof msg.data !== 'string') {
-    return;
-  }
-
-  const { type, payload = {} } = JSON.parse(msg.data);
-  this.gateway = payload.gateway || this.gateway;
-  this.region = payload.region || this.region;
-
-  if (type === 'error' && payload.error) {
-    payload.error.twilioError = new SignalingErrors.ConnectionError();
-  }
-
-  this.emit(type, payload);
-};
-
-PStream.prototype._handleTransportOpen = function() {
-  this.status = 'connected';
-  this.setToken(this.token);
-
-  this.emit('transportOpen');
-
-  const messages = this._messageQueue.splice(0, this._messageQueue.length);
-  messages.forEach(message => this._publish(...message));
-};
-
-/**
- * @return {string}
- */
-PStream.toString = () => '[Twilio.PStream class]';
-PStream.prototype.toString = () => '[Twilio.PStream instance]';
-
-PStream.prototype.setToken = function(token) {
-  this._log.info('Setting token and publishing listen');
-  this.token = token;
-
-  let reconnectTimeout = 0;
-  const t = this.options.maxPreferredDurationMs;
-  this._log.info(`maxPreferredDurationMs:${t}`);
-  if (typeof t === 'number' && t >= 0) {
-    reconnectTimeout = Math.min(Math.ceil(t / 1000), MAX_RECONNECT_TIMEOUT_ALLOWED);
-  }
-
-  this._log.info(`reconnectTimeout:${reconnectTimeout}`);
-  const payload = {
-    browserinfo: getBrowserInfo(),
-    reconnectTimeout,
-    token,
-  };
-
-  this._publish('listen', payload);
-};
-
-PStream.prototype.sendMessage = function(
-  callsid,
-  content,
-  contenttype = 'application/json',
-  messagetype,
-  voiceeventsid,
-) {
-  const payload = {
-    callsid,
-    content,
-    contenttype,
-    messagetype,
-    voiceeventsid,
-  };
-  this._publish('message', payload, true);
-};
-
-PStream.prototype.register = function(mediaCapabilities) {
-  const regPayload = { media: mediaCapabilities };
-  this._publish('register', regPayload, true);
-};
-
-PStream.prototype.invite = function(sdp, callsid, params) {
-  const payload = {
-    callsid,
-    sdp,
-    twilio: params ? { params } : {},
-  };
-  this._publish('invite', payload, true);
-};
-
-PStream.prototype.reconnect = function(sdp, callsid, reconnect) {
-  const payload = {
-    callsid,
-    reconnect,
-    sdp,
-    twilio: {},
-  };
-  this._publish('invite', payload, true);
-};
-
-PStream.prototype.answer = function(sdp, callsid) {
-  this._publish('answer', { sdp, callsid }, true);
-};
-
-PStream.prototype.dtmf = function(callsid, digits) {
-  this._publish('dtmf', { callsid, dtmf: digits }, true);
-};
-
-PStream.prototype.hangup = function(callsid, message) {
-  const payload = message ? { callsid, message } : { callsid };
-  this._publish('hangup', payload, true);
-};
-
-PStream.prototype.reject = function(callsid) {
-  this._publish('reject', { callsid }, true);
-};
-
-PStream.prototype.reinvite = function(sdp, callsid) {
-  this._publish('reinvite', { sdp, callsid }, false);
-};
-
-PStream.prototype._destroy = function() {
-  this.transport.removeListener('close', this._handleTransportClose);
-  this.transport.removeListener('error', this._handleTransportError);
-  this.transport.removeListener('message', this._handleTransportMessage);
-  this.transport.removeListener('open', this._handleTransportOpen);
-  this.transport.close();
-
-  this.emit('offline', this);
-};
-
-PStream.prototype.destroy = function() {
-  this._log.info('PStream.destroy() called...');
-  this._destroy();
-  return this;
-};
-
-PStream.prototype.updatePreferredURI = function(uri) {
-  this._preferredUri = uri;
-  this.transport.updatePreferredURI(uri);
-};
-
-PStream.prototype.updateURIs = function(uris) {
-  this._uris = uris;
-  this.transport.updateURIs(this._uris);
-};
-
-PStream.prototype.publish = function(type, payload) {
-  return this._publish(type, payload, true);
-};
-
-PStream.prototype._publish = function(type, payload, shouldRetry) {
-  const msg = JSON.stringify({
-    payload,
-    type,
-    version: PSTREAM_VERSION,
-  });
-  const isSent = !!this.transport.send(msg);
-
-  if (!isSent) {
-    this.emit('error', { error: {
-      code: 31009,
-      message: 'No transport available to send or receive messages',
-      twilioError: new GeneralErrors.TransportError(),
-    } });
-
-    if (shouldRetry) {
-      this._messageQueue.push([type, payload, true]);
-    }
-  }
-};
-
-function getBrowserInfo() {
-  const nav = typeof navigator !== 'undefined' ? navigator : {};
+function getBrowserInfo(): object {
+  const nav: any = typeof navigator !== 'undefined' ? navigator : {};
 
   const info = {
     browser: {

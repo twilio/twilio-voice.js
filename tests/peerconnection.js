@@ -1,8 +1,27 @@
 const sinon = require('sinon');
 const assert = require('assert');
+const { EventEmitter } = require('events');
 const PeerConnection = require('./../lib/twilio/rtc/peerconnection').default;
 
 const root = global;
+
+/**
+ * Create a test context object that extends EventEmitter so that
+ * PeerConnection methods that call this.emit() work correctly.
+ * @param {Object} props - Properties to assign to the context.
+ * @param {string[]} events - Event names to auto-register spies for.
+ *   For each event name, creates ctx['on' + event] = sinon.stub() and
+ *   registers it as a listener so existing assertions still work.
+ */
+function createContext(props, events = []) {
+  const ctx = Object.assign(new EventEmitter(), props);
+  events.forEach(event => {
+    const spy = sinon.stub();
+    ctx['on' + event] = spy;
+    ctx.on(event, (...args) => spy(...args));
+  });
+  return ctx;
+}
 
 describe('PeerConnection', () => {
   let log;
@@ -205,7 +224,7 @@ describe('PeerConnection', () => {
       stream = {
         name: 'this is a stream'
       };
-      context = {
+      context = createContext({
         _audioHelper: {
           _destroyRemoteProcessedStream: sinon.stub()
         },
@@ -228,7 +247,6 @@ describe('PeerConnection', () => {
         _outputAnalyser: {
           disconnect: sinon.stub()
         },
-        onclose: sinon.spy(),
         _removeReconnectionListeners: sinon.stub(),
         status: 'open',
         stream,
@@ -239,7 +257,7 @@ describe('PeerConnection', () => {
         version: {
           pc
         }
-      };
+      }, ['close']);
       toTest = METHOD.bind(context);
     });
 
@@ -428,7 +446,7 @@ describe('PeerConnection', () => {
         pc: 'peer connection',
         getSDP: sinon.stub()
       };
-      context = {
+      context = createContext({
         _initializeMediaStream: sinon.stub(),
         _maybeSetIceAggressiveNomination: (sdp) => sdp,
         _setEncodingParameters: sinon.stub(),
@@ -437,11 +455,10 @@ describe('PeerConnection', () => {
         options: { dscp: true },
         version,
         status: 'closed',
-        onerror: sinon.stub(),
         pstream: {
           answer: sinon.stub()
         }
-      };
+      }, ['error']);
       toTest = METHOD.bind(
         context,
         eCallSid,
@@ -627,16 +644,15 @@ describe('PeerConnection', () => {
         on: sinon.stub(),
         reinvite: sinon.stub()
       };
-      context = {
+      context = createContext({
         callSid: CALLSID,
         codecPreferences: ['opus'],
         _log: log,
-        onerror: sinon.stub(),
         options,
         pstream,
         _removeReconnectionListeners: sinon.stub(),
         version
-      };
+      }, ['error']);
       toTest = METHOD.bind(context);
       wait = () => new Promise(r => setTimeout(r, 0));
     });
@@ -668,6 +684,7 @@ describe('PeerConnection', () => {
     it('Should call onfailed on createOffer fail', () => {
       version.createOffer = sinon.stub().returns(Promise.reject('foo'));
       context.onfailed = sinon.stub();
+      context.on('failed', (...args) => context.onfailed(...args));
       toTest();
       return wait().then(() => {
         sinon.assert.calledWithExactly(context.onfailed, 'foo');
@@ -743,7 +760,7 @@ describe('PeerConnection', () => {
         createOffer: sinon.stub(),
         processAnswer: sinon.stub()
       };
-      context = {
+      context = createContext({
         _initializeMediaStream: sinon.stub().returns(true),
         _maybeSetIceAggressiveNomination: (sdp) => sdp,
         _setEncodingParameters: sinon.stub(),
@@ -751,7 +768,6 @@ describe('PeerConnection', () => {
         callSid: null,
         version,
         status: CLOSED,
-        onerror: sinon.stub(),
         options: { preflight: true },
         pstream: {
           once: sinon.stub(),
@@ -763,7 +779,7 @@ describe('PeerConnection', () => {
         device: {
           token: null
         }
-      };
+      }, ['error']);
       toTest = METHOD.bind(
         context,
         eParams,
@@ -975,14 +991,13 @@ describe('PeerConnection', () => {
       pstream = {
         status: PSTREAM_STATUS_NOT_DISCONNECTED
       };
-      context = {
+      context = createContext({
         status: STATUS_NOT_OPEN,
         pstream,
-        onerror: sinon.stub(),
         close: sinon.stub(),
         _setupPeerConnection: sinon.stub(),
         _setupChannel: sinon.stub()
-      };
+      }, ['error']);
       toTest = METHOD.bind(context, ICE_SERVERS);
     });
 
@@ -1084,10 +1099,9 @@ describe('PeerConnection', () => {
 
     beforeEach(() => {
       iceTransport = { getSelectedCandidatePair: () => 'foo' };
-      context = {
-        onselectedcandidatepairchange: sinon.stub(),
+      context = createContext({
         _getRTCIceTransport: () => iceTransport,
-      };
+      }, ['selectedcandidatepairchange']);
       toTest = METHOD.bind(context);
     });
 
@@ -1120,11 +1134,10 @@ describe('PeerConnection', () => {
 
       beforeEach(() => {
         transport = { state: 'new' };
-        context = {
+        context = createContext({
           getRTCDtlsTransport: sinon.stub().returns(transport),
           _log: log,
-          ondtlstransportstatechange: sinon.stub(),
-        };
+        }, ['dtlstransportstatechange']);
         toTest = METHOD.bind(context);
       });
 
@@ -1149,11 +1162,10 @@ describe('PeerConnection', () => {
 
       before(() => {
         transport = { state: 'new' };
-        context = {
+        context = createContext({
           getRTCDtlsTransport: sinon.stub().returns(transport),
           _log: log,
-          ondtlstransportstatechange: sinon.stub(),
-        };
+        }, ['dtlstransportstatechange']);
         METHOD.call(context);
 
         sinon.assert.calledWithExactly(context.ondtlstransportstatechange, 'new');
@@ -1162,7 +1174,9 @@ describe('PeerConnection', () => {
 
       ['new', 'connecting', 'connected', 'closed', 'failed'].forEach(state => {
         it(`should call ondtlstransportstatechange when dtls transport state is ${state}`, () => {
+          context.removeAllListeners('dtlstransportstatechange');
           context.ondtlstransportstatechange = sinon.stub();
+          context.on('dtlstransportstatechange', (...args) => context.ondtlstransportstatechange(...args));
           transport.state = state;
           transport.onstatechange();
 
@@ -1189,23 +1203,17 @@ describe('PeerConnection', () => {
           onsignalingstatechange: sinon.stub(),
         }
       };
-      context = {
+      context = createContext({
         version,
         options: {},
         _log: log,
-        onfailed: sinon.stub(),
-        onopen: sinon.stub(),
-        onicecandidate: sinon.stub(),
-        onicegatheringstatechange: sinon.stub(),
-        oniceconnectionstatechange: sinon.stub(),
-        onpcconnectionstatechange: sinon.stub(),
         _hasIceCandidates: false,
         _onMediaConnectionStateChange: sinon.stub(),
         _onIceGatheringFailure: sinon.stub(),
         _setupRTCIceTransportListener: sinon.stub(),
         _startIceGatheringTimeout: sinon.stub(),
         _stopIceGatheringTimeout: sinon.stub(),
-      };
+      }, ['failed', 'open', 'icecandidate', 'icegatheringstatechange', 'iceconnectionstatechange', 'pcconnectionstatechange']);
       toTest = METHOD.bind(context);
     });
 
@@ -1384,10 +1392,9 @@ describe('PeerConnection', () => {
     let context = null;
 
     beforeEach(() => {
-      context = {
+      context = createContext({
         _hasIceGatheringFailures: false,
-        onicegatheringfailure: sinon.stub(),
-      };
+      }, ['icegatheringfailure']);
       toTest = METHOD.bind(context);
     });
     it('Should set _hasIceGatheringFailures to true', () => {
@@ -1408,15 +1415,11 @@ describe('PeerConnection', () => {
     let context = null;
 
     beforeEach(() => {
-      context = {
+      context = createContext({
         _iceState: 'new',
         _stopIceGatheringTimeout: sinon.stub(),
         _log: log,
-        onconnected: sinon.stub(),
-        onreconnected: sinon.stub(),
-        ondisconnected: sinon.stub(),
-        onfailed: sinon.stub(),
-      };
+      }, ['connected', 'reconnected', 'disconnected', 'failed']);
       toTest = METHOD.bind(context);
     });
 
@@ -2296,9 +2299,8 @@ describe('PeerConnection', () => {
     describe('after creating audio outputs', () => {
       beforeEach(() => {
         clock = sinon.useFakeTimers();
-        context = {
+        context = createContext({
           ...context,
-          onvolume: sinon.stub(),
           _audioContext: {},
           _remoteStream: {},
           _updateInputStreamSource: sinon.stub(),
@@ -2311,7 +2313,7 @@ describe('PeerConnection', () => {
             PeerConnection.prototype._startPollingVolume.call(context);
           }),
           util: { average: () => {} },
-        };
+        }, ['volume']);
         PeerConnection.prototype._setupPeerConnection.call(context, ICE_SERVERS);
         versionPc.onaddstream({stream: STREAM});
       });

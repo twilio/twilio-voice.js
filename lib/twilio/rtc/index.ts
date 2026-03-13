@@ -1,13 +1,12 @@
-// @ts-nocheck
 import PeerConnection from './peerconnection';
 import RTCPC from './rtcpc';
 
-function enabled() {
+function enabled(): boolean {
   return RTCPC.test();
 }
 
-function getMediaEngine() {
-  return typeof RTCIceGatherer !== 'undefined' ? 'ORTC' : 'WebRTC';
+function getMediaEngine(): string {
+  return typeof (globalThis as any).RTCIceGatherer !== 'undefined' ? 'ORTC' : 'WebRTC';
 }
 
 export {

@@ -19,6 +19,7 @@ import Publisher from './eventpublisher';
 import Log from './log';
 import { PreflightTest } from './preflight/preflight';
 import PStream from './pstream';
+import RegistrationManager from './registrationManager';
 import {
   createEventGatewayURI,
   createSignalingEndpointURL,
@@ -32,13 +33,13 @@ import * as rtc from './rtc';
 import getUserMedia from './rtc/getusermedia';
 import { generateVoiceEventSid } from './sid';
 import Sound from './sound';
+import SoundManager from './soundManager';
 import {
   isLegacyEdge,
   promisifyEvents,
   queryToJson,
 } from './util';
 
-// Placeholders until we convert the respective files to TypeScript.
 /**
  * @private
  */
@@ -52,7 +53,6 @@ export type IPublisher = any;
  */
 export type ISound = any;
 
-const REGISTRATION_INTERVAL = 30000;
 const RINGTONE_PLAY_TIMEOUT = 2000;
 const PUBLISHER_PRODUCT_NAME = 'twilio-js-sdk';
 const INVALID_TOKEN_MESSAGE = 'Parameter "token" must be of type "string".';
@@ -234,24 +234,6 @@ class Device extends EventEmitter {
    */
   private static _audioContext?: AudioContext;
 
-  private static _defaultSounds: Record<string, ISoundDefinition> = {
-    disconnect: { filename: 'disconnect', maxDuration: 3000 },
-    dtmf0: { filename: 'dtmf-0', maxDuration: 1000 },
-    dtmf1: { filename: 'dtmf-1', maxDuration: 1000 },
-    dtmf2: { filename: 'dtmf-2', maxDuration: 1000 },
-    dtmf3: { filename: 'dtmf-3', maxDuration: 1000 },
-    dtmf4: { filename: 'dtmf-4', maxDuration: 1000 },
-    dtmf5: { filename: 'dtmf-5', maxDuration: 1000 },
-    dtmf6: { filename: 'dtmf-6', maxDuration: 1000 },
-    dtmf7: { filename: 'dtmf-7', maxDuration: 1000 },
-    dtmf8: { filename: 'dtmf-8', maxDuration: 1000 },
-    dtmf9: { filename: 'dtmf-9', maxDuration: 1000 },
-    dtmfh: { filename: 'dtmf-hash', maxDuration: 1000 },
-    dtmfs: { filename: 'dtmf-star', maxDuration: 1000 },
-    incoming: { filename: 'incoming', shouldLoop: true },
-    outgoing: { filename: 'outgoing', maxDuration: 3000 },
-  };
-
   /**
    * A DialtonePlayer to play mock DTMF sounds through.
    */
@@ -394,22 +376,21 @@ class Device extends EventEmitter {
   private _region: string | null = null;
 
   /**
-   * A timeout ID for a setTimeout schedule to re-register the {@link Device}.
+   * Manages device registration lifecycle.
    */
-  private _regTimer: NodeJS.Timeout | null = null;
+  private _registrationManager: RegistrationManager = new RegistrationManager();
 
   /**
-   * Boolean representing whether or not the {@link Device} was registered when
-   * receiving a signaling `offline`. Determines if the {@link Device} attempts
-   * a `re-register` once signaling is re-established when receiving a
-   * `connected` event from the stream.
+   * Manages the sound cache and sink IDs.
    */
-  private _shouldReRegister: boolean = false;
+  private _soundManager: SoundManager = new SoundManager();
 
   /**
    * A Map of Sounds to play.
    */
-  private _soundcache: Map<Device.SoundName, ISound> = new Map();
+  private get _soundcache(): Map<string, ISound> {
+    return this._soundManager.soundcache;
+  }
 
   /**
    * The current status of the {@link Device}.
@@ -693,7 +674,7 @@ class Device extends EventEmitter {
       );
     }
 
-    this._shouldReRegister = false;
+    this._registrationManager.shouldReRegister = false;
     this._setState(Device.State.Registering);
 
     await (this._streamConnectedPromise || this._setupStream());
@@ -736,7 +717,7 @@ class Device extends EventEmitter {
       );
     }
 
-    this._shouldReRegister = false;
+    this._registrationManager.shouldReRegister = false;
 
     const stream = await this._streamConnectedPromise;
     const streamOfflinePromise = new Promise(resolve => {
@@ -783,21 +764,12 @@ class Device extends EventEmitter {
 
     this._setupLoglevel(this._options.logLevel);
 
-    for (const name of Object.keys(Device._defaultSounds)) {
-      const soundDef: ISoundDefinition = Device._defaultSounds[name];
-
-      const defaultUrl: string = `${C.SOUNDS_BASE_URL}/${soundDef.filename}.${Device.extension}`
-        + `?cache=${C.RELEASE_VERSION}`;
-
-      const soundUrl: string = this._options.sounds && this._options.sounds[name as Device.SoundName] || defaultUrl;
-      const sound: any = new (this._options.Sound || Sound)(name, soundUrl, {
-        audioContext: this._options.disableAudioContextSounds ? null : Device.audioContext,
-        maxDuration: soundDef.maxDuration,
-        shouldLoop: soundDef.shouldLoop,
-      });
-
-      this._soundcache.set(name as Device.SoundName, sound);
-    }
+    this._soundManager.setupSounds({
+      Sound: this._options.Sound,
+      audioContext: this._options.disableAudioContextSounds ? undefined : Device.audioContext,
+      extension: Device.extension,
+      sounds: this._options.sounds,
+    });
 
     this._setupAudioHelper();
     this._setupPublisher();
@@ -1163,9 +1135,7 @@ class Device extends EventEmitter {
    * Stop the incoming sound if no {@link Call}s remain.
    */
   private _maybeStopIncomingSound(): void {
-    if (!this._calls.length) {
-      this._soundcache.get(Device.SoundName.Incoming).stop();
-    }
+    this._soundManager.maybeStopIncomingSound(this._calls.length);
   }
 
   /**
@@ -1215,7 +1185,7 @@ class Device extends EventEmitter {
 
     // The signaling stream emits a `connected` event after reconnection, if the
     // device was registered before this, then register again.
-    if (this._shouldReRegister) {
+    if (this._registrationManager.shouldReRegister) {
       this.register();
     }
   }
@@ -1337,7 +1307,7 @@ class Device extends EventEmitter {
     this._edge = null;
     this._region = null;
 
-    this._shouldReRegister = this.state !== Device.State.Unregistered;
+    this._registrationManager.shouldReRegister = this.state !== Device.State.Unregistered;
 
     this._setState(Device.State.Unregistered);
   }
@@ -1391,16 +1361,7 @@ class Device extends EventEmitter {
    * Register with the signaling server.
    */
   private async _sendPresence(presence: boolean): Promise<void> {
-    const stream = await this._streamConnectedPromise;
-
-    if (!stream) { return; }
-
-    stream.register({ audio: presence });
-    if (presence) {
-      this._startRegistrationTimer();
-    } else {
-      this._stopRegistrationTimer();
-    }
+    return this._registrationManager.sendPresence(presence, this._streamConnectedPromise);
   }
 
   /**
@@ -1583,19 +1544,14 @@ class Device extends EventEmitter {
    * Set a timeout to send another register message to the signaling server.
    */
   private _startRegistrationTimer(): void {
-    this._stopRegistrationTimer();
-    this._regTimer = setTimeout(() => {
-      this._sendPresence(true);
-    }, REGISTRATION_INTERVAL);
+    this._registrationManager.startTimer(this._streamConnectedPromise);
   }
 
   /**
    * Stop sending registration messages to the signaling server.
    */
   private _stopRegistrationTimer(): void {
-    if (this._regTimer) {
-      clearTimeout(this._regTimer);
-    }
+    this._registrationManager.stopTimer();
   }
 
   /**
@@ -1630,7 +1586,7 @@ class Device extends EventEmitter {
    * @param sinkIds - An array of device IDs
    */
   private _updateRingtoneSinkIds(sinkIds: string[]): Promise<void> {
-    return Promise.resolve(this._soundcache.get(Device.SoundName.Incoming).setSinkIds(sinkIds));
+    return this._soundManager.updateRingtoneSinkIds(sinkIds);
   }
 
   /**
@@ -1663,15 +1619,11 @@ class Device extends EventEmitter {
    * @param sinkIds - An array of device IDs
    */
   private _updateSpeakerSinkIds(sinkIds: string[]): Promise<void> {
-    Array.from(this._soundcache.entries())
-      .filter(entry => entry[0] !== Device.SoundName.Incoming)
-      .forEach(entry => entry[1].setSinkIds(sinkIds));
-
-    this._callSinkIds = sinkIds;
-    const call = this._activeCall;
-    return call
-      ? call._setSinkIds(sinkIds)
-      : Promise.resolve();
+    return this._soundManager.updateSpeakerSinkIds(
+      sinkIds,
+      (ids: string[]) => { this._callSinkIds = ids; },
+      this._activeCall,
+    );
   }
 }
 

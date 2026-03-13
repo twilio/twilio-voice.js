@@ -1019,7 +1019,7 @@ describe('Call', function() {
 
       it('should not emit a disconnect event', () => {
         const callback = sinon.stub();
-        conn['_mediaHandler'].close = () => mediaHandler.onclose();
+        conn['_mediaHandler'].close = () => mediaHandler.emit('close');
         conn.on('disconnect', callback);
         conn.reject();
         clock.tick(10);
@@ -1027,7 +1027,7 @@ describe('Call', function() {
       });
 
       it('should not play disconnect sound', () => {
-        conn['_mediaHandler'].close = () => mediaHandler.onclose();
+        conn['_mediaHandler'].close = () => mediaHandler.emit('close');
         conn.reject();
         clock.tick(10);
         sinon.assert.notCalled(soundcache.get(Device.SoundName.Disconnect).play);
@@ -1337,20 +1337,20 @@ describe('Call', function() {
           done();
         });
 
-        mediaHandler.onvolume(123, 456);
+        mediaHandler.emit('volume', 123, 456);
       });
     });
 
     describe('mediaHandler.onicecandidate', () => {
       it('should publish a debug event', () => {
-        mediaHandler.onicecandidate({ candidate: 'foo' });
+        mediaHandler.emit('icecandidate', { candidate: 'foo' });
         sinon.assert.calledWith(publisher.debug, 'ice-candidate', 'ice-candidate');
       });
     });
 
     describe('mediaHandler.onselectedcandidatepairchange', () => {
       it('should publish a debug event', () => {
-        mediaHandler.onselectedcandidatepairchange({
+        mediaHandler.emit('selectedcandidatepairchange', {
           local: { candidate: 'foo' },
           remote: { candidate: 'bar' },
         });
@@ -1360,57 +1360,57 @@ describe('Call', function() {
 
     describe('mediaHandler.onpcconnectionstatechange', () => {
       it('should publish an warning event if state is failed', () => {
-        mediaHandler.onpcconnectionstatechange('failed');
+        mediaHandler.emit('pcconnectionstatechange', 'failed');
         sinon.assert.calledWith(publisher.post, 'warning', 'pc-connection-state', 'failed');
       });
 
       it('should publish a debug event if state is not failed', () => {
-        mediaHandler.onpcconnectionstatechange('foo');
+        mediaHandler.emit('pcconnectionstatechange', 'foo');
         sinon.assert.calledWith(publisher.post, 'debug', 'pc-connection-state', 'foo');
       });
     });
 
     describe('mediaHandler.ondtlstransportstatechange', () => {
       it('should publish an error event if state is failed', () => {
-        mediaHandler.ondtlstransportstatechange('failed');
+        mediaHandler.emit('dtlstransportstatechange', 'failed');
         sinon.assert.calledWith(publisher.post, 'error', 'dtls-transport-state', 'failed');
       });
 
       it('should publish a debug event if state is not failed', () => {
-        mediaHandler.ondtlstransportstatechange('foo');
+        mediaHandler.emit('dtlstransportstatechange', 'foo');
         sinon.assert.calledWith(publisher.post, 'debug', 'dtls-transport-state', 'foo');
       });
     });
 
     describe('mediaHandler.oniceconnectionstatechange', () => {
       it('should publish an error event if state is failed', () => {
-        mediaHandler.oniceconnectionstatechange('failed');
+        mediaHandler.emit('iceconnectionstatechange', 'failed');
         sinon.assert.calledWith(publisher.post, 'error', 'ice-connection-state', 'failed');
       });
 
       it('should publish a debug event if state is not failed', () => {
-        mediaHandler.oniceconnectionstatechange('foo');
+        mediaHandler.emit('iceconnectionstatechange', 'foo');
         sinon.assert.calledWith(publisher.post, 'debug', 'ice-connection-state', 'foo');
       });
     });
 
     describe('mediaHandler.onicegatheringstatechange', () => {
       it('should publish a debug event: ice-gathering-state', () => {
-        mediaHandler.onicegatheringstatechange('foo');
+        mediaHandler.emit('icegatheringstatechange', 'foo');
         sinon.assert.calledWith(publisher.debug, 'ice-gathering-state', 'foo');
       });
     });
 
     describe('mediaHandler.onsignalingstatechange', () => {
       it('should publish a debug event: signaling-state', () => {
-        mediaHandler.onsignalingstatechange('foo');
+        mediaHandler.emit('signalingstatechange', 'foo');
         sinon.assert.calledWith(publisher.debug, 'signaling-state', 'foo');
       });
     });
 
     describe('mediaHandler.ondisconnected', () => {
       it('should publish a warning event: ice-connectivity-lost', () => {
-        mediaHandler.ondisconnected('foo');
+        mediaHandler.emit('disconnected', 'foo');
         sinon.assert.calledWith(publisher.warn, 'network-quality-warning-raised',
           'ice-connectivity-lost', { message: 'foo' });
       });
@@ -1421,13 +1421,13 @@ describe('Call', function() {
           done();
         });
 
-        mediaHandler.ondisconnected('foo');
+        mediaHandler.emit('disconnected', 'foo');
       });
     });
 
     describe('mediaHandler.onreconnected', () => {
       it('should publish an info event: ice-connectivity-lost', () => {
-        mediaHandler.onreconnected('foo');
+        mediaHandler.emit('reconnected', 'foo');
         sinon.assert.calledWith(publisher.info, 'network-quality-warning-cleared',
           'ice-connectivity-lost', { message: 'foo' });
       });
@@ -1438,7 +1438,7 @@ describe('Call', function() {
           done();
         });
 
-        mediaHandler.onreconnected('foo');
+        mediaHandler.emit('reconnected', 'foo');
       });
     });
 
@@ -1451,7 +1451,7 @@ describe('Call', function() {
           done();
         });
 
-        mediaHandler.onerror(baseError);
+        mediaHandler.emit('error', baseError);
       });
 
       context('when error.disconnect is true', () => {
@@ -1466,12 +1466,12 @@ describe('Call', function() {
             });
 
             it('should call pstream.hangup with error message', () => {
-              mediaHandler.onerror(Object.assign({ disconnect: true }, baseError));
+              mediaHandler.emit('error', Object.assign({ disconnect: true }, baseError));
               sinon.assert.calledWith(pstream.hangup, conn.outboundConnectionId, 'foo');
             });
 
             it('should call mediaHandler.close', () => {
-              mediaHandler.onerror(Object.assign({ disconnect: true }, baseError));
+              mediaHandler.emit('error', Object.assign({ disconnect: true }, baseError));
               sinon.assert.calledOnce(mediaHandler.close);
             });
           });
@@ -1487,12 +1487,12 @@ describe('Call', function() {
             });
 
             it('should not call pstream.hangup', () => {
-              mediaHandler.onerror(Object.assign({ disconnect: true }, baseError));
+              mediaHandler.emit('error', Object.assign({ disconnect: true }, baseError));
               sinon.assert.notCalled(pstream.hangup);
             });
 
             it('should not call mediaHandler.close', () => {
-              mediaHandler.onerror(Object.assign({ disconnect: true }, baseError));
+              mediaHandler.emit('error', Object.assign({ disconnect: true }, baseError));
               sinon.assert.notCalled(mediaHandler.close);
             });
           });
@@ -1507,13 +1507,13 @@ describe('Call', function() {
         });
 
         it(`should not call mediaHandler.close`, () => {
-          mediaHandler.onopen();
+          mediaHandler.emit('open');
           sinon.assert.notCalled(mediaHandler.close);
         });
 
         it(`should not call call.mute(false)`, () => {
           conn.mute = sinon.spy();
-          mediaHandler.onopen();
+          mediaHandler.emit('open');
           sinon.assert.notCalled(conn.mute as SinonSpy);
         });
       });
@@ -1528,20 +1528,20 @@ describe('Call', function() {
           });
 
           it(`should not call mediaHandler.close`, () => {
-            mediaHandler.onopen();
+            mediaHandler.emit('open');
             sinon.assert.notCalled(mediaHandler.close);
           });
 
           it(`should call call.mute(false)`, () => {
             conn.mute = sinon.spy();
-            mediaHandler.onopen();
+            mediaHandler.emit('open');
             sinon.assert.calledWith(conn.mute as SinonSpy, false);
           });
 
           it(`should call call.mute(true)`, () => {
             conn.mute = sinon.spy();
             mediaHandler.isMuted = true;
-            mediaHandler.onopen();
+            mediaHandler.emit('open');
             sinon.assert.calledWith(conn.mute as SinonSpy, true);
           });
 
@@ -1553,11 +1553,11 @@ describe('Call', function() {
 
             it('should emit Call.accept event', (done) => {
               conn.on('accept', () => done());
-              mediaHandler.onopen();
+              mediaHandler.emit('open');
             });
 
             it('should transition to open', () => {
-              mediaHandler.onopen();
+              mediaHandler.emit('open');
               assert.equal(conn.status(), Call.State.Open);
             });
           });
@@ -1569,12 +1569,12 @@ describe('Call', function() {
 
             it('should not emit Call.accept event', () => {
               conn.on('accept', () => { throw new Error('Expected to not emit accept event'); });
-              mediaHandler.onopen();
+              mediaHandler.emit('open');
               clock.tick(1);
             });
 
             it('should not transition to open', () => {
-              mediaHandler.onopen();
+              mediaHandler.emit('open');
               assert.equal(conn.status(), state);
             });
           });
@@ -1591,13 +1591,13 @@ describe('Call', function() {
           });
 
           it(`should call mediaHandler.close`, () => {
-            mediaHandler.onopen();
+            mediaHandler.emit('open');
             sinon.assert.calledOnce(mediaHandler.close);
           });
 
           it(`should not call call.mute(false)`, () => {
             conn.mute = sinon.spy();
-            mediaHandler.onopen();
+            mediaHandler.emit('open');
             sinon.assert.notCalled(conn.mute as SinonSpy);
           });
         });
@@ -1606,12 +1606,12 @@ describe('Call', function() {
 
     describe('mediaHandler.onclose', () => {
       it('should transition to closed', () => {
-        mediaHandler.onclose();
+        mediaHandler.emit('close');
         assert.equal(conn.status(), Call.State.Closed);
       });
 
       it('should call monitor.disable', () => {
-        mediaHandler.onclose();
+        mediaHandler.emit('close');
         sinon.assert.calledOnce(monitor.disable);
       });
 
@@ -1621,23 +1621,23 @@ describe('Call', function() {
           done();
         });
 
-        mediaHandler.onclose();
+        mediaHandler.emit('close');
       });
 
       it('should play the disconnect ringtone if shouldPlayDisconnect is not specified', () => {
-        mediaHandler.onclose();
+        mediaHandler.emit('close');
         sinon.assert.calledOnce(soundcache.get(Device.SoundName.Disconnect).play);
       });
 
       it('should play the disconnect ringtone if shouldPlayDisconnect returns true', () => {
         conn = new Call(config, Object.assign({ shouldPlayDisconnect: () => true }, options));
-        mediaHandler.onclose();
+        mediaHandler.emit('close');
         sinon.assert.calledOnce(soundcache.get(Device.SoundName.Disconnect).play);
       });
 
       it('should not play the disconnect ringtone if shouldPlayDisconnect returns false', () => {
         conn = new Call(config, Object.assign({ shouldPlayDisconnect: () => false }, options));
-        mediaHandler.onclose();
+        mediaHandler.emit('close');
         sinon.assert.notCalled(soundcache.get(Device.SoundName.Disconnect).play);
       });
     });
@@ -1720,7 +1720,7 @@ describe('Call', function() {
 
         it('should not emit a disconnect event', () => {
           const callback = sinon.stub();
-          conn['_mediaHandler'].close = () => mediaHandler.onclose();
+          conn['_mediaHandler'].close = () => mediaHandler.emit('close');
           conn.on('disconnect', callback);
           pstream.emit('cancel', { callsid: 'CA123' });
 
@@ -1730,7 +1730,7 @@ describe('Call', function() {
         it('should not play disconnect sound', () => {
           options.shouldPlayDisconnect = () => true;
           initCall();
-          conn['_mediaHandler'].close = () => mediaHandler.onclose();
+          conn['_mediaHandler'].close = () => mediaHandler.emit('close');
           pstream.emit('cancel', { callsid: 'CA123' });
 
           return wait().then(() => {
@@ -2311,10 +2311,10 @@ describe('Call', function() {
           const internalAudioIn = i;
           const internalAudioOut = i * 2;
 
-          mediaHandler.onvolume(i, i, internalAudioIn, internalAudioOut);
+          mediaHandler.emit('volume', i, i, internalAudioIn, internalAudioOut);
 
           // This helps determine that levels are averaging correctly
-          mediaHandler.onvolume(i, i, 2, 2);
+          mediaHandler.emit('volume', i, i, 2, 2);
 
           const sample = {
             ...sampleData,
@@ -2520,7 +2520,7 @@ describe('Call', function() {
         const callback = sinon.stub();
 
         conn.on('reconnecting', callback);
-        mediaHandler.onicegatheringfailure();
+        mediaHandler.emit('icegatheringfailure');
 
         const mediaReconnectionError = new MediaErrors.ConnectionError('Media connection failed.');
         sinon.assert.callCount(callback, 1);
@@ -2531,13 +2531,13 @@ describe('Call', function() {
       });
 
       it('should publish warning on ICE Gathering timeout', () => {
-        mediaHandler.onicegatheringfailure(Call.IceGatheringFailureReason.Timeout);
+        mediaHandler.emit('icegatheringfailure', Call.IceGatheringFailureReason.Timeout);
         sinon.assert.calledWith(publisher.warn, 'ice-gathering-state',
           Call.IceGatheringFailureReason.Timeout, null);
       });
 
       it('should publish warning on ICE Gathering none', () => {
-        mediaHandler.onicegatheringfailure(Call.IceGatheringFailureReason.None);
+        mediaHandler.emit('icegatheringfailure', Call.IceGatheringFailureReason.None);
         sinon.assert.calledWith(publisher.warn, 'ice-gathering-state',
           Call.IceGatheringFailureReason.None, null);
       });
@@ -2577,19 +2577,19 @@ describe('Call', function() {
       it('should restart ice if has low bytes', () => {
         mediaHandler.version.pc.iceConnectionState = 'disconnected';
         monitor.hasActiveWarning = sinon.stub().returns(true);
-        mediaHandler.ondisconnected();
+        mediaHandler.emit('disconnected');
         sinon.assert.callCount(mediaHandler.iceRestart, 1);
       });
       it('should not restart ice if no low bytes warning', () => {
         mediaHandler.version.pc.iceConnectionState = 'disconnected';
         monitor.hasActiveWarning = sinon.stub().returns(false);
-        mediaHandler.ondisconnected();
+        mediaHandler.emit('disconnected');
         sinon.assert.callCount(mediaHandler.iceRestart, 0);
       });
     });
 
     it('should restart on ice failed', () => {
-      mediaHandler.onfailed();
+      mediaHandler.emit('failed');
       sinon.assert.callCount(mediaHandler.iceRestart, 1);
     });
 
@@ -2599,8 +2599,8 @@ describe('Call', function() {
       monitor.hasActiveWarning = sinon.stub().returns(true);
 
       conn.on('reconnecting', callback);
-      mediaHandler.ondisconnected();
-      mediaHandler.onfailed();
+      mediaHandler.emit('disconnected');
+      mediaHandler.emit('failed');
 
       const mediaReconnectionError = new MediaErrors.ConnectionError('Media connection failed.');
       sinon.assert.callCount(callback, 1);
@@ -2612,20 +2612,20 @@ describe('Call', function() {
 
     it('should emit reconnected on ice reconnected', () => {
       const callback = sinon.stub();
-      mediaHandler.onfailed();
+      mediaHandler.emit('failed');
       conn.on('reconnected', callback);
       conn['_signalingStatus'] = Call.State.Open;
-      mediaHandler.onreconnected();
+      mediaHandler.emit('reconnected');
 
       sinon.assert.callCount(callback, 1);
     });
 
     it('should emit reconnected on initial ice connected after ice gathering failure', () => {
       const callback = sinon.stub();
-      mediaHandler.onicegatheringfailure();
+      mediaHandler.emit('icegatheringfailure');
       conn.on('reconnected', callback);
       conn['_signalingStatus'] = Call.State.Open;
-      mediaHandler.onconnected();
+      mediaHandler.emit('connected');
 
       sinon.assert.callCount(callback, 1);
     });

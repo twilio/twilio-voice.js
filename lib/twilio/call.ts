@@ -13,6 +13,8 @@ import {
   UserMediaErrors,
 } from './errors';
 import Log from './log';
+import MetricsPublisher from './metricsPublisher';
+import type { CallMetrics } from './metricsPublisher';
 import { PeerConnection } from './rtc';
 import { IceCandidate, RTCIceCandidate } from './rtc/icecandidate';
 import RTCSample from './rtc/sample';
@@ -20,11 +22,11 @@ import { getPreferredCodecInfo } from './rtc/sdp';
 import RTCWarning from './rtc/warning';
 import { generateVoiceEventSid } from './sid';
 import StatsMonitor from './statsMonitor';
+import WarningManager from './warningManager';
 import { isChrome } from './util';
 
-import { RELEASE_VERSION } from './constants';
 
-// Placeholders until we convert the respective files to TypeScript.
+
 export type IAudioHelper = any;
 export type IPStream = any;
 export type IPeerConnection = any;
@@ -42,7 +44,6 @@ const DTMF_INTER_TONE_GAP: number = 70;
 const DTMF_PAUSE_DURATION: number = 500;
 const DTMF_TONE_DURATION: number = 160;
 
-const METRICS_BATCH_SIZE: number = 10;
 const METRICS_DELAY: number = 5000;
 
 const MEDIA_DISCONNECT_ERROR = {
@@ -54,32 +55,6 @@ const MEDIA_DISCONNECT_ERROR = {
   },
 };
 
-const MULTIPLE_THRESHOLD_WARNING_NAMES: Record<string, Record<string, string>> = {
-  // The stat `packetsLostFraction` is monitored by two separate thresholds,
-  // `maxAverage` and `max`. Each threshold emits a different warning name.
-  packetsLostFraction: {
-    max: 'packet-loss',
-    maxAverage: 'packets-lost-fraction',
-  },
-};
-
-const WARNING_NAMES: Record<string, string> = {
-  audioInputLevel: 'audio-input-level',
-  audioOutputLevel: 'audio-output-level',
-  bytesReceived: 'bytes-received',
-  bytesSent: 'bytes-sent',
-  jitter: 'jitter',
-  mos: 'mos',
-  rtt: 'rtt',
-};
-
-const WARNING_PREFIXES: Record<string, string> = {
-  max: 'high-',
-  maxAverage: 'high-',
-  maxDuration: 'constant-',
-  min: 'low-',
-  minStandardDeviation: 'constant-',
-};
 
 /**
  * A {@link Call} represents a media and signaling connection to a TwiML application.
@@ -231,10 +206,9 @@ class Call extends EventEmitter {
   private _messages: Map<string, Call.Message> = new Map();
 
   /**
-   * A batch of metrics samples to send to Insights. Gets cleared after
-   * each send and appended to on each new sample.
+   * Batches and publishes call quality metrics to Insights.
    */
-  private readonly _metricsSamples: Call.CallMetrics[] = [];
+  private _metricsPublisher: MetricsPublisher;
 
   /**
    * An instance of StatsMonitor.
@@ -291,7 +265,7 @@ class Call extends EventEmitter {
   /**
    * A Map of Sounds to play.
    */
-  private readonly _soundcache: Map<Device.SoundName, ISound> = new Map();
+  private readonly _soundcache: Map<string, ISound> = new Map();
 
   /**
    * State of the {@link Call}.
@@ -306,6 +280,11 @@ class Call extends EventEmitter {
   /**
    * Whether the {@link Call} has been connected. Used to determine if we are reconnected.
    */
+  /**
+   * Manages call quality warnings and volume streak detection.
+   */
+  private _warningManager: WarningManager;
+
   private _wasConnected: boolean = false;
 
   /**
@@ -368,6 +347,30 @@ class Call extends EventEmitter {
     }
 
     const monitor = this._monitor = new (this._options.StatsMonitor || StatsMonitor)();
+
+    this._metricsPublisher = new MetricsPublisher({
+      callSid: () => this.parameters.CallSid,
+      direction: () => this._direction,
+      dscp: !!this._options.dscp,
+      gateway: this._options.gateway,
+      getInputVolume: () => this._latestInputVolume,
+      getOutputVolume: () => this._latestOutputVolume,
+      publisher: this._publisher,
+    });
+
+    this._warningManager = new WarningManager({
+      publisher: this._publisher,
+      isMuted: () => this.isMuted(),
+      onWarning: (warningName: string, warningData: RTCWarning | null) => {
+        this._log.debug('#warning', warningName);
+        this.emit('warning', warningName, warningData);
+      },
+      onWarningCleared: (warningName: string) => {
+        this._log.debug('#warning-cleared', warningName);
+        this.emit('warning-cleared', warningName);
+      },
+    });
+
     monitor.on('sample', this._onRTCSample);
 
     // First 20 seconds or so are choppy, so let's not bother with these warnings.
@@ -378,10 +381,10 @@ class Call extends EventEmitter {
       if (data.name === 'bytesSent' || data.name === 'bytesReceived') {
         this._onMediaFailure(Call.MediaFailure.LowBytes);
       }
-      this._reemitWarning(data, wasCleared);
+      this._warningManager.reemitWarning(data, wasCleared);
     });
     monitor.on('warning-cleared', (data: RTCWarning) => {
-      this._reemitWarningCleared(data);
+      this._warningManager.reemitWarningCleared(data);
     });
 
     this._mediaHandler = new (this._options.MediaHandler)
@@ -395,20 +398,20 @@ class Call extends EventEmitter {
       });
 
     this.on('volume', (inputVolume: number, outputVolume: number): void => {
-      this._inputVolumeStreak = this._checkVolume(
+      this._inputVolumeStreak = this._warningManager.checkVolume(
         inputVolume, this._inputVolumeStreak, this._latestInputVolume, 'input');
-      this._outputVolumeStreak = this._checkVolume(
+      this._outputVolumeStreak = this._warningManager.checkVolume(
         outputVolume, this._outputVolumeStreak, this._latestOutputVolume, 'output');
       this._latestInputVolume = inputVolume;
       this._latestOutputVolume = outputVolume;
     });
 
-    this._mediaHandler.onaudio = (remoteAudio: typeof Audio) => {
+    this._mediaHandler.on('audio', (remoteAudio: typeof Audio) => {
       this._log.debug('#audio');
       this.emit('audio', remoteAudio);
-    };
+    });
 
-    this._mediaHandler.onvolume = (inputVolume: number, outputVolume: number,
+    this._mediaHandler.on('volume', (inputVolume: number, outputVolume: number,
                                    internalInputVolume: number, internalOutputVolume: number) => {
       // (rrowland) These values mock the 0 -> 32767 format used by legacy getStats. We should look into
       // migrating to a newer standard, either 0.0 -> linear or -127 to 0 in dB, matching the range
@@ -417,14 +420,14 @@ class Call extends EventEmitter {
 
       // (rrowland) 0.0 -> 1.0 linear
       this.emit('volume', inputVolume, outputVolume);
-    };
+    });
 
-    this._mediaHandler.ondtlstransportstatechange = (state: string): void => {
+    this._mediaHandler.on('dtlstransportstatechange', (state: string): void => {
       const level = state === 'failed' ? 'error' : 'debug';
       this._publisher.post(level, 'dtls-transport-state', state, null, this);
-    };
+    });
 
-    this._mediaHandler.onpcconnectionstatechange = (state: string): void => {
+    this._mediaHandler.on('pcconnectionstatechange', (state: string): void => {
       let level = 'debug';
       const dtlsTransport = this._mediaHandler.getRTCDtlsTransport();
 
@@ -432,14 +435,14 @@ class Call extends EventEmitter {
         level = dtlsTransport && dtlsTransport.state === 'failed' ? 'error' : 'warning';
       }
       this._publisher.post(level, 'pc-connection-state', state, null, this);
-    };
+    });
 
-    this._mediaHandler.onicecandidate = (candidate: RTCIceCandidate): void => {
+    this._mediaHandler.on('icecandidate', (candidate: RTCIceCandidate): void => {
       const payload = new IceCandidate(candidate).toPayload();
       this._publisher.debug('ice-candidate', 'ice-candidate', payload, this);
-    };
+    });
 
-    this._mediaHandler.onselectedcandidatepairchange = (pair: RTCIceCandidatePair): void => {
+    this._mediaHandler.on('selectedcandidatepairchange', (pair: RTCIceCandidatePair): void => {
       const localCandidatePayload = new IceCandidate(pair.local).toPayload();
       const remoteCandidatePayload = new IceCandidate(pair.remote, true).toPayload();
 
@@ -447,27 +450,27 @@ class Call extends EventEmitter {
         local_candidate: localCandidatePayload,
         remote_candidate: remoteCandidatePayload,
       }, this);
-    };
+    });
 
-    this._mediaHandler.oniceconnectionstatechange = (state: string): void => {
+    this._mediaHandler.on('iceconnectionstatechange', (state: string): void => {
       const level = state === 'failed' ? 'error' : 'debug';
       this._publisher.post(level, 'ice-connection-state', state, null, this);
-    };
+    });
 
-    this._mediaHandler.onicegatheringfailure = (type: Call.IceGatheringFailureReason): void => {
+    this._mediaHandler.on('icegatheringfailure', (type: Call.IceGatheringFailureReason): void => {
       this._publisher.warn('ice-gathering-state', type, null, this);
       this._onMediaFailure(Call.MediaFailure.IceGatheringFailed);
-    };
+    });
 
-    this._mediaHandler.onicegatheringstatechange = (state: string): void => {
+    this._mediaHandler.on('icegatheringstatechange', (state: string): void => {
       this._publisher.debug('ice-gathering-state', state, null, this);
-    };
+    });
 
-    this._mediaHandler.onsignalingstatechange = (state: string): void => {
+    this._mediaHandler.on('signalingstatechange', (state: string): void => {
       this._publisher.debug('signaling-state', state, null, this);
-    };
+    });
 
-    this._mediaHandler.ondisconnected = (msg: string): void => {
+    this._mediaHandler.on('disconnected', (msg: string): void => {
       this._log.warn(msg);
       this._publisher.warn('network-quality-warning-raised', 'ice-connectivity-lost', {
         message: msg,
@@ -476,20 +479,20 @@ class Call extends EventEmitter {
       this.emit('warning', 'ice-connectivity-lost');
 
       this._onMediaFailure(Call.MediaFailure.ConnectionDisconnected);
-    };
+    });
 
-    this._mediaHandler.onfailed = (msg: string): void => {
+    this._mediaHandler.on('failed', (msg: string): void => {
       this._onMediaFailure(Call.MediaFailure.ConnectionFailed);
-    };
+    });
 
-    this._mediaHandler.onconnected = (): void => {
+    this._mediaHandler.on('connected', (): void => {
       // First time _mediaHandler is connected, but ICE Gathering issued an ICE restart and succeeded.
       if (this._status === Call.State.Reconnecting) {
         this._onMediaReconnected();
       }
-    };
+    });
 
-    this._mediaHandler.onreconnected = (msg: string): void => {
+    this._mediaHandler.on('reconnected', (msg: string): void => {
       this._log.info(msg);
       this._publisher.info('network-quality-warning-cleared', 'ice-connectivity-lost', {
         message: msg,
@@ -497,9 +500,9 @@ class Call extends EventEmitter {
       this._log.debug('#warning-cleared', 'ice-connectivity-lost');
       this.emit('warning-cleared', 'ice-connectivity-lost');
       this._onMediaReconnected();
-    };
+    });
 
-    this._mediaHandler.onerror = (e: any): void => {
+    this._mediaHandler.on('error', (e: any): void => {
       if (e.disconnect === true) {
         this._disconnect(e.info && e.info.message);
       }
@@ -508,9 +511,9 @@ class Call extends EventEmitter {
       this._log.error('Received an error from MediaStream:', e);
       this._log.debug('#error', error);
       this.emit('error', error);
-    };
+    });
 
-    this._mediaHandler.onopen = () => {
+    this._mediaHandler.on('open', () => {
       // NOTE(mroberts): While this may have been happening in previous
       // versions of Chrome, since Chrome 45 we have seen the
       // PeerConnection's onsignalingstatechange handler invoked multiple
@@ -529,9 +532,9 @@ class Call extends EventEmitter {
         // call was probably canceled sometime before this
         this._mediaHandler.close();
       }
-    };
+    });
 
-    this._mediaHandler.onclose = () => {
+    this._mediaHandler.on('close', () => {
       this._status = Call.State.Closed;
       if (this._options.shouldPlayDisconnect && this._options.shouldPlayDisconnect()
         // Don't play disconnect sound if this was from a cancel event. i.e. the call
@@ -550,7 +553,7 @@ class Call extends EventEmitter {
         this._log.debug('#disconnect');
         this.emit('disconnect', this);
       }
-    };
+    });
 
     this._pstream = config.pstream;
     this._pstream.on('ack', this._onAck);
@@ -967,23 +970,6 @@ class Call extends EventEmitter {
    * @param direction - The directionality of this audio track, either 'input' or 'output'
    * @returns The current streak; how many times in a row the same value has been polled.
    */
-  private _checkVolume(currentVolume: number, currentStreak: number,
-                       lastValue: number, direction: 'input'|'output'): number {
-    const wasWarningRaised: boolean = currentStreak >= 10;
-    let newStreak: number = 0;
-
-    if (lastValue === currentVolume) {
-      newStreak = currentStreak;
-    }
-
-    if (newStreak >= 10) {
-      this._emitWarning('audio-level-', `constant-audio-${direction}-level`, 10, newStreak, false);
-    } else if (wasWarningRaised) {
-      this._emitWarning('audio-level-', `constant-audio-${direction}-level`, 10, newStreak, true);
-    }
-
-    return newStreak;
-  }
 
   /**
    * Clean up event listeners.
@@ -1022,20 +1008,6 @@ class Call extends EventEmitter {
   /**
    * Create the payload wrapper for a batch of metrics to be sent to Insights.
    */
-  private _createMetricPayload(): Partial<Record<string, string|boolean>> {
-    const payload: Partial<Record<string, string|boolean>> = {
-      call_sid: this.parameters.CallSid,
-      dscp: !!this._options.dscp,
-      sdk_version: RELEASE_VERSION,
-    };
-
-    if (this._options.gateway) {
-      payload.gateway = this._options.gateway;
-    }
-
-    payload.direction = this._direction;
-    return payload;
-  }
 
   /**
    * Disconnect the {@link Call}.
@@ -1070,47 +1042,6 @@ class Call extends EventEmitter {
     }
   }
 
-  private _emitWarning = (groupPrefix: string, warningName: string, threshold: number,
-                          value: number|number[], wasCleared?: boolean, warningData?: RTCWarning): void => {
-    const groupSuffix = wasCleared ? '-cleared' : '-raised';
-    const groupName = `${groupPrefix}warning${groupSuffix}`;
-
-    // Ignore constant input if the Call is muted (Expected)
-    if (warningName === 'constant-audio-input-level' && this.isMuted()) {
-      return;
-    }
-
-    let level = wasCleared ? 'info' : 'warning';
-
-    // Avoid throwing false positives as warnings until we refactor volume metrics
-    if (warningName === 'constant-audio-output-level') {
-      level = 'info';
-    }
-
-    const payloadData: Record<string, any> = { threshold };
-
-    if (value) {
-      if (value instanceof Array) {
-        payloadData.values = value.map((val: any) => {
-          if (typeof val === 'number') {
-            return Math.round(val * 100) / 100;
-          }
-
-          return value;
-        });
-      } else {
-        payloadData.value = value;
-      }
-    }
-
-    this._publisher.post(level, groupName, warningName, { data: payloadData }, this);
-
-    if (warningName !== 'constant-audio-output-level') {
-      const emitName = wasCleared ? 'warning-cleared' : 'warning';
-      this._log.debug(`#${emitName}`, warningName);
-      this.emit(emitName, warningName, warningData && !wasCleared ? warningData : null);
-    }
-  }
 
   /**
    * Transition to {@link CallStatus.Open} if criteria is met.
@@ -1414,19 +1345,8 @@ class Call extends EventEmitter {
    * @param sample
    */
   private _onRTCSample = (sample: RTCSample): void => {
-    const callMetrics: Call.CallMetrics = {
-      ...sample,
-      inputVolume: this._latestInputVolume,
-      outputVolume: this._latestOutputVolume,
-    };
-
-    this._codec = callMetrics.codecName;
-
-    this._metricsSamples.push(callMetrics);
-    if (this._metricsSamples.length >= METRICS_BATCH_SIZE) {
-      this._publishMetrics();
-    }
-
+    this._metricsPublisher.onRTCSample(sample);
+    this._codec = this._metricsPublisher.codec;
     this.emit('sample', sample);
   }
 
@@ -1521,15 +1441,7 @@ class Call extends EventEmitter {
    * Publish the current set of queued metrics samples to Insights.
    */
   private _publishMetrics(): void {
-    if (this._metricsSamples.length === 0) {
-      return;
-    }
-
-    this._publisher.postMetrics(
-      'quality-metrics-samples', 'metrics-sample', this._metricsSamples.splice(0), this._createMetricPayload(), this,
-    ).catch((e: any) => {
-      this._log.warn('Unable to post metrics to Insights. Received error:', e);
-    });
+    this._metricsPublisher.publishMetrics();
   }
 
   /**
@@ -1537,37 +1449,6 @@ class Call extends EventEmitter {
    * @param warningData
    * @param wasCleared - Whether this is a -cleared or -raised event.
    */
-  private _reemitWarning = (warningData: Record<string, any>, wasCleared?: boolean): void => {
-    const groupPrefix = /^audio/.test(warningData.name) ?
-      'audio-level-' : 'network-quality-';
-
-    const warningPrefix = WARNING_PREFIXES[warningData.threshold.name];
-
-    /**
-     * NOTE: There are two "packet-loss" warnings: `high-packet-loss` and
-     * `high-packets-lost-fraction`, so in this case we need to use a different
-     * `WARNING_NAME` mapping.
-     */
-    let warningName: string | undefined;
-    if (warningData.name in MULTIPLE_THRESHOLD_WARNING_NAMES) {
-      warningName = MULTIPLE_THRESHOLD_WARNING_NAMES[warningData.name][warningData.threshold.name];
-    } else if (warningData.name in WARNING_NAMES) {
-      warningName = WARNING_NAMES[warningData.name];
-    }
-
-    const warning: string = warningPrefix + warningName;
-
-    this._emitWarning(groupPrefix, warning, warningData.threshold.value,
-                      warningData.values || warningData.value, wasCleared, warningData);
-  }
-
-  /**
-   * Re-emit an StatsMonitor warning-cleared as a .warning-cleared event.
-   * @param warningData
-   */
-  private _reemitWarningCleared = (warningData: Record<string, any>): void => {
-    this._reemitWarning(warningData, true);
-  }
 
   /**
    * Set the CallSid
@@ -1904,7 +1785,7 @@ namespace Call {
     /**
      * A Map of Sounds to play.
      */
-    soundcache: Map<Device.SoundName, ISound>;
+    soundcache: Map<string, ISound>;
   }
 
   /**

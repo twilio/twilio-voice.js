@@ -1,12 +1,25 @@
-// @ts-nocheck
 import { EventEmitter } from 'events';
 import Log from './log';
 import request from './request';
 
+interface EventPublisherOptions {
+  defaultPayload?: object | (() => object);
+  host?: string;
+  metadata?: {
+    app_name?: string;
+    app_version?: string;
+  };
+  request?: any;
+}
+
+interface EventPublisherMetadata {
+  app_name?: string;
+  app_version?: string;
+}
+
 /**
  * Builds Endpoint Analytics (EA) event payloads and sends them to
  *   the EA server.
- * @constructor
  * @param {String} productName - Name of the product publishing events.
  * @param {String} token - The JWT token to use to authenticate with
  *   the EA server.
@@ -15,260 +28,242 @@ import request from './request';
  *   to the server. Currently ignores the request altogether, in the future this
  *   may store them in case publishing is re-enabled later. Defaults to true.
  */
-/**
- * @typedef {Object} EventPublisher.Options
- * @property {Object} [metadata=undefined] - A publisher_metadata object to send
- *   with each payload.
- * @property {String} [host='eventgw.twilio.com'] - The host address of the EA
- *   server to publish to.
- * @property {Object|Function} [defaultPayload] - A default payload to extend
- *   when creating and sending event payloads. Also takes a function that
- *   should return an object representing the default payload. This is
- *   useful for fields that should always be present when they are
- *   available, but are not always available.
- */
 class EventPublisher extends EventEmitter {
-  constructor(productName, token, options) {
+  _defaultPayload: (connection?: any) => object;
+  _host: string | undefined;
+  _isEnabled: boolean;
+  _log: Log;
+  _request: any;
+  _token: string;
+  metadata: EventPublisherMetadata;
+  productName: string;
+
+  get isEnabled(): boolean {
+    return this._isEnabled;
+  }
+
+  get token(): string {
+    return this._token;
+  }
+
+  constructor(productName: string, token: string, options?: EventPublisherOptions) {
     super();
 
-    if (!(this instanceof EventPublisher)) {
-      return new EventPublisher(productName, token, options);
-    }
-
     // Apply default options
-    options = Object.assign({ defaultPayload() { return { }; } }, options);
+    const opts: EventPublisherOptions = Object.assign({ defaultPayload() { return { }; } }, options);
 
-    let defaultPayload = options.defaultPayload;
+    let defaultPayload: any = opts.defaultPayload;
 
     if (typeof defaultPayload !== 'function') {
-      defaultPayload = () => Object.assign({ }, options.defaultPayload);
+      defaultPayload = () => Object.assign({ }, opts.defaultPayload);
     }
 
-    let isEnabled = true;
-    const metadata = Object.assign({ app_name: undefined, app_version: undefined }, options.metadata);
+    this._defaultPayload = defaultPayload;
+    this._host = opts.host;
+    this._isEnabled = true;
+    this._log = new Log('EventPublisher');
+    this._request = opts.request || request;
+    this._token = token;
+    this.metadata = Object.assign({ app_name: undefined, app_version: undefined }, opts.metadata);
+    this.productName = productName;
+  }
 
-    Object.defineProperties(this, {
-      _defaultPayload: { value: defaultPayload },
-      _host: { value: options.host, writable: true },
-      _isEnabled: {
-        get() { return isEnabled; },
-        set(_isEnabled) { isEnabled = _isEnabled; },
+  /**
+   * Post to an EA server.
+   * @private
+   * @param {String} endpointName - Endpoint to post the event to
+   * @param {String} level - ['debug', 'info', 'warning', 'error']
+   * @param {String} group - The name of the group the event belongs to.
+   * @param {String} name - The designated event name.
+   * @param {?Object} [payload=null] - The payload to pass. This will be extended
+   *    onto the default payload object, if one exists.
+   * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
+   * @param {?Boolean} [force=false] - Whether or not to send this even if
+   *    publishing is disabled.
+   * @returns {Promise} Fulfilled if the HTTP response is 20x.
+   */
+  _post(endpointName: string, level: string, group: string, name: string, payload?: any, connection?: any, force?: boolean): Promise<void> {
+    if ((!this.isEnabled && !force) || !this._host) {
+      this._log.debug('Publishing cancelled', JSON.stringify({ isEnabled: this.isEnabled, force, host: this._host }));
+      return Promise.resolve();
+    }
+
+    if (!connection || ((!connection.parameters || !connection.parameters.CallSid) && !connection.outboundConnectionId)) {
+      if (!connection) {
+        this._log.debug('Publishing cancelled. Missing connection object');
+      } else {
+        this._log.debug('Publishing cancelled. Missing connection info', JSON.stringify({
+          outboundConnectionId: connection.outboundConnectionId, parameters: connection.parameters,
+        }));
+      }
+      return Promise.resolve();
+    }
+
+    const event: any = {
+      group,
+      level: level.toUpperCase(),
+      name,
+      payload: (payload && payload.forEach) ?
+        payload.slice(0) : Object.assign(this._defaultPayload(connection), payload),
+        payload_type: 'application/json',
+        private: false,
+      publisher: this.productName,
+      timestamp: (new Date()).toISOString(),
+    };
+
+    if (this.metadata) {
+      event.publisher_metadata = this.metadata;
+    }
+
+    if (endpointName === 'EndpointEvents') {
+      this._log.debug(
+        'Publishing insights',
+        JSON.stringify({ endpointName, event, force, host: this._host }),
+      );
+    }
+
+    const requestParams = {
+      body: event,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Twilio-Token': this.token,
       },
-      _log: { value: new Log('EventPublisher') },
-      _request: { value: options.request || request, writable: true },
-      _token: { value: token, writable: true },
-      isEnabled: {
-        enumerable: true,
-        get() { return isEnabled; },
-      },
-      metadata: {
-        enumerable: true,
-        get() { return metadata; },
-      },
-      productName: { enumerable: true, value: productName },
-      token: {
-        enumerable: true,
-        get() { return this._token; },
-      },
+      url: `https://${this._host}/v4/${endpointName}`,
+    };
+
+    return new Promise<void>((resolve, reject) => {
+      this._request.post(requestParams, (err: any) => {
+        if (err) {
+          this.emit('error', err);
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    }).catch(e => {
+      this._log.error(`Unable to post ${group} ${name} event to Insights. Received error: ${e}`);
     });
+  }
+
+  /**
+   * Post an event to the EA server. Use this method when the level
+   *  is dynamic. Otherwise, it's better practice to use the sugar
+   *  methods named for the specific level.
+   * @param {String} level - ['debug', 'info', 'warning', 'error']
+   * @param {String} group - The name of the group the event belongs to.
+   * @param {String} name - The designated event name.
+   * @param {?Object} [payload=null] - The payload to pass. This will be extended
+   *    onto the default payload object, if one exists.
+   * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
+   * @returns {Promise} Fulfilled if the HTTP response is 20x.
+   */
+  post(level: string, group: string, name: string, payload?: any, connection?: any, force?: boolean): Promise<void> {
+    return this._post('EndpointEvents', level, group, name, payload, connection, force);
+  }
+
+  /**
+   * Post a debug-level event to the EA server.
+   * @param {String} group - The name of the group the event belongs to.
+   * @param {String} name - The designated event name.
+   * @param {?Object} [payload=null] - The payload to pass. This will be extended
+   *    onto the default payload object, if one exists.
+   * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
+   * @returns {Promise} Fulfilled if the HTTP response is 20x.
+   */
+  debug(group: string, name: string, payload?: any, connection?: any): Promise<void> {
+    return this.post('debug', group, name, payload, connection);
+  }
+
+  /**
+   * Post an info-level event to the EA server.
+   * @param {String} group - The name of the group the event belongs to.
+   * @param {String} name - The designated event name.
+   * @param {?Object} [payload=null] - The payload to pass. This will be extended
+   *    onto the default payload object, if one exists.
+   * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
+   * @returns {Promise} Fulfilled if the HTTP response is 20x.
+   */
+  info(group: string, name: string, payload?: any, connection?: any): Promise<void> {
+    return this.post('info', group, name, payload, connection);
+  }
+
+  /**
+   * Post a warning-level event to the EA server.
+   * @param {String} group - The name of the group the event belongs to.
+   * @param {String} name - The designated event name.
+   * @param {?Object} [payload=null] - The payload to pass. This will be extended
+   *    onto the default payload object, if one exists.
+   * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
+   * @returns {Promise} Fulfilled if the HTTP response is 20x.
+   */
+  warn(group: string, name: string, payload?: any, connection?: any): Promise<void> {
+    return this.post('warning', group, name, payload, connection);
+  }
+
+  /**
+   * Post an error-level event to the EA server.
+   * @param {String} group - The name of the group the event belongs to.
+   * @param {String} name - The designated event name.
+   * @param {?Object} [payload=null] - The payload to pass. This will be extended
+   *    onto the default payload object, if one exists.
+   * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
+   * @returns {Promise} Fulfilled if the HTTP response is 20x.
+   */
+  error(group: string, name: string, payload?: any, connection?: any): Promise<void> {
+    return this.post('error', group, name, payload, connection);
+  }
+
+  /**
+   * Post a metrics event to the EA server.
+   * @param {String} group - The name of the group the event belongs to.
+   * @param {String} name - The designated event name.
+   * @param {Array<Object>} metrics - The metrics to post.
+   * @param {?Object} [customFields] - Custom fields to append to each payload.
+   * @returns {Promise} Fulfilled if the HTTP response is 20x.
+   */
+  postMetrics(group: string, name: string, metrics: any[], customFields?: any, connection?: any): Promise<any> {
+    return new Promise(resolve => {
+      const samples = metrics
+        .map(formatMetric)
+        .map(sample => Object.assign(sample, customFields));
+
+      resolve(this._post('EndpointMetrics', 'info', group, name, samples, connection));
+    });
+  }
+
+  /**
+   * Update the host address of the insights server to publish to.
+   * @param {String} host - The new host address of the insights server.
+   */
+  setHost(host: string): void {
+    this._host = host;
+  }
+
+  /**
+   * Update the token to use to authenticate requests.
+   * @param {string} token
+   * @returns {void}
+   */
+  setToken(token: string): void {
+    this._token = token;
+  }
+
+  /**
+   * Enable the publishing of events.
+   */
+  enable(): void {
+    this._isEnabled = true;
+  }
+
+  /**
+   * Disable the publishing of events.
+   */
+  disable(): void {
+    this._isEnabled = false;
   }
 }
 
-/**
- * Post to an EA server.
- * @private
- * @param {String} endpointName - Endpoint to post the event to
- * @param {String} level - ['debug', 'info', 'warning', 'error']
- * @param {String} group - The name of the group the event belongs to.
- * @param {String} name - The designated event name.
- * @param {?Object} [payload=null] - The payload to pass. This will be extended
- *    onto the default payload object, if one exists.
- * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @param {?Boolean} [force=false] - Whether or not to send this even if
- *    publishing is disabled.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
- */
-EventPublisher.prototype._post = function _post(endpointName, level, group, name, payload, connection, force) {
-  if ((!this.isEnabled && !force) || !this._host) {
-    this._log.debug('Publishing cancelled', JSON.stringify({ isEnabled: this.isEnabled, force, host: this._host }));
-    return Promise.resolve();
-  }
-
-  if (!connection || ((!connection.parameters || !connection.parameters.CallSid) && !connection.outboundConnectionId)) {
-    if (!connection) {
-      this._log.debug('Publishing cancelled. Missing connection object');
-    } else {
-      this._log.debug('Publishing cancelled. Missing connection info', JSON.stringify({
-        outboundConnectionId: connection.outboundConnectionId, parameters: connection.parameters,
-      }));
-    }
-    return Promise.resolve();
-  }
-
-  const event = {
-    group,
-    level: level.toUpperCase(),
-    name,
-    payload: (payload && payload.forEach) ?
-      payload.slice(0) : Object.assign(this._defaultPayload(connection), payload),
-      payload_type: 'application/json',
-      private: false,
-    publisher: this.productName,
-    timestamp: (new Date()).toISOString(),
-  };
-
-  if (this.metadata) {
-    event.publisher_metadata = this.metadata;
-  }
-
-  if (endpointName === 'EndpointEvents') {
-    this._log.debug(
-      'Publishing insights',
-      JSON.stringify({ endpointName, event, force, host: this._host }),
-    );
-  }
-
-  const requestParams = {
-    body: event,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Twilio-Token': this.token,
-    },
-    url: `https://${this._host}/v4/${endpointName}`,
-  };
-
-  return new Promise((resolve, reject) => {
-    this._request.post(requestParams, err => {
-      if (err) {
-        this.emit('error', err);
-        reject(err);
-      } else {
-        resolve();
-      }
-    });
-  }).catch(e => {
-    this._log.error(`Unable to post ${group} ${name} event to Insights. Received error: ${e}`);
-  });
-};
-
-/**
- * Post an event to the EA server. Use this method when the level
- *  is dynamic. Otherwise, it's better practice to use the sugar
- *  methods named for the specific level.
- * @param {String} level - ['debug', 'info', 'warning', 'error']
- * @param {String} group - The name of the group the event belongs to.
- * @param {String} name - The designated event name.
- * @param {?Object} [payload=null] - The payload to pass. This will be extended
- *    onto the default payload object, if one exists.
- * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
- */
-EventPublisher.prototype.post = function post(level, group, name, payload, connection, force) {
-  return this._post('EndpointEvents', level, group, name, payload, connection, force);
-};
-
-/**
- * Post a debug-level event to the EA server.
- * @param {String} group - The name of the group the event belongs to.
- * @param {String} name - The designated event name.
- * @param {?Object} [payload=null] - The payload to pass. This will be extended
- *    onto the default payload object, if one exists.
- * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
- */
-EventPublisher.prototype.debug = function debug(group, name, payload, connection) {
-  return this.post('debug', group, name, payload, connection);
-};
-
-/**
- * Post an info-level event to the EA server.
- * @param {String} group - The name of the group the event belongs to.
- * @param {String} name - The designated event name.
- * @param {?Object} [payload=null] - The payload to pass. This will be extended
- *    onto the default payload object, if one exists.
- * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
- */
-EventPublisher.prototype.info = function info(group, name, payload, connection) {
-  return this.post('info', group, name, payload, connection);
-};
-
-/**
- * Post a warning-level event to the EA server.
- * @param {String} group - The name of the group the event belongs to.
- * @param {String} name - The designated event name.
- * @param {?Object} [payload=null] - The payload to pass. This will be extended
- *    onto the default payload object, if one exists.
- * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
- */
-EventPublisher.prototype.warn = function warn(group, name, payload, connection) {
-  return this.post('warning', group, name, payload, connection);
-};
-
-/**
- * Post an error-level event to the EA server.
- * @param {String} group - The name of the group the event belongs to.
- * @param {String} name - The designated event name.
- * @param {?Object} [payload=null] - The payload to pass. This will be extended
- *    onto the default payload object, if one exists.
- * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
- */
-EventPublisher.prototype.error = function error(group, name, payload, connection) {
-  return this.post('error', group, name, payload, connection);
-};
-
-/**
- * Post a metrics event to the EA server.
- * @param {String} group - The name of the group the event belongs to.
- * @param {String} name - The designated event name.
- * @param {Array<Object>} metrics - The metrics to post.
- * @param {?Object} [customFields] - Custom fields to append to each payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
- */
-EventPublisher.prototype.postMetrics = function postMetrics(group, name, metrics, customFields, connection) {
-  return new Promise(resolve => {
-    const samples = metrics
-      .map(formatMetric)
-      .map(sample => Object.assign(sample, customFields));
-
-    resolve(this._post('EndpointMetrics', 'info', group, name, samples, connection));
-  });
-};
-
-/**
- * Update the host address of the insights server to publish to.
- * @param {String} host - The new host address of the insights server.
- */
-EventPublisher.prototype.setHost = function setHost(host) {
-  this._host = host;
-};
-
-/**
- * Update the token to use to authenticate requests.
- * @param {string} token
- * @returns {void}
- */
-EventPublisher.prototype.setToken = function setToken(token) {
-  this._token = token;
-};
-
-/**
- * Enable the publishing of events.
- */
-EventPublisher.prototype.enable = function enable() {
-  this._isEnabled = true;
-};
-
-/**
- * Disable the publishing of events.
- */
-EventPublisher.prototype.disable = function disable() {
-  this._isEnabled = false;
-};
-
-function formatMetric(sample) {
+function formatMetric(sample: any): any {
   return {
     audio_codec: sample.codecName,
     audio_level_in: sample.audioInputLevel,
