@@ -138,6 +138,7 @@ describe('Opus', function() {
             done();
           }
         }};
+        (call1 as any)['_metricsPublisher'].publishMetrics();
       });
 
       it('should hang up', (done) => {

@@ -350,6 +350,7 @@ class Call extends EventEmitter {
 
     this._metricsPublisher = new MetricsPublisher({
       callSid: () => this.parameters.CallSid,
+      connection: this,
       direction: () => this._direction,
       dscp: !!this._options.dscp,
       gateway: this._options.gateway,

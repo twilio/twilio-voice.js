@@ -10,6 +10,7 @@ const METRICS_BATCH_SIZE: number = 10;
  */
 export interface MetricsPublisherOptions {
   callSid: () => string;
+  connection: any;
   direction: () => string;
   dscp: boolean;
   gateway?: string;
@@ -84,7 +85,7 @@ class MetricsPublisher {
     payload.direction = this._options.direction();
 
     this._options.publisher.postMetrics(
-      'quality-metrics-samples', 'metrics-sample', this._metricsSamples.splice(0), payload, this,
+      'quality-metrics-samples', 'metrics-sample', this._metricsSamples.splice(0), payload, this._options.connection,
     ).catch((e: any) => {
       this._log.warn('Unable to post metrics to Insights. Received error:', e);
     });
