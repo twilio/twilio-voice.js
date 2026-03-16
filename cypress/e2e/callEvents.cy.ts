@@ -2,20 +2,9 @@ import * as assert from 'assert';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../../tests/lib/token';
-import { expectEvent } from '../../tests/lib/util';
+import { expectEvent, waitFor } from '../../tests/lib/util';
 
 const EVENT_TIMEOUT = 30000;
-
-function waitFor(promise: Promise<any>, timeoutMS: number): Promise<any> {
-  let timer: ReturnType<typeof setTimeout>;
-  const timeoutPromise = new Promise((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error('Timed out')), timeoutMS);
-  });
-  return Promise.race([promise, timeoutPromise]).then((result) => {
-    clearTimeout(timer);
-    return result;
-  });
-}
 
 describe('Call Events', function() {
   this.timeout(60000);

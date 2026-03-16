@@ -80,7 +80,7 @@ describe('AudioHelper', function() {
   it('should enumerate at least one input device', () => {
     const audio = device.audio!;
     // In a browser environment with getUserMedia available, there should be at least one input device
-    assert(audio.availableInputDevices.size >= 0,
-      'Should have zero or more input devices');
+    assert(audio.availableInputDevices.size > 0,
+      'Should have at least one input device');
   });
 });

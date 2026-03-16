@@ -21,22 +21,22 @@ describe('Logger', function() {
 
     // Should not throw when setting various log levels
     assert.doesNotThrow(() => {
-      const device = new Device(token, { logLevel: 'error' as any });
+      const device = new Device(token, { logLevel: 'error' });
       device.destroy();
     });
 
     assert.doesNotThrow(() => {
-      const device = new Device(token, { logLevel: 'warn' as any });
+      const device = new Device(token, { logLevel: 'warn' });
       device.destroy();
     });
 
     assert.doesNotThrow(() => {
-      const device = new Device(token, { logLevel: 'info' as any });
+      const device = new Device(token, { logLevel: 'info' });
       device.destroy();
     });
 
     assert.doesNotThrow(() => {
-      const device = new Device(token, { logLevel: 'debug' as any });
+      const device = new Device(token, { logLevel: 'debug' });
       device.destroy();
     });
   });
@@ -47,12 +47,12 @@ describe('Logger', function() {
 
     // loglevel uses numeric levels: 0=TRACE, 1=DEBUG, 2=INFO, 3=WARN, 4=ERROR, 5=SILENT
     assert.doesNotThrow(() => {
-      const device = new Device(token, { logLevel: 0 as any });
+      const device = new Device(token, { logLevel: 0 });
       device.destroy();
     });
 
     assert.doesNotThrow(() => {
-      const device = new Device(token, { logLevel: 4 as any });
+      const device = new Device(token, { logLevel: 4 });
       device.destroy();
     });
   });

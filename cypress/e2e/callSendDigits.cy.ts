@@ -64,7 +64,7 @@ describe('Call sendDigits', function() {
 
   it('should throw on invalid characters', () => {
     assert.throws(() => call1.sendDigits('abc'), (err: any) => {
-      return err.message === 'Illegal character passed into sendDigits';
+      return err instanceof InvalidArgumentError;
     });
   });
 

@@ -14,7 +14,7 @@ function waitFor(n: number, reject?: boolean) {
 async function isRelayServerAvailable(): Promise<boolean> {
   try {
     const response = await fetch(RELAY_SERVER_URL, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
-    return true;
+    return response.ok;
   } catch {
     return false;
   }

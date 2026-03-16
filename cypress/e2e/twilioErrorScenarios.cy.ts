@@ -62,32 +62,32 @@ describe('TwilioError Scenarios', function() {
     assert(error instanceof Error, 'Error should extend Error');
   });
 
-  it('should emit an error event on the device for an invalid token', (done) => {
+  it('should emit an error event on the device for an invalid token', async () => {
     const device = new Device('invalid-token');
-    device.on(Device.EventName.Error, (error: any) => {
+    try {
+      const error: any = await expectEvent(Device.EventName.Error, device);
       assert(error, 'Error should be emitted');
       assert(typeof error.code === 'number', 'Error should have a code');
+    } finally {
       device.destroy();
-      done();
-    });
-    device.register().catch(() => { /* expected */ });
+    }
   });
 
-  it('should emit an error event for an expired token', (done) => {
+  it('should emit an error event for an expired token', async () => {
     // Generate a token with 1 second TTL
     const identity = 'id-expired-' + Date.now();
     const token = generateAccessToken(identity, 1);
     const device = new Device(token);
 
-    device.on(Device.EventName.Error, (error: any) => {
-      assert(error, 'Error should be emitted');
-      device.destroy();
-      done();
-    });
-
     // Wait for the token to expire before trying to register
-    setTimeout(() => {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    try {
       device.register().catch(() => { /* expected */ });
-    }, 2000);
+      const error: any = await expectEvent(Device.EventName.Error, device);
+      assert(error, 'Error should be emitted');
+    } finally {
+      device.destroy();
+    }
   });
 });
