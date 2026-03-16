@@ -1791,18 +1791,11 @@ describe('Device', function() {
             });
           });
 
-          describe('on unload or pagehide', () => {
+          describe('on pagehide', () => {
             it('should call destroy once on pagehide', () => {
               stub = sinon.createStubInstance(Device);
               Device.prototype.constructor.call(stub, token);
               root.window.dispatchEvent('pagehide');
-              sinon.assert.calledOnce(stub.destroy);
-            });
-
-            it('should call destroy once on unload', () => {
-              stub = sinon.createStubInstance(Device);
-              Device.prototype.constructor.call(stub, token);
-              root.window.dispatchEvent('unload');
               sinon.assert.calledOnce(stub.destroy);
             });
           });
