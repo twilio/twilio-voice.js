@@ -516,7 +516,6 @@ class Device extends EventEmitter {
     this._boundConfirmClose = this._confirmClose.bind(this);
 
     if (typeof window !== 'undefined' && window.addEventListener) {
-      window.addEventListener('unload', this._boundDestroy);
       window.addEventListener('pagehide', this._boundDestroy);
     }
 
@@ -629,7 +628,6 @@ class Device extends EventEmitter {
 
     if (typeof window !== 'undefined' && window.removeEventListener) {
       window.removeEventListener('beforeunload', this._boundConfirmClose);
-      window.removeEventListener('unload', this._boundDestroy);
       window.removeEventListener('pagehide', this._boundDestroy);
     }
 
@@ -806,7 +804,7 @@ class Device extends EventEmitter {
       this._setupStream();
     }
 
-    // Setup close protection and make sure we clean up ongoing calls on unload.
+    // Setup close protection and make sure we clean up ongoing calls on page close.
     if (
       typeof window !== 'undefined' &&
       typeof window.addEventListener === 'function' &&
