@@ -1,7 +1,6 @@
 import * as assert from 'assert';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
-import { InvalidArgumentError } from '../../lib/twilio/errors';
 import { generateAccessToken } from '../../tests/lib/token';
 import { expectEvent } from '../../tests/lib/util';
 
@@ -64,7 +63,7 @@ describe('Call sendDigits', function() {
 
   it('should throw on invalid characters', () => {
     assert.throws(() => call1.sendDigits('abc'), (err: any) => {
-      return err instanceof InvalidArgumentError;
+      return err.name === 'InvalidArgumentError';
     });
   });
 
