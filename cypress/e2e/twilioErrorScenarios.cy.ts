@@ -65,7 +65,9 @@ describe('TwilioError Scenarios', function() {
   it('should emit an error event on the device for an invalid token', async () => {
     const device = new Device('invalid-token');
     try {
-      const error: any = await expectEvent(Device.EventName.Error, device);
+      const errorPromise = expectEvent(Device.EventName.Error, device);
+      device.register().catch(() => { /* expected */ });
+      const error: any = await errorPromise;
       assert(error, 'Error should be emitted');
       assert(typeof error.code === 'number', 'Error should have a code');
     } finally {
@@ -83,8 +85,9 @@ describe('TwilioError Scenarios', function() {
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     try {
+      const errorPromise = expectEvent(Device.EventName.Error, device);
       device.register().catch(() => { /* expected */ });
-      const error: any = await expectEvent(Device.EventName.Error, device);
+      const error: any = await errorPromise;
       assert(error, 'Error should be emitted');
     } finally {
       device.destroy();
