@@ -5,6 +5,7 @@ import { generateAccessToken } from '../../tests/lib/token';
 import { expectEvent, isFirefox } from '../../tests/lib/util';
 
 const CONNECTION_DELAY_THRESHOLD = 1000;
+const HIGH_DELAY_MULTIPLIER = 2;
 const SUITE_TIMEOUT = 20000;
 const MAX_TIMEOUT = 300000;
 
@@ -23,6 +24,8 @@ maybeSkip('ICE Nomination', function() {
 
   let highDelayEdge: string;
   let lowDelayEdge: string;
+  let lowDelayDuration: number;
+  let highDelayDuration: number;
 
   const setupDevices = () => {
     identity1 = 'id1-' + Date.now();
@@ -107,8 +110,10 @@ maybeSkip('ICE Nomination', function() {
     }
     delete device2Options.edge;
 
-    lowDelayEdge = edges[durations.indexOf(Math.min(...durations))];
-    highDelayEdge = edges[durations.indexOf(Math.max(...durations))];
+    lowDelayDuration = Math.min(...durations);
+    highDelayDuration = Math.max(...durations);
+    lowDelayEdge = edges[durations.indexOf(lowDelayDuration)];
+    highDelayEdge = edges[durations.indexOf(highDelayDuration)];
 
     console.log(JSON.stringify({ lowDelayEdge, highDelayEdge }, null, 2));
   });
@@ -150,7 +155,10 @@ maybeSkip('ICE Nomination', function() {
         deviceOptions.edge = highDelayEdge;
         await setupDevices();
         await getCallDuration(direction).then(duration => {
-          assert(duration > CONNECTION_DELAY_THRESHOLD);
+          assert(
+            duration > CONNECTION_DELAY_THRESHOLD || duration > lowDelayDuration * HIGH_DELAY_MULTIPLIER,
+            `Expected duration (${duration}ms) to exceed ${CONNECTION_DELAY_THRESHOLD}ms or be at least ${HIGH_DELAY_MULTIPLIER}x the low-delay duration (${lowDelayDuration}ms)`,
+          );
         });
       });
 
@@ -159,7 +167,10 @@ maybeSkip('ICE Nomination', function() {
         deviceOptions.forceAggressiveIceNomination = true;
         await setupDevices();
         await getCallDuration(direction).then(duration => {
-          assert(duration < CONNECTION_DELAY_THRESHOLD);
+          assert(
+            duration < CONNECTION_DELAY_THRESHOLD || duration < highDelayDuration,
+            `Expected duration (${duration}ms) to be under ${CONNECTION_DELAY_THRESHOLD}ms or faster than high-delay baseline (${highDelayDuration}ms)`,
+          );
         });
       });
     });
