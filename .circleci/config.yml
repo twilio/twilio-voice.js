@@ -110,6 +110,9 @@ commands:
       datadog-test-service:
         type: string
         default: ""
+      is_pr_workflow:
+        type: boolean
+        default: false
       start_relay_server:
         type: boolean
         default: false
@@ -133,6 +136,12 @@ commands:
           name: Running integration tests
           command: bash scripts/run-integration-tests.sh <<parameters.browser>> <<parameters.integration_test_files>>
           max_auto_reruns: 3
+      - run:
+          name: Report failure to Slack
+          command: bash scripts/report-failure.sh "<<parameters.browser>>" "<<parameters.integration_test_files>>"
+          environment:
+            IS_PR_WORKFLOW: "<<parameters.is_pr_workflow>>"
+          when: on_fail
       - run:
           name: Upload test results to Datadog
           command: |
@@ -200,6 +209,9 @@ jobs:
       integration_test_files:
         type: string
         default: ""
+      is_pr_workflow:
+        type: boolean
+        default: false
       parallelism:
         type: integer
         default: 4
@@ -218,6 +230,7 @@ jobs:
       - integration-tests:
           browser: <<parameters.browser>>
           datadog-test-service: <<parameters.datadog-test-service>>
+          is_pr_workflow: <<parameters.is_pr_workflow>>
           start_relay_server: <<parameters.start_relay_server>>
           integration_test_files: <<parameters.integration_test_files>>
   run-release:
@@ -335,6 +348,7 @@ workflows:
           context:
             - dockerhub-pulls
             - vblocks-js
+          is_pr_workflow: true
           start_relay_server: true
           browser: <<matrix.browser>>
           datadog-test-service: "pull-request-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
