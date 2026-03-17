@@ -30,7 +30,7 @@ then
         s = $0
         sub(/.*name="/, "", s)
         sub(/".*/, "", s)
-        gsub(/&quot;/, "\"", s)
+        gsub(/&quot;/, "`", s)
         gsub(/&amp;/, "\\&", s)
         gsub(/&lt;/, "<", s)
         gsub(/&gt;/, ">", s)
@@ -39,9 +39,9 @@ then
       /<failure/ {
         if (current_file != "" && current_test != "") {
           if (files[current_file] != "")
-            files[current_file] = files[current_file] ", \"" current_test "\""
+            files[current_file] = files[current_file] ", " current_test
           else
-            files[current_file] = "\"" current_test "\""
+            files[current_file] = current_test
         }
       }
       END {
