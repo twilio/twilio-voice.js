@@ -29,8 +29,11 @@ module.exports = defineConfig({
     },
     specPattern: 'cypress/e2e/**/*.cy.ts',
   },
-  reporter: 'junit',
+  reporter: 'cypress-multi-reporters',
   reporterOptions: {
-    mochaFile: 'reports/junit-report-[hash].xml',
+    reporterEnabled: 'spec, mocha-junit-reporter',
+    mochaJunitReporterReporterOptions: {
+      mochaFile: 'reports/junit-report-[hash].xml',
+    },
   },
 });
