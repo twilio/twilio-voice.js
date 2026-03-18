@@ -16,43 +16,14 @@ then
   BRANCH_NAME=$(git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/\1/')
   SLACK_MESSAGE=":failed_build: <${CIRCLE_BUILD_URL}|${BUILD_LABEL}> ${BROWSER} ${BVER} on branch ${BRANCH_NAME} on step ${STEP_NAME}"
 
-  # Parse JUnit XML reports for failed test details
+  # Parse merged JUnit XML report for failed test details
   FAILURE_DETAILS=""
-  if ls reports/junit-report-*.xml 1>/dev/null 2>&1; then
-    FAILURE_DETAILS=$(awk '
-      /<testsuite / && /file="/ {
-        s = $0
-        sub(/.*file="/, "", s)
-        sub(/".*/, "", s)
-        if (s != "") current_file = s
-      }
-      /<testcase / && /name="/ {
-        s = $0
-        sub(/.*name="/, "", s)
-        sub(/".*/, "", s)
-        gsub(/&quot;/, "`", s)
-        gsub(/&amp;/, "\\&", s)
-        gsub(/&lt;/, "<", s)
-        gsub(/&gt;/, ">", s)
-        if (s != "") current_test = s
-      }
-      /<failure/ {
-        if (current_file != "" && current_test != "") {
-          if (files[current_file] != "")
-            files[current_file] = files[current_file] ", " current_test
-          else
-            files[current_file] = current_test
-        }
-      }
-      END {
-        for (f in files) {
-          print "- " f ": " files[f]
-        }
-      }
-    ' reports/junit-report-*.xml)
+  if [ -f reports/junit-report.xml ]; then
+    FAILURE_DETAILS=$(grep -B1 '<failure' reports/junit-report.xml | grep '<testcase' | sed 's/.*[[:space:]]name="\([^"]*\)".*/- \1/' || true)
   fi
 
   if [ -n "${FAILURE_DETAILS}" ]; then
+    FAILURE_DETAILS=$(echo "${FAILURE_DETAILS}" | tr '\n' '\\' | sed 's/\\/\\n/g')
     SLACK_MESSAGE="${SLACK_MESSAGE}\nFailed tests:\n${FAILURE_DETAILS}"
   fi
 
