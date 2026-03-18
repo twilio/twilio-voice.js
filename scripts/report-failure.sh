@@ -16,19 +16,11 @@ then
   BRANCH_NAME=$(git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/\1/')
   SLACK_MESSAGE=":failed_build: <${CIRCLE_BUILD_URL}|${BUILD_LABEL}> ${BROWSER} ${BVER} on branch ${BRANCH_NAME} on step ${STEP_NAME}"
 
-  # Parse merged JUnit XML report for failed test details
-  FAILURE_DETAILS=""
-  if [ -f reports/junit-report.xml ]; then
-    FAILURE_DETAILS=$(grep -B1 '<failure' reports/junit-report.xml | grep '<testcase' | sed 's/.*[[:space:]]name="\([^"]*\)".*/- \1/' || true)
-  fi
-
-  if [ -n "${FAILURE_DETAILS}" ]; then
-    FAILURE_DETAILS=$(echo "${FAILURE_DETAILS}" | tr '\n' '\\' | sed 's/\\/\\n/g')
-    SLACK_MESSAGE="${SLACK_MESSAGE}\nFailed tests:\n${FAILURE_DETAILS}"
-  fi
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  PAYLOAD=$(SLACK_MESSAGE="${SLACK_MESSAGE}" node "${SCRIPT_DIR}/build-slack-payload.js" 2>/dev/null || echo "{\"text\": \"${SLACK_MESSAGE}\"}")
 
   echo "Reporting to slack: ${SLACK_MESSAGE}"
-  curl -X POST -H 'Content-type: application/json' --data '{"text": '\""$SLACK_MESSAGE"\"'}' $SLACK_WEBHOOK
+  curl -X POST -H 'Content-type: application/json' --data "${PAYLOAD}" "${SLACK_WEBHOOK}"
 fi
 
 echo "Step failed: ${STEP_NAME}"
