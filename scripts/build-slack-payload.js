@@ -25,8 +25,8 @@ try {
   if (failures.length > 0) {
     fullMessage += `\nFailed tests:\n${failures.join('\n')}`;
   }
-} catch (_) {
-  // No XML file or parse error — use base message as-is
+} catch (error) {
+  console.error('Failed to parse test report XML:', error);
 }
 
 process.stdout.write(JSON.stringify({ text: fullMessage }));
