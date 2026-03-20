@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const message = process.env.SLACK_MESSAGE || '';
+const message = (process.env.SLACK_MESSAGE || '').replace(/\\n/g, '\n');
 const xmlPath = path.resolve('reports/junit-report.xml');
 
 let fullMessage = message;
@@ -23,7 +23,7 @@ try {
   }
 
   if (failures.length > 0) {
-    fullMessage += `\nFailed tests:\n${failures.join('\n')}`;
+    fullMessage += `\n\n:x: *Failed Tests (${failures.length}):*\n${failures.join('\n')}`;
   }
 } catch (error) {
   console.error('Failed to parse test report XML:', error);
