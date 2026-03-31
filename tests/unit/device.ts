@@ -288,6 +288,20 @@ describe('Device', function() {
           await assert.rejects(() => device.connect(), /A Call is already active/);
         });
 
+        it('should reject if a connect is already in progress', async () => {
+          const connectPromise = device.connect();
+          await assert.rejects(() => device.connect(), /A Call is already active/);
+          await connectPromise;
+        });
+
+        it('should allow a new connect after the first one completes', async () => {
+          const call1 = await device.connect();
+          call1.emit('disconnect');
+          device['_activeCall'] = null;
+          const call2 = await device.connect();
+          assert(call2);
+        });
+
         it('should call ignore on all existing calls', async () => {
           const calls: any[] = [];
           for (let i = 0; i < 10; i++) {
@@ -1495,6 +1509,14 @@ describe('Device', function() {
           await connectPromise;
           assert(device['_activeCall']);
           assert(!device['_makeCallPromise']);
+        });
+
+        it('should reject a second connect while the first is waiting for signaling', async () => {
+          const connectPromise = device.connect();
+          assert(device['_makeCallPromise']);
+          await assert.rejects(() => device.connect(), /A Call is already active/);
+          pstream.emit('connected', { region: 'US_EAST_VIRGINIA' });
+          await connectPromise;
         });
       });
 

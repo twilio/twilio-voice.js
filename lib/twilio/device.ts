@@ -536,7 +536,7 @@ class Device extends EventEmitter {
   async connect(options: Device.ConnectOptions = { }): Promise<Call> {
     this._log.debug('.connect', JSON.stringify(options));
     this._throwIfDestroyed();
-    if (this._activeCall) {
+    if (this._activeCall || this._makeCallPromise) {
       throw new InvalidStateError('A Call is already active');
     }
 
