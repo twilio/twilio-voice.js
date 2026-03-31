@@ -95,6 +95,39 @@ describe('Device', function() {
     });
   });
 
+  describe('concurrent connect calls', () => {
+    it('should throw an error if connect is called while a connect is already in progress', async () => {
+      const connectPromise = device1.connect({ params: { To: identity2 } });
+      try {
+        await device1.connect({ params: { To: identity2 } });
+        assert.fail('Expected an error to be thrown');
+      } catch (err: any) {
+        assert(err.message.includes('A Call is already active'));
+      }
+
+      const call = await connectPromise;
+      call.disconnect();
+    });
+
+    it('should throw an error if connect is called while a call is already active', async () => {
+      const incomingPromise = new Promise<Call>(resolve => {
+        device2.once(Device.EventName.Incoming, resolve);
+      });
+      const call1 = await device1.connect({ params: { To: identity2 } });
+      const call2 = await incomingPromise;
+      call2.accept();
+
+      try {
+        await device1.connect({ params: { To: identity2 } });
+        assert.fail('Expected an error to be thrown');
+      } catch (err: any) {
+        assert(err.message.includes('A Call is already active'));
+      }
+
+      call1.disconnect();
+    });
+  });
+
   describe('device 1 calls device 2', () => {
     let call1: Call;
     let call2: Call;
