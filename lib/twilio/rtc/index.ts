@@ -1,5 +1,5 @@
 // @ts-nocheck
-import PeerConnection from './peerconnection';
+import PeerConnection from './peerconnection_class';
 import RTCPC from './rtcpc';
 
 function enabled() {

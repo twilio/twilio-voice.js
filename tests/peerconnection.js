@@ -1,6 +1,6 @@
 const sinon = require('sinon');
 const assert = require('assert');
-const PeerConnection = require('./../lib/twilio/rtc/peerconnection').default;
+const PeerConnection = require('./../lib/twilio/rtc/peerconnection_class').default;
 
 const root = global;
 

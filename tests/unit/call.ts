@@ -28,7 +28,7 @@ describe('Call', function() {
   const wait = (timeout?: number) => new Promise(r => setTimeout(r, timeout || 0));
 
   const MediaHandler = () => {
-    mediaHandler = createEmitterStub(require('../../lib/twilio/rtc/peerconnection').default);
+    mediaHandler = createEmitterStub(require('../../lib/twilio/rtc/peerconnection_class').default);
     mediaHandler.setInputTracksFromStream = sinon.spy((rejectCode?: number) => {
       return rejectCode ? Promise.reject({ code: rejectCode }) : Promise.resolve();
     });
