@@ -59,6 +59,10 @@ type IRTCPC = {
   getSDP(): string;
 };
 
+export type SignalingCallbacks = {
+
+};
+
 export type PeerConnectionOptions = {
   MediaStream?: typeof MediaStream;
   RTCPeerConnection?: typeof RTCPeerConnection;
@@ -164,7 +168,11 @@ export class PeerConnection {
   static protocol = ((() => RTCPC.test() ? new (RTCPC as any)() : null))();
   static enabled = RTCPC.test();
 
-  constructor(audioHelper: AudioHelper, pstream: PStream, options: PeerConnectionOptions) {
+  constructor(
+    audioHelper: AudioHelper,
+    pstream: PStream,
+    options: PeerConnectionOptions
+  ) {
     if (!audioHelper || !pstream) {
       throw new InvalidArgumentError('Audiohelper, and pstream are required arguments');
     }
@@ -735,7 +743,7 @@ export class PeerConnection {
   _setupChannel() {
     // TODO: rework whole method so we don't need "!"
 
-    const pc = this.version!.pc; 
+    const pc = this.version!.pc;
 
     // Chrome 25 supports onopen
     // TODO: revisit, no longer in the standard
