@@ -682,10 +682,10 @@ class Call extends EventEmitter {
 
                 const setRemoteAnswerPromise = this._mediaHandler.setRemoteAnswer(answerSdp);
 
+                resolve(setRemoteAnswerPromise); // bubble the setRemoteAnswerPromise result up
+
                 this._pstream.removeListener('answer', onPstreamAnswerOrRinging);
                 this._pstream.removeListener('ringing', onPstreamAnswerOrRinging);
-
-                resolve(setRemoteAnswerPromise); // bubble the setRemoteAnswerPromise result up
               };
 
               this._pstream.on('answer', onPstreamAnswerOrRinging);

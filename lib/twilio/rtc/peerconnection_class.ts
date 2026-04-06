@@ -952,7 +952,7 @@ export class PeerConnection {
   async setRemoteAnswer(sdp: string): Promise<{ status: 'success'; pc: RTCPeerConnection } | { status: 'error' }> {
     this._answerSdp = this._maybeSetIceAggressiveNomination(sdp);
 
-    const processAnswerPromiseResult = await new Promise<{ status: 'success' | 'error' }>(async (resolve) => {
+    const processAnswerPromiseResult = await new Promise<{ status: 'success' | 'error' }>((resolve) => {
       if (this.status === 'closed') {
         resolve({ status: 'error' });
         return;
@@ -980,7 +980,7 @@ export class PeerConnection {
         resolve({ status: 'error' });
       };
 
-      await this.version?.processAnswer(
+      this.version?.processAnswer(
         this.codecPreferences,
         this._answerSdp,
         onProcessAnswerSuccess,
@@ -1005,7 +1005,7 @@ export class PeerConnection {
 
     this.callSid = callsid;
 
-    const createOfferPromiseResult = await new Promise<{ status: 'success' | 'error' }>(async (resolve) => {
+    const createOfferPromiseResult = await new Promise<{ status: 'success' | 'error' }>((resolve) => {
       const onCreateOfferSuccess = () => {
         if (this.status === 'closed') {
           resolve({ status: 'error' });
@@ -1031,7 +1031,7 @@ export class PeerConnection {
         resolve({ status: 'error' });
       };
 
-      await this.version?.createOffer(
+      this.version?.createOffer(
         this.options.maxAverageBitrate,
         { audio: true } as any,
         onCreateOfferSuccess,
