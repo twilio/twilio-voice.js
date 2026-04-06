@@ -229,12 +229,8 @@ describe('PeerConnection', () => {
           disconnect: sinon.stub()
         },
         onclose: sinon.spy(),
-        _removeReconnectionListeners: sinon.stub(),
         status: 'open',
         stream,
-        pstream: {
-          removeListener: sinon.stub()
-        },
         mute: sinon.stub(),
         version: {
           pc
@@ -256,7 +252,6 @@ describe('PeerConnection', () => {
       assert(context._audioProcessorEventObserver.removeListener.calledWithExactly('add', context._onAudioProcessorAdded));
       assert(context._audioProcessorEventObserver.removeListener.calledWithExactly('remove', context._onAudioProcessorRemoved));
       assert(context.mute.calledWithExactly(false));
-      assert(context._removeReconnectionListeners.calledOnce);
       assert(pc.close.calledOnce);
       assert(pc.close.calledWithExactly());
       assert(context.onclose.calledOnce);
@@ -269,7 +264,7 @@ describe('PeerConnection', () => {
     it('Should stop everything what is available with minimum context', () => {
       context.version = false;
       context.stream = false;
-      context.pstream = false;
+
       context._mediaStreamSource = false;
       context._inputAnalyser = false;
       context._outputAnalyser = false;
@@ -284,7 +279,7 @@ describe('PeerConnection', () => {
     it('Should stop everything what is available with _outputAnalyser', () => {
       context.version = false;
       context.stream = false;
-      context.pstream = false;
+
       context._mediaStreamSource = false;
       context._inputAnalyser = false;
       toTest();
@@ -300,7 +295,7 @@ describe('PeerConnection', () => {
     it('Should stop everything what is available with _inputAnalyser', () => {
       context.version = false;
       context.stream = false;
-      context.pstream = false;
+
       context._mediaStreamSource = false;
       context._outputAnalyser = false;
       toTest();
@@ -316,7 +311,7 @@ describe('PeerConnection', () => {
     it('Should stop everything what is available with _mediaStreamSource', () => {
       context.version = false;
       context.stream = false;
-      context.pstream = false;
+
       context._inputAnalyser = false;
       context._outputAnalyser = false;
       toTest();
@@ -329,24 +324,9 @@ describe('PeerConnection', () => {
       assert(context._mediaStreamSource.disconnect.calledWithExactly());
     });
 
-    it('Should stop everything what is available with pstream', () => {
-      context.version = false;
-      context.stream = false;
-      context._mediaStreamSource = false;
-      context._inputAnalyser = false;
-      context._outputAnalyser = false;
-      toTest();
-      assert(context.onclose.calledOnce);
-      assert(context.onclose.calledWithExactly());
-      assert.strictEqual(context.stream, null);
-      assert.strictEqual(context.version, false);
-      assert.strictEqual(context.status, 'closed');
-      assert(context._removeReconnectionListeners.calledOnce);
-    });
-
     it('Should stop everything what is available with stream', () => {
       context.version = false;
-      context.pstream = false;
+
       context._mediaStreamSource = false;
       context._inputAnalyser = false;
       context._outputAnalyser = false;
@@ -363,7 +343,7 @@ describe('PeerConnection', () => {
     it('Should stop everything what is available with stream and _shouldManaageStream as false', () => {
       context._shouldManaageStream = false;
       context.version = false;
-      context.pstream = false;
+
       context._mediaStreamSource = false;
       context._inputAnalyser = false;
       context._outputAnalyser = false;
@@ -378,7 +358,7 @@ describe('PeerConnection', () => {
 
     it('Should stop everything what is available with version', () => {
       context.stream = false;
-      context.pstream = false;
+
       context._mediaStreamSource = false;
       context._inputAnalyser = false;
       context._outputAnalyser = false;
@@ -395,7 +375,7 @@ describe('PeerConnection', () => {
     it('Should stop everything what is available with version and signaling state is closed', () => {
       pc.signalingState = 'closed';
       context.stream = false;
-      context.pstream = false;
+
       context._mediaStreamSource = false;
       context._inputAnalyser = false;
       context._outputAnalyser = false;
@@ -567,33 +547,6 @@ describe('PeerConnection', () => {
       sinon.assert.notCalled(context._setupRTCDtlsTransportListener);
     });
 
-  });
-
-  context('PeerConnection.prototype._removeReconnectionListeners', () => {
-    const METHOD = PeerConnection.prototype._removeReconnectionListeners;
-
-    let context;
-    let pstream;
-    let toTest;
-
-    beforeEach(() => {
-      pstream = {
-        removeListener: sinon.stub()
-      };
-      context = {
-        pstream,
-        _onAnswerOrRinging: sinon.stub(),
-        _onHangup: sinon.stub(),
-        _removeReconnectionListeners: sinon.stub()
-      };
-      toTest = METHOD.bind(context);
-    });
-
-    it('Should remove reconnection listeners', () => {
-      toTest();
-      assert(pstream.removeListener.calledWithExactly('answer', context._onAnswerOrRinging));
-      assert(pstream.removeListener.calledWithExactly('hangup', context._onHangup));
-    });
   });
 
   context('PeerConnection.prototype.iceRestart', () => {
@@ -872,21 +825,17 @@ describe('PeerConnection', () => {
     const ICE_SERVERS = {SERVER_ONE: 1, SERVER_TWO: 2};
     const STATUS_OPEN = 'open';
     const STATUS_NOT_OPEN = 'not open';
-    const PSTREAM_STATUS_DISCONNECTED = 'disconnected';
-    const PSTREAM_STATUS_NOT_DISCONNECTED = 'not disconnected';
     const CONNECTION_ERROR = {info: { code: 31000, message: 'Cannot establish connection. Client is disconnected'}};
 
     let context = null;
-    let pstream = null;
+    let isSignalingDisconnected = null;
     let toTest = null;
 
     beforeEach(() => {
-      pstream = {
-        status: PSTREAM_STATUS_NOT_DISCONNECTED
-      };
+      isSignalingDisconnected = sinon.stub().returns(false);
       context = {
         status: STATUS_NOT_OPEN,
-        pstream,
+        options: { isSignalingDisconnected },
         onerror: sinon.stub(),
         close: sinon.stub(),
         _setupPeerConnection: sinon.stub(),
@@ -904,8 +853,8 @@ describe('PeerConnection', () => {
       assert.equal(context.close.called, false);
     });
 
-    it('Should call onerror with error object and return false when pstream status is disconnected', () => {
-      pstream.status = PSTREAM_STATUS_DISCONNECTED;
+    it('Should call onerror with error object and return false when signaling is disconnected', () => {
+      isSignalingDisconnected.returns(true);
       assert.strictEqual(toTest(), false);
       assert(context.close.calledWithExactly());
       assert(context.onerror.calledBefore(context.close));
@@ -918,7 +867,7 @@ describe('PeerConnection', () => {
       assert.equal(context._setupChannel.called, false);
     });
 
-    it('Should call setup peer connection and return true when status is not open and pstream status is not disconnected', () => {
+    it('Should call setup peer connection and return true when status is not open and signaling is not disconnected', () => {
       assert.strictEqual(toTest(), true);
       assert(context._setupPeerConnection.calledWithExactly(ICE_SERVERS));
       assert(context._setupChannel.calledWithExactly());

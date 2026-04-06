@@ -408,12 +408,13 @@ class Call extends EventEmitter {
     });
 
     this._mediaHandler = new (this._options.MediaHandler)
-      (config.audioHelper, config.pstream, {
+      (config.audioHelper, {
         MediaStream: this._options.MediaStream,
         RTCPeerConnection: this._options.RTCPeerConnection,
         codecPreferences: this._options.codecPreferences,
         dscp: this._options.dscp,
         forceAggressiveIceNomination: this._options.forceAggressiveIceNomination,
+        isSignalingDisconnected: () => this._pstream.status === 'disconnected',
         maxAverageBitrate: this._options.maxAverageBitrate,
       });
 

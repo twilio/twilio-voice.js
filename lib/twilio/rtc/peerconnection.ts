@@ -19,18 +19,17 @@ const VOLUME_INTERVAL_MS = 50;
 /**
  * @typedef {Object} PeerConnection
  * @param audioHelper
- * @param pstream
  * @param options
  * @return {PeerConnection}
  * @constructor
  */
-function PeerConnection(audioHelper, pstream, options) {
-  if (!audioHelper || !pstream) {
-    throw new InvalidArgumentError('Audiohelper, and pstream are required arguments');
+function PeerConnection(audioHelper, options) {
+  if (!audioHelper) {
+    throw new InvalidArgumentError('Audiohelper is a required argument');
   }
 
   if (!(this instanceof PeerConnection)) {
-    return new PeerConnection(audioHelper, pstream, options);
+    return new PeerConnection(audioHelper, options);
   }
 
   this._log = new Log('PeerConnection');
@@ -56,7 +55,6 @@ function PeerConnection(audioHelper, pstream, options) {
   this.onselectedcandidatepairchange = noop;
   this.onvolume = noop;
   this.version = null;
-  this.pstream = pstream;
   this.stream = null;
   this.sinkIds = new Set(['default']);
   this.outputs = new Map();
@@ -717,7 +715,7 @@ PeerConnection.prototype._initializeMediaStream = function(rtcConfiguration) {
   if (this.status === 'open') {
     return false;
   }
-  if (this.pstream.status === 'disconnected') {
+  if (this.options.isSignalingDisconnected && this.options.isSignalingDisconnected()) {
     this.onerror({ info: {
       code: 31000,
       message: 'Cannot establish connection. Client is disconnected',
@@ -731,16 +729,6 @@ PeerConnection.prototype._initializeMediaStream = function(rtcConfiguration) {
   return true;
 };
 
-/**
- * Remove reconnection-related listeners
- * @private
- */
-PeerConnection.prototype._removeReconnectionListeners = function() {
-  if (this.pstream) {
-    this.pstream.removeListener('answer', this._onAnswerOrRinging);
-    this.pstream.removeListener('hangup', this._onHangup);
-  }
-};
 
 /**
  * Setup a listener for RTCDtlsTransport to capture state changes events
@@ -886,7 +874,6 @@ PeerConnection.prototype.close = function() {
     this._stopStream();
   }
   this.stream = null;
-  this._removeReconnectionListeners();
   this._stopIceGatheringTimeout();
   this._audioHelper._destroyRemoteProcessedStream();
   this._audioProcessorEventObserver.removeListener('add', this._onAudioProcessorAdded);
