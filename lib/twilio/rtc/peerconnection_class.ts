@@ -949,73 +949,101 @@ export class PeerConnection {
     });
   }
 
-  makeOutgoingCall(
-    params: string,
-    signalingReconnectToken: string | undefined,
-    callsid: string,
-    rtcConfiguration: RTCConfiguration,
-    onMediaStarted: (pc: RTCPeerConnection) => void
-  ) {
-    if (!this._initializeMediaStream(rtcConfiguration)) {
-      return;
-    }
+  async setRemoteAnswer(sdp: string): Promise<{ status: 'success'; pc: RTCPeerConnection } | { status: 'error' }> {
+    this._answerSdp = this._maybeSetIceAggressiveNomination(sdp);
 
-    const self = this;
-    this.callSid = callsid;
-    function onAnswerSuccess() {
-      if (self.options) {
-        self._setEncodingParameters(self.options.dscp!); // TODO: remove "!"
+    const processAnswerPromiseResult = await new Promise<{ status: 'success' | 'error' }>(async (resolve) => {
+      if (this.status === 'closed') {
+        resolve({ status: 'error' });
+        return;
       }
-      onMediaStarted(self.version!.pc); // TODO: remove "!"
-    }
-    function onAnswerError(err: any) { // TODO: remove "any"
-      const errMsg = err.message || err;
-      self.onerror({ info: {
-        code: 31000,
-        message: `Error processing answer: ${errMsg}`,
-        twilioError: new MediaErrors.ClientRemoteDescFailed(),
-      } });
-    }
-    this._onAnswerOrRinging = payload => {
-      if (!payload.sdp) { return; }
 
-      const sdp = this._maybeSetIceAggressiveNomination(payload.sdp);
-      self._answerSdp = sdp;
-      if (self.status !== 'closed') {
-        // TODO: remove "!"
-        self.version!.processAnswer(this.codecPreferences, sdp, onAnswerSuccess, onAnswerError);
-      }
-      self.pstream.removeListener('answer', self._onAnswerOrRinging);
-      self.pstream.removeListener('ringing', self._onAnswerOrRinging);
-    };
-    this.pstream.on('answer', this._onAnswerOrRinging);
-    this.pstream.on('ringing', this._onAnswerOrRinging);
-
-    function onOfferSuccess() {
-      if (self.status !== 'closed') {
-        if (signalingReconnectToken) {
-          // TODO: remove "as any" and "!"
-          (self.pstream as any).reconnect(self.version!.getSDP(), self.callSid, signalingReconnectToken);
-        } else {
-          // TODO: remove "as any" and "!"
-          (self.pstream as any).invite(self.version!.getSDP(), self.callSid, params);
+      const onProcessAnswerSuccess = () => {
+        if (this.options) {
+          this._setEncodingParameters(this.options.dscp!); // TODO: remove "!"
         }
-        self._setupRTCDtlsTransportListener();
-      }
+
+        resolve({ status: 'success' });
+      };
+
+      const onProcessAnswerError = (err: any) => {
+        const errMsg = err.message || err;
+
+        this.onerror({
+          info: {
+            code: 31000,
+            message: `Error processing answer: ${errMsg}`,
+            twilioError: new MediaErrors.ClientRemoteDescFailed(),
+          },
+        });
+
+        resolve({ status: 'error' });
+      };
+
+      await this.version?.processAnswer(
+        this.codecPreferences,
+        this._answerSdp,
+        onProcessAnswerSuccess,
+        onProcessAnswerError
+      );
+    });
+
+    if (processAnswerPromiseResult.status === 'error') {
+      return { status: 'error' };
     }
 
-    // TODO: remove "any"
-    function onOfferError(err: any) {
-      const errMsg = err.message || err;
-      self.onerror({ info: {
-        code: 31000,
-        message: `Error creating the offer: ${errMsg}`,
-        twilioError: new MediaErrors.ClientLocalDescFailed(),
-      } });
+    return { status: 'success', pc: this.version!.pc };
+  }
+
+  async makeOutgoingCall(
+    callsid: string,
+    rtcConfiguration: RTCConfiguration
+  ): Promise<{ status: 'success'; offerSdp: string } | { status: 'error' }> {
+    if (!this._initializeMediaStream(rtcConfiguration)) {
+      return { status: 'error' };
     }
 
-    // TODO: remove "as any"
-    (this.version as any).createOffer(this.options.maxAverageBitrate, { audio: true }, onOfferSuccess, onOfferError);
+    this.callSid = callsid;
+
+    const createOfferPromiseResult = await new Promise<{ status: 'success' | 'error' }>(async (resolve) => {
+      const onCreateOfferSuccess = () => {
+        if (this.status === 'closed') {
+          resolve({ status: 'error' });
+          return;
+        }
+
+        this._setupRTCDtlsTransportListener();
+
+        resolve({ status: 'success' });
+      };
+
+      const onCreateOfferError = (err: any) => {
+        const errMsg = err.message || err;
+
+        this.onerror({
+          info: {
+            code: 31000,
+            message: `Error creating the offer: ${errMsg}`,
+            twilioError: new MediaErrors.ClientLocalDescFailed(),
+          },
+        });
+
+        resolve({ status: 'error' });
+      };
+
+      await this.version?.createOffer(
+        this.options.maxAverageBitrate,
+        { audio: true } as any,
+        onCreateOfferSuccess,
+        onCreateOfferError,
+      );
+    });
+
+    if (createOfferPromiseResult.status === 'error') {
+      return { status: 'error' };
+    }
+
+    return { status: 'success', offerSdp: this.version!.getSDP() };
   }
 
   answerIncomingCall(

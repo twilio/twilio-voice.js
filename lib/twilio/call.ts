@@ -660,8 +660,68 @@ class Call extends EventEmitter {
         const params = Array.from(this.customParameters.entries()).map(pair =>
          `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
         this._pstream.on('answer', this._onAnswer);
-        this._mediaHandler.makeOutgoingCall(params, this._signalingReconnectToken,
-          this._options.reconnectCallSid || this.outboundConnectionId, rtcConfiguration, onAnswer);
+
+        const outgoingCallSid =
+          this._options.reconnectCallSid || this.outboundConnectionId;
+
+        // TODO: proper null checks
+        this._mediaHandler
+          .makeOutgoingCall(outgoingCallSid!, rtcConfiguration!)
+          .then((result: any) => {
+            if (result.status === 'error') { return result; }
+
+            return new Promise<{ status: 'success'; pc: RTCPeerConnection } | { status: 'error' }>((resolve) => {
+              // setup pstream listeners for the answer
+              const onPstreamAnswerOrRinging = (payload: any) => {
+                if (!payload.sdp) {
+                  resolve({ status: 'error' });
+                  return;
+                }
+
+                const answerSdp = payload.sdp;
+
+                const setRemoteAnswerPromise = this._mediaHandler.setRemoteAnswer(answerSdp);
+
+                this._pstream.removeListener('answer', onPstreamAnswerOrRinging);
+                this._pstream.removeListener('ringing', onPstreamAnswerOrRinging);
+
+                resolve(setRemoteAnswerPromise); // bubble the setRemoteAnswerPromise result up
+              };
+
+              this._pstream.on('answer', onPstreamAnswerOrRinging);
+              this._pstream.on('ringing', onPstreamAnswerOrRinging);
+
+              // send offer sdp over pstream
+              if (this._signalingReconnectToken) {
+                this._pstream.reconnect(result.offerSdp, outgoingCallSid, this._signalingReconnectToken);
+              } else {
+                this._pstream.invite(result.offerSdp, outgoingCallSid, params);
+              }
+
+              // after pstream gets offer, the backend should send an answer
+              // over pstream and fire onPstreamAnswerOrRinging
+            });
+          })
+          .then((result: any) => {
+            // catch the bubbled setRemoteAnswerPromise here
+            if (result.status === 'error') { return result; }
+
+            // Report that the call was answered, and directionality
+            const eventName = this._direction === Call.CallDirection.Incoming
+              ? 'accepted-by-local'
+              : 'accepted-by-remote';
+            this._publisher.info('connection', eventName, null, this);
+
+            // Report the preferred codec and params as they appear in the SDP
+            const { codecName, codecParams } = getPreferredCodecInfo(this._mediaHandler.version!.getSDP()); // TODO: proper null check
+            this._publisher.info('settings', 'codec', {
+              codec_params: codecParams,
+              selected_codec: codecName,
+            }, this);
+
+            // Enable RTC monitoring
+            this._monitor.enable(result.pc);
+          });
       }
     };
 
