@@ -18,7 +18,7 @@ import {
 import Publisher from './eventpublisher';
 import Log from './log';
 import { PreflightTest } from './preflight/preflight';
-import PStream from './pstream';
+import { ISignalingAdapter, PStreamAdapter } from './signalingadapter';
 import {
   createEventGatewayURI,
   createSignalingEndpointURL,
@@ -42,7 +42,7 @@ import {
 /**
  * @private
  */
-export type IPStream = any;
+export type IPStream = ISignalingAdapter;
 /**
  * @private
  */
@@ -108,9 +108,9 @@ export interface IExtendedDeviceOptions extends Device.Options {
   preflight?: boolean;
 
   /**
-   * Custom PStream constructor
+   * Custom signaling adapter constructor (must implement ISignalingAdapter)
    */
-  PStream?: IPStream;
+  PStream?: new (token: string, uris: string[], options?: Record<string, any>) => ISignalingAdapter;
 
   /**
    * Custom Publisher constructor
@@ -1530,7 +1530,7 @@ class Device extends EventEmitter {
     }
 
     this._log.info('Setting up VSP');
-    this._stream = new (this._options.PStream || PStream)(
+    this._stream = new (this._options.PStream || PStreamAdapter)(
       this.token,
       this._chunderURIs,
       {
