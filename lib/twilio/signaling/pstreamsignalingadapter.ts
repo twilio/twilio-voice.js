@@ -21,6 +21,8 @@ export class PStreamSignalingAdapter extends EventEmitter implements SignalingAd
 
   get status(): SignalingAdapterStatus { return this._pstream.status; }
   get uri(): string { return this._pstream.uri; }
+  get gateway(): string | undefined { return this._pstream.gateway; }
+  get region(): string | undefined { return this._pstream.region; }
 
   setToken(token: string): void { this._pstream.setToken(token); }
   destroy(): void { this._pstream.destroy(); }
@@ -35,7 +37,7 @@ export class PStreamSignalingAdapter extends EventEmitter implements SignalingAd
   reconnect(sdp: string, callSid: string, reconnectToken: string): void { this._pstream.reconnect(sdp, callSid, reconnectToken); }
 
   dtmf(callSid: string, digits: string): void { this._pstream.dtmf(callSid, digits); }
-  sendMessage(callSid: string, content: string, contentType: string, messageType: string, voiceEventSid: string): void {
+  sendMessage(callSid: string, content: string, contentType: string | undefined, messageType: string, voiceEventSid: string): void {
     this._pstream.sendMessage(callSid, content, contentType, messageType, voiceEventSid);
   }
   register(mediaCapabilities: Record<string, any>): void { this._pstream.register(mediaCapabilities); }

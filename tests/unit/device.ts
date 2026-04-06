@@ -598,7 +598,7 @@ describe('Device', function() {
             const setupPromise = _setupStream();
             pstream.emit('close');
             await setupPromise;
-          });
+          }) as any;
 
           await assert.rejects(() => registerDevice());
         });
@@ -611,7 +611,7 @@ describe('Device', function() {
             const setupPromise = _setupStream();
             pstream.emit('close');
             await setupPromise;
-          });
+          }) as any;
 
           await assert.rejects(() => registerDevice());
         })
@@ -1152,8 +1152,8 @@ describe('Device', function() {
           it('should update the preferred uri', () => {
             sinon.assert.calledOnce(spyIncomingSound.play);
             pstream.emit('connected', { edge: 'sydney' });
-            const spy: any = device['_stream'].updatePreferredURI =
-              sinon.spy(device['_stream'].updatePreferredURI);
+            const spy: any = device['_stream']!.updatePreferredURI =
+              sinon.spy(device['_stream']!.updatePreferredURI);
             const call = device.calls[0];
             call.emit('accept');
             sinon.assert.calledOnce(spy);
@@ -1211,8 +1211,8 @@ describe('Device', function() {
           });
 
           it('should unset the preferred uri if the call was closed', () => {
-            const spy: any = device['_stream'].updatePreferredURI =
-              sinon.spy(device['_stream'].updatePreferredURI);
+            const spy: any = device['_stream']!.updatePreferredURI =
+              sinon.spy(device['_stream']!.updatePreferredURI);
             device.calls[0].status = () => CallType.State.Closed;
             device.calls[0].emit('error');
             sinon.assert.calledOnceWithExactly(spy, null);
@@ -1226,8 +1226,8 @@ describe('Device', function() {
           });
 
           it('should not unset the preferred uri if stream is null', () => {
-            const spy: any = device['_stream'].updatePreferredURI =
-              sinon.spy(device['_stream'].updatePreferredURI);
+            const spy: any = device['_stream']!.updatePreferredURI =
+              sinon.spy(device['_stream']!.updatePreferredURI);
 
             device['_stream'] = null;
             device.calls[0].status = () => CallType.State.Closed;
@@ -1269,8 +1269,8 @@ describe('Device', function() {
           });
 
           it('should unset the preferred uri', () => {
-            const spy: any = device['_stream'].updatePreferredURI =
-              sinon.spy(device['_stream'].updatePreferredURI);
+            const spy: any = device['_stream']!.updatePreferredURI =
+              sinon.spy(device['_stream']!.updatePreferredURI);
             device.calls[0].emit('disconnect');
             sinon.assert.calledOnceWithExactly(spy, null);
           });
@@ -1289,8 +1289,8 @@ describe('Device', function() {
           });
 
           it('should unset the preferred uri', () => {
-            const spy: any = device['_stream'].updatePreferredURI =
-              sinon.spy(device['_stream'].updatePreferredURI);
+            const spy: any = device['_stream']!.updatePreferredURI =
+              sinon.spy(device['_stream']!.updatePreferredURI);
             device.calls[0].emit('reject');
             sinon.assert.calledOnceWithExactly(spy, null);
           });
@@ -1341,8 +1341,8 @@ describe('Device', function() {
 
         describe('on call.error', () => {
           it('should not unset the preferred uri even if the call was closed', () => {
-            const spy: any = device['_stream'].updatePreferredURI =
-              sinon.spy(device['_stream'].updatePreferredURI);
+            const spy: any = device['_stream']!.updatePreferredURI =
+              sinon.spy(device['_stream']!.updatePreferredURI);
             call1.status = () => CallType.State.Closed;
             call1.emit('error');
             sinon.assert.notCalled(spy);
@@ -1351,8 +1351,8 @@ describe('Device', function() {
 
         describe('on call.disconnect', () => {
           it('should not unset the preferred uri', () => {
-            const spy: any = device['_stream'].updatePreferredURI =
-              sinon.spy(device['_stream'].updatePreferredURI);
+            const spy: any = device['_stream']!.updatePreferredURI =
+              sinon.spy(device['_stream']!.updatePreferredURI);
             call1.emit('disconnect');
             sinon.assert.notCalled(spy);
           });
@@ -1360,8 +1360,8 @@ describe('Device', function() {
 
         describe('on call.reject', () => {
           it('should not unset the preferred uri', () => {
-            const spy: any = device['_stream'].updatePreferredURI =
-              sinon.spy(device['_stream'].updatePreferredURI);
+            const spy: any = device['_stream']!.updatePreferredURI =
+              sinon.spy(device['_stream']!.updatePreferredURI);
             call1.parameters = { CallSid: 'foobar' };
             call1.emit('reject');
             sinon.assert.notCalled(spy);

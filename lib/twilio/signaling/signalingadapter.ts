@@ -5,6 +5,8 @@ export type SignalingAdapterStatus = 'disconnected' | 'connected' | 'ready' | 'o
 export interface SignalingAdapter extends EventEmitter {
   status: SignalingAdapterStatus;
   uri: string;
+  gateway?: string;
+  region?: string;
 
   setToken(token: string): void;
   destroy(): void;
