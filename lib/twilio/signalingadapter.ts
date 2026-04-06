@@ -19,7 +19,7 @@ export interface SignalingAdapter extends EventEmitter {
   reconnect(sdp: string, callSid: string, reconnectToken: string): void;
 
   dtmf(callSid: string, digits: string): void;
-  sendMessage(callSid: string, content: string, contentType: string,
+  sendMessage(callSid: string, content: string, contentType: string | undefined,
               messageType: string, voiceEventSid: string): void;
   register(mediaCapabilities: Record<string, any>): void;
 }

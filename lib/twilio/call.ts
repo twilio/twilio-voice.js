@@ -690,7 +690,7 @@ class Call extends EventEmitter {
          `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
         this._signalingAdapter.on('answer', this._onAnswer);
 
-        const outgoingCallSid = this._options.reconnectCallSid || this.outboundConnectionId;
+        const outgoingCallSid = this._options.reconnectCallSid || this.outboundConnectionId!;
 
         this._mediaHandler.makeOutgoingCall(outgoingCallSid, rtcConfiguration, (offerSdp: string) => {
           const onPstreamAnswerOrRinging = (payload: any) => {
@@ -991,7 +991,7 @@ class Call extends EventEmitter {
 
     const voiceEventSid = this._voiceEventSidGenerator();
     this._messages.set(voiceEventSid, { content, contentType, messageType, voiceEventSid });
-    this._signalingAdapter.sendMessage(callSid, content, contentType, messageType, voiceEventSid);
+    this._signalingAdapter.sendMessage(callSid!, content, contentType, messageType, voiceEventSid);
     return voiceEventSid;
   }
 
