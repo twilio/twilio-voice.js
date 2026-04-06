@@ -418,11 +418,13 @@ describe('PeerConnection', () => {
 
     let context = null;
     let version = null;
-    let callback = null;
+    let onAnswerReady = null;
+    let onMediaStarted = null;
     let toTest = null;
 
     beforeEach(() => {
-      callback = sinon.stub();
+      onAnswerReady = sinon.stub();
+      onMediaStarted = sinon.stub();
       version = {
         processSDP: sinon.stub(),
         pc: 'peer connection',
@@ -438,16 +440,14 @@ describe('PeerConnection', () => {
         version,
         status: 'closed',
         onerror: sinon.stub(),
-        pstream: {
-          answer: sinon.stub()
-        }
       };
       toTest = METHOD.bind(
         context,
         eCallSid,
         eSDP,
         eIceServers,
-        callback
+        onAnswerReady,
+        onMediaStarted
       );
     });
 
@@ -475,11 +475,11 @@ describe('PeerConnection', () => {
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.processSDP.calledOnce);
       assert(version.processSDP.calledWithExactly(undefined, undefined, eSDP, {audio: true}, sinon.match.func, sinon.match.func));
-      assert.equal(callback.called, false);
+      assert.equal(onMediaStarted.called, false);
       sinon.assert.notCalled(context._setupRTCDtlsTransportListener);
     });
 
-    it('Should call onMediaStarted callback when processSDP success callback called and status is not closed', () => {
+    it('Should call onAnswerReady and onMediaStarted when processSDP success callback called and status is not closed', () => {
       const sdp1 = 'sdp1';
       context._initializeMediaStream.returns(true);
       version.getSDP.returns(sdp1);
@@ -487,8 +487,7 @@ describe('PeerConnection', () => {
       context.status = false;
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
-      assert(context.pstream.answer.calledWithExactly(sdp1, eCallSid));
-      assert(context.pstream.answer.calledOn(context.pstream));
+      assert(onAnswerReady.calledWithExactly(sdp1));
       assert(version.processSDP.calledOnce);
       assert(version.processSDP.calledWithExactly(undefined, undefined, eSDP, {audio: true}, sinon.match.func, sinon.match.func));
       assert(version.getSDP.calledWithExactly());
@@ -496,7 +495,7 @@ describe('PeerConnection', () => {
       assert.equal(context._setEncodingParameters.callCount, 1);
       sinon.assert.calledWith(context._setEncodingParameters, true);
       sinon.assert.calledOnce(context._setupRTCDtlsTransportListener);
-      assert(callback.calledWithExactly(version.pc));
+      assert(onMediaStarted.calledWithExactly(version.pc));
       assert.equal(context.onerror.called, false);
     });
 
@@ -514,9 +513,9 @@ describe('PeerConnection', () => {
       assert.equal(rVal.info.twilioError.code, 53402);
 
       assert(version.processSDP.calledWithExactly(undefined, undefined, eSDP, {audio: true}, sinon.match.func, sinon.match.func));
-      assert.equal(context.pstream.answer.called, false);
+      assert.equal(onAnswerReady.called, false);
       assert.equal(version.getSDP.called, false);
-      assert.equal(callback.called, false);
+      assert.equal(onMediaStarted.called, false);
       sinon.assert.notCalled(context._setupRTCDtlsTransportListener);
     });
 
@@ -532,22 +531,22 @@ describe('PeerConnection', () => {
       assert.equal(rVal.info.twilioError.code, 53402);
 
       assert(version.processSDP.calledWithExactly(undefined, undefined, eSDP, {audio: true}, sinon.match.func, sinon.match.func));
-      assert.equal(context.pstream.answer.called, false);
+      assert.equal(onAnswerReady.called, false);
       assert.equal(version.getSDP.called, false);
       sinon.assert.notCalled(context._setEncodingParameters);
-      assert.equal(callback.called, false);
+      assert.equal(onMediaStarted.called, false);
       sinon.assert.notCalled(context._setupRTCDtlsTransportListener);
     });
 
-    it('Should call callback for each success callback processSDP calls', () => {
+    it('Should call onMediaStarted for each success callback processSDP calls', () => {
       context._initializeMediaStream.returns(true);
       version.getSDP.returns('sdp');
       context.status = false;
       toTest();
       version.processSDP.callArg(4);
       version.processSDP.callArg(4);
-      assert(callback.calledWithExactly(version.pc));
-      assert(callback.calledTwice);
+      assert(onMediaStarted.calledWithExactly(version.pc));
+      assert(onMediaStarted.calledTwice);
       assert.equal(context.onerror.called, false);
       sinon.assert.calledTwice(context._setupRTCDtlsTransportListener);
     });
@@ -564,7 +563,7 @@ describe('PeerConnection', () => {
       assert.equal(rVal.info.twilioError.code, 53402);
 
       assert(context.onerror.calledTwice);
-      assert.equal(callback.called, false);
+      assert.equal(onMediaStarted.called, false);
       sinon.assert.notCalled(context._setupRTCDtlsTransportListener);
     });
 

@@ -655,7 +655,11 @@ class Call extends EventEmitter {
         this._isAnswered = true;
         this._pstream.on('answer', this._onAnswer);
         this._mediaHandler.answerIncomingCall(this.parameters.CallSid,
-          this._options.offerSdp, rtcConfiguration, onAnswer);
+          this._options.offerSdp, rtcConfiguration,
+          (answerSdp: string) => {
+            this._pstream.answer(answerSdp, this.parameters.CallSid);
+          },
+          onAnswer);
       } else {
         const params = Array.from(this.customParameters.entries()).map(pair =>
          `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');

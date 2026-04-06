@@ -875,7 +875,7 @@ PeerConnection.prototype.processAnswer = function(sdp, onMediaStarted) {
     } });
   });
 };
-PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfiguration, onMediaStarted) {
+PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfiguration, onAnswerReady, onMediaStarted) {
   if (!this._initializeMediaStream(rtcConfiguration)) {
     return;
   }
@@ -885,7 +885,7 @@ PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfigur
   const self = this;
   function onAnswerSuccess() {
     if (self.status !== 'closed') {
-      self.pstream.answer(self.version.getSDP(), callSid);
+      onAnswerReady(self.version.getSDP());
       if (self.options) {
         self._setEncodingParameters(self.options.dscp);
       }

@@ -32,7 +32,7 @@ describe('Call', function() {
     mediaHandler.setInputTracksFromStream = sinon.spy((rejectCode?: number) => {
       return rejectCode ? Promise.reject({ code: rejectCode }) : Promise.resolve();
     });
-    mediaHandler.answerIncomingCall = sinon.spy((a: any, b: any, c: RTCConfiguration, cb: Function) => {
+    mediaHandler.answerIncomingCall = sinon.spy((a: any, b: any, c: RTCConfiguration, onAnswerReady: Function, cb: Function) => {
       callback = cb;
       rtcConfig = c;
     });
