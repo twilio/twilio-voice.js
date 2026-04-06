@@ -19,6 +19,7 @@ import Publisher from './eventpublisher';
 import Log from './log';
 import { PreflightTest } from './preflight/preflight';
 import PStream from './pstream';
+import { PStreamSignalingAdapter } from './pstreamsignalingadapter';
 import {
   createEventGatewayURI,
   createSignalingEndpointURL,
@@ -1530,7 +1531,7 @@ class Device extends EventEmitter {
     }
 
     this._log.info('Setting up VSP');
-    this._stream = new (this._options.PStream || PStream)(
+    const pstream = new (this._options.PStream || PStream)(
       this.token,
       this._chunderURIs,
       {
@@ -1538,6 +1539,7 @@ class Device extends EventEmitter {
         maxPreferredDurationMs: this._options.maxCallSignalingTimeoutMs,
       },
     );
+    this._stream = new PStreamSignalingAdapter(pstream);
 
     this._stream.addListener('close', this._onSignalingClose);
     this._stream.addListener('connected', this._onSignalingConnected);
