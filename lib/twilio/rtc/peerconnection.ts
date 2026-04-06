@@ -827,49 +827,18 @@ PeerConnection.prototype.iceRestart = function() {
   });
 };
 
-PeerConnection.prototype.makeOutgoingCall = function(params, signalingReconnectToken, callsid, rtcConfiguration, onMediaStarted) {
+PeerConnection.prototype.makeOutgoingCall = function(callsid, rtcConfiguration, onOfferReady) {
   if (!this._initializeMediaStream(rtcConfiguration)) {
     return;
   }
 
   const self = this;
   this.callSid = callsid;
-  function onAnswerSuccess() {
-    if (self.options) {
-      self._setEncodingParameters(self.options.dscp);
-    }
-    onMediaStarted(self.version.pc);
-  }
-  function onAnswerError(err) {
-    const errMsg = err.message || err;
-    self.onerror({ info: {
-      code: 31000,
-      message: `Error processing answer: ${errMsg}`,
-      twilioError: new MediaErrors.ClientRemoteDescFailed(),
-    } });
-  }
-  this._onAnswerOrRinging = payload => {
-    if (!payload.sdp) { return; }
-
-    const sdp = this._maybeSetIceAggressiveNomination(payload.sdp);
-    self._answerSdp = sdp;
-    if (self.status !== 'closed') {
-      self.version.processAnswer(this.codecPreferences, sdp, onAnswerSuccess, onAnswerError);
-    }
-    self.pstream.removeListener('answer', self._onAnswerOrRinging);
-    self.pstream.removeListener('ringing', self._onAnswerOrRinging);
-  };
-  this.pstream.on('answer', this._onAnswerOrRinging);
-  this.pstream.on('ringing', this._onAnswerOrRinging);
 
   function onOfferSuccess() {
     if (self.status !== 'closed') {
-      if (signalingReconnectToken) {
-        self.pstream.reconnect(self.version.getSDP(), self.callSid, signalingReconnectToken);
-      } else {
-        self.pstream.invite(self.version.getSDP(), self.callSid, params);
-      }
       self._setupRTCDtlsTransportListener();
+      onOfferReady(self.version.getSDP());
     }
   }
 
@@ -883,6 +852,28 @@ PeerConnection.prototype.makeOutgoingCall = function(params, signalingReconnectT
   }
 
   this.version.createOffer(this.options.maxAverageBitrate, { audio: true }, onOfferSuccess, onOfferError);
+};
+
+PeerConnection.prototype.processAnswer = function(sdp, onMediaStarted) {
+  const processedSdp = this._maybeSetIceAggressiveNomination(sdp);
+  this._answerSdp = processedSdp;
+
+  if (this.status === 'closed') { return; }
+
+  const self = this;
+  this.version.processAnswer(this.codecPreferences, processedSdp, function onSuccess() {
+    if (self.options) {
+      self._setEncodingParameters(self.options.dscp);
+    }
+    onMediaStarted(self.version.pc);
+  }, function onError(err) {
+    const errMsg = err.message || err;
+    self.onerror({ info: {
+      code: 31000,
+      message: `Error processing answer: ${errMsg}`,
+      twilioError: new MediaErrors.ClientRemoteDescFailed(),
+    } });
+  });
 };
 PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfiguration, onMediaStarted) {
   if (!this._initializeMediaStream(rtcConfiguration)) {

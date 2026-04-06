@@ -717,26 +717,19 @@ describe('PeerConnection', () => {
   context('PeerConnection.prototype.makeOutgoingCall', () => {
     const METHOD = PeerConnection.prototype.makeOutgoingCall;
     const EXPECTED_OFFER_ERROR = {info: {code: 31000, message: 'Error creating the offer: error message'}};
-    const EXPECTED_PROCESSING_ERROR = {info: {code: 31000, message: 'Error processing answer: error message'}};
     const ERROR_MESSAGE = 'error message';
-    const ERROR = new Error(ERROR_MESSAGE);
-    const PAYLOAD = {sdp: 'sdp payload'};
-    const CLOSED = 'closed';
-    const NOT_CLOSED = 'not closed';
 
-    const eParams = 'params';
     const eCallSid = 'callSid';
     const eIceServers = 'iceServers';
-    const eIss = 'this is iss';
     const eSDP = 'sdp';
 
     let context = null;
     let version = null;
-    let callback = null;
+    let onOfferReady = null;
     let toTest = null;
 
     beforeEach(() => {
-      callback = sinon.stub();
+      onOfferReady = sinon.stub();
       version = {
         pc: 'peer connection',
         getSDP: sinon.stub().returns(eSDP),
@@ -750,27 +743,15 @@ describe('PeerConnection', () => {
         _setupRTCDtlsTransportListener: sinon.stub(),
         callSid: null,
         version,
-        status: CLOSED,
+        status: 'closed',
         onerror: sinon.stub(),
         options: { preflight: true },
-        pstream: {
-          once: sinon.stub(),
-          on: sinon.stub(),
-          removeListener: sinon.stub(),
-          invite: sinon.stub(),
-          reconnect: sinon.stub(),
-        },
-        device: {
-          token: null
-        }
       };
       toTest = METHOD.bind(
         context,
-        eParams,
-        undefined,
         eCallSid,
         eIceServers,
-        callback,
+        onOfferReady,
       );
     });
 
@@ -786,68 +767,26 @@ describe('PeerConnection', () => {
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.createOffer.calledOnce);
       assert(version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func));
-      assert.equal(callback.called, false);
-      assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
+      assert.equal(onOfferReady.called, false);
     });
 
-    it('Should call onOfferSuccess and do nothting when createOffer calls success callback and status is closed', () => {
+    it('Should not call onOfferReady when createOffer succeeds but status is closed', () => {
       version.createOffer.callsArg(2);
       toTest();
-      assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.createOffer.calledOnce);
-      assert(version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func));
-      assert.equal(callback.called, false);
-      assert.equal(context.pstream.invite.called, false);
-      assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
+      assert.equal(onOfferReady.called, false);
       sinon.assert.notCalled(context._setupRTCDtlsTransportListener);
     });
 
-    it('Should call onOfferSuccess and pstream invite when createOffer calls success callback and status is not closed', () => {
+    it('Should call onOfferReady with SDP when createOffer succeeds and status is not closed', () => {
       context.status = 'not closed';
       version.createOffer.callsArg(2);
       toTest();
-      assert(context._initializeMediaStream.calledWithExactly(eIceServers));
       assert(version.createOffer.calledOnce);
-      assert(version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func));
-      assert.equal(callback.called, false);
-      assert(context.pstream.invite.calledOnce);
-      assert(context.pstream.invite.calledWithExactly(eSDP, eCallSid, eParams));
+      assert(onOfferReady.calledOnce);
+      assert(onOfferReady.calledWithExactly(eSDP));
       assert(version.getSDP.calledOnce);
-      assert(version.getSDP.calledWithExactly());
-      assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
       sinon.assert.calledOnce(context._setupRTCDtlsTransportListener);
-    });
-
-    it('Should call onOfferSuccess and pstream reconnect when createOffer calls success callback and status is not closed', () => {
-      context.status = 'not closed';
-      version.createOffer.callsArg(2);
-      METHOD.call(context, eParams, 'reconnectToken', eCallSid, eIceServers, callback);
-      assert(context._initializeMediaStream.calledWithExactly(eIceServers));
-      assert(version.createOffer.calledOnce);
-      assert(version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func));
-      assert.equal(callback.called, false);
-      assert(context.pstream.reconnect.calledOnce);
-      assert(context.pstream.reconnect.calledWithExactly(eSDP, eCallSid, 'reconnectToken'));
-      assert(version.getSDP.calledOnce);
-      assert(version.getSDP.calledWithExactly());
-      assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
-      sinon.assert.calledOnce(context._setupRTCDtlsTransportListener);
-    });
-
-    it('Should call onOfferSuccess when createOffer calls success callback and status is not closed and device token is not truthy', () => {
-      context.device.token = 'this is device token';
-      context.status = NOT_CLOSED;
-      version.createOffer.callsArg(2);
-      toTest();
-      assert(context._initializeMediaStream.calledWithExactly(eIceServers));
-      assert(version.createOffer.calledOnce);
-      assert(version.createOffer.calledWithExactly(undefined, {audio: true}, sinon.match.func, sinon.match.func));
-      assert.equal(callback.called, false);
-      assert(context.pstream.invite.calledOnce);
-      assert(context.pstream.invite.calledWithExactly(eSDP, eCallSid, eParams));
-      assert(version.getSDP.calledOnce);
-      assert(version.getSDP.calledWithExactly());
-      assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
     });
 
     it('Should call onOfferError when createOffer calls error callback with error message', () => {
@@ -857,72 +796,96 @@ describe('PeerConnection', () => {
 
       const rVal = context.onerror.firstCall.args[0];
       assert.equal(rVal.info.twilioError.code, 53400);
-
-      assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
     });
 
-    it('Should call onAnswer and set _answerSdp listener when pstream answer event is triggered', () => {
-      context.pstream.on.callsArgWith(1, PAYLOAD);
+    it('Should set callSid on the context', () => {
       toTest();
-      assert.equal(context._answerSdp, PAYLOAD.sdp);
-      assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
+      assert.equal(context.callSid, eCallSid);
+    });
+  });
+
+  context('PeerConnection.prototype.processAnswer', () => {
+    const METHOD = PeerConnection.prototype.processAnswer;
+    const EXPECTED_PROCESSING_ERROR = {info: {code: 31000, message: 'Error processing answer: error message'}};
+    const ERROR_MESSAGE = 'error message';
+    const ERROR = new Error(ERROR_MESSAGE);
+    const SDP = 'sdp payload';
+
+    let context = null;
+    let version = null;
+    let onMediaStarted = null;
+    let toTest = null;
+
+    beforeEach(() => {
+      onMediaStarted = sinon.stub();
+      version = {
+        pc: 'peer connection',
+        processAnswer: sinon.stub()
+      };
+      context = {
+        _maybeSetIceAggressiveNomination: (sdp) => sdp,
+        _setEncodingParameters: sinon.stub(),
+        _answerSdp: null,
+        version,
+        status: 'not closed',
+        onerror: sinon.stub(),
+        options: { dscp: true },
+        codecPreferences: undefined,
+      };
+      toTest = METHOD.bind(context, SDP, onMediaStarted);
     });
 
-    it('Should enable ice aggressive nomination when status not closed and answer is emitted', () => {
-      context.status = NOT_CLOSED;
-      context.pstream.on.callsArgWith(1, PAYLOAD);
-      context._maybeSetIceAggressiveNomination = sinon.stub();
+    it('Should set _answerSdp', () => {
       toTest();
-      sinon.assert.calledWithExactly(context._maybeSetIceAggressiveNomination, PAYLOAD.sdp);
+      assert.equal(context._answerSdp, SDP);
     });
 
-    it('Should call processAnswer when when status not closed and answer is emitted', () => {
-      context.status = NOT_CLOSED;
-      context.pstream.on.callsArgWith(1, PAYLOAD);
+    it('Should call _maybeSetIceAggressiveNomination with the sdp', () => {
+      context._maybeSetIceAggressiveNomination = sinon.stub().returns(SDP);
+      toTest = METHOD.bind(context, SDP, onMediaStarted);
       toTest();
-      assert.equal(context._answerSdp, PAYLOAD.sdp);
-      assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
-      assert(version.processAnswer.calledWithExactly(undefined, PAYLOAD.sdp, sinon.match.func, sinon.match.func));
+      sinon.assert.calledWithExactly(context._maybeSetIceAggressiveNomination, SDP);
+    });
+
+    it('Should not call processAnswer when status is closed', () => {
+      context.status = 'closed';
+      toTest = METHOD.bind(context, SDP, onMediaStarted);
+      toTest();
+      assert.equal(context._answerSdp, SDP);
+      assert.equal(version.processAnswer.called, false);
+    });
+
+    it('Should call version.processAnswer when status is not closed', () => {
+      toTest();
+      assert(version.processAnswer.calledWithExactly(undefined, SDP, sinon.match.func, sinon.match.func));
       assert(version.processAnswer.calledOn(version));
     });
 
-    it('Should call onerror and proxy error message when processAnswer calls error callback', () => {
-      context.status = NOT_CLOSED;
-      context.pstream.on.callsArgWith(1, PAYLOAD);
+    it('Should call onerror when processAnswer calls error callback with Error object', () => {
       version.processAnswer.callsArgWith(3, ERROR);
       toTest();
-      assert.equal(context._answerSdp, PAYLOAD.sdp);
-      assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
-      assert(version.processAnswer.calledWithExactly(undefined, PAYLOAD.sdp, sinon.match.func, sinon.match.func));
-      assert(version.processAnswer.calledOn(version));
       assert(context.onerror.calledWithMatch(EXPECTED_PROCESSING_ERROR));
     });
 
-    it('Should call onerror and proxy message when processAnswer calls error callback', () => {
-      context.status = NOT_CLOSED;
-      context.pstream.on.callsArgWith(1, PAYLOAD);
+    it('Should call onerror when processAnswer calls error callback with string', () => {
       version.processAnswer.callsArgWith(3, ERROR_MESSAGE);
       toTest();
-      assert.equal(context._answerSdp, PAYLOAD.sdp);
-      assert.equal(callback.called, false);
-      assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
-      assert(version.processAnswer.calledWithExactly(undefined, PAYLOAD.sdp, sinon.match.func, sinon.match.func));
-      assert(version.processAnswer.calledOn(version));
       assert(context.onerror.calledWithMatch(EXPECTED_PROCESSING_ERROR));
       sinon.assert.notCalled(context._setEncodingParameters);
     });
 
-    it('Should call onAnswerSuccess and onMediaStarted with version pc when prcoessAnswer calls success callback', () => {
-      context.status = NOT_CLOSED;
-      context.pstream.on.callsArgWith(1, PAYLOAD);
+    it('Should call onMediaStarted with version.pc when processAnswer succeeds', () => {
       version.processAnswer.callsArgWith(2);
       toTest();
       assert.equal(context.onerror.called, false);
-      assert.equal(context._answerSdp, PAYLOAD.sdp);
-      assert(context.pstream.on.calledWithExactly('answer', sinon.match.func));
-      assert(version.processAnswer.calledWithExactly(undefined, PAYLOAD.sdp, sinon.match.func, sinon.match.func));
-      assert(version.processAnswer.calledOn(version));
-      assert(callback.calledWithExactly(version.pc));
+      assert(onMediaStarted.calledWithExactly(version.pc));
+    });
+
+    it('Should call _setEncodingParameters when processAnswer succeeds and options exist', () => {
+      version.processAnswer.callsArgWith(2);
+      toTest();
+      sinon.assert.calledOnce(context._setEncodingParameters);
+      sinon.assert.calledWithExactly(context._setEncodingParameters, true);
     });
   });
 

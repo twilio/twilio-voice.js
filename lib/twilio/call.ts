@@ -660,8 +660,30 @@ class Call extends EventEmitter {
         const params = Array.from(this.customParameters.entries()).map(pair =>
          `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
         this._pstream.on('answer', this._onAnswer);
-        this._mediaHandler.makeOutgoingCall(params, this._signalingReconnectToken,
-          this._options.reconnectCallSid || this.outboundConnectionId, rtcConfiguration, onAnswer);
+
+        const outgoingCallSid = this._options.reconnectCallSid || this.outboundConnectionId;
+
+        this._mediaHandler.makeOutgoingCall(outgoingCallSid, rtcConfiguration, (offerSdp: string) => {
+          const onPstreamAnswerOrRinging = (payload: any) => {
+            if (!payload.sdp) { return; }
+
+            this._pstream.removeListener('answer', onPstreamAnswerOrRinging);
+            this._pstream.removeListener('ringing', onPstreamAnswerOrRinging);
+
+            this._mediaHandler.processAnswer(payload.sdp, (pc: RTCPeerConnection) => {
+              onAnswer(pc);
+            });
+          };
+
+          this._pstream.on('answer', onPstreamAnswerOrRinging);
+          this._pstream.on('ringing', onPstreamAnswerOrRinging);
+
+          if (this._signalingReconnectToken) {
+            this._pstream.reconnect(offerSdp, outgoingCallSid, this._signalingReconnectToken);
+          } else {
+            this._pstream.invite(offerSdp, outgoingCallSid, params);
+          }
+        });
       }
     };
 
