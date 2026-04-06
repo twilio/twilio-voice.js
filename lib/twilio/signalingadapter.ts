@@ -42,7 +42,7 @@ export interface ISignalingAdapter extends EventEmitter {
 export class PStreamAdapter extends EventEmitter implements ISignalingAdapter {
   private readonly _pstream: any;
 
-  constructor(token: string, uris: string[], options?: Record<string, any>) {
+  constructor(token: string | null, uris: string[], options?: Record<string, any>) {
     super();
     this._pstream = new PStream(token, uris, options);
 

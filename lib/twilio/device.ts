@@ -110,7 +110,7 @@ export interface IExtendedDeviceOptions extends Device.Options {
   /**
    * Custom signaling adapter constructor (must implement ISignalingAdapter)
    */
-  PStream?: new (token: string, uris: string[], options?: Record<string, any>) => ISignalingAdapter;
+  PStream?: new (token: string | null, uris: string[], options?: Record<string, any>) => ISignalingAdapter;
 
   /**
    * Custom Publisher constructor
@@ -736,7 +736,10 @@ class Device extends EventEmitter {
 
     this._shouldReRegister = false;
 
-    const stream = await this._streamConnectedPromise;
+    // TODO: _streamConnectedPromise resolves to ISignalingAdapter | null; audit whether
+    // null is reachable here and add a proper guard if so.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const stream = (await this._streamConnectedPromise)!;
     const streamOfflinePromise = new Promise(resolve => {
       stream.on('offline', resolve);
     });
@@ -1066,7 +1069,9 @@ class Device extends EventEmitter {
     }, call);
 
     call.once('accept', () => {
-      this._stream.updatePreferredURI(this._preferredURI);
+      // TODO: _stream can be null by the time this callback fires; audit whether that is
+      // expected and handle it explicitly if so.
+      this._stream?.updatePreferredURI(this._preferredURI);
       this._removeCall(call);
       this._activeCall = call;
       if (this._audio) {
@@ -1546,8 +1551,11 @@ class Device extends EventEmitter {
     this._stream.addListener('offline', this._onSignalingOffline);
     this._stream.addListener('ready', this._onSignalingReady);
 
+    // TODO: _stream could theoretically be null inside the then callback if destroyed before
+    // the promise resolves; audit and add a proper guard if needed.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     return this._streamConnectedPromise =
-      promisifyEvents(this._stream, 'connected', 'close').then(() => this._stream);
+      promisifyEvents(this._stream, 'connected', 'close').then(() => this._stream!);
   }
 
   /**
