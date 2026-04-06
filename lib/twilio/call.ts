@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import Backoff from './backoff';
 import Device from './device';
 import DialtonePlayer from './dialtonePlayer';
+import { SignalingAdapter } from './signalingadapter';
 import {
   GeneralErrors,
   getPreciseSignalingErrorByCode,
@@ -266,7 +267,7 @@ class Call extends EventEmitter {
   /**
    * The signaling adapter to use for Twilio call signaling.
    */
-  private readonly _signalingAdapter: IPStream;
+  private readonly _signalingAdapter: SignalingAdapter;
 
   /**
    * An instance of EventPublisher.
@@ -1944,7 +1945,7 @@ namespace Call {
     /**
      * The signaling adapter to use for Twilio call signaling.
      */
-    signalingAdapter: IPStream;
+    signalingAdapter: SignalingAdapter;
 
     /**
      * An EventPublisher instance to use for publishing events
