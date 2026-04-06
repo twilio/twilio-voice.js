@@ -64,7 +64,7 @@ describe('SHAKEN/STIR', function() {
             data.payload.parameters.longProp = Array(100).fill(text).join(',');
             message.data = JSON.stringify(data);
           }
-          return devShim._stream.transport.__onSocketMessage(message);
+          return devShim._stream._pstream.transport.__onSocketMessage(message);
         };
 
         call1 = await (device1['connect'] as any)({
