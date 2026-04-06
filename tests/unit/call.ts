@@ -76,7 +76,7 @@ describe('Call', function() {
       audioHelper,
       onIgnore,
       publisher,
-      pstream,
+      signalingAdapter: pstream,
       soundcache,
     };
 
@@ -1187,9 +1187,9 @@ describe('Call', function() {
       });
     });
 
-    it('should throw if pstream is unavailable', () => {
+    it('should throw if signaling adapter is unavailable', () => {
       // @ts-ignore
-      conn._pstream = null;
+      conn._signalingAdapter = null;
       assert.throws(
         () => conn.sendMessage(message),
         new InvalidStateError(

@@ -1014,7 +1014,7 @@ class Device extends EventEmitter {
       onIgnore: (): void => {
         this._soundcache.get(Device.SoundName.Incoming).stop();
       },
-      pstream: await (this._streamConnectedPromise || this._setupStream()),
+      signalingAdapter: await (this._streamConnectedPromise || this._setupStream()),
       publisher: this._publisher,
       soundcache: this._soundcache,
     };
