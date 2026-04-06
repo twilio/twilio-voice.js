@@ -783,41 +783,11 @@ PeerConnection.prototype._setupRTCIceTransportListener = function() {
  * ICE Restart failures are ignored. Retries are managed in Connection
  * @private
  */
-PeerConnection.prototype.iceRestart = function() {
+PeerConnection.prototype.iceRestart = function(onOfferReady) {
   this._log.info('Attempting to restart ICE...');
   this._hasIceCandidates = false;
   this.version.createOffer(this.options.maxAverageBitrate, { iceRestart: true }).then(() => {
-    this._removeReconnectionListeners();
-
-    this._onAnswerOrRinging = payload => {
-      this._removeReconnectionListeners();
-
-      if (!payload.sdp || this.version.pc.signalingState !== 'have-local-offer') {
-        const message = 'Invalid state or param during ICE Restart:'
-          + `hasSdp:${!!payload.sdp}, signalingState:${this.version.pc.signalingState}`;
-        this._log.warn(message);
-        return;
-      }
-
-      const sdp = this._maybeSetIceAggressiveNomination(payload.sdp);
-      this._answerSdp = sdp;
-      if (this.status !== 'closed') {
-        this.version.processAnswer(this.codecPreferences, sdp, null, err => {
-          const message = err && err.message ? err.message : err;
-          this._log.error(`Failed to process answer during ICE Restart. Error: ${message}`);
-        });
-      }
-    };
-
-    this._onHangup = () => {
-      this._log.info('Received hangup during ICE Restart');
-      this._removeReconnectionListeners();
-    };
-
-    this.pstream.on('answer', this._onAnswerOrRinging);
-    this.pstream.on('hangup', this._onHangup);
-    this.pstream.reinvite(this.version.getSDP(), this.callSid);
-
+    onOfferReady(this.version.getSDP());
   }).catch((err) => {
     const message = err && err.message ? err.message : err;
     this._log.error(`Failed to createOffer during ICE Restart. Error: ${message}`);

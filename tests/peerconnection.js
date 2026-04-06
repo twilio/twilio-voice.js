@@ -599,15 +599,14 @@ describe('PeerConnection', () => {
   context('PeerConnection.prototype.iceRestart', () => {
     const METHOD = PeerConnection.prototype.iceRestart;
     const SDP = 'sdp';
-    const CALLSID = 'callsid';
 
     let context;
-    let options;
-    let pstream;
+    let onOfferReady;
     let toTest;
     let version;
 
     beforeEach(() => {
+      onOfferReady = sinon.stub();
       version = {
         createOffer: sinon.stub().returns({then: (cb) => {
           cb();
@@ -616,27 +615,14 @@ describe('PeerConnection', () => {
           }
         }}),
         getSDP: () => SDP,
-        pc: {
-          signalingState: 'have-local-offer'
-        },
-        processAnswer: sinon.stub().callsFake(() => {}),
-      };
-      options = {};
-      pstream = {
-        on: sinon.stub(),
-        reinvite: sinon.stub()
       };
       context = {
-        callSid: CALLSID,
-        codecPreferences: ['opus'],
         _log: log,
-        onerror: sinon.stub(),
-        options,
-        pstream,
-        _removeReconnectionListeners: sinon.stub(),
-        version
+        options: {},
+        version,
+        _hasIceCandidates: false,
       };
-      toTest = METHOD.bind(context);
+      toTest = METHOD.bind(context, onOfferReady);
       wait = () => new Promise(r => setTimeout(r, 0));
     });
 
@@ -650,17 +636,16 @@ describe('PeerConnection', () => {
     it('Should reset hasIceCandidates flag before ICE restart', () => {
       context._hasIceCandidates = true;
       toTest();
-      assert(!context._hasIceCandidates)
+      assert(!context._hasIceCandidates);
       return wait().then(() => {
         sinon.assert.calledOnce(version.createOffer);
       });
     });
 
-    it('Should publish reinvite', () => {
+    it('Should call onOfferReady with SDP after createOffer succeeds', () => {
       toTest();
       return wait().then(() => {
-        assert(!context._removeReconnectionListeners.notCalled);
-        assert(pstream.reinvite.calledWithExactly(SDP, CALLSID));
+        sinon.assert.calledWithExactly(onOfferReady, SDP);
       });
     });
 
@@ -670,45 +655,7 @@ describe('PeerConnection', () => {
       toTest();
       return wait().then(() => {
         sinon.assert.calledWithExactly(context.onfailed, 'foo');
-      });
-    });
-
-    it('Should release handlers if reinvite fail', () => {
-      toTest();
-      context._onHangup();
-      return wait().then(() => {
-        assert(!context._removeReconnectionListeners.notCalled);
-      });
-    });
-
-    it('Should release handlers if sdp is missing', () => {
-      toTest();
-      context._onAnswerOrRinging({});
-      return wait().then(() => {
-        sinon.assert.notCalled(version.processAnswer);
-        assert(!context._removeReconnectionListeners.notCalled);
-      });
-    });
-
-    it('Should release handlers if there is no local offer', () => {
-      version.pc.signalingState = 'stable';
-      toTest();
-      context._onAnswerOrRinging({ sdp: SDP });
-      return wait().then(() => {
-        sinon.assert.notCalled(version.processAnswer);
-        assert(!context._removeReconnectionListeners.notCalled);
-      });
-    });
-
-    it('Should set aggressive nomination before ICE restart', () => {
-      const sdp = 'foo';
-      context._maybeSetIceAggressiveNomination = sinon.stub().returns(sdp);
-      toTest();
-      context._onAnswerOrRinging({ sdp: 'bar' });
-      return wait().then(() => {
-        sinon.assert.calledWith(context.version.processAnswer, context.codecPreferences, sdp);
-        sinon.assert.calledWith(context._maybeSetIceAggressiveNomination, 'bar');
-        assert.equal(context._answerSdp, sdp);
+        sinon.assert.notCalled(onOfferReady);
       });
     });
   });

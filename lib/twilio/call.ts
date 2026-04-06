@@ -351,7 +351,30 @@ class Call extends EventEmitter {
     }
 
     this._mediaReconnectBackoff = new Backoff(BACKOFF_CONFIG);
-    this._mediaReconnectBackoff.on('ready', () => this._mediaHandler.iceRestart());
+    this._mediaReconnectBackoff.on('ready', () => {
+      this._mediaHandler.iceRestart((offerSdp: string) => {
+        const onAnswerOrRinging = (payload: any) => {
+          this._pstream.removeListener('answer', onAnswerOrRinging);
+          this._pstream.removeListener('hangup', onHangup);
+
+          if (!payload.sdp || !this._mediaHandler.version
+              || this._mediaHandler.version.pc.signalingState !== 'have-local-offer') {
+            return;
+          }
+
+          this._mediaHandler.processAnswer(payload.sdp, () => { /* noop for ICE restart */ });
+        };
+
+        const onHangup = () => {
+          this._pstream.removeListener('answer', onAnswerOrRinging);
+          this._pstream.removeListener('hangup', onHangup);
+        };
+
+        this._pstream.on('answer', onAnswerOrRinging);
+        this._pstream.on('hangup', onHangup);
+        this._pstream.reinvite(offerSdp, this.parameters.CallSid);
+      });
+    });
 
     // temporary call sid to be used for outgoing calls
     this.outboundConnectionId = generateTempCallSid();
