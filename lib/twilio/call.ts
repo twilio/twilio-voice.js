@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import Backoff from './backoff';
 import Device from './device';
 import DialtonePlayer from './dialtonePlayer';
-import { SignalingAdapter } from './signalingadapter';
+import { SignalingAdapter } from './signaling/signalingadapter';
 import {
   GeneralErrors,
   getPreciseSignalingErrorByCode,

@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import { EventEmitter } from 'events';
 import * as sinon from 'sinon';
-import { PStreamSignalingAdapter } from '../../lib/twilio/pstreamsignalingadapter';
+import { PStreamSignalingAdapter } from '../../lib/twilio/signaling/pstreamsignalingadapter';
 
 function createPStreamStub() {
   const emitter = new EventEmitter();

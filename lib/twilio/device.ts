@@ -19,7 +19,7 @@ import Publisher from './eventpublisher';
 import Log from './log';
 import { PreflightTest } from './preflight/preflight';
 import PStream from './pstream';
-import { PStreamSignalingAdapter } from './pstreamsignalingadapter';
+import { PStreamSignalingAdapter } from './signaling/pstreamsignalingadapter';
 import {
   createEventGatewayURI,
   createSignalingEndpointURL,
