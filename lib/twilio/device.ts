@@ -746,7 +746,8 @@ class Device extends EventEmitter {
     }
     const streamOfflinePromise = new Promise(resolve => {
       stream.on('offline', resolve);
-      stream.on('close', resolve);
+      // NOTE(VBLOCKS-6417): consider adding this close event here
+      // stream.on('close', resolve);
     });
     await this._sendPresence(false);
     await streamOfflinePromise;
