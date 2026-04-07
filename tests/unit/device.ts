@@ -748,6 +748,65 @@ describe('Device', function() {
             });
           });
         });
+
+        describe('useSip validation', () => {
+          it('should throw if useSip is true but sipServer is not provided', () => {
+            assert.throws(
+              () => device.updateOptions({
+                useSip: true,
+                sipCredentials: { username: 'u', password: 'p' },
+              } as any),
+              /sipServer.*required/,
+            );
+          });
+
+          it('should throw if useSip is true but sipCredentials is not provided', () => {
+            assert.throws(
+              () => device.updateOptions({
+                useSip: true,
+                sipServer: 'wss://sip.example.com',
+              } as any),
+              /sipCredentials.*required/,
+            );
+          });
+
+          it('should throw if useSip is true but sipCredentials.username is missing', () => {
+            assert.throws(
+              () => device.updateOptions({
+                useSip: true,
+                sipServer: 'wss://sip.example.com',
+                sipCredentials: { username: '', password: 'p' },
+              } as any),
+              /sipCredentials.*required/,
+            );
+          });
+
+          it('should throw if useSip is true but sipCredentials.password is missing', () => {
+            assert.throws(
+              () => device.updateOptions({
+                useSip: true,
+                sipServer: 'wss://sip.example.com',
+                sipCredentials: { username: 'u', password: '' },
+              } as any),
+              /sipCredentials.*required/,
+            );
+          });
+
+          it('should not throw if useSip is true with valid sipServer and sipCredentials', () => {
+            assert.doesNotThrow(
+              () => device.updateOptions({
+                useSip: true,
+                sipServer: 'wss://sip.example.com',
+                sipCredentials: { username: 'u', password: 'p' },
+              } as any),
+            );
+          });
+
+          it('should not throw if useSip is false or not set', () => {
+            assert.doesNotThrow(() => device.updateOptions({ useSip: false } as any));
+            assert.doesNotThrow(() => device.updateOptions({}));
+          });
+        });
       });
 
       describe('.updateToken()', () => {

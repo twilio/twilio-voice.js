@@ -336,6 +336,7 @@ class Device extends EventEmitter {
     preflight: false,
     sounds: { },
     tokenRefreshMs: 10000,
+    useSip: false,
     voiceEventSidGenerator: generateVoiceEventSid,
   };
 
@@ -766,6 +767,19 @@ class Device extends EventEmitter {
     }
 
     this._options = { ...this._defaultOptions, ...this._options, ...options };
+
+    if (this._options.useSip) {
+      if (!this._options.sipServer) {
+        throw new InvalidArgumentError('`sipServer` is required when `useSip` is true');
+      }
+      if (!this._options.sipCredentials
+        || !this._options.sipCredentials.username
+        || !this._options.sipCredentials.password) {
+        throw new InvalidArgumentError(
+          '`sipCredentials` with `username` and `password` are required when `useSip` is true',
+        );
+      }
+    }
 
     const originalChunderURIs: Set<string> = new Set(this._chunderURIs);
 
@@ -1538,6 +1552,11 @@ class Device extends EventEmitter {
       this._destroyStream();
     }
 
+    if (this._options.useSip) {
+      this._log.info('Setting up SIP signaling');
+      // TODO(VBLOCKS-6371): Replace with SipSignalingAdapter
+    }
+
     this._log.info('Setting up VSP');
     const pstream = new (this._options.PStream || PStream)(
       this.token,
@@ -2100,6 +2119,21 @@ namespace Device {
     RTCPeerConnection?: any;
 
     /**
+     * SIP digest authentication credentials, required when
+     * {@link Device.Options.useSip} is `true`.
+     */
+    sipCredentials?: {
+      username: string;
+      password: string;
+    };
+
+    /**
+     * The SIP WebSocket server URL to connect to when {@link Device.Options.useSip}
+     * is `true` (e.g. `'wss://sip.example.com'`).
+     */
+    sipServer?: string;
+
+    /**
      * A mapping of custom sound URLs by sound name.
      */
     sounds?: Partial<Record<Device.SoundName, string>>;
@@ -2109,6 +2143,15 @@ namespace Device {
      * Default is 10000 (10 seconds).
      */
     tokenRefreshMs?: number;
+
+    /**
+     * Set to `true` to use SIP over WebSocket for signaling instead of the
+     * default Twilio signaling protocol. When enabled, {@link Device.Options.sipServer}
+     * and {@link Device.Options.sipCredentials} are required.
+     *
+     * @default false
+     */
+    useSip?: boolean;
   }
 }
 
