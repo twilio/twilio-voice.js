@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import Backoff from './backoff';
 import Device from './device';
 import DialtonePlayer from './dialtonePlayer';
+import { SignalingAdapter } from './signaling/signalingadapter';
 import {
   GeneralErrors,
   getPreciseSignalingErrorByCode,
@@ -264,9 +265,9 @@ class Call extends EventEmitter {
   private _outputVolumeStreak: number = 0;
 
   /**
-   * The PStream instance to use for Twilio call signaling.
+   * The signaling adapter to use for Twilio call signaling.
    */
-  private readonly _pstream: IPStream;
+  private readonly _signalingAdapter: SignalingAdapter;
 
   /**
    * An instance of EventPublisher.
@@ -351,7 +352,30 @@ class Call extends EventEmitter {
     }
 
     this._mediaReconnectBackoff = new Backoff(BACKOFF_CONFIG);
-    this._mediaReconnectBackoff.on('ready', () => this._mediaHandler.iceRestart());
+    this._mediaReconnectBackoff.on('ready', () => {
+      this._mediaHandler.iceRestart((offerSdp: string) => {
+        const onAnswerOrRinging = (payload: any) => {
+          this._signalingAdapter.removeListener('answer', onAnswerOrRinging);
+          this._signalingAdapter.removeListener('hangup', onHangup);
+
+          if (!payload.sdp || !this._mediaHandler.version
+              || this._mediaHandler.version.pc.signalingState !== 'have-local-offer') {
+            return;
+          }
+
+          this._mediaHandler.processAnswer(payload.sdp, () => { /* noop for ICE restart */ });
+        };
+
+        const onHangup = () => {
+          this._signalingAdapter.removeListener('answer', onAnswerOrRinging);
+          this._signalingAdapter.removeListener('hangup', onHangup);
+        };
+
+        this._signalingAdapter.on('answer', onAnswerOrRinging);
+        this._signalingAdapter.on('hangup', onHangup);
+        this._signalingAdapter.reinvite(offerSdp, this.parameters.CallSid);
+      });
+    });
 
     // temporary call sid to be used for outgoing calls
     this.outboundConnectionId = generateTempCallSid();
@@ -385,12 +409,13 @@ class Call extends EventEmitter {
     });
 
     this._mediaHandler = new (this._options.MediaHandler)
-      (config.audioHelper, config.pstream, {
+      (config.audioHelper, {
         MediaStream: this._options.MediaStream,
         RTCPeerConnection: this._options.RTCPeerConnection,
         codecPreferences: this._options.codecPreferences,
         dscp: this._options.dscp,
         forceAggressiveIceNomination: this._options.forceAggressiveIceNomination,
+        isSignalingDisconnected: () => this._signalingAdapter.status === 'disconnected',
         maxAverageBitrate: this._options.maxAverageBitrate,
       });
 
@@ -552,21 +577,21 @@ class Call extends EventEmitter {
       }
     };
 
-    this._pstream = config.pstream;
-    this._pstream.on('ack', this._onAck);
-    this._pstream.on('cancel', this._onCancel);
-    this._pstream.on('error', this._onSignalingError);
-    this._pstream.on('ringing', this._onRinging);
-    this._pstream.on('transportClose', this._onTransportClose);
-    this._pstream.on('connected', this._onConnected);
-    this._pstream.on('message', this._onMessageReceived);
+    this._signalingAdapter = config.signalingAdapter;
+    this._signalingAdapter.on('ack', this._onAck);
+    this._signalingAdapter.on('cancel', this._onCancel);
+    this._signalingAdapter.on('error', this._onSignalingError);
+    this._signalingAdapter.on('ringing', this._onRinging);
+    this._signalingAdapter.on('transportClose', this._onTransportClose);
+    this._signalingAdapter.on('connected', this._onConnected);
+    this._signalingAdapter.on('message', this._onMessageReceived);
 
     this.on('error', error => {
       this._publisher.error('connection', 'error', {
         code: error.code, message: error.message,
       }, this);
 
-      if (this._pstream && this._pstream.status === 'disconnected') {
+      if (this._signalingAdapter && this._signalingAdapter.status === 'disconnected') {
         this._cleanupEventListeners();
       }
     });
@@ -649,19 +674,51 @@ class Call extends EventEmitter {
         });
       }
 
-      this._pstream.addListener('hangup', this._onHangup);
+      this._signalingAdapter.addListener('hangup', this._onHangup);
 
       if (this._direction === Call.CallDirection.Incoming) {
         this._isAnswered = true;
-        this._pstream.on('answer', this._onAnswer);
+        this._signalingAdapter.on('answer', this._onAnswer);
         this._mediaHandler.answerIncomingCall(this.parameters.CallSid,
-          this._options.offerSdp, rtcConfiguration, onAnswer);
+          this._options.offerSdp, rtcConfiguration,
+          (answerSdp: string) => {
+            this._signalingAdapter.answer(answerSdp, this.parameters.CallSid);
+          },
+          onAnswer);
       } else {
         const params = Array.from(this.customParameters.entries()).map(pair =>
          `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
-        this._pstream.on('answer', this._onAnswer);
-        this._mediaHandler.makeOutgoingCall(params, this._signalingReconnectToken,
-          this._options.reconnectCallSid || this.outboundConnectionId, rtcConfiguration, onAnswer);
+        this._signalingAdapter.on('answer', this._onAnswer);
+
+        const outgoingCallSid = this._options.reconnectCallSid || this.outboundConnectionId!;
+
+        this._mediaHandler.makeOutgoingCall(outgoingCallSid, rtcConfiguration, (offerSdp: string) => {
+          const onPstreamAnswerOrRinging = (payload: any) => {
+            if (!payload.sdp) { return; }
+
+            this._signalingAdapter.removeListener('answer', onPstreamAnswerOrRinging);
+            this._signalingAdapter.removeListener('ringing', onPstreamAnswerOrRinging);
+
+            this._mediaHandler.processAnswer(payload.sdp, (pc: RTCPeerConnection) => {
+              onAnswer(pc);
+            });
+          };
+
+          this._signalingAdapter.on('answer', onPstreamAnswerOrRinging);
+          this._signalingAdapter.on('ringing', onPstreamAnswerOrRinging);
+
+          if (this._signalingReconnectToken) {
+            this._signalingAdapter.reconnect(offerSdp, outgoingCallSid, this._signalingReconnectToken);
+          } else {
+            this._signalingAdapter.invite(offerSdp, outgoingCallSid, params);
+          }
+
+          // NOTE(VBLOCKS-6417): in the original implementation, the RTC DTLS
+          // transport was set up _after_ the reconnect/invite message was sent
+          // over signaling. Therefore, to maintain exact behavior, we invoke
+          // self._setupDTLSTransport in the media handler after this method
+          // finishes. See peerconnection.makeOutgoingCall.
+        });
       }
     };
 
@@ -816,7 +873,7 @@ class Call extends EventEmitter {
     }
 
     this._isRejected = true;
-    this._pstream.reject(this.parameters.CallSid);
+    this._signalingAdapter.reject(this.parameters.CallSid);
     this._mediaHandler.reject(this.parameters.CallSid);
     this._publisher.info('connection', 'rejected-by-local', null, this);
     this._cleanupEventListeners();
@@ -889,8 +946,8 @@ class Call extends EventEmitter {
     // send pstream message to send DTMF
     this._log.info('Sending digits over PStream');
 
-    if (this._pstream !== null && this._pstream.status !== 'disconnected') {
-      this._pstream.dtmf(this.parameters.CallSid, digits);
+    if (this._signalingAdapter !== null && this._signalingAdapter.status !== 'disconnected') {
+      this._signalingAdapter.dtmf(this.parameters.CallSid, digits);
     } else {
       const error = new GeneralErrors.ConnectionError('Could not send DTMF: Signaling channel is disconnected');
       this._log.debug('#error', error);
@@ -925,7 +982,7 @@ class Call extends EventEmitter {
       );
     }
 
-    if (this._pstream === null) {
+    if (this._signalingAdapter === null) {
       throw new InvalidStateError(
         'Could not send CallMessage; Signaling channel is disconnected',
       );
@@ -940,7 +997,7 @@ class Call extends EventEmitter {
 
     const voiceEventSid = this._voiceEventSidGenerator();
     this._messages.set(voiceEventSid, { content, contentType, messageType, voiceEventSid });
-    this._pstream.sendMessage(callSid, content, contentType, messageType, voiceEventSid);
+    this._signalingAdapter.sendMessage(callSid!, content, contentType, messageType, voiceEventSid);
     return voiceEventSid;
   }
 
@@ -990,17 +1047,17 @@ class Call extends EventEmitter {
    */
   private _cleanupEventListeners(): void {
     const cleanup = () => {
-      if (!this._pstream) { return; }
+      if (!this._signalingAdapter) { return; }
 
-      this._pstream.removeListener('ack', this._onAck);
-      this._pstream.removeListener('answer', this._onAnswer);
-      this._pstream.removeListener('cancel', this._onCancel);
-      this._pstream.removeListener('error', this._onSignalingError);
-      this._pstream.removeListener('hangup', this._onHangup);
-      this._pstream.removeListener('ringing', this._onRinging);
-      this._pstream.removeListener('transportClose', this._onTransportClose);
-      this._pstream.removeListener('connected', this._onConnected);
-      this._pstream.removeListener('message', this._onMessageReceived);
+      this._signalingAdapter.removeListener('ack', this._onAck);
+      this._signalingAdapter.removeListener('answer', this._onAnswer);
+      this._signalingAdapter.removeListener('cancel', this._onCancel);
+      this._signalingAdapter.removeListener('error', this._onSignalingError);
+      this._signalingAdapter.removeListener('hangup', this._onHangup);
+      this._signalingAdapter.removeListener('ringing', this._onRinging);
+      this._signalingAdapter.removeListener('transportClose', this._onTransportClose);
+      this._signalingAdapter.removeListener('connected', this._onConnected);
+      this._signalingAdapter.removeListener('message', this._onMessageReceived);
     };
 
     // This is kind of a hack, but it lets us avoid rewriting more code.
@@ -1055,10 +1112,10 @@ class Call extends EventEmitter {
     this._log.info('Disconnecting...');
 
     // send pstream hangup message
-    if (this._pstream !== null && this._pstream.status !== 'disconnected' && this._shouldSendHangup) {
+    if (this._signalingAdapter !== null && this._signalingAdapter.status !== 'disconnected' && this._shouldSendHangup) {
       const callsid: string | undefined = this.parameters.CallSid || this.outboundConnectionId;
       if (callsid) {
-        this._pstream.hangup(callsid, message);
+        this._signalingAdapter.hangup(callsid, message);
       }
     }
 
@@ -1184,7 +1241,7 @@ class Call extends EventEmitter {
       this._status = Call.State.Closed;
       this._log.debug('#cancel');
       this.emit('cancel');
-      this._pstream.removeListener('cancel', this._onCancel);
+      this._signalingAdapter.removeListener('cancel', this._onCancel);
     }
   }
 
@@ -1195,7 +1252,7 @@ class Call extends EventEmitter {
   private _onConnected = (): void => {
     this._log.info('Received connected from pstream');
     if (this._signalingReconnectToken && this._mediaHandler.version) {
-      this._pstream.reconnect(
+      this._signalingAdapter.reconnect(
         this._mediaHandler.version.getSDP(),
         this.parameters.CallSid,
         this._signalingReconnectToken,
@@ -1892,9 +1949,9 @@ namespace Call {
     onIgnore: () => void;
 
     /**
-     * The PStream instance to use for Twilio call signaling.
+     * The signaling adapter to use for Twilio call signaling.
      */
-    pstream: IPStream;
+    signalingAdapter: SignalingAdapter;
 
     /**
      * An EventPublisher instance to use for publishing events

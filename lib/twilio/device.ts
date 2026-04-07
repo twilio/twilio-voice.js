@@ -19,6 +19,8 @@ import Publisher from './eventpublisher';
 import Log from './log';
 import { PreflightTest } from './preflight/preflight';
 import PStream from './pstream';
+import { PStreamSignalingAdapter } from './signaling/pstreamsignalingadapter';
+import { SignalingAdapter } from './signaling/signalingadapter';
 import {
   createEventGatewayURI,
   createSignalingEndpointURL,
@@ -429,12 +431,12 @@ class Device extends EventEmitter {
   /**
    * The Signaling stream.
    */
-  private _stream: IPStream | null = null;
+  private _stream: SignalingAdapter | null = null;
 
   /**
    * A promise that will resolve when the Signaling stream is ready.
    */
-  private _streamConnectedPromise: Promise<IPStream> | null = null;
+  private _streamConnectedPromise: Promise<SignalingAdapter> | null = null;
 
   /**
    * The JWT string currently being used to authenticate this {@link Device}.
@@ -737,8 +739,15 @@ class Device extends EventEmitter {
     this._shouldReRegister = false;
 
     const stream = await this._streamConnectedPromise;
+    if (!stream) {
+      this._log.warn('unregister called without an active stream');
+      this._setState(Device.State.Unregistered);
+      return;
+    }
     const streamOfflinePromise = new Promise(resolve => {
       stream.on('offline', resolve);
+      // NOTE(VBLOCKS-6417): consider adding this close event here
+      // stream.on('close', resolve);
     });
     await this._sendPresence(false);
     await streamOfflinePromise;
@@ -1014,7 +1023,7 @@ class Device extends EventEmitter {
       onIgnore: (): void => {
         this._soundcache.get(Device.SoundName.Incoming).stop();
       },
-      pstream: await (this._streamConnectedPromise || this._setupStream()),
+      signalingAdapter: await (this._streamConnectedPromise || this._setupStream()),
       publisher: this._publisher,
       soundcache: this._soundcache,
     };
@@ -1066,7 +1075,7 @@ class Device extends EventEmitter {
     }, call);
 
     call.once('accept', () => {
-      this._stream.updatePreferredURI(this._preferredURI);
+      this._stream?.updatePreferredURI(this._preferredURI);
       this._removeCall(call);
       this._activeCall = call;
       if (this._audio) {
@@ -1523,14 +1532,14 @@ class Device extends EventEmitter {
    * Set up the connection to the signaling server. Tears down an existing
    * stream if called while a stream exists.
    */
-  private _setupStream(): Promise<IPStream> {
+  private _setupStream(): Promise<SignalingAdapter> {
     if (this._stream) {
       this._log.info('Found existing stream; destroying...');
       this._destroyStream();
     }
 
     this._log.info('Setting up VSP');
-    this._stream = new (this._options.PStream || PStream)(
+    const pstream = new (this._options.PStream || PStream)(
       this.token,
       this._chunderURIs,
       {
@@ -1538,6 +1547,7 @@ class Device extends EventEmitter {
         maxPreferredDurationMs: this._options.maxCallSignalingTimeoutMs,
       },
     );
+    this._stream = new PStreamSignalingAdapter(pstream);
 
     this._stream.addListener('close', this._onSignalingClose);
     this._stream.addListener('connected', this._onSignalingConnected);
@@ -1547,7 +1557,12 @@ class Device extends EventEmitter {
     this._stream.addListener('ready', this._onSignalingReady);
 
     return this._streamConnectedPromise =
-      promisifyEvents(this._stream, 'connected', 'close').then(() => this._stream);
+      promisifyEvents(this._stream, 'connected', 'close').then(() => {
+        if (!this._stream) {
+          throw new Error('Stream closed during connection');
+        }
+        return this._stream;
+      });
   }
 
   /**

@@ -19,18 +19,17 @@ const VOLUME_INTERVAL_MS = 50;
 /**
  * @typedef {Object} PeerConnection
  * @param audioHelper
- * @param pstream
  * @param options
  * @return {PeerConnection}
  * @constructor
  */
-function PeerConnection(audioHelper, pstream, options) {
-  if (!audioHelper || !pstream) {
-    throw new InvalidArgumentError('Audiohelper, and pstream are required arguments');
+function PeerConnection(audioHelper, options) {
+  if (!audioHelper) {
+    throw new InvalidArgumentError('Audiohelper is a required argument');
   }
 
   if (!(this instanceof PeerConnection)) {
-    return new PeerConnection(audioHelper, pstream, options);
+    return new PeerConnection(audioHelper, options);
   }
 
   this._log = new Log('PeerConnection');
@@ -56,7 +55,6 @@ function PeerConnection(audioHelper, pstream, options) {
   this.onselectedcandidatepairchange = noop;
   this.onvolume = noop;
   this.version = null;
-  this.pstream = pstream;
   this.stream = null;
   this.sinkIds = new Set(['default']);
   this.outputs = new Map();
@@ -717,7 +715,7 @@ PeerConnection.prototype._initializeMediaStream = function(rtcConfiguration) {
   if (this.status === 'open') {
     return false;
   }
-  if (this.pstream.status === 'disconnected') {
+  if (this.options.isSignalingDisconnected && this.options.isSignalingDisconnected()) {
     this.onerror({ info: {
       code: 31000,
       message: 'Cannot establish connection. Client is disconnected',
@@ -731,16 +729,6 @@ PeerConnection.prototype._initializeMediaStream = function(rtcConfiguration) {
   return true;
 };
 
-/**
- * Remove reconnection-related listeners
- * @private
- */
-PeerConnection.prototype._removeReconnectionListeners = function() {
-  if (this.pstream) {
-    this.pstream.removeListener('answer', this._onAnswerOrRinging);
-    this.pstream.removeListener('hangup', this._onHangup);
-  }
-};
 
 /**
  * Setup a listener for RTCDtlsTransport to capture state changes events
@@ -783,41 +771,11 @@ PeerConnection.prototype._setupRTCIceTransportListener = function() {
  * ICE Restart failures are ignored. Retries are managed in Connection
  * @private
  */
-PeerConnection.prototype.iceRestart = function() {
+PeerConnection.prototype.iceRestart = function(onOfferReady) {
   this._log.info('Attempting to restart ICE...');
   this._hasIceCandidates = false;
   this.version.createOffer(this.options.maxAverageBitrate, { iceRestart: true }).then(() => {
-    this._removeReconnectionListeners();
-
-    this._onAnswerOrRinging = payload => {
-      this._removeReconnectionListeners();
-
-      if (!payload.sdp || this.version.pc.signalingState !== 'have-local-offer') {
-        const message = 'Invalid state or param during ICE Restart:'
-          + `hasSdp:${!!payload.sdp}, signalingState:${this.version.pc.signalingState}`;
-        this._log.warn(message);
-        return;
-      }
-
-      const sdp = this._maybeSetIceAggressiveNomination(payload.sdp);
-      this._answerSdp = sdp;
-      if (this.status !== 'closed') {
-        this.version.processAnswer(this.codecPreferences, sdp, null, err => {
-          const message = err && err.message ? err.message : err;
-          this._log.error(`Failed to process answer during ICE Restart. Error: ${message}`);
-        });
-      }
-    };
-
-    this._onHangup = () => {
-      this._log.info('Received hangup during ICE Restart');
-      this._removeReconnectionListeners();
-    };
-
-    this.pstream.on('answer', this._onAnswerOrRinging);
-    this.pstream.on('hangup', this._onHangup);
-    this.pstream.reinvite(this.version.getSDP(), this.callSid);
-
+    onOfferReady(this.version.getSDP());
   }).catch((err) => {
     const message = err && err.message ? err.message : err;
     this._log.error(`Failed to createOffer during ICE Restart. Error: ${message}`);
@@ -827,48 +785,23 @@ PeerConnection.prototype.iceRestart = function() {
   });
 };
 
-PeerConnection.prototype.makeOutgoingCall = function(params, signalingReconnectToken, callsid, rtcConfiguration, onMediaStarted) {
+PeerConnection.prototype.makeOutgoingCall = function(callsid, rtcConfiguration, onOfferReady) {
   if (!this._initializeMediaStream(rtcConfiguration)) {
     return;
   }
 
   const self = this;
   this.callSid = callsid;
-  function onAnswerSuccess() {
-    if (self.options) {
-      self._setEncodingParameters(self.options.dscp);
-    }
-    onMediaStarted(self.version.pc);
-  }
-  function onAnswerError(err) {
-    const errMsg = err.message || err;
-    self.onerror({ info: {
-      code: 31000,
-      message: `Error processing answer: ${errMsg}`,
-      twilioError: new MediaErrors.ClientRemoteDescFailed(),
-    } });
-  }
-  this._onAnswerOrRinging = payload => {
-    if (!payload.sdp) { return; }
-
-    const sdp = this._maybeSetIceAggressiveNomination(payload.sdp);
-    self._answerSdp = sdp;
-    if (self.status !== 'closed') {
-      self.version.processAnswer(this.codecPreferences, sdp, onAnswerSuccess, onAnswerError);
-    }
-    self.pstream.removeListener('answer', self._onAnswerOrRinging);
-    self.pstream.removeListener('ringing', self._onAnswerOrRinging);
-  };
-  this.pstream.on('answer', this._onAnswerOrRinging);
-  this.pstream.on('ringing', this._onAnswerOrRinging);
 
   function onOfferSuccess() {
     if (self.status !== 'closed') {
-      if (signalingReconnectToken) {
-        self.pstream.reconnect(self.version.getSDP(), self.callSid, signalingReconnectToken);
-      } else {
-        self.pstream.invite(self.version.getSDP(), self.callSid, params);
-      }
+      // NOTE(VBLOCKS-6417): in the original implementation, the RTC DTLS
+      // transport was set up _after_ the reconnect/invite message was sent
+      // over signaling. Therefore, to maintain exact behavior, we invoke
+      // self._setupDTLSTransport in the media handler after this method
+      // finishes.
+      onOfferReady(self.version.getSDP());
+
       self._setupRTCDtlsTransportListener();
     }
   }
@@ -884,7 +817,29 @@ PeerConnection.prototype.makeOutgoingCall = function(params, signalingReconnectT
 
   this.version.createOffer(this.options.maxAverageBitrate, { audio: true }, onOfferSuccess, onOfferError);
 };
-PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfiguration, onMediaStarted) {
+
+PeerConnection.prototype.processAnswer = function(sdp, onMediaStarted) {
+  const processedSdp = this._maybeSetIceAggressiveNomination(sdp);
+  this._answerSdp = processedSdp;
+
+  if (this.status === 'closed') { return; }
+
+  const self = this;
+  this.version.processAnswer(this.codecPreferences, processedSdp, function onSuccess() {
+    if (self.options) {
+      self._setEncodingParameters(self.options.dscp);
+    }
+    onMediaStarted(self.version.pc);
+  }, function onError(err) {
+    const errMsg = err.message || err;
+    self.onerror({ info: {
+      code: 31000,
+      message: `Error processing answer: ${errMsg}`,
+      twilioError: new MediaErrors.ClientRemoteDescFailed(),
+    } });
+  });
+};
+PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfiguration, onAnswerReady, onMediaStarted) {
   if (!this._initializeMediaStream(rtcConfiguration)) {
     return;
   }
@@ -894,7 +849,7 @@ PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfigur
   const self = this;
   function onAnswerSuccess() {
     if (self.status !== 'closed') {
-      self.pstream.answer(self.version.getSDP(), callSid);
+      onAnswerReady(self.version.getSDP());
       if (self.options) {
         self._setEncodingParameters(self.options.dscp);
       }
@@ -925,7 +880,6 @@ PeerConnection.prototype.close = function() {
     this._stopStream();
   }
   this.stream = null;
-  this._removeReconnectionListeners();
   this._stopIceGatheringTimeout();
   this._audioHelper._destroyRemoteProcessedStream();
   this._audioProcessorEventObserver.removeListener('add', this._onAudioProcessorAdded);

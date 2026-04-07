@@ -53,8 +53,9 @@ describe('SHAKEN/STIR', function() {
           call2 = call;
         });
         const devShim = device2 as any;
-        devShim._stream.transport.__onSocketMessage = devShim._stream.transport._onSocketMessage;
-        devShim._stream.transport._onSocketMessage = (message: any) => {
+        const pstream = devShim._stream._pstream;
+        pstream.transport.__onSocketMessage = pstream.transport._onSocketMessage;
+        pstream.transport._onSocketMessage = (message: any) => {
           if (message && message.data && typeof message.data === 'string') {
             const data = JSON.parse(message.data);
             const text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
@@ -64,7 +65,7 @@ describe('SHAKEN/STIR', function() {
             data.payload.parameters.longProp = Array(100).fill(text).join(',');
             message.data = JSON.stringify(data);
           }
-          return devShim._stream.transport.__onSocketMessage(message);
+          return pstream.transport.__onSocketMessage(message);
         };
 
         call1 = await (device1['connect'] as any)({

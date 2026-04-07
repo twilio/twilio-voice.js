@@ -32,7 +32,7 @@ describe('Call', function() {
     mediaHandler.setInputTracksFromStream = sinon.spy((rejectCode?: number) => {
       return rejectCode ? Promise.reject({ code: rejectCode }) : Promise.resolve();
     });
-    mediaHandler.answerIncomingCall = sinon.spy((a: any, b: any, c: RTCConfiguration, cb: Function) => {
+    mediaHandler.answerIncomingCall = sinon.spy((a: any, b: any, c: RTCConfiguration, onAnswerReady: Function, cb: Function) => {
       callback = cb;
       rtcConfig = c;
     });
@@ -76,7 +76,7 @@ describe('Call', function() {
       audioHelper,
       onIgnore,
       publisher,
-      pstream,
+      signalingAdapter: pstream,
       soundcache,
     };
 
@@ -555,6 +555,7 @@ describe('Call', function() {
 
       context('when outgoing', () => {
         let callback: Function;
+        let onOfferReady: Function;
 
         const setup = (callOptions = {}) => {
           getInputStream = sinon.spy(() => 'foo');
@@ -582,37 +583,21 @@ describe('Call', function() {
             return p;
           });
 
-          mediaHandler.makeOutgoingCall = sinon.spy((a: any, b: any, c: any, d: any, _callback: Function) => {
-            callback = _callback;
+          mediaHandler.makeOutgoingCall = sinon.spy((a: any, b: any, _onOfferReady: Function) => {
+            onOfferReady = _onOfferReady;
+          });
+          mediaHandler.processAnswer = sinon.spy((sdp: string, cb: Function) => {
+            callback = cb;
           });
         };
 
         beforeEach(() => setup());
 
-        it('should call mediaHandler.makeOutgoingCall with correctly encoded params', () => {
-          conn.accept();
-          return wait.then(() => {
-            sinon.assert.calledOnce(mediaHandler.makeOutgoingCall);
-            assert.equal(mediaHandler.makeOutgoingCall.args[0][0],
-              'To=foo&a=undefined&b=true&c=false&d=&e=123&f=123&g=null&h=undefined&i=null&j=0&k=0&l=a%24b%26c%3Fd%3De');
-          });
-        });
-
-        it('should call mediaHandler.makeOutgoingCall with a reconnectToken', () => {
-          setup({ reconnectToken: 'testReconnectToken' });
-          conn.accept();
-          return wait.then(() => {
-            sinon.assert.calledOnce(mediaHandler.makeOutgoingCall);
-            assert.equal(mediaHandler.makeOutgoingCall.args[0][1],
-              'testReconnectToken');
-          });
-        });
-
         it('should call mediaHandler.makeOutgoingCall with a temp callsid', () => {
           conn.accept();
           return wait.then(() => {
             sinon.assert.calledOnce(mediaHandler.makeOutgoingCall);
-            assert.equal(mediaHandler.makeOutgoingCall.args[0][2],
+            assert.equal(mediaHandler.makeOutgoingCall.args[0][0],
               conn.outboundConnectionId);
           });
         });
@@ -622,7 +607,7 @@ describe('Call', function() {
           conn.accept();
           return wait.then(() => {
             sinon.assert.calledOnce(mediaHandler.makeOutgoingCall);
-            assert.equal(mediaHandler.makeOutgoingCall.args[0][2],
+            assert.equal(mediaHandler.makeOutgoingCall.args[0][0],
               'testReconnectCallsid');
           });
         });
@@ -633,7 +618,39 @@ describe('Call', function() {
           };
           conn.accept({ rtcConfiguration });
           return wait.then(() => {
-            assert.deepEqual(mediaHandler.makeOutgoingCall.args[0][3], rtcConfiguration);
+            assert.deepEqual(mediaHandler.makeOutgoingCall.args[0][1], rtcConfiguration);
+          });
+        });
+
+        it('should call pstream.invite with correctly encoded params when onOfferReady fires', () => {
+          conn.accept();
+          return wait.then(() => {
+            onOfferReady('offer-sdp');
+            sinon.assert.calledOnce(pstream.invite);
+            assert.equal(pstream.invite.args[0][0], 'offer-sdp');
+            assert.equal(pstream.invite.args[0][2],
+              'To=foo&a=undefined&b=true&c=false&d=&e=123&f=123&g=null&h=undefined&i=null&j=0&k=0&l=a%24b%26c%3Fd%3De');
+          });
+        });
+
+        it('should call pstream.reconnect when reconnectToken is set', () => {
+          setup({ reconnectToken: 'testReconnectToken' });
+          conn.accept();
+          return wait.then(() => {
+            onOfferReady('offer-sdp');
+            sinon.assert.calledOnce(pstream.reconnect);
+            assert.equal(pstream.reconnect.args[0][0], 'offer-sdp');
+            assert.equal(pstream.reconnect.args[0][2], 'testReconnectToken');
+          });
+        });
+
+        it('should call mediaHandler.processAnswer when pstream emits answer with sdp', () => {
+          conn.accept();
+          return wait.then(() => {
+            onOfferReady('offer-sdp');
+            pstream.emit('answer', { sdp: 'answer-sdp' });
+            sinon.assert.calledOnce(mediaHandler.processAnswer);
+            assert.equal(mediaHandler.processAnswer.args[0][0], 'answer-sdp');
           });
         });
 
@@ -641,6 +658,8 @@ describe('Call', function() {
           it('should publish an accepted-by-remote event', () => {
             conn.accept();
             return wait.then(() => {
+              onOfferReady('offer-sdp');
+              pstream.emit('answer', { sdp: 'answer-sdp' });
               callback('foo');
               sinon.assert.calledWith(publisher.info, 'connection', 'accepted-by-remote');
             });
@@ -649,6 +668,8 @@ describe('Call', function() {
           it('should publish a settings:codec event', () => {
             conn.accept();
             return wait.then(() => {
+              onOfferReady('offer-sdp');
+              pstream.emit('answer', { sdp: 'answer-sdp' });
               callback('foo');
               sinon.assert.calledWith(publisher.info, 'settings', 'codec', {
                 codec_params: 'maxaveragebitrate=12000',
@@ -660,6 +681,8 @@ describe('Call', function() {
           it('should call monitor.enable', () => {
             conn.accept();
             return wait.then(() => {
+              onOfferReady('offer-sdp');
+              pstream.emit('answer', { sdp: 'answer-sdp' });
               callback('foo');
               sinon.assert.calledWith(monitor.enable, 'foo');
             });
@@ -1164,9 +1187,9 @@ describe('Call', function() {
       });
     });
 
-    it('should throw if pstream is unavailable', () => {
+    it('should throw if signaling adapter is unavailable', () => {
       // @ts-ignore
-      conn._pstream = null;
+      conn._signalingAdapter = null;
       assert.throws(
         () => conn.sendMessage(message),
         new InvalidStateError(
