@@ -795,8 +795,8 @@ PeerConnection.prototype.makeOutgoingCall = function(callsid, rtcConfiguration, 
 
   function onOfferSuccess() {
     if (self.status !== 'closed') {
-      self._setupRTCDtlsTransportListener();
       onOfferReady(self.version.getSDP());
+      self._setupRTCDtlsTransportListener();
     }
   }
 

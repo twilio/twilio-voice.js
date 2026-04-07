@@ -19,10 +19,21 @@ export class PStreamSignalingAdapter extends EventEmitter implements SignalingAd
     }
   }
 
-  get status(): SignalingAdapterStatus { return this._pstream.status; }
-  get uri(): string { return this._pstream.uri; }
-  get gateway(): string | undefined { return this._pstream.gateway; }
-  get region(): string | undefined { return this._pstream.region; }
+  get gateway(): string | undefined {
+    return this._pstream.gateway;
+  }
+
+  get region(): string | undefined {
+    return this._pstream.region;
+  }
+
+  get status(): SignalingAdapterStatus {
+    return this._pstream.status;
+  }
+
+  get uri(): string {
+    return this._pstream.uri;
+  }
 
   setToken(token: string): void {
     this._pstream.setToken(token);
@@ -69,8 +80,11 @@ export class PStreamSignalingAdapter extends EventEmitter implements SignalingAd
   }
 
   sendMessage(
-    callSid: string, content: string, contentType: string | undefined,
-    messageType: string, voiceEventSid: string,
+    callSid: string,
+    content: string,
+    contentType: string | undefined,
+    messageType: string,
+    voiceEventSid: string,
   ): void {
     this._pstream.sendMessage(callSid, content, contentType, messageType, voiceEventSid);
   }
