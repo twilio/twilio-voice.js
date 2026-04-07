@@ -795,7 +795,13 @@ PeerConnection.prototype.makeOutgoingCall = function(callsid, rtcConfiguration, 
 
   function onOfferSuccess() {
     if (self.status !== 'closed') {
+      // NOTE(VBLOCKS-6417): in the original implementation, the RTC DTLS
+      // transport was set up _after_ the reconnect/invite message was sent
+      // over signaling. Therefore, to maintain exact behavior, we invoke
+      // self._setupDTLSTransport in the media handler after this method
+      // finishes.
       onOfferReady(self.version.getSDP());
+
       self._setupRTCDtlsTransportListener();
     }
   }
