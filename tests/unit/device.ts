@@ -819,6 +819,15 @@ describe('Device', function() {
           it('should not throw when signalingOptions is not set', () => {
             assert.doesNotThrow(() => device.updateOptions({}));
           });
+
+          it('should throw with an unknown useSignalingMethod value', () => {
+            assert.throws(
+              () => device.updateOptions({
+                signalingOptions: { useSignalingMethod: 'foo' } as any,
+              }),
+              /Unknown.*useSignalingMethod.*foo/,
+            );
+          });
         });
       });
 
@@ -908,6 +917,25 @@ describe('Device', function() {
             device['_options'].signalingOptions = { useSignalingMethod: 'vsp', chunderw: ['foo', 'bar'] };
             pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
             assert.equal(device['_preferredURI'], ['wss://foo/signal']);
+          });
+
+          it('should use flat chunderw as the preferred uri if it is a string', () => {
+            device['_options'].chunderw = 'foo';
+            pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
+            assert.equal(device['_preferredURI'], ['wss://foo/signal']);
+          });
+
+          it('should use the first flat chunderw as the preferred uri if it is an array', () => {
+            device['_options'].chunderw = ['foo', 'bar'];
+            pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
+            assert.equal(device['_preferredURI'], ['wss://foo/signal']);
+          });
+
+          it('should prefer signalingOptions.chunderw over flat chunderw', () => {
+            device['_options'].signalingOptions = { useSignalingMethod: 'vsp', chunderw: 'sig' };
+            device['_options'].chunderw = 'flat';
+            pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
+            assert.equal(device['_preferredURI'], ['wss://sig/signal']);
           });
         });
 
@@ -1652,7 +1680,7 @@ describe('Device', function() {
         await setupStream();
       };
 
-      describe('should use chunderw regardless', () => {
+      describe('should use signalingOptions.chunderw', () => {
         it('when it is a string', async () => {
           await testWithOptions({ signalingOptions: { useSignalingMethod: 'vsp', chunderw: 'foo' } });
           sinon.assert.calledOnceWithExactly(
@@ -1668,6 +1696,34 @@ describe('Device', function() {
 
         it('when it is an array', async () => {
           await testWithOptions({ signalingOptions: { useSignalingMethod: 'vsp', chunderw: ['foo', 'bar'] } });
+          sinon.assert.calledOnceWithExactly(
+            PStream,
+            token,
+            ['wss://foo/signal', 'wss://bar/signal'],
+            {
+              backoffMaxMs: undefined,
+              maxPreferredDurationMs: 0,
+            },
+          );
+        });
+      });
+
+      describe('should use flat chunderw', () => {
+        it('when it is a string', async () => {
+          await testWithOptions({ chunderw: 'foo' });
+          sinon.assert.calledOnceWithExactly(
+            PStream,
+            token,
+            ['wss://foo/signal'],
+            {
+              backoffMaxMs: undefined,
+              maxPreferredDurationMs: 0,
+            },
+          );
+        });
+
+        it('when it is an array', async () => {
+          await testWithOptions({ chunderw: ['foo', 'bar'] });
           sinon.assert.calledOnceWithExactly(
             PStream,
             token,

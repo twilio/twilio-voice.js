@@ -973,6 +973,11 @@ class Device extends EventEmitter {
     if (!opts || opts.useSignalingMethod === 'vsp') {
       return opts ?? { useSignalingMethod: 'vsp' };
     }
+    if (opts.useSignalingMethod !== 'sip') {
+      throw new InvalidArgumentError(
+        `Unknown \`signalingOptions.useSignalingMethod\` value: "${(opts as any).useSignalingMethod}"`,
+      );
+    }
     if (!opts.sipServer) {
       throw new InvalidArgumentError('`signalingOptions.sipServer` is required when `useSignalingMethod` is "sip"');
     }
