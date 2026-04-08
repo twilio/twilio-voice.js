@@ -138,13 +138,13 @@ describe('PreflightTest', () => {
     it('should pass defaults to device', () => {
       const preflight = new PreflightTest('foo', options);
       sinon.assert.calledOnceWithExactly(deviceContext.updateOptions, {
+        chunderw: undefined,
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: 'roaming',
         eventgw: undefined,
         fileInputStream: undefined,
         logLevel: 'error',
         preflight: true,
-        signalingOptions: undefined,
       });
     });
 
@@ -152,13 +152,13 @@ describe('PreflightTest', () => {
       options.codecPreferences = [Call.Codec.PCMU];
       const preflight = new PreflightTest('foo', options);
       sinon.assert.calledOnceWithExactly(deviceContext.updateOptions, {
+        chunderw: undefined,
         codecPreferences: options.codecPreferences,
         edge: 'roaming',
         eventgw: undefined,
         fileInputStream: undefined,
         logLevel: 'error',
         preflight: true,
-        signalingOptions: undefined,
       });
     });
 
@@ -166,13 +166,13 @@ describe('PreflightTest', () => {
       options.logLevel = 'debug';
       const preflight = new PreflightTest('foo', options);
       sinon.assert.calledOnceWithExactly(deviceContext.updateOptions, {
+        chunderw: undefined,
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: 'roaming',
         eventgw: undefined,
         fileInputStream: undefined,
         logLevel: options.logLevel,
         preflight: true,
-        signalingOptions: undefined,
       });
     });
 
@@ -180,13 +180,13 @@ describe('PreflightTest', () => {
       options.edge = 'ashburn';
       const preflight = new PreflightTest('foo', options);
       sinon.assert.calledOnceWithExactly(deviceContext.updateOptions, {
+        chunderw: undefined,
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: options.edge,
         eventgw: undefined,
         fileInputStream: undefined,
         logLevel: 'error',
         preflight: true,
-        signalingOptions: undefined,
       });
       sinon.assert.calledOnce(edgeStub);
     });
@@ -195,27 +195,27 @@ describe('PreflightTest', () => {
       options.rtcConfiguration = {foo: 'foo', iceServers: 'bar'};
       const preflight = new PreflightTest('foo', options);
       sinon.assert.calledWith(deviceContext.updateOptions, {
+        chunderw: undefined,
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: 'roaming',
         eventgw: undefined,
         fileInputStream: undefined,
         logLevel: 'error',
         preflight: true,
-        signalingOptions: undefined,
       });
     });
 
-    it('should pass chunderw to device via signalingOptions', () => {
+    it('should pass chunderw to device', () => {
       options.chunderw = 'foobar';
       new PreflightTest('token', options);
       sinon.assert.calledWith(deviceContext.updateOptions, {
+        chunderw: 'foobar',
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: 'roaming',
         eventgw: undefined,
         fileInputStream: undefined,
         logLevel: 'error',
         preflight: true,
-        signalingOptions: { useSignalingMethod: 'vsp', chunderw: 'foobar' },
       });
     });
 
@@ -223,13 +223,13 @@ describe('PreflightTest', () => {
       options.eventgw = 'foobar';
       new PreflightTest('token', options);
       sinon.assert.calledWith(deviceContext.updateOptions, {
+        chunderw: undefined,
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: 'roaming',
         eventgw: 'foobar',
         fileInputStream: undefined,
         logLevel: 'error',
         preflight: true,
-        signalingOptions: undefined,
       });
     });
   });
@@ -270,13 +270,13 @@ describe('PreflightTest', () => {
     it('should set fakeMicInput to false by default', () => {
       preflight = new PreflightTest('foo', options);
       sinon.assert.calledOnceWithExactly(deviceContext.updateOptions, {
+        chunderw: undefined,
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: 'roaming',
         eventgw: undefined,
         fileInputStream: undefined,
         logLevel: 'error',
         preflight: true,
-        signalingOptions: undefined,
       });
       sinon.assert.calledOnceWithExactly(deviceContext.register);
     });
@@ -285,13 +285,13 @@ describe('PreflightTest', () => {
       preflight = new PreflightTest('foo', {...options, fakeMicInput: true });
       await clock.tickAsync(1000);
       sinon.assert.calledOnceWithExactly(deviceContext.updateOptions, {
+        chunderw: undefined,
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: 'roaming',
         eventgw: undefined,
         fileInputStream: stream,
         logLevel: 'error',
         preflight: true,
-        signalingOptions: undefined,
       });
       sinon.assert.calledOnceWithExactly(deviceContext.register);
     });

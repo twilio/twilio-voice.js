@@ -381,9 +381,7 @@ export class PreflightTest extends EventEmitter {
   private _initDevice(token: string, options: PreflightTest.ExtendedOptions): void {
     try {
       this._device = new (options.deviceFactory || Device)(token, {
-        signalingOptions: options.chunderw
-          ? { useSignalingMethod: 'vsp', chunderw: options.chunderw }
-          : undefined,
+        chunderw: options.chunderw,
         codecPreferences: options.codecPreferences,
         edge: options.edge,
         eventgw: options.eventgw,
