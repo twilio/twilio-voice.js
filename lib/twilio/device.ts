@@ -960,8 +960,16 @@ class Device extends EventEmitter {
       ? this._options.signalingOptions as Device.VSPSignalingOptions
       : undefined;
     const chunderw = vspOpts?.chunderw ?? this._options.chunderw;
-    return typeof chunderw === 'string' ? [chunderw]
-      : Array.isArray(chunderw) ? chunderw : null;
+
+    if (typeof chunderw === 'string') {
+      return [chunderw];
+    }
+
+    if (Array.isArray(chunderw)) {
+      return chunderw;
+    }
+
+    return null;
   }
 
   /**
@@ -970,18 +978,23 @@ class Device extends EventEmitter {
    */
   private _resolveSignalingOptions(): Device.SIPSignalingOptions | Device.VSPSignalingOptions {
     const opts = this._options.signalingOptions;
-    if (!opts || opts.useSignalingMethod === 'vsp') {
-      return opts ?? { useSignalingMethod: 'vsp' };
+    if (!opts) {
+      return { useSignalingMethod: 'vsp' };
+    }
+
+    if (opts.useSignalingMethod === 'vsp') {
+      return opts;
     }
     if (opts.useSignalingMethod !== 'sip') {
       throw new InvalidArgumentError(
         `Unknown \`signalingOptions.useSignalingMethod\` value: "${(opts as any).useSignalingMethod}"`,
       );
     }
-    if (!opts.sipServer) {
+    if (typeof opts.sipServer !== 'string' || !opts.sipServer) {
       throw new InvalidArgumentError('`signalingOptions.sipServer` is required when `useSignalingMethod` is "sip"');
     }
-    if (!opts.sipCredentials?.username || !opts.sipCredentials?.password) {
+    if (typeof opts.sipCredentials?.username !== 'string' || !opts.sipCredentials.username
+        || typeof opts.sipCredentials?.password !== 'string' || !opts.sipCredentials.password) {
       throw new InvalidArgumentError(
         '`signalingOptions.sipCredentials` with `username` and `password` are required when `useSignalingMethod` is "sip"',
       );
