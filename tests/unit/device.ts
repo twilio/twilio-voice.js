@@ -748,6 +748,87 @@ describe('Device', function() {
             });
           });
         });
+
+        describe('signalingOptions validation', () => {
+          it('should throw if useSignalingMethod is sip but sipServer is missing', () => {
+            assert.throws(
+              () => device.updateOptions({
+                signalingOptions: {
+                  useSignalingMethod: 'sip',
+                  sipCredentials: { username: 'u', password: 'p' },
+                } as any,
+              }),
+              /sipServer.*required/,
+            );
+          });
+
+          it('should throw if useSignalingMethod is sip but sipCredentials is missing', () => {
+            assert.throws(
+              () => device.updateOptions({
+                signalingOptions: {
+                  useSignalingMethod: 'sip',
+                  sipServer: 'wss://sip.example.com',
+                } as any,
+              }),
+              /sipCredentials.*required/,
+            );
+          });
+
+          it('should throw if useSignalingMethod is sip but sipCredentials.username is empty', () => {
+            assert.throws(
+              () => device.updateOptions({
+                signalingOptions: {
+                  useSignalingMethod: 'sip',
+                  sipServer: 'wss://sip.example.com',
+                  sipCredentials: { username: '', password: 'p' },
+                },
+              }),
+              /sipCredentials.*required/,
+            );
+          });
+
+          it('should throw if useSignalingMethod is sip but sipCredentials.password is empty', () => {
+            assert.throws(
+              () => device.updateOptions({
+                signalingOptions: {
+                  useSignalingMethod: 'sip',
+                  sipServer: 'wss://sip.example.com',
+                  sipCredentials: { username: 'u', password: '' },
+                },
+              }),
+              /sipCredentials.*required/,
+            );
+          });
+
+          it('should not throw with valid SIP signalingOptions', () => {
+            assert.doesNotThrow(() => device.updateOptions({
+              signalingOptions: {
+                useSignalingMethod: 'sip',
+                sipServer: 'wss://sip.example.com',
+                sipCredentials: { username: 'u', password: 'p' },
+              },
+            }));
+          });
+
+          it('should not throw with VSP signalingOptions', () => {
+            assert.doesNotThrow(() => device.updateOptions({
+              signalingOptions: { useSignalingMethod: 'vsp' },
+            }));
+          });
+
+          it('should not throw when signalingOptions is not set', () => {
+            assert.doesNotThrow(() => device.updateOptions({}));
+          });
+
+          it('should throw with an unknown useSignalingMethod value', () => {
+            assert.throws(
+              () => device.updateOptions({
+                signalingOptions: { useSignalingMethod: 'foo' } as any,
+              }),
+              /Unknown.*useSignalingMethod.*foo/,
+            );
+          });
+        });
       });
 
       describe('.updateToken()', () => {
@@ -827,15 +908,34 @@ describe('Device', function() {
 
         context('when chunderw is set', () => {
           it('should use chunderw as the preferred uri if it is a string', () => {
-            device['_options'].chunderw = 'foo';
+            device['_options'].signalingOptions = { useSignalingMethod: 'vsp', chunderw: 'foo' };
             pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
             assert.equal(device['_preferredURI'], ['wss://foo/signal']);
           });
 
           it('should use the first chunderw as the preferred uri if it is an array', () => {
+            device['_options'].signalingOptions = { useSignalingMethod: 'vsp', chunderw: ['foo', 'bar'] };
+            pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
+            assert.equal(device['_preferredURI'], ['wss://foo/signal']);
+          });
+
+          it('should use flat chunderw as the preferred uri if it is a string', () => {
+            device['_options'].chunderw = 'foo';
+            pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
+            assert.equal(device['_preferredURI'], ['wss://foo/signal']);
+          });
+
+          it('should use the first flat chunderw as the preferred uri if it is an array', () => {
             device['_options'].chunderw = ['foo', 'bar'];
             pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
             assert.equal(device['_preferredURI'], ['wss://foo/signal']);
+          });
+
+          it('should prefer signalingOptions.chunderw over flat chunderw', () => {
+            device['_options'].signalingOptions = { useSignalingMethod: 'vsp', chunderw: 'sig' };
+            device['_options'].chunderw = 'flat';
+            pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
+            assert.equal(device['_preferredURI'], ['wss://sig/signal']);
           });
         });
 
@@ -1580,7 +1680,35 @@ describe('Device', function() {
         await setupStream();
       };
 
-      describe('should use chunderw regardless', () => {
+      describe('should use signalingOptions.chunderw', () => {
+        it('when it is a string', async () => {
+          await testWithOptions({ signalingOptions: { useSignalingMethod: 'vsp', chunderw: 'foo' } });
+          sinon.assert.calledOnceWithExactly(
+            PStream,
+            token,
+            ['wss://foo/signal'],
+            {
+              backoffMaxMs: undefined,
+              maxPreferredDurationMs: 0,
+            },
+          );
+        });
+
+        it('when it is an array', async () => {
+          await testWithOptions({ signalingOptions: { useSignalingMethod: 'vsp', chunderw: ['foo', 'bar'] } });
+          sinon.assert.calledOnceWithExactly(
+            PStream,
+            token,
+            ['wss://foo/signal', 'wss://bar/signal'],
+            {
+              backoffMaxMs: undefined,
+              maxPreferredDurationMs: 0,
+            },
+          );
+        });
+      });
+
+      describe('should use flat chunderw', () => {
         it('when it is a string', async () => {
           await testWithOptions({ chunderw: 'foo' });
           sinon.assert.calledOnceWithExactly(

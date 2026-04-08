@@ -766,6 +766,7 @@ class Device extends EventEmitter {
     }
 
     this._options = { ...this._defaultOptions, ...this._options, ...options };
+    this._options = { ...this._options, signalingOptions: this._resolveSignalingOptions() };
 
     const originalChunderURIs: Set<string> = new Set(this._chunderURIs);
 
@@ -955,8 +956,50 @@ class Device extends EventEmitter {
    * Get chunderws array from the chunderw param
    */
   private _getChunderws(): string[] | null {
-    return typeof this._options.chunderw === 'string' ? [this._options.chunderw]
-      : Array.isArray(this._options.chunderw) ? this._options.chunderw : null;
+    const vspOpts = this._options.signalingOptions?.useSignalingMethod === 'vsp'
+      ? this._options.signalingOptions as Device.VSPSignalingOptions
+      : undefined;
+    const chunderw = vspOpts?.chunderw ?? this._options.chunderw;
+
+    if (typeof chunderw === 'string') {
+      return [chunderw];
+    }
+
+    if (Array.isArray(chunderw)) {
+      return chunderw;
+    }
+
+    return null;
+  }
+
+  /**
+   * Resolves the active signaling options, defaulting to VSP if not specified.
+   * Throws {@link InvalidArgumentError} if SIP is selected but required fields are missing.
+   */
+  private _resolveSignalingOptions(): Device.SIPSignalingOptions | Device.VSPSignalingOptions {
+    const opts = this._options.signalingOptions;
+    if (!opts) {
+      return { useSignalingMethod: 'vsp' };
+    }
+
+    if (opts.useSignalingMethod === 'vsp') {
+      return opts;
+    }
+    if (opts.useSignalingMethod !== 'sip') {
+      throw new InvalidArgumentError(
+        `Unknown \`signalingOptions.useSignalingMethod\` value: "${(opts as any).useSignalingMethod}"`,
+      );
+    }
+    if (typeof opts.sipServer !== 'string' || !opts.sipServer) {
+      throw new InvalidArgumentError('`signalingOptions.sipServer` is required when `useSignalingMethod` is "sip"');
+    }
+    if (typeof opts.sipCredentials?.username !== 'string' || !opts.sipCredentials.username
+        || typeof opts.sipCredentials?.password !== 'string' || !opts.sipCredentials.password) {
+      throw new InvalidArgumentError(
+        '`signalingOptions.sipCredentials` with `username` and `password` are required when `useSignalingMethod` is "sip"',
+      );
+    }
+    return opts;
   }
 
   /**
@@ -1538,6 +1581,11 @@ class Device extends EventEmitter {
       this._destroyStream();
     }
 
+    if (this._options.signalingOptions?.useSignalingMethod === 'sip') {
+      this._log.info('Setting up SIP signaling');
+      // TODO(VBLOCKS-6371): Replace with SipSignalingAdapter
+    }
+
     this._log.info('Setting up VSP');
     const pstream = new (this._options.PStream || PStream)(
       this.token,
@@ -1873,6 +1921,27 @@ namespace Device {
   }
 
   /**
+   * Signaling options for SIP over WebSocket.
+   */
+  export interface SIPSignalingOptions {
+    useSignalingMethod: 'sip';
+    /** The SIP WebSocket server URL (e.g. `'wss://sip.example.com'`). */
+    sipServer: string;
+    /** SIP digest authentication credentials. */
+    sipCredentials: { username: string; password: string };
+  }
+
+  /**
+   * Signaling options for Twilio's VSP (Voice Signaling Protocol).
+   * This is the default signaling method.
+   */
+  export interface VSPSignalingOptions {
+    useSignalingMethod: 'vsp';
+    /** Override the VSP signaling endpoint(s). */
+    chunderw?: string | string[];
+  }
+
+  /**
    * Options that may be passed to the {@link Device} constructor, or Device.setup via public API
    */
   export interface Options {
@@ -2098,6 +2167,22 @@ namespace Device {
      * ```
      */
     RTCPeerConnection?: any;
+
+    /**
+     * Signaling configuration. Defaults to VSP (Twilio's native protocol) if omitted.
+     *
+     * @example SIP over WebSocket
+     * ```ts
+     * const sipDevice = new Device(token, {
+     *   signalingOptions: {
+     *     useSignalingMethod: 'sip',
+     *     sipServer: 'wss://sip.example.com',
+     *     sipCredentials: { username: 'foo', password: 'bar' },
+     *   },
+     * });
+     * ```
+     */
+    signalingOptions?: SIPSignalingOptions | VSPSignalingOptions;
 
     /**
      * A mapping of custom sound URLs by sound name.
