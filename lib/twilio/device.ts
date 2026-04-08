@@ -84,6 +84,16 @@ export interface IExtendedDeviceOptions extends Device.Options {
   Call?: typeof Call;
 
   /**
+   * Hostname of the signaling gateway to connect to.
+   */
+  chunderw?: string | string[];
+
+  /**
+   * Hostname of the event gateway to connect to.
+   */
+  eventgw?: string;
+
+  /**
    * File input stream to use instead of reading from mic
    */
   fileInputStream?: MediaStream;
@@ -756,8 +766,7 @@ class Device extends EventEmitter {
     }
 
     this._options = { ...this._defaultOptions, ...this._options, ...options };
-
-    this._resolveSignalingOptions();
+    this._options = { ...this._options, signalingOptions: this._resolveSignalingOptions() };
 
     const originalChunderURIs: Set<string> = new Set(this._chunderURIs);
 
@@ -950,7 +959,7 @@ class Device extends EventEmitter {
     const vspOpts = this._options.signalingOptions?.useSignalingMethod === 'vsp'
       ? this._options.signalingOptions as Device.VSPSignalingOptions
       : undefined;
-    const chunderw = vspOpts?.chunderw;
+    const chunderw = vspOpts?.chunderw ?? this._options.chunderw;
     return typeof chunderw === 'string' ? [chunderw]
       : Array.isArray(chunderw) ? chunderw : null;
   }
@@ -962,7 +971,7 @@ class Device extends EventEmitter {
   private _resolveSignalingOptions(): Device.SIPSignalingOptions | Device.VSPSignalingOptions {
     const opts = this._options.signalingOptions;
     if (!opts || opts.useSignalingMethod === 'vsp') {
-      return { useSignalingMethod: 'vsp' };
+      return opts ?? { useSignalingMethod: 'vsp' };
     }
     if (!opts.sipServer) {
       throw new InvalidArgumentError('`signalingOptions.sipServer` is required when `useSignalingMethod` is "sip"');
@@ -1523,11 +1532,8 @@ class Device extends EventEmitter {
       },
     } as any;
 
-    const vspOpts = this._options.signalingOptions?.useSignalingMethod === 'vsp'
-      ? this._options.signalingOptions as Device.VSPSignalingOptions
-      : undefined;
-    if (vspOpts?.eventgw) {
-      publisherOptions.host = vspOpts.eventgw;
+    if (this._options.eventgw) {
+      publisherOptions.host = this._options.eventgw;
     }
 
     if (this._home) {
@@ -1557,7 +1563,7 @@ class Device extends EventEmitter {
       this._destroyStream();
     }
 
-    if (this._resolveSignalingOptions().useSignalingMethod === 'sip') {
+    if (this._options.signalingOptions?.useSignalingMethod === 'sip') {
       this._log.info('Setting up SIP signaling');
       // TODO(VBLOCKS-6371): Replace with SipSignalingAdapter
     }
@@ -1915,8 +1921,6 @@ namespace Device {
     useSignalingMethod: 'vsp';
     /** Override the VSP signaling endpoint(s). */
     chunderw?: string | string[];
-    /** Override the event gateway hostname. */
-    eventgw?: string;
   }
 
   /**

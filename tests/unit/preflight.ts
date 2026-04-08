@@ -139,6 +139,7 @@ describe('PreflightTest', () => {
       const preflight = new PreflightTest('foo', options);
       sinon.assert.calledOnceWithExactly(deviceContext.updateOptions, {
         signalingOptions: undefined,
+        eventgw: undefined,
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: 'roaming',
         fileInputStream: undefined,
@@ -152,6 +153,7 @@ describe('PreflightTest', () => {
       const preflight = new PreflightTest('foo', options);
       sinon.assert.calledOnceWithExactly(deviceContext.updateOptions, {
         signalingOptions: undefined,
+        eventgw: undefined,
         codecPreferences: options.codecPreferences,
         edge: 'roaming',
         fileInputStream: undefined,
@@ -165,6 +167,7 @@ describe('PreflightTest', () => {
       const preflight = new PreflightTest('foo', options);
       sinon.assert.calledOnceWithExactly(deviceContext.updateOptions, {
         signalingOptions: undefined,
+        eventgw: undefined,
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: 'roaming',
         fileInputStream: undefined,
@@ -178,6 +181,7 @@ describe('PreflightTest', () => {
       const preflight = new PreflightTest('foo', options);
       sinon.assert.calledOnceWithExactly(deviceContext.updateOptions, {
         signalingOptions: undefined,
+        eventgw: undefined,
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: options.edge,
         fileInputStream: undefined,
@@ -192,6 +196,7 @@ describe('PreflightTest', () => {
       const preflight = new PreflightTest('foo', options);
       sinon.assert.calledWith(deviceContext.updateOptions, {
         signalingOptions: undefined,
+        eventgw: undefined,
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: 'roaming',
         fileInputStream: undefined,
@@ -204,7 +209,8 @@ describe('PreflightTest', () => {
       options.chunderw = 'foobar';
       new PreflightTest('token', options);
       sinon.assert.calledWith(deviceContext.updateOptions, {
-        signalingOptions: { useSignalingMethod: 'vsp', chunderw: 'foobar', eventgw: undefined },
+        signalingOptions: { useSignalingMethod: 'vsp', chunderw: 'foobar' },
+        eventgw: undefined,
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: 'roaming',
         fileInputStream: undefined,
@@ -213,11 +219,12 @@ describe('PreflightTest', () => {
       });
     });
 
-    it('should pass eventgw to device via signalingOptions', () => {
+    it('should pass eventgw to device as a flat option', () => {
       options.eventgw = 'foobar';
       new PreflightTest('token', options);
       sinon.assert.calledWith(deviceContext.updateOptions, {
-        signalingOptions: { useSignalingMethod: 'vsp', chunderw: undefined, eventgw: 'foobar' },
+        signalingOptions: undefined,
+        eventgw: 'foobar',
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: 'roaming',
         fileInputStream: undefined,
@@ -264,6 +271,7 @@ describe('PreflightTest', () => {
       preflight = new PreflightTest('foo', options);
       sinon.assert.calledOnceWithExactly(deviceContext.updateOptions, {
         signalingOptions: undefined,
+        eventgw: undefined,
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: 'roaming',
         fileInputStream: undefined,
@@ -278,6 +286,7 @@ describe('PreflightTest', () => {
       await clock.tickAsync(1000);
       sinon.assert.calledOnceWithExactly(deviceContext.updateOptions, {
         signalingOptions: undefined,
+        eventgw: undefined,
         codecPreferences: [Call.Codec.PCMU, Call.Codec.Opus],
         edge: 'roaming',
         fileInputStream: stream,
