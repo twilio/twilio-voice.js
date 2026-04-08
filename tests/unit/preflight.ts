@@ -219,7 +219,7 @@ describe('PreflightTest', () => {
       });
     });
 
-    it('should pass eventgw to device as a flat option', () => {
+    it('should pass eventgw to device', () => {
       options.eventgw = 'foobar';
       new PreflightTest('token', options);
       sinon.assert.calledWith(deviceContext.updateOptions, {
