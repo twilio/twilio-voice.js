@@ -84,16 +84,6 @@ export interface IExtendedDeviceOptions extends Device.Options {
   Call?: typeof Call;
 
   /**
-   * Hostname of the signaling gateway to connect to.
-   */
-  chunderw?: string | string[];
-
-  /**
-   * Hostname of the event gateway to connect to.
-   */
-  eventgw?: string;
-
-  /**
    * File input stream to use instead of reading from mic
    */
   fileInputStream?: MediaStream;
@@ -336,7 +326,6 @@ class Device extends EventEmitter {
     preflight: false,
     sounds: { },
     tokenRefreshMs: 10000,
-    useSip: false,
     voiceEventSidGenerator: generateVoiceEventSid,
   };
 
@@ -768,18 +757,7 @@ class Device extends EventEmitter {
 
     this._options = { ...this._defaultOptions, ...this._options, ...options };
 
-    if (this._options.useSip) {
-      if (!this._options.sipServer) {
-        throw new InvalidArgumentError('`sipServer` is required when `useSip` is true');
-      }
-      if (!this._options.sipCredentials
-        || !this._options.sipCredentials.username
-        || !this._options.sipCredentials.password) {
-        throw new InvalidArgumentError(
-          '`sipCredentials` with `username` and `password` are required when `useSip` is true',
-        );
-      }
-    }
+    this._resolveSignalingOptions();
 
     const originalChunderURIs: Set<string> = new Set(this._chunderURIs);
 
@@ -969,8 +947,32 @@ class Device extends EventEmitter {
    * Get chunderws array from the chunderw param
    */
   private _getChunderws(): string[] | null {
-    return typeof this._options.chunderw === 'string' ? [this._options.chunderw]
-      : Array.isArray(this._options.chunderw) ? this._options.chunderw : null;
+    const vspOpts = this._options.signalingOptions?.useSignalingMethod === 'vsp'
+      ? this._options.signalingOptions as Device.VSPSignalingOptions
+      : undefined;
+    const chunderw = vspOpts?.chunderw;
+    return typeof chunderw === 'string' ? [chunderw]
+      : Array.isArray(chunderw) ? chunderw : null;
+  }
+
+  /**
+   * Resolves the active signaling options, defaulting to VSP if not specified.
+   * Throws {@link InvalidArgumentError} if SIP is selected but required fields are missing.
+   */
+  private _resolveSignalingOptions(): Device.SIPSignalingOptions | Device.VSPSignalingOptions {
+    const opts = this._options.signalingOptions;
+    if (!opts || opts.useSignalingMethod === 'vsp') {
+      return { useSignalingMethod: 'vsp' };
+    }
+    if (!opts.sipServer) {
+      throw new InvalidArgumentError('`signalingOptions.sipServer` is required when `useSignalingMethod` is "sip"');
+    }
+    if (!opts.sipCredentials?.username || !opts.sipCredentials?.password) {
+      throw new InvalidArgumentError(
+        '`signalingOptions.sipCredentials` with `username` and `password` are required when `useSignalingMethod` is "sip"',
+      );
+    }
+    return opts;
   }
 
   /**
@@ -1521,8 +1523,11 @@ class Device extends EventEmitter {
       },
     } as any;
 
-    if (this._options.eventgw) {
-      publisherOptions.host = this._options.eventgw;
+    const vspOpts = this._options.signalingOptions?.useSignalingMethod === 'vsp'
+      ? this._options.signalingOptions as Device.VSPSignalingOptions
+      : undefined;
+    if (vspOpts?.eventgw) {
+      publisherOptions.host = vspOpts.eventgw;
     }
 
     if (this._home) {
@@ -1552,7 +1557,7 @@ class Device extends EventEmitter {
       this._destroyStream();
     }
 
-    if (this._options.useSip) {
+    if (this._resolveSignalingOptions().useSignalingMethod === 'sip') {
       this._log.info('Setting up SIP signaling');
       // TODO(VBLOCKS-6371): Replace with SipSignalingAdapter
     }
@@ -1892,6 +1897,29 @@ namespace Device {
   }
 
   /**
+   * Signaling options for SIP over WebSocket.
+   */
+  export interface SIPSignalingOptions {
+    useSignalingMethod: 'sip';
+    /** The SIP WebSocket server URL (e.g. `'wss://sip.example.com'`). */
+    sipServer: string;
+    /** SIP digest authentication credentials. */
+    sipCredentials: { username: string; password: string };
+  }
+
+  /**
+   * Signaling options for Twilio's VSP (Voice Signaling Protocol).
+   * This is the default signaling method.
+   */
+  export interface VSPSignalingOptions {
+    useSignalingMethod: 'vsp';
+    /** Override the VSP signaling endpoint(s). */
+    chunderw?: string | string[];
+    /** Override the event gateway hostname. */
+    eventgw?: string;
+  }
+
+  /**
    * Options that may be passed to the {@link Device} constructor, or Device.setup via public API
    */
   export interface Options {
@@ -2119,19 +2147,20 @@ namespace Device {
     RTCPeerConnection?: any;
 
     /**
-     * SIP digest authentication credentials, required when
-     * {@link Device.Options.useSip} is `true`.
+     * Signaling configuration. Defaults to VSP (Twilio's native protocol) if omitted.
+     *
+     * @example SIP over WebSocket
+     * ```ts
+     * const sipDevice = new Device(token, {
+     *   signalingOptions: {
+     *     useSignalingMethod: 'sip',
+     *     sipServer: 'wss://sip.example.com',
+     *     sipCredentials: { username: 'foo', password: 'bar' },
+     *   },
+     * });
+     * ```
      */
-    sipCredentials?: {
-      username: string;
-      password: string;
-    };
-
-    /**
-     * The SIP WebSocket server URL to connect to when {@link Device.Options.useSip}
-     * is `true` (e.g. `'wss://sip.example.com'`).
-     */
-    sipServer?: string;
+    signalingOptions?: SIPSignalingOptions | VSPSignalingOptions;
 
     /**
      * A mapping of custom sound URLs by sound name.
@@ -2143,15 +2172,6 @@ namespace Device {
      * Default is 10000 (10 seconds).
      */
     tokenRefreshMs?: number;
-
-    /**
-     * Set to `true` to use SIP over WebSocket for signaling instead of the
-     * default Twilio signaling protocol. When enabled, {@link Device.Options.sipServer}
-     * and {@link Device.Options.sipCredentials} are required.
-     *
-     * @default false
-     */
-    useSip?: boolean;
   }
 }
 

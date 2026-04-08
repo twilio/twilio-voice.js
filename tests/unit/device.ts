@@ -749,61 +749,74 @@ describe('Device', function() {
           });
         });
 
-        describe('useSip validation', () => {
-          it('should throw if useSip is true but sipServer is not provided', () => {
+        describe('signalingOptions validation', () => {
+          it('should throw if useSignalingMethod is sip but sipServer is missing', () => {
             assert.throws(
               () => device.updateOptions({
-                useSip: true,
-                sipCredentials: { username: 'u', password: 'p' },
-              } as any),
+                signalingOptions: {
+                  useSignalingMethod: 'sip',
+                  sipCredentials: { username: 'u', password: 'p' },
+                } as any,
+              }),
               /sipServer.*required/,
             );
           });
 
-          it('should throw if useSip is true but sipCredentials is not provided', () => {
+          it('should throw if useSignalingMethod is sip but sipCredentials is missing', () => {
             assert.throws(
               () => device.updateOptions({
-                useSip: true,
-                sipServer: 'wss://sip.example.com',
-              } as any),
+                signalingOptions: {
+                  useSignalingMethod: 'sip',
+                  sipServer: 'wss://sip.example.com',
+                } as any,
+              }),
               /sipCredentials.*required/,
             );
           });
 
-          it('should throw if useSip is true but sipCredentials.username is missing', () => {
+          it('should throw if useSignalingMethod is sip but sipCredentials.username is empty', () => {
             assert.throws(
               () => device.updateOptions({
-                useSip: true,
-                sipServer: 'wss://sip.example.com',
-                sipCredentials: { username: '', password: 'p' },
-              } as any),
+                signalingOptions: {
+                  useSignalingMethod: 'sip',
+                  sipServer: 'wss://sip.example.com',
+                  sipCredentials: { username: '', password: 'p' },
+                },
+              }),
               /sipCredentials.*required/,
             );
           });
 
-          it('should throw if useSip is true but sipCredentials.password is missing', () => {
+          it('should throw if useSignalingMethod is sip but sipCredentials.password is empty', () => {
             assert.throws(
               () => device.updateOptions({
-                useSip: true,
-                sipServer: 'wss://sip.example.com',
-                sipCredentials: { username: 'u', password: '' },
-              } as any),
+                signalingOptions: {
+                  useSignalingMethod: 'sip',
+                  sipServer: 'wss://sip.example.com',
+                  sipCredentials: { username: 'u', password: '' },
+                },
+              }),
               /sipCredentials.*required/,
             );
           });
 
-          it('should not throw if useSip is true with valid sipServer and sipCredentials', () => {
-            assert.doesNotThrow(
-              () => device.updateOptions({
-                useSip: true,
+          it('should not throw with valid SIP signalingOptions', () => {
+            assert.doesNotThrow(() => device.updateOptions({
+              signalingOptions: {
+                useSignalingMethod: 'sip',
                 sipServer: 'wss://sip.example.com',
                 sipCredentials: { username: 'u', password: 'p' },
-              } as any),
-            );
+              },
+            }));
           });
 
-          it('should not throw if useSip is false or not set', () => {
-            assert.doesNotThrow(() => device.updateOptions({ useSip: false } as any));
+          it('should not throw with VSP signalingOptions', () => {
+            assert.doesNotThrow(() => device.updateOptions({
+              signalingOptions: { useSignalingMethod: 'vsp' },
+            }));
+          });
+
+          it('should not throw when signalingOptions is not set', () => {
             assert.doesNotThrow(() => device.updateOptions({}));
           });
         });
@@ -886,13 +899,13 @@ describe('Device', function() {
 
         context('when chunderw is set', () => {
           it('should use chunderw as the preferred uri if it is a string', () => {
-            device['_options'].chunderw = 'foo';
+            device['_options'].signalingOptions = { useSignalingMethod: 'vsp', chunderw: 'foo' };
             pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
             assert.equal(device['_preferredURI'], ['wss://foo/signal']);
           });
 
           it('should use the first chunderw as the preferred uri if it is an array', () => {
-            device['_options'].chunderw = ['foo', 'bar'];
+            device['_options'].signalingOptions = { useSignalingMethod: 'vsp', chunderw: ['foo', 'bar'] };
             pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
             assert.equal(device['_preferredURI'], ['wss://foo/signal']);
           });
@@ -1641,7 +1654,7 @@ describe('Device', function() {
 
       describe('should use chunderw regardless', () => {
         it('when it is a string', async () => {
-          await testWithOptions({ chunderw: 'foo' });
+          await testWithOptions({ signalingOptions: { useSignalingMethod: 'vsp', chunderw: 'foo' } });
           sinon.assert.calledOnceWithExactly(
             PStream,
             token,
@@ -1654,7 +1667,7 @@ describe('Device', function() {
         });
 
         it('when it is an array', async () => {
-          await testWithOptions({ chunderw: ['foo', 'bar'] });
+          await testWithOptions({ signalingOptions: { useSignalingMethod: 'vsp', chunderw: ['foo', 'bar'] } });
           sinon.assert.calledOnceWithExactly(
             PStream,
             token,
