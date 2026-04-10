@@ -4,10 +4,12 @@
     "checkJs": false,
     "declaration": true,
     "lib": ["es5", "es6", "es2016", "es2017.object", "dom"],
+    "target": "es2015",
     "moduleResolution": "node",
     "noImplicitAny": true,
     "noImplicitThis": true,
     "rootDir": "lib",
+    "typeRoots": ["./node_modules/@types"],
     "inlineSourceMap": true,
     "strictNullChecks": true
   },
