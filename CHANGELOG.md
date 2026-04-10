@@ -7,6 +7,7 @@ Bug Fixes
 ---------
 
 - Fixed an issue where multiple PeerConnections are created when `device.connect()` is called multiple times.
+- Fixed a build issue where TypeDoc could pick up incompatible ambient types from a parent workspace's `node_modules`, causing `docs:ts` to fail in monorepo-style environments.
 
 2.18.1 (March 17, 2026)
 =======================
