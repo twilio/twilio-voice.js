@@ -21,6 +21,7 @@ import { PreflightTest } from './preflight/preflight';
 import PStream from './pstream';
 import { PStreamSignalingAdapter } from './signaling/pstreamsignalingadapter';
 import { SignalingAdapter } from './signaling/signalingadapter';
+import { SipSignalingAdapter } from './signaling/sipsignalingadapter';
 import {
   createEventGatewayURI,
   createSignalingEndpointURL,
@@ -1583,19 +1584,24 @@ class Device extends EventEmitter {
 
     if (this._options.signalingOptions?.useSignalingMethod === 'sip') {
       this._log.info('Setting up SIP signaling');
-      // TODO(VBLOCKS-6371): Replace with SipSignalingAdapter
+      const sipOpts = this._options.signalingOptions as Device.SIPSignalingOptions;
+      this._stream = new SipSignalingAdapter({
+        sipServer: sipOpts.sipServer,
+        sipCredentials: sipOpts.sipCredentials,
+        region: sipOpts.region,
+      });
+    } else {
+      this._log.info('Setting up VSP');
+      const pstream = new (this._options.PStream || PStream)(
+        this.token,
+        this._chunderURIs,
+        {
+          backoffMaxMs: this._options.backoffMaxMs,
+          maxPreferredDurationMs: this._options.maxCallSignalingTimeoutMs,
+        },
+      );
+      this._stream = new PStreamSignalingAdapter(pstream);
     }
-
-    this._log.info('Setting up VSP');
-    const pstream = new (this._options.PStream || PStream)(
-      this.token,
-      this._chunderURIs,
-      {
-        backoffMaxMs: this._options.backoffMaxMs,
-        maxPreferredDurationMs: this._options.maxCallSignalingTimeoutMs,
-      },
-    );
-    this._stream = new PStreamSignalingAdapter(pstream);
 
     this._stream.addListener('close', this._onSignalingClose);
     this._stream.addListener('connected', this._onSignalingConnected);
@@ -1929,6 +1935,8 @@ namespace Device {
     sipServer: string;
     /** SIP digest authentication credentials. */
     sipCredentials: { username: string; password: string };
+    /** Optional region hint for edge/region metadata (e.g. `'ashburn'`). */
+    region?: string;
   }
 
   /**

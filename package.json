@@ -31,7 +31,7 @@
     "build:errors": "node ./scripts/errors.js",
     "build:dev": "ENV=dev npm run build",
     "build:dist": "node ./scripts/build.js ./lib/browser.js ./LICENSE.md ./dist/twilio.js",
-    "build:dist-min": "uglifyjs ./dist/twilio.js -o ./dist/twilio.min.js --comments \"/^! twilio-voice.js/\" -b beautify=false,ascii_only=true",
+    "build:dist-min": "terser ./dist/twilio.js -o ./dist/twilio.min.js --comments \"/^! twilio-voice.js/\" --compress --mangle",
     "build:release": "npm-run-all lint build test:es5 test:esm status",
     "build:ts": "rollup -c",
     "build:constants": "node ./scripts/constants.js",
@@ -106,13 +106,13 @@
     "renamer": "4.0.0",
     "rollup": "4.46.3",
     "sinon": "9.0.3",
+    "terser": "5.46.1",
     "ts-node": "10.9.2",
     "tslint": "6.1.3",
     "twilio": "3.84.1",
     "twilio-release-tool": "1.0.5",
     "typedoc": "0.28.3",
     "typescript": "5.8.3",
-    "uglify-js": "3.7.5",
     "vinyl-fs": "4.0.0",
     "vinyl-source-stream": "2.0.0",
     "ws": "7.4.6"
@@ -122,6 +122,7 @@
     "@types/events": "^3.0.3",
     "events": "3.3.0",
     "loglevel": "1.9.2",
+    "sip.js": "0.21.2",
     "tslib": "2.8.1"
   },
   "overrides": {

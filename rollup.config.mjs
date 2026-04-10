@@ -30,8 +30,10 @@ const createPlugins = (outDir, target) => [
   }),
 ];
 
+const BUNDLED_DEPS = ['sip.js'];
+
 const createExternal = () => [
-  ...Object.keys(pkg.dependencies),
+  ...Object.keys(pkg.dependencies).filter(dep => !BUNDLED_DEPS.includes(dep)),
 ];
 
 const commonJsConfig = {
