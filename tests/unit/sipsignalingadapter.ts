@@ -180,7 +180,7 @@ describe('SipSignalingAdapter', () => {
       assert.strictEqual(adapter.status, 'ready');
     });
 
-    it('should emit "error" when registration fails', (done) => {
+    it('should emit "error" and "offline" when registration fails', (done) => {
       const failRegStub = createRegistererStub();
       failRegStub.register = sinon.stub().rejects(new Error('auth failed'));
 
@@ -189,9 +189,16 @@ describe('SipSignalingAdapter', () => {
       });
 
       uaStub._triggerConnect();
+      let errorEmitted = false;
       adapter.on('error', (payload: any) => {
         assert.strictEqual(payload.error.code, 31201);
         assert(payload.error.message.includes('auth failed'));
+        errorEmitted = true;
+      });
+      adapter.on('offline', () => {
+        assert(errorEmitted, 'error should be emitted before offline');
+        assert.strictEqual(adapter.status, 'offline');
+        assert(failRegStub.dispose.calledOnce);
         done();
       });
       adapter.register({ audio: true });
@@ -216,12 +223,24 @@ describe('SipSignalingAdapter', () => {
       regStub._simulateState('Unregistered');
     });
 
-    it('should skip if already registered', () => {
+    it('should emit "offline" when unregister fails', (done) => {
       const { adapter, uaStub, regStub } = createAdapter();
       uaStub._triggerConnect();
       adapter.register({ audio: true });
       regStub._simulateState('Registered');
-      // Second register call should be a no-op
+      regStub.unregister = sinon.stub().rejects(new Error('unregister failed'));
+      adapter.on('offline', () => {
+        assert.strictEqual(adapter.status, 'offline');
+        done();
+      });
+      adapter.register({ audio: false });
+    });
+
+    it('should skip if registerer already exists', () => {
+      const { adapter, uaStub, regStub } = createAdapter();
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      // Second register call should be a no-op — SIP.js handles refresh internally
       adapter.register({ audio: true });
       assert.strictEqual(regStub.register.callCount, 1);
     });

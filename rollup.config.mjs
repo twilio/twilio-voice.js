@@ -37,23 +37,24 @@ const createPlugins = (outDir, target) => [
   }),
 ];
 
+// sip.js ships as ESM-only, so it must be bundled inline for the CJS build
+// (which browserify consumes for the browser dist). The ESM build keeps it
+// external so consumers can resolve their own copy.
 const BUNDLED_DEPS = ['sip.js'];
 
-const createExternal = () => [
-  ...Object.keys(pkg.dependencies).filter(dep => !BUNDLED_DEPS.includes(dep)),
-];
+const allDeps = Object.keys(pkg.dependencies);
 
 const commonJsConfig = {
   input,
   output: createOutput('./es5', 'named', 'cjs'),
-  external: createExternal(),
+  external: allDeps.filter(dep => !BUNDLED_DEPS.includes(dep)),
   plugins: createPlugins('./es5', 'es5'),
 };
 
 const esmConfig = {
   input,
   output: createOutput('./esm', 'auto', 'es'),
-  external: createExternal(),
+  external: allDeps,
   plugins: createPlugins('./esm', 'es6'),
 };
 

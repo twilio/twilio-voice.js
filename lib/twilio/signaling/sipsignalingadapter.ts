@@ -152,9 +152,9 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     const isPresent = mediaCapabilities?.audio === true;
 
     if (isPresent) {
-      // If already registered, skip — SIP.js Registerer handles refresh internally.
-      if (this._registerer?.state === RegistererState.Registered) {
-        this._log.debug('Already registered, skipping duplicate register call');
+      // SIP.js Registerer handles refresh internally, so skip if one already exists.
+      if (this._registerer) {
+        this._log.debug('Registerer already exists, skipping duplicate register call');
         return;
       }
 
@@ -184,17 +184,25 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
       this._registerer.register().catch((error: Error) => {
         this._log.error('SIP registration failed', error);
+        this._registerer?.dispose().catch((err: Error) => {
+          this._log.warn('Error disposing registerer after failed registration', err);
+        });
+        this._registerer = null;
+        this._status = 'offline';
         this.emit('error', {
           error: {
             code: 31201,
             message: `SIP registration failed: ${error.message}`,
           },
         });
+        this.emit('offline', this);
       });
     } else {
       if (this._registerer) {
         this._registerer.unregister().catch((error: Error) => {
           this._log.error('SIP unregister failed', error);
+          this._status = 'offline';
+          this.emit('offline', this);
         });
       }
     }
