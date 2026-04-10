@@ -69,8 +69,11 @@
     "docs:ts"
   ],
   "devDependencies": {
+    "@babel/core": "7.29.0",
+    "@babel/preset-env": "7.29.2",
     "@datadog/datadog-ci": "4.4.0",
     "@ngrok/ngrok": "1.2.0",
+    "@rollup/plugin-babel": "7.0.0",
     "@rollup/plugin-commonjs": "28.0.6",
     "@rollup/plugin-node-resolve": "16.0.1",
     "@rollup/plugin-typescript": "12.1.4",

@@ -2,6 +2,7 @@
 
 // @ts-check
 
+import babel from '@rollup/plugin-babel';
 import commonjs from '@rollup/plugin-commonjs';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import typescript from '@rollup/plugin-typescript';
@@ -27,6 +28,12 @@ const createPlugins = (outDir, target) => [
     outDir,
     target,
     tsconfig: './tsconfig.json',
+  }),
+  babel({
+    babelHelpers: 'bundled',
+    include: ['node_modules/sip.js/**'],
+    presets: [['@babel/preset-env']],
+    extensions: ['.js'],
   }),
 ];
 
