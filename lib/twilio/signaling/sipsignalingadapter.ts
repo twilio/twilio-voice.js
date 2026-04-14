@@ -9,25 +9,25 @@ import Log from '../log';
 import { SignalingAdapter, SignalingAdapterStatus } from './signalingadapter';
 
 /**
- * @private
  * Options for constructing a SipSignalingAdapter.
  */
 export interface SipSignalingAdapterOptions {
-  sipServer: string;
-  sipCredentials: { username: string; password: string };
+  sipDomain: string;
+  sipUri: string;
+  sipTransportServer: string;
+  credentials: { username: string; password: string };
   region?: string;
   /**
-   * @private Factory override for testing.
+   * Factory override for testing.
    */
-  createUserAgent?: (config: any) => any;
+  createUserAgent?: (...args: ConstructorParameters<typeof UserAgent>) => UserAgent;
   /**
-   * @private Factory override for testing.
+   * Factory override for testing.
    */
-  createRegisterer?: (ua: any) => any;
+  createRegisterer?: (userAgent: UserAgent) => Registerer;
 }
 
 /**
- * @private
  * A no-op SessionDescriptionHandler for SIP.js. Call signaling is not yet
  * implemented in this ticket (VBLOCKS-6374), so this stub satisfies the
  * SIP.js SDH interface without doing any real media work.
@@ -48,20 +48,6 @@ function createNoOpSDH(): any {
 }
 
 /**
- * @private
- * Extract the hostname from a WebSocket URL.
- */
-function extractDomain(wsUrl: string): string {
-  try {
-    const url = new URL(wsUrl);
-    return url.hostname;
-  } catch {
-    return wsUrl;
-  }
-}
-
-/**
- * @private
  * SignalingAdapter implementation backed by SIP.js. Handles WebSocket
  * connection and SIP registration lifecycle. Call-level signaling methods
  * are not yet implemented (VBLOCKS-6374).
@@ -79,25 +65,24 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   constructor(options: SipSignalingAdapterOptions) {
     super();
     this._options = options;
-    this._uri = options.sipServer;
-    this._region = options.region || this._extractRegionFromServer(options.sipServer);
+    this._uri = options.sipTransportServer;
+    this._region = options.region;
 
-    const domain = extractDomain(options.sipServer);
-    const createUA = options.createUserAgent || ((config: any) => new UserAgent(config));
+    const createUA = options.createUserAgent || ((...args: ConstructorParameters<typeof UserAgent>) => new UserAgent(...args));
 
-    const sipUri = UserAgent.makeURI(`sip:${options.sipCredentials.username}@${domain}`);
+    const sipUri = UserAgent.makeURI(options.sipUri);
     if (!sipUri) {
-      throw new Error(`Failed to create SIP URI from username "${options.sipCredentials.username}" and domain "${domain}"`);
+      throw new Error(`Failed to create SIP URI from "${options.sipUri}"`);
     }
 
     this._userAgent = createUA({
       uri: sipUri,
       transportOptions: {
-        server: options.sipServer,
+        server: options.sipTransportServer,
         reconnectionAttempts: 0,
       },
-      authorizationUsername: options.sipCredentials.username,
-      authorizationPassword: options.sipCredentials.password,
+      authorizationUsername: options.credentials.username,
+      authorizationPassword: options.credentials.password,
       sessionDescriptionHandlerFactory: () => createNoOpSDH(),
       delegate: {
         onConnect: () => this._onTransportConnect(),
@@ -151,53 +136,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
     const isPresent = mediaCapabilities?.audio === true;
 
-    if (isPresent) {
-      // SIP.js Registerer handles refresh internally, so skip if one already exists.
-      if (this._registerer) {
-        this._log.debug('Registerer already exists, skipping duplicate register call');
-        return;
-      }
-
-      const createReg = this._options.createRegisterer
-        || ((ua: any) => new Registerer(ua));
-      this._registerer = createReg(this._userAgent);
-
-      this._registerer.stateChange.addListener((state: RegistererState) => {
-        switch (state) {
-          case RegistererState.Registered:
-            this._log.info('SIP registered');
-            this._status = 'ready';
-            this.emit('ready');
-            break;
-          case RegistererState.Unregistered:
-            this._log.info('SIP unregistered');
-            if (this._status !== 'disconnected') {
-              this._status = 'offline';
-              this.emit('offline', this);
-            }
-            break;
-          case RegistererState.Terminated:
-            this._log.info('Registerer terminated');
-            break;
-        }
-      });
-
-      this._registerer.register().catch((error: Error) => {
-        this._log.error('SIP registration failed', error);
-        this._registerer?.dispose().catch((err: Error) => {
-          this._log.warn('Error disposing registerer after failed registration', err);
-        });
-        this._registerer = null;
-        this._status = 'offline';
-        this.emit('error', {
-          error: {
-            code: 31201,
-            message: `SIP registration failed: ${error.message}`,
-          },
-        });
-        this.emit('offline', this);
-      });
-    } else {
+    if (!isPresent) {
       if (this._registerer) {
         this._registerer.unregister().catch((error: Error) => {
           this._log.error('SIP unregister failed', error);
@@ -205,7 +144,54 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
           this.emit('offline', this);
         });
       }
+      return;
     }
+
+    // SIP.js Registerer handles refresh internally, so skip if one already exists.
+    if (this._registerer) {
+      this._log.debug('Registerer already exists, skipping duplicate register call');
+      return;
+    }
+
+    const createReg = this._options.createRegisterer
+      || ((userAgent: UserAgent) => new Registerer(userAgent));
+    this._registerer = createReg(this._userAgent);
+
+    this._registerer.stateChange.addListener((state: RegistererState) => {
+      switch (state) {
+        case RegistererState.Registered:
+          this._log.info('SIP registered');
+          this._status = 'ready';
+          this.emit('ready');
+          break;
+        case RegistererState.Unregistered:
+          this._log.info('SIP unregistered');
+          if (this._status !== 'disconnected') {
+            this._status = 'offline';
+            this.emit('offline', this);
+          }
+          break;
+        case RegistererState.Terminated:
+          this._log.info('Registerer terminated');
+          break;
+      }
+    });
+
+    this._registerer.register().catch((error: Error) => {
+      this._log.error('SIP registration failed', error);
+      this._registerer?.dispose().catch((err: Error) => {
+        this._log.warn('Error disposing registerer after failed registration', err);
+      });
+      this._registerer = null;
+      this._status = 'offline';
+      this.emit('error', {
+        error: {
+          code: 31201,
+          message: `SIP registration failed: ${error.message}`,
+        },
+      });
+      this.emit('offline', this);
+    });
   }
 
   destroy(): void {
@@ -283,19 +269,6 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  private _extractRegionFromServer(wsUrl: string): string | undefined {
-    try {
-      const hostname = new URL(wsUrl).hostname;
-      const parts = hostname.split('.');
-      if (parts.length >= 2) {
-        return parts[1];
-      }
-    } catch {
-      this._log.warn('Failed to extract region from SIP server URL', wsUrl);
-    }
-    return undefined;
-  }
-
   private _onTransportConnect(): void {
     this._log.info('WebSocket connected');
     this._status = 'connected';
@@ -303,7 +276,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     const payload: Record<string, any> = {
       region: this._region,
       token: {
-        identity: this._options.sipCredentials.username,
+        identity: this._options.credentials.username,
       },
     };
 
@@ -320,10 +293,9 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       this._registerer = null;
     }
 
-    this.emit('transportClose');
-
     if (this._status !== 'disconnected') {
       this._status = 'disconnected';
+      this.emit('transportClose');
       this.emit('offline', this);
     }
   }

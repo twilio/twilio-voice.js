@@ -46,16 +46,18 @@ function createAdapter(overrides?: Partial<any>) {
   const regStub = createRegistererStub();
 
   const adapter = new SipSignalingAdapter({
-    sipServer: 'wss://sip.ashburn.dev.twilio.com',
-    sipCredentials: { username: 'alice', password: 'secret' },
+    sipDomain: 'sip.ashburn.dev.twilio.com',
+    sipUri: 'sip:alice@sip.ashburn.dev.twilio.com',
+    sipTransportServer: 'wss://sip.ashburn.dev.twilio.com',
+    credentials: { username: 'alice', password: 'secret' },
     region: 'ashburn',
     createUserAgent(config: any) {
       // Capture the delegate so our stub can trigger events
       uaStub._setDelegate(config.delegate);
-      return uaStub;
+      return uaStub as any;
     },
     createRegisterer() {
-      return regStub;
+      return regStub as any;
     },
     ...overrides,
   });
@@ -75,7 +77,7 @@ describe('SipSignalingAdapter', () => {
       assert.strictEqual(adapter.status, 'disconnected');
     });
 
-    it('should set uri to sipServer', () => {
+    it('should set uri to sipTransportServer', () => {
       const { adapter } = createAdapter();
       assert.strictEqual(adapter.uri, 'wss://sip.ashburn.dev.twilio.com');
     });
@@ -85,10 +87,9 @@ describe('SipSignalingAdapter', () => {
       assert.strictEqual(adapter.region, 'ashburn');
     });
 
-    it('should extract region from sipServer if not provided', () => {
+    it('should set region to undefined if not provided', () => {
       const { adapter } = createAdapter({ region: undefined });
-      // Extracted from 'sip.ashburn.dev.twilio.com' → 'ashburn'
-      assert.strictEqual(adapter.region, 'ashburn');
+      assert.strictEqual(adapter.region, undefined);
     });
 
     it('should return undefined for gateway', () => {
@@ -185,7 +186,7 @@ describe('SipSignalingAdapter', () => {
       failRegStub.register = sinon.stub().rejects(new Error('auth failed'));
 
       const { adapter, uaStub } = createAdapter({
-        createRegisterer() { return failRegStub; },
+        createRegisterer() { return failRegStub as any; },
       });
 
       uaStub._triggerConnect();

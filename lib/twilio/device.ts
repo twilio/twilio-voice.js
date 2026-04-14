@@ -1573,6 +1573,35 @@ class Device extends EventEmitter {
   }
 
   /**
+   * Create the appropriate SignalingAdapter based on the configured signaling method.
+   */
+  private _createSignalingAdapter(): SignalingAdapter {
+    if (this._options.signalingOptions?.useSignalingMethod === 'sip') {
+      this._log.info('Setting up SIP signaling');
+      const sipOpts = this._options.signalingOptions as Device.SIPSignalingOptions;
+      const domain = new URL(sipOpts.sipServer).hostname;
+      return new SipSignalingAdapter({
+        sipDomain: domain,
+        sipUri: `sip:${sipOpts.sipCredentials.username}@${domain}`,
+        sipTransportServer: sipOpts.sipServer,
+        credentials: sipOpts.sipCredentials,
+        region: sipOpts.region || domain.split('.')[1],
+      });
+    }
+
+    this._log.info('Setting up VSP');
+    const pstream = new (this._options.PStream || PStream)(
+      this.token,
+      this._chunderURIs,
+      {
+        backoffMaxMs: this._options.backoffMaxMs,
+        maxPreferredDurationMs: this._options.maxCallSignalingTimeoutMs,
+      },
+    );
+    return new PStreamSignalingAdapter(pstream);
+  }
+
+  /**
    * Set up the connection to the signaling server. Tears down an existing
    * stream if called while a stream exists.
    */
@@ -1582,26 +1611,7 @@ class Device extends EventEmitter {
       this._destroyStream();
     }
 
-    if (this._options.signalingOptions?.useSignalingMethod === 'sip') {
-      this._log.info('Setting up SIP signaling');
-      const sipOpts = this._options.signalingOptions as Device.SIPSignalingOptions;
-      this._stream = new SipSignalingAdapter({
-        sipServer: sipOpts.sipServer,
-        sipCredentials: sipOpts.sipCredentials,
-        region: sipOpts.region,
-      });
-    } else {
-      this._log.info('Setting up VSP');
-      const pstream = new (this._options.PStream || PStream)(
-        this.token,
-        this._chunderURIs,
-        {
-          backoffMaxMs: this._options.backoffMaxMs,
-          maxPreferredDurationMs: this._options.maxCallSignalingTimeoutMs,
-        },
-      );
-      this._stream = new PStreamSignalingAdapter(pstream);
-    }
+    this._stream = this._createSignalingAdapter();
 
     this._stream.addListener('close', this._onSignalingClose);
     this._stream.addListener('connected', this._onSignalingConnected);
