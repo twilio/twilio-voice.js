@@ -21,6 +21,7 @@ import { PreflightTest } from './preflight/preflight';
 import PStream from './pstream';
 import { PStreamSignalingAdapter } from './signaling/pstreamsignalingadapter';
 import { SignalingAdapter } from './signaling/signalingadapter';
+import { SipSignalingAdapter } from './signaling/sipsignalingadapter';
 import {
   createEventGatewayURI,
   createSignalingEndpointURL,
@@ -1572,18 +1573,20 @@ class Device extends EventEmitter {
   }
 
   /**
-   * Set up the connection to the signaling server. Tears down an existing
-   * stream if called while a stream exists.
+   * Create the appropriate SignalingAdapter based on the configured signaling method.
    */
-  private _setupStream(): Promise<SignalingAdapter> {
-    if (this._stream) {
-      this._log.info('Found existing stream; destroying...');
-      this._destroyStream();
-    }
-
+  private _createSignalingAdapter(): SignalingAdapter {
     if (this._options.signalingOptions?.useSignalingMethod === 'sip') {
       this._log.info('Setting up SIP signaling');
-      // TODO(VBLOCKS-6371): Replace with SipSignalingAdapter
+      const sipOpts = this._options.signalingOptions as Device.SIPSignalingOptions;
+      const domain = new URL(sipOpts.sipServer).hostname;
+      return new SipSignalingAdapter({
+        sipDomain: domain,
+        sipUri: `sip:${sipOpts.sipCredentials.username}@${domain}`,
+        sipTransportServer: sipOpts.sipServer,
+        credentials: sipOpts.sipCredentials,
+        region: sipOpts.region || domain.split('.')[1],
+      });
     }
 
     this._log.info('Setting up VSP');
@@ -1595,7 +1598,20 @@ class Device extends EventEmitter {
         maxPreferredDurationMs: this._options.maxCallSignalingTimeoutMs,
       },
     );
-    this._stream = new PStreamSignalingAdapter(pstream);
+    return new PStreamSignalingAdapter(pstream);
+  }
+
+  /**
+   * Set up the connection to the signaling server. Tears down an existing
+   * stream if called while a stream exists.
+   */
+  private _setupStream(): Promise<SignalingAdapter> {
+    if (this._stream) {
+      this._log.info('Found existing stream; destroying...');
+      this._destroyStream();
+    }
+
+    this._stream = this._createSignalingAdapter();
 
     this._stream.addListener('close', this._onSignalingClose);
     this._stream.addListener('connected', this._onSignalingConnected);
@@ -1929,6 +1945,8 @@ namespace Device {
     sipServer: string;
     /** SIP digest authentication credentials. */
     sipCredentials: { username: string; password: string };
+    /** Optional region hint for edge/region metadata (e.g. `'ashburn'`). */
+    region?: string;
   }
 
   /**
