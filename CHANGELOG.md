@@ -7,6 +7,7 @@ Bug Fixes
 ---------
 
 - Fixed an issue where multiple PeerConnections are created when `device.connect()` is called multiple times.
+- Fixed an issue where the `docs:ts` build fails when the repository is inside a monorepo or workspace due to TypeDoc picking up conflicting `@types` from parent `node_modules`. Thanks @taf2 for your [contribution](https://github.com/twilio/twilio-voice.js/pull/416).
 
 2.18.1 (March 17, 2026)
 =======================

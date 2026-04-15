@@ -25,5 +25,6 @@ server.js
 templates
 tests
 tslint.json
+tsconfig.docs.json
 typedoc.json
 reports
