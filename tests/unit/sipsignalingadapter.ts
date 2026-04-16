@@ -1,10 +1,9 @@
 import * as assert from 'assert';
-import { EventEmitter } from 'events';
 import * as sinon from 'sinon';
 import { SipSignalingAdapter } from '../../lib/twilio/signaling/sipsignalingadapter';
 
 /**
- * Stub that mimics a SIP.js Registerer's stateChange emitter.
+ * Stub that mimics a SIP.js Registerer/Session stateChange emitter.
  */
 class StateChangeEmitter {
   private _listeners: Function[] = [];
@@ -27,6 +26,49 @@ function createRegistererStub() {
   };
 }
 
+function createSessionStub(initialState: string = 'Initial') {
+  const stateChange = new StateChangeEmitter();
+  return {
+    state: initialState,
+    stateChange,
+    delegate: undefined as any,
+    bye: sinon.stub().resolves(),
+    cancel: sinon.stub().resolves(),
+    invite: sinon.stub().resolves(),
+    info: sinon.stub().resolves(),
+    message: sinon.stub().resolves(),
+    _simulateState(state: string) {
+      this.state = state;
+      stateChange.notify(state);
+    },
+  };
+}
+
+function createInviterStub() {
+  const stub = createSessionStub('Initial');
+  let requestDelegate: any = null;
+  stub.invite = sinon.stub().callsFake((opts?: any) => {
+    requestDelegate = opts?.requestDelegate;
+    return Promise.resolve();
+  });
+  return {
+    ...stub,
+    _getRequestDelegate() { return requestDelegate; },
+  };
+}
+
+function createInvitationStub() {
+  const stub = createSessionStub('Initial');
+  return {
+    ...stub,
+    id: 'inv-session-id-123',
+    body: 'v=0\r\no=- 123 456 IN IP4 0.0.0.0\r\n',
+    remoteIdentity: { uri: { toString: () => 'sip:bob@example.com' } },
+    accept: sinon.stub().resolves(),
+    reject: sinon.stub().resolves(),
+  };
+}
+
 function createUserAgentStub() {
   let delegate: any = {};
   return {
@@ -44,6 +86,7 @@ function createUserAgentStub() {
 function createAdapter(overrides?: Partial<any>) {
   const uaStub = createUserAgentStub();
   const regStub = createRegistererStub();
+  const inviterStub = createInviterStub();
 
   const adapter = new SipSignalingAdapter({
     sipDomain: 'sip.ashburn.dev.twilio.com',
@@ -52,17 +95,19 @@ function createAdapter(overrides?: Partial<any>) {
     credentials: { username: 'alice', password: 'secret' },
     region: 'ashburn',
     createUserAgent(config: any) {
-      // Capture the delegate so our stub can trigger events
       uaStub._setDelegate(config.delegate);
       return uaStub as any;
     },
     createRegisterer() {
       return regStub as any;
     },
+    createInviter() {
+      return inviterStub as any;
+    },
     ...overrides,
   });
 
-  return { adapter, uaStub, regStub };
+  return { adapter, uaStub, regStub, inviterStub };
 }
 
 describe('SipSignalingAdapter', () => {
@@ -301,48 +346,273 @@ describe('SipSignalingAdapter', () => {
     });
   });
 
-  describe('call signaling stubs', () => {
-    it('invite() should throw NotSupportedError', () => {
-      const { adapter } = createAdapter();
-      assert.throws(() => adapter.invite('sdp', 'sid', 'params'), /not yet implemented/);
+  describe('invite()', () => {
+    it('should create an Inviter and call invite()', () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('sdp', 'call-1', 'To=bob');
+      assert(inviterStub.invite.calledOnce);
     });
 
-    it('answer() should throw NotSupportedError', () => {
-      const { adapter } = createAdapter();
-      assert.throws(() => adapter.answer('sdp', 'sid'), /not yet implemented/);
+    it('should emit "ringing" on requestDelegate.onProgress', (done) => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.on('ringing', (payload: any) => {
+        assert.strictEqual(payload.callsid, 'call-1');
+        done();
+      });
+      adapter.invite('sdp', 'call-1', 'To=bob');
+      const rd = inviterStub._getRequestDelegate();
+      rd.onProgress({});
     });
 
-    it('hangup() should throw NotSupportedError', () => {
-      const { adapter } = createAdapter();
-      assert.throws(() => adapter.hangup('sid'), /not yet implemented/);
+    it('should emit "answer" on requestDelegate.onAccept', (done) => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.on('answer', (payload: any) => {
+        assert.strictEqual(payload.callsid, 'call-1');
+        done();
+      });
+      adapter.invite('sdp', 'call-1', 'To=bob');
+      const rd = inviterStub._getRequestDelegate();
+      rd.onAccept({});
     });
 
-    it('reject() should throw NotSupportedError', () => {
-      const { adapter } = createAdapter();
-      assert.throws(() => adapter.reject('sid'), /not yet implemented/);
+    it('should emit "hangup" with error on requestDelegate.onReject', (done) => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.on('hangup', (payload: any) => {
+        assert.strictEqual(payload.callsid, 'call-1');
+        assert(payload.error);
+        done();
+      });
+      adapter.invite('sdp', 'call-1', 'To=bob');
+      const rd = inviterStub._getRequestDelegate();
+      rd.onReject({ message: { statusCode: 486, reasonPhrase: 'Busy Here' } });
     });
 
-    it('reinvite() should throw NotSupportedError', () => {
-      const { adapter } = createAdapter();
-      assert.throws(() => adapter.reinvite('sdp', 'sid'), /not yet implemented/);
+    it('should emit "error" if invite() promise rejects', (done) => {
+      const failInviterStub = createInviterStub();
+      failInviterStub.invite = sinon.stub().rejects(new Error('transport down'));
+      const { adapter } = createAdapter({
+        createInviter() { return failInviterStub as any; },
+      });
+      adapter.on('error', (payload: any) => {
+        assert.strictEqual(payload.error.code, 31000);
+        assert(payload.error.message.includes('transport down'));
+        done();
+      });
+      adapter.invite('sdp', 'call-1', 'To=bob');
     });
 
-    it('reconnect() should throw NotSupportedError', () => {
-      const { adapter } = createAdapter();
-      assert.throws(() => adapter.reconnect('sdp', 'sid', 'token'), /not yet implemented/);
+    it('should clean up session on SessionState.Terminated', () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('sdp', 'call-1', 'To=bob');
+      inviterStub._simulateState('Terminated');
+      // Subsequent hangup should warn (no session found) — just verifying no crash
+      assert.doesNotThrow(() => adapter.hangup('call-1'));
+    });
+  });
+
+  describe('reconnect()', () => {
+    it('should create an Inviter and call invite()', () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.reconnect('sdp', 'call-1', 'rtoken');
+      assert(inviterStub.invite.calledOnce);
     });
 
-    it('dtmf() should throw NotSupportedError', () => {
-      const { adapter } = createAdapter();
-      assert.throws(() => adapter.dtmf('sid', '123'), /not yet implemented/);
+    it('should include reconnect token in answer payload', (done) => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.on('answer', (payload: any) => {
+        assert.strictEqual(payload.reconnect, 'rtoken');
+        done();
+      });
+      adapter.reconnect('sdp', 'call-1', 'rtoken');
+      const rd = inviterStub._getRequestDelegate();
+      rd.onAccept({});
+    });
+  });
+
+  describe('incoming call (onInvite)', () => {
+    it('should emit "invite" with callsid, sdp, parameters', (done) => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      adapter.on('invite', (payload: any) => {
+        assert.strictEqual(payload.callsid, inv.id);
+        assert.strictEqual(payload.sdp, inv.body);
+        assert.strictEqual(payload.parameters.CallSid, inv.id);
+        assert.strictEqual(payload.parameters.From, 'sip:bob@example.com');
+        done();
+      });
+      uaStub._triggerInvite(inv);
     });
 
-    it('sendMessage() should throw NotSupportedError', () => {
+    it('should emit "cancel" when invitation.delegate.onCancel fires', (done) => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      adapter.on('cancel', (payload: any) => {
+        assert.strictEqual(payload.callsid, inv.id);
+        done();
+      });
+      uaStub._triggerInvite(inv);
+      inv.delegate.onCancel();
+    });
+
+    it('should emit "hangup" when session.delegate.onBye fires', (done) => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      adapter.on('hangup', (payload: any) => {
+        assert.strictEqual(payload.callsid, inv.id);
+        done();
+      });
+      uaStub._triggerInvite(inv);
+      inv.delegate.onBye();
+    });
+  });
+
+  describe('answer()', () => {
+    it('should call invitation.accept()', () => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      uaStub._triggerInvite(inv);
+      adapter.answer('sdp-answer', inv.id);
+      assert(inv.accept.calledOnce);
+    });
+
+    it('should warn if no pending invitation', () => {
       const { adapter } = createAdapter();
-      assert.throws(
-        () => adapter.sendMessage('sid', 'hi', 'text/plain', 'user-msg', 'evt1'),
-        /not yet implemented/,
-      );
+      // Should not throw — just warns
+      assert.doesNotThrow(() => adapter.answer('sdp', 'unknown-id'));
+    });
+  });
+
+  describe('reject()', () => {
+    it('should call invitation.reject()', () => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      uaStub._triggerInvite(inv);
+      adapter.reject(inv.id);
+      assert(inv.reject.calledOnce);
+    });
+
+    it('should warn if no pending invitation', () => {
+      const { adapter } = createAdapter();
+      assert.doesNotThrow(() => adapter.reject('unknown-id'));
+    });
+  });
+
+  describe('hangup()', () => {
+    it('should call session.bye() when state is Established', () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('sdp', 'call-1', 'To=bob');
+      inviterStub.state = 'Established';
+      adapter.hangup('call-1');
+      assert(inviterStub.bye.calledOnce);
+    });
+
+    it('should call inviter.cancel() when state is Establishing', () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('sdp', 'call-1', 'To=bob');
+      inviterStub.state = 'Establishing';
+      adapter.hangup('call-1');
+      assert(inviterStub.cancel.calledOnce);
+    });
+
+    it('should reject pending invitation during hangup', () => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      uaStub._triggerInvite(inv);
+      adapter.hangup(inv.id);
+      assert(inv.reject.calledOnce);
+    });
+
+    it('should not throw for unknown callSid', () => {
+      const { adapter } = createAdapter();
+      assert.doesNotThrow(() => adapter.hangup('unknown'));
+    });
+  });
+
+  describe('reinvite()', () => {
+    it('should call session.invite() for established sessions', () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('sdp', 'call-1', 'To=bob');
+      inviterStub.state = 'Established';
+      adapter.reinvite('new-sdp', 'call-1');
+      // session.invite is the re-INVITE call (distinct from inviter.invite for initial INVITE)
+      // inviterStub.invite is called once for initial, then once for reinvite = 2 total
+      assert.strictEqual(inviterStub.invite.callCount, 2);
+    });
+
+    it('should not throw for non-established session', () => {
+      const { adapter } = createAdapter();
+      assert.doesNotThrow(() => adapter.reinvite('sdp', 'unknown'));
+    });
+  });
+
+  describe('dtmf()', () => {
+    it('should call session.info() for each digit', async () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('sdp', 'call-1', 'To=bob');
+      inviterStub.state = 'Established';
+      adapter.dtmf('call-1', '12');
+      // Allow async sends to complete
+      await new Promise(resolve => setTimeout(resolve, 10));
+      assert.strictEqual(inviterStub.info.callCount, 2);
+    });
+
+    it('should not throw for non-established session', () => {
+      const { adapter } = createAdapter();
+      assert.doesNotThrow(() => adapter.dtmf('unknown', '1'));
+    });
+  });
+
+  describe('sendMessage()', () => {
+    it('should call session.message() and emit "ack"', (done) => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('sdp', 'call-1', 'To=bob');
+      inviterStub.state = 'Established';
+      adapter.on('ack', (payload: any) => {
+        assert.strictEqual(payload.acktype, 'message');
+        assert.strictEqual(payload.callsid, 'call-1');
+        assert.strictEqual(payload.voiceeventsid, 'evt-1');
+        done();
+      });
+      adapter.sendMessage('call-1', '{"hello":"world"}', 'application/json', 'user-msg', 'evt-1');
+    });
+
+    it('should emit "error" if message() fails', (done) => {
+      const failInviterStub = createInviterStub();
+      failInviterStub.message = sinon.stub().rejects(new Error('send failed'));
+      const { adapter } = createAdapter({
+        createInviter() { return failInviterStub as any; },
+      });
+      adapter.invite('sdp', 'call-1', 'To=bob');
+      (failInviterStub as any).state = 'Established';
+      adapter.on('error', (payload: any) => {
+        assert.strictEqual(payload.voiceeventsid, 'evt-1');
+        done();
+      });
+      adapter.sendMessage('call-1', 'hi', 'text/plain', 'user-msg', 'evt-1');
+    });
+
+    it('should not throw for unknown callSid', () => {
+      const { adapter } = createAdapter();
+      assert.doesNotThrow(() => adapter.sendMessage('unknown', 'hi', 'text/plain', 'msg', 'evt'));
+    });
+  });
+
+  describe('lifecycle cleanup', () => {
+    it('destroy() should bye established sessions and clear maps', () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('sdp', 'call-1', 'To=bob');
+      inviterStub.state = 'Established';
+      adapter.destroy();
+      assert(inviterStub.bye.calledOnce);
+    });
+
+    it('transport disconnect should clear session maps', () => {
+      const { adapter, uaStub, inviterStub } = createAdapter();
+      uaStub._triggerConnect();
+      adapter.invite('sdp', 'call-1', 'To=bob');
+      uaStub._triggerDisconnect();
+      // Session map cleared — hangup should not find session
+      assert.doesNotThrow(() => adapter.hangup('call-1'));
     });
   });
 });
