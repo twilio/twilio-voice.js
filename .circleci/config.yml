@@ -70,7 +70,7 @@ commands:
           key: dependency-cache-{{ arch }}-{{ checksum "package-lock.json" }}
       - run:
           name: Installing dependencies
-          command: node -v && npm ci
+          command: npm ci
       - save_cache:
           key: dependency-cache-{{ arch }}-{{ checksum "package-lock.json" }}
           paths:
@@ -260,7 +260,7 @@ jobs:
 
   trigger-qe-tests:
     docker:
-      - image: cimg/node:24.15.0
+      - image: cimg/node:24.15.0@sha256:0a67b6fa151ceac233d469a5915ca75a4a1c9e3854502ed7cc236f18c3a4f5c3
     steps:
       - run:
           name: Trigger QE tests
