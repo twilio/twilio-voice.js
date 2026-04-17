@@ -37,7 +37,7 @@ parameters:
 executors:
   machine-executor:
     machine:
-      image: ubuntu-2004:current
+      image: ubuntu-2004:2024.11.1
       docker_layer_caching: true
   docker-with-browser:
     parameters:
