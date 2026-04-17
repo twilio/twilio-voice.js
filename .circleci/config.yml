@@ -1,7 +1,7 @@
 version: 2.1
 
 orbs:
-  test-visibility-circleci-orb: datadog/test-visibility-circleci-orb@1
+  test-visibility-circleci-orb: datadog/test-visibility-circleci-orb@1.2.7
 
 ###
 # Parameters
@@ -67,14 +67,14 @@ commands:
     steps:
       - get-code
       - restore_cache:
-          key: dependency-cache-{{ arch }}-{{ checksum "package.json" }}
+          key: dependency-cache-{{ arch }}-{{ checksum "package-lock.json" }}
       - run:
           name: Installing dependencies
-          command: node -v && npm install
+          command: node -v && npm ci
       - save_cache:
-          key: dependency-cache-{{ arch }}-{{ checksum "package.json" }}
+          key: dependency-cache-{{ arch }}-{{ checksum "package-lock.json" }}
           paths:
-            - ./node_modules
+            - ~/.npm
   build:
     steps:
       - get-code-and-dependencies
@@ -260,7 +260,7 @@ jobs:
 
   trigger-qe-tests:
     docker:
-      - image: circleci/node:latest
+      - image: cimg/node:24.15.0
     steps:
       - run:
           name: Trigger QE tests
