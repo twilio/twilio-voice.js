@@ -271,7 +271,8 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     if (invitation) {
       this._pendingInvitations.delete(callSid);
       invitation.reject().catch((error: Error) => {
-        this._log.warn('Failed to reject invitation during hangup', error);
+        this._log.error('Failed to reject invitation during hangup', error);
+        this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
       });
       return;
     }
@@ -285,16 +286,19 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
     if (session.state === SessionState.Established) {
       session.bye().catch((error: Error) => {
-        this._log.warn('Failed to send BYE', error);
+        this._log.error('Failed to send BYE', error);
+        this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
       });
     } else if (session.state === SessionState.Initial || session.state === SessionState.Establishing) {
       if (this._outboundCallSids.has(callSid)) {
         (session as Inviter).cancel().catch((error: Error) => {
-          this._log.warn('Failed to cancel outgoing call', error);
+          this._log.error('Failed to cancel outgoing call', error);
+          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
         });
       } else {
-        (session as unknown as Invitation).reject().catch((error: Error) => {
-          this._log.warn('Failed to reject invitation during hangup', error);
+        (session as Invitation).reject().catch((error: Error) => {
+          this._log.error('Failed to reject invitation during hangup', error);
+          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
         });
       }
     }
@@ -372,8 +376,8 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     voiceEventSid: string,
   ): void {
     const session = this._sessions.get(callSid);
-    if (!session) {
-      this._log.warn('sendMessage: no session for callSid', callSid);
+    if (!session || session.state !== SessionState.Established) {
+      this._log.warn('sendMessage: no established session for callSid', callSid);
       return;
     }
     session.message({

@@ -464,6 +464,18 @@ describe('SipSignalingAdapter', () => {
       uaStub._triggerInvite(inv);
       inv.delegate.onBye();
     });
+
+    it('should emit "hangup" via onBye after answering an inbound call', (done) => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      uaStub._triggerInvite(inv);
+      adapter.answer('sdp-answer', inv.id);
+      adapter.on('hangup', (payload: any) => {
+        assert.strictEqual(payload.callsid, inv.id);
+        done();
+      });
+      inv.delegate.onBye();
+    });
   });
 
   describe('answer()', () => {
@@ -480,6 +492,20 @@ describe('SipSignalingAdapter', () => {
       // Should not throw — just warns
       assert.doesNotThrow(() => adapter.answer('sdp', 'unknown-id'));
     });
+
+    it('should emit "error" if accept() fails', (done) => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      inv.accept = sinon.stub().rejects(new Error('accept failed'));
+      uaStub._triggerInvite(inv);
+      adapter.on('error', (payload: any) => {
+        assert.strictEqual(payload.error.code, 31000);
+        assert.strictEqual(payload.error.message, 'accept failed');
+        assert.strictEqual(payload.callsid, inv.id);
+        done();
+      });
+      adapter.answer('sdp-answer', inv.id);
+    });
   });
 
   describe('reject()', () => {
@@ -494,6 +520,20 @@ describe('SipSignalingAdapter', () => {
     it('should warn if no pending invitation', () => {
       const { adapter } = createAdapter();
       assert.doesNotThrow(() => adapter.reject('unknown-id'));
+    });
+
+    it('should emit "error" if reject() fails', (done) => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      inv.reject = sinon.stub().rejects(new Error('reject failed'));
+      uaStub._triggerInvite(inv);
+      adapter.on('error', (payload: any) => {
+        assert.strictEqual(payload.error.code, 31000);
+        assert.strictEqual(payload.error.message, 'reject failed');
+        assert.strictEqual(payload.callsid, inv.id);
+        done();
+      });
+      adapter.reject(inv.id);
     });
   });
 
@@ -543,6 +583,28 @@ describe('SipSignalingAdapter', () => {
       const { adapter } = createAdapter();
       assert.doesNotThrow(() => adapter.reinvite('sdp', 'unknown'));
     });
+
+    it('should emit "answer" on requestDelegate.onAccept', (done) => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('sdp', 'call-1', 'To=bob');
+      inviterStub.state = 'Established';
+      adapter.on('answer', (payload: any) => {
+        assert.strictEqual(payload.callsid, 'call-1');
+        done();
+      });
+      adapter.reinvite('new-sdp', 'call-1');
+      const rd = inviterStub.invite.lastCall.args[0]?.requestDelegate;
+      rd.onAccept();
+    });
+
+    it('should warn but not throw on requestDelegate.onReject', () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('sdp', 'call-1', 'To=bob');
+      inviterStub.state = 'Established';
+      adapter.reinvite('new-sdp', 'call-1');
+      const rd = inviterStub.invite.lastCall.args[0]?.requestDelegate;
+      assert.doesNotThrow(() => rd.onReject({ message: { statusCode: 488 } }));
+    });
   });
 
   describe('dtmf()', () => {
@@ -583,7 +645,7 @@ describe('SipSignalingAdapter', () => {
         createInviter() { return failInviterStub as any; },
       });
       adapter.invite('sdp', 'call-1', 'To=bob');
-      (failInviterStub as any).state = 'Established';
+      failInviterStub._simulateState('Established');
       adapter.on('error', (payload: any) => {
         assert.strictEqual(payload.voiceeventsid, 'evt-1');
         done();
