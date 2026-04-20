@@ -57,13 +57,18 @@ function createInviterStub() {
   };
 }
 
-function createInvitationStub() {
+function createInvitationStub(headers?: Record<string, string>) {
+  const defaultHeaders: Record<string, string> = {
+    'X-Twilio-CallSid': 'CA-test-call-sid',
+    ...headers,
+  };
   const stub = createSessionStub('Initial');
   return {
     ...stub,
     id: 'inv-session-id-123',
     body: 'v=0\r\no=- 123 456 IN IP4 0.0.0.0\r\n',
     remoteIdentity: { uri: { toString: () => 'sip:bob@example.com' } },
+    request: { getHeader: (name: string) => defaultHeaders[name] },
     accept: sinon.stub().resolves(),
     reject: sinon.stub().resolves(),
   };
@@ -430,24 +435,43 @@ describe('SipSignalingAdapter', () => {
   });
 
   describe('incoming call (onInvite)', () => {
-    it('should emit "invite" with callsid, sdp, parameters', (done) => {
+    it('should emit "invite" with callsid from X-Twilio-CallSid header', (done) => {
       const { adapter, uaStub } = createAdapter();
       const inv = createInvitationStub();
       adapter.on('invite', (payload: any) => {
-        assert.strictEqual(payload.callsid, inv.id);
+        assert.strictEqual(payload.callsid, 'CA-test-call-sid');
         assert.strictEqual(payload.sdp, inv.body);
-        assert.strictEqual(payload.parameters.CallSid, inv.id);
+        assert.strictEqual(payload.parameters.CallSid, 'CA-test-call-sid');
         assert.strictEqual(payload.parameters.From, 'sip:bob@example.com');
         done();
       });
       uaStub._triggerInvite(inv);
     });
 
+    it('should reject invitation when X-Twilio-CallSid header is missing', () => {
+      const { adapter, uaStub } = createAdapter();
+      const stub = createSessionStub('Initial');
+      const inv = {
+        ...stub,
+        id: 'inv-session-id-123',
+        body: '',
+        remoteIdentity: { uri: { toString: () => 'sip:bob@example.com' } },
+        request: { getHeader: () => undefined },
+        accept: sinon.stub().resolves(),
+        reject: sinon.stub().resolves(),
+      };
+      let inviteEmitted = false;
+      adapter.on('invite', () => { inviteEmitted = true; });
+      uaStub._triggerInvite(inv);
+      assert.strictEqual(inviteEmitted, false);
+      assert(inv.reject.calledOnce);
+    });
+
     it('should emit "cancel" when invitation.delegate.onCancel fires', (done) => {
       const { adapter, uaStub } = createAdapter();
       const inv = createInvitationStub();
       adapter.on('cancel', (payload: any) => {
-        assert.strictEqual(payload.callsid, inv.id);
+        assert.strictEqual(payload.callsid, 'CA-test-call-sid');
         done();
       });
       uaStub._triggerInvite(inv);
@@ -458,7 +482,7 @@ describe('SipSignalingAdapter', () => {
       const { adapter, uaStub } = createAdapter();
       const inv = createInvitationStub();
       adapter.on('hangup', (payload: any) => {
-        assert.strictEqual(payload.callsid, inv.id);
+        assert.strictEqual(payload.callsid, 'CA-test-call-sid');
         done();
       });
       uaStub._triggerInvite(inv);
@@ -469,9 +493,9 @@ describe('SipSignalingAdapter', () => {
       const { adapter, uaStub } = createAdapter();
       const inv = createInvitationStub();
       uaStub._triggerInvite(inv);
-      adapter.answer('sdp-answer', inv.id);
+      adapter.answer('sdp-answer', 'CA-test-call-sid');
       adapter.on('hangup', (payload: any) => {
-        assert.strictEqual(payload.callsid, inv.id);
+        assert.strictEqual(payload.callsid, 'CA-test-call-sid');
         done();
       });
       inv.delegate.onBye();
@@ -483,7 +507,7 @@ describe('SipSignalingAdapter', () => {
       const { adapter, uaStub } = createAdapter();
       const inv = createInvitationStub();
       uaStub._triggerInvite(inv);
-      adapter.answer('sdp-answer', inv.id);
+      adapter.answer('sdp-answer', 'CA-test-call-sid');
       assert(inv.accept.calledOnce);
     });
 
@@ -501,10 +525,10 @@ describe('SipSignalingAdapter', () => {
       adapter.on('error', (payload: any) => {
         assert.strictEqual(payload.error.code, 31000);
         assert.strictEqual(payload.error.message, 'accept failed');
-        assert.strictEqual(payload.callsid, inv.id);
+        assert.strictEqual(payload.callsid, 'CA-test-call-sid');
         done();
       });
-      adapter.answer('sdp-answer', inv.id);
+      adapter.answer('sdp-answer', 'CA-test-call-sid');
     });
   });
 
@@ -513,7 +537,7 @@ describe('SipSignalingAdapter', () => {
       const { adapter, uaStub } = createAdapter();
       const inv = createInvitationStub();
       uaStub._triggerInvite(inv);
-      adapter.reject(inv.id);
+      adapter.reject('CA-test-call-sid');
       assert(inv.reject.calledOnce);
     });
 
@@ -530,10 +554,10 @@ describe('SipSignalingAdapter', () => {
       adapter.on('error', (payload: any) => {
         assert.strictEqual(payload.error.code, 31000);
         assert.strictEqual(payload.error.message, 'reject failed');
-        assert.strictEqual(payload.callsid, inv.id);
+        assert.strictEqual(payload.callsid, 'CA-test-call-sid');
         done();
       });
-      adapter.reject(inv.id);
+      adapter.reject('CA-test-call-sid');
     });
   });
 
@@ -558,7 +582,7 @@ describe('SipSignalingAdapter', () => {
       const { adapter, uaStub } = createAdapter();
       const inv = createInvitationStub();
       uaStub._triggerInvite(inv);
-      adapter.hangup(inv.id);
+      adapter.hangup('CA-test-call-sid');
       assert(inv.reject.calledOnce);
     });
 

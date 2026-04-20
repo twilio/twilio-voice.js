@@ -2,10 +2,12 @@ import { EventEmitter } from 'events';
 import {
   Invitation,
   Inviter,
+  InviterOptions,
   Registerer,
   RegistererState,
   Session,
   SessionState,
+  URI,
   UserAgent,
 } from 'sip.js';
 import Log from '../log';
@@ -31,7 +33,7 @@ export interface SipSignalingAdapterOptions {
   /**
    * Factory override for testing.
    */
-  createInviter?: (userAgent: UserAgent, targetURI: any, options?: any) => Inviter;
+  createInviter?: (userAgent: UserAgent, targetURI: URI, options?: InviterOptions) => Inviter;
 }
 
 /**
@@ -64,11 +66,11 @@ function createNoOpSDH(): any {
 export class SipSignalingAdapter extends EventEmitter implements SignalingAdapter {
   private _log: Log = new Log('SipSignalingAdapter');
   private _options: SipSignalingAdapterOptions;
-  private _outboundCallSids: Set<string> = new Set();
+  private _inboundSessions: Map<string, Invitation> = new Map();
+  private _outboundSessions: Map<string, Inviter> = new Map();
   private _pendingInvitations: Map<string, Invitation> = new Map();
   private _registerer: any | null = null;
   private _region: string | undefined;
-  private _sessions: Map<string, Session> = new Map();
   private _status: SignalingAdapterStatus = 'disconnected';
   private _token: string = '';
   private _uri: string;
@@ -207,16 +209,18 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   destroy(): void {
     this._log.info('Destroying SipSignalingAdapter');
 
-    this._sessions.forEach((session) => {
+    const byeEstablished = (session: Session) => {
       if (session.state === SessionState.Established) {
         session.bye().catch((error: Error) => {
           this._log.warn('Error sending BYE during destroy', error);
         });
       }
-    });
-    this._sessions.clear();
+    };
+    this._inboundSessions.forEach(byeEstablished);
+    this._outboundSessions.forEach(byeEstablished);
+    this._inboundSessions.clear();
+    this._outboundSessions.clear();
     this._pendingInvitations.clear();
-    this._outboundCallSids.clear();
 
     if (this._registerer) {
       this._registerer.dispose().catch((error: Error) => {
@@ -259,7 +263,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       return;
     }
     this._pendingInvitations.delete(callSid);
-    this._sessions.set(callSid, invitation);
+    this._inboundSessions.set(callSid, invitation);
     invitation.accept().catch((error: Error) => {
       this._log.error('Failed to accept invitation', error);
       this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
@@ -267,42 +271,19 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   }
 
   hangup(callSid: string, _message?: string | null): void {
-    const invitation = this._pendingInvitations.get(callSid);
-    if (invitation) {
-      this._pendingInvitations.delete(callSid);
-      invitation.reject().catch((error: Error) => {
-        this._log.error('Failed to reject invitation during hangup', error);
-        this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-      });
-      return;
+    if (this._pendingInvitations.has(callSid)) {
+      return this._hangupPendingInvitation(callSid);
     }
 
-    const session = this._sessions.get(callSid);
-    if (!session) {
-      this._log.warn('hangup: no session for callSid', callSid);
-      return;
+    if (this._outboundSessions.has(callSid)) {
+      return this._hangupOutboundSession(callSid);
     }
-    this._sessions.delete(callSid);
 
-    if (session.state === SessionState.Established) {
-      session.bye().catch((error: Error) => {
-        this._log.error('Failed to send BYE', error);
-        this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-      });
-    } else if (session.state === SessionState.Initial || session.state === SessionState.Establishing) {
-      if (this._outboundCallSids.has(callSid)) {
-        (session as Inviter).cancel().catch((error: Error) => {
-          this._log.error('Failed to cancel outgoing call', error);
-          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-        });
-      } else {
-        (session as Invitation).reject().catch((error: Error) => {
-          this._log.error('Failed to reject invitation during hangup', error);
-          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-        });
-      }
+    if (this._inboundSessions.has(callSid)) {
+      return this._hangupInboundSession(callSid);
     }
-    this._outboundCallSids.delete(callSid);
+
+    this._log.warn('hangup: no session for callSid', callSid);
   }
 
   reject(callSid: string): void {
@@ -319,7 +300,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   }
 
   reinvite(sdp: string, callSid: string): void {
-    const session = this._sessions.get(callSid);
+    const session = this._getSession(callSid);
     if (!session || session.state !== SessionState.Established) {
       this._log.warn('reinvite: no established session for callSid', callSid);
       return;
@@ -343,12 +324,12 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   }
 
   dtmf(callSid: string, digits: string): void {
-    const session = this._sessions.get(callSid);
+    const session = this._getSession(callSid);
     if (!session || session.state !== SessionState.Established) {
       this._log.warn('dtmf: no established session for callSid', callSid);
       return;
     }
-    const sendDigit = async () => {
+    const sendDigits = async () => {
       for (const digit of digits) {
         try {
           await session.info({
@@ -365,7 +346,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
         }
       }
     };
-    sendDigit();
+    sendDigits();
   }
 
   sendMessage(
@@ -375,7 +356,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     _messageType: string,
     voiceEventSid: string,
   ): void {
-    const session = this._sessions.get(callSid);
+    const session = this._getSession(callSid);
     if (!session || session.state !== SessionState.Established) {
       this._log.warn('sendMessage: no established session for callSid', callSid);
       return;
@@ -404,27 +385,81 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   // Private helpers
   // ---------------------------------------------------------------------------
 
+  private _hangupPendingInvitation(callSid: string): void {
+    const invitation = this._pendingInvitations.get(callSid)!;
+    this._pendingInvitations.delete(callSid);
+    invitation.reject().catch((error: Error) => {
+      this._log.error('Failed to reject invitation during hangup', error);
+      this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+    });
+  }
+
+  private _hangupOutboundSession(callSid: string): void {
+    const session = this._outboundSessions.get(callSid)!;
+    this._outboundSessions.delete(callSid);
+
+    if (session.state === SessionState.Established) {
+      session.bye().catch((error: Error) => {
+        this._log.error('Failed to send BYE', error);
+        this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+      });
+    } else if (session.state === SessionState.Initial || session.state === SessionState.Establishing) {
+      session.cancel().catch((error: Error) => {
+        this._log.error('Failed to cancel outgoing call', error);
+        this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+      });
+    }
+  }
+
+  private _hangupInboundSession(callSid: string): void {
+    const session = this._inboundSessions.get(callSid)!;
+    this._inboundSessions.delete(callSid);
+
+    if (session.state === SessionState.Established) {
+      session.bye().catch((error: Error) => {
+        this._log.error('Failed to send BYE', error);
+        this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+      });
+    } else if (session.state === SessionState.Initial || session.state === SessionState.Establishing) {
+      session.reject().catch((error: Error) => {
+        this._log.error('Failed to reject invitation during hangup', error);
+        this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+      });
+    }
+  }
+
+  private _getSession(callSid: string): Session | undefined {
+    return this._outboundSessions.get(callSid) || this._inboundSessions.get(callSid);
+  }
+
   private _handleIncomingInvite(invitation: Invitation): void {
-    const callSid = invitation.id;
+    const callSid = invitation.request.getHeader('X-Twilio-CallSid');
+    if (!callSid) {
+      this._log.error('Incoming INVITE missing X-Twilio-CallSid header');
+      invitation.reject().catch((error: Error) => {
+        this._log.error('Failed to reject invitation missing CallSid', error);
+      });
+      return;
+    }
     this._pendingInvitations.set(callSid, invitation);
 
-    invitation.delegate = {
-      ...invitation.delegate,
-      onCancel: () => {
-        this._pendingInvitations.delete(callSid);
-        this._sessions.delete(callSid);
-        this.emit('cancel', { callsid: callSid });
-      },
-      onBye: () => {
-        this._sessions.delete(callSid);
-        this.emit('hangup', { callsid: callSid });
-      },
+    if (!invitation.delegate) {
+      invitation.delegate = {};
+    }
+    invitation.delegate.onCancel = () => {
+      this._pendingInvitations.delete(callSid);
+      this._inboundSessions.delete(callSid);
+      this.emit('cancel', { callsid: callSid });
+    };
+    invitation.delegate.onBye = () => {
+      this._inboundSessions.delete(callSid);
+      this.emit('hangup', { callsid: callSid });
     };
 
     invitation.stateChange.addListener((state: SessionState) => {
       if (state === SessionState.Terminated) {
         this._pendingInvitations.delete(callSid);
-        this._sessions.delete(callSid);
+        this._inboundSessions.delete(callSid);
       }
     });
 
@@ -452,24 +487,21 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     }
 
     const createInv = this._options.createInviter
-      || ((ua: UserAgent, uri: any, opts?: any) => new Inviter(ua, uri, opts));
+      || ((ua: UserAgent, uri: URI, opts?: InviterOptions) => new Inviter(ua, uri, opts));
     const inviter = createInv(this._userAgent, targetUri);
 
-    this._sessions.set(callSid, inviter);
-    this._outboundCallSids.add(callSid);
+    this._outboundSessions.set(callSid, inviter);
 
     inviter.delegate = {
       onBye: () => {
-        this._sessions.delete(callSid);
-        this._outboundCallSids.delete(callSid);
+        this._outboundSessions.delete(callSid);
         this.emit('hangup', { callsid: callSid });
       },
     };
 
     inviter.stateChange.addListener((state: SessionState) => {
       if (state === SessionState.Terminated) {
-        this._sessions.delete(callSid);
-        this._outboundCallSids.delete(callSid);
+        this._outboundSessions.delete(callSid);
       }
     });
 
@@ -488,15 +520,13 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
         onReject: (response: any) => {
           const code = response?.message?.statusCode || 31000;
           const message = response?.message?.reasonPhrase || 'Call rejected';
-          this._sessions.delete(callSid);
-          this._outboundCallSids.delete(callSid);
+          this._outboundSessions.delete(callSid);
           this.emit('hangup', { callsid: callSid, error: { code, message } });
         },
       },
     }).catch((error: Error) => {
       this._log.error('Failed to send INVITE', error);
-      this._sessions.delete(callSid);
-      this._outboundCallSids.delete(callSid);
+      this._outboundSessions.delete(callSid);
       this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
     });
   }
@@ -518,9 +548,9 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   private _onTransportDisconnect(error?: Error): void {
     this._log.info('WebSocket disconnected', error?.message);
 
-    this._sessions.clear();
+    this._inboundSessions.clear();
+    this._outboundSessions.clear();
     this._pendingInvitations.clear();
-    this._outboundCallSids.clear();
 
     if (this._registerer) {
       this._registerer.dispose().catch((err: Error) => {
