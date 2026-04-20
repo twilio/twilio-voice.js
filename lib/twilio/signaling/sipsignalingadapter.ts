@@ -353,7 +353,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     callSid: string,
     content: string,
     contentType: string | undefined,
-    _messageType: string,
+    _messageType: string, // PStream-specific; no SIP MESSAGE equivalent
     voiceEventSid: string,
   ): void {
     const session = this._getSession(callSid);
