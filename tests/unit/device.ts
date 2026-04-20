@@ -1913,7 +1913,8 @@ describe('Device', function() {
               const stub = sinon.stub();
               device['_audio']!['_updateUserOptions'] = stub;
               device['_setupAudioHelper']();
-              assert.deepEqual(stub.getCall(0).args[0].beforeSetInputDevice(), Promise.resolve());
+              const result = await stub.getCall(0).args[0].beforeSetInputDevice();
+              assert.strictEqual(result, undefined);
             });
           });
 
