@@ -1,10 +1,15 @@
 import { EventEmitter } from 'events';
 import {
+  Invitation,
+  Inviter,
+  InviterOptions,
   Registerer,
   RegistererState,
+  Session,
+  SessionState,
+  URI,
   UserAgent,
 } from 'sip.js';
-import { NotSupportedError } from '../errors';
 import Log from '../log';
 import { SignalingAdapter, SignalingAdapterStatus } from './signalingadapter';
 
@@ -25,12 +30,18 @@ export interface SipSignalingAdapterOptions {
    * Factory override for testing.
    */
   createRegisterer?: (userAgent: UserAgent) => Registerer;
+  /**
+   * Factory override for testing.
+   */
+  createInviter?: (userAgent: UserAgent, targetURI: URI, options?: InviterOptions) => Inviter;
 }
 
 /**
- * A no-op SessionDescriptionHandler for SIP.js. Call signaling is not yet
- * implemented in this ticket (VBLOCKS-6374), so this stub satisfies the
- * SIP.js SDH interface without doing any real media work.
+ * A no-op SessionDescriptionHandler for SIP.js. SDP relay through
+ * SIP.js is deferred to VBLOCKS-6372 (SipSessionDescriptionHandler).
+ * This stub satisfies the SIP.js SDH interface without doing any
+ * real media work — actual SDP exchange is handled out-of-band by
+ * PeerConnection via Call.ts.
  */
 function createNoOpSDH(): any {
   return {
@@ -49,12 +60,15 @@ function createNoOpSDH(): any {
 
 /**
  * SignalingAdapter implementation backed by SIP.js. Handles WebSocket
- * connection and SIP registration lifecycle. Call-level signaling methods
- * are not yet implemented (VBLOCKS-6374).
+ * connection, SIP registration lifecycle, and call-level signaling
+ * (INVITE, BYE, re-INVITE, INFO, MESSAGE).
  */
 export class SipSignalingAdapter extends EventEmitter implements SignalingAdapter {
   private _log: Log = new Log('SipSignalingAdapter');
   private _options: SipSignalingAdapterOptions;
+  private _inboundSessions: Map<string, Invitation> = new Map();
+  private _outboundSessions: Map<string, Inviter> = new Map();
+  private _pendingInvitations: Map<string, Invitation> = new Map();
   private _registerer: any | null = null;
   private _region: string | undefined;
   private _status: SignalingAdapterStatus = 'disconnected';
@@ -87,9 +101,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       delegate: {
         onConnect: () => this._onTransportConnect(),
         onDisconnect: (error?: Error) => this._onTransportDisconnect(error),
-        onInvite: () => {
-          this._log.warn('Received incoming INVITE but call signaling is not yet implemented (VBLOCKS-6374)');
-        },
+        onInvite: (invitation: Invitation) => this._handleIncomingInvite(invitation),
       },
     });
 
@@ -197,6 +209,19 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   destroy(): void {
     this._log.info('Destroying SipSignalingAdapter');
 
+    const byeEstablished = (session: Session) => {
+      if (session.state === SessionState.Established) {
+        session.bye().catch((error: Error) => {
+          this._log.warn('Error sending BYE during destroy', error);
+        });
+      }
+    };
+    this._inboundSessions.forEach(byeEstablished);
+    this._outboundSessions.forEach(byeEstablished);
+    this._inboundSessions.clear();
+    this._outboundSessions.clear();
+    this._pendingInvitations.clear();
+
     if (this._registerer) {
       this._registerer.dispose().catch((error: Error) => {
         this._log.warn('Error disposing registerer during destroy', error);
@@ -224,50 +249,311 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   }
 
   // ---------------------------------------------------------------------------
-  // Call signaling — not yet implemented (VBLOCKS-6374)
+  // Call signaling
   // ---------------------------------------------------------------------------
 
-  invite(_sdp: string, _callSid: string, _params: string): void {
-    throw new NotSupportedError('SIP call signaling is not yet implemented (VBLOCKS-6374)');
+  invite(sdp: string, callSid: string, params: string): void {
+    this._sendInvite(sdp, callSid, params);
   }
 
-  answer(_sdp: string, _callSid: string): void {
-    throw new NotSupportedError('SIP call signaling is not yet implemented (VBLOCKS-6374)');
+  answer(sdp: string, callSid: string): void {
+    const invitation = this._pendingInvitations.get(callSid);
+    if (!invitation) {
+      this._log.warn('answer: no pending invitation for callSid', callSid);
+      return;
+    }
+    this._pendingInvitations.delete(callSid);
+    this._inboundSessions.set(callSid, invitation);
+    invitation.accept().catch((error: Error) => {
+      this._log.error('Failed to accept invitation', error);
+      this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+    });
   }
 
-  hangup(_callSid: string, _message?: string | null): void {
-    throw new NotSupportedError('SIP call signaling is not yet implemented (VBLOCKS-6374)');
+  hangup(callSid: string, _message?: string | null): void {
+    const pendingInvitation = this._pendingInvitations.get(callSid);
+    if (pendingInvitation) {
+      return this._hangupPendingInvitation(pendingInvitation, callSid);
+    }
+
+    const outboundSession = this._outboundSessions.get(callSid);
+    if (outboundSession) {
+      return this._hangupOutboundSession(outboundSession, callSid);
+    }
+
+    const inboundSession = this._inboundSessions.get(callSid);
+    if (inboundSession) {
+      return this._hangupInboundSession(inboundSession, callSid);
+    }
+
+    this._log.warn('hangup: no session for callSid', callSid);
   }
 
-  reject(_callSid: string): void {
-    throw new NotSupportedError('SIP call signaling is not yet implemented (VBLOCKS-6374)');
+  reject(callSid: string): void {
+    const invitation = this._pendingInvitations.get(callSid);
+    if (!invitation) {
+      this._log.warn('reject: no pending invitation for callSid', callSid);
+      return;
+    }
+    this._pendingInvitations.delete(callSid);
+    invitation.reject().catch((error: Error) => {
+      this._log.error('Failed to reject invitation', error);
+      this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+    });
   }
 
-  reinvite(_sdp: string, _callSid: string): void {
-    throw new NotSupportedError('SIP call signaling is not yet implemented (VBLOCKS-6374)');
+  reinvite(sdp: string, callSid: string): void {
+    const session = this._getSession(callSid);
+    if (!session || session.state !== SessionState.Established) {
+      this._log.warn('reinvite: no established session for callSid', callSid);
+      return;
+    }
+    session.invite({
+      requestDelegate: {
+        onAccept: () => {
+          this.emit('answer', { callsid: callSid, sdp: '' });
+        },
+        onReject: (response: any) => {
+          this._log.warn('re-INVITE rejected', response?.message?.statusCode);
+        },
+      },
+    }).catch((error: Error) => {
+      this._log.warn('Failed to send re-INVITE', error);
+    });
   }
 
-  reconnect(_sdp: string, _callSid: string, _reconnectToken: string): void {
-    throw new NotSupportedError('SIP call signaling is not yet implemented (VBLOCKS-6374)');
+  reconnect(sdp: string, callSid: string, reconnectToken: string): void {
+    this._sendInvite(sdp, callSid, undefined, reconnectToken);
   }
 
-  dtmf(_callSid: string, _digits: string): void {
-    throw new NotSupportedError('SIP call signaling is not yet implemented (VBLOCKS-6374)');
+  dtmf(callSid: string, digits: string): void {
+    const session = this._getSession(callSid);
+    if (!session || session.state !== SessionState.Established) {
+      this._log.warn('dtmf: no established session for callSid', callSid);
+      return;
+    }
+    const sendDigits = async () => {
+      for (const digit of digits) {
+        try {
+          await session.info({
+            requestOptions: {
+              body: {
+                contentDisposition: 'render',
+                contentType: 'application/dtmf-relay',
+                content: `Signal=${digit}\r\nDuration=100\r\n`,
+              },
+            },
+          });
+        } catch (error: any) {
+          this._log.warn('Failed to send DTMF digit', digit, error?.message);
+        }
+      }
+    };
+    sendDigits();
   }
 
   sendMessage(
-    _callSid: string,
-    _content: string,
-    _contentType: string | undefined,
-    _messageType: string,
-    _voiceEventSid: string,
+    callSid: string,
+    content: string,
+    contentType: string | undefined,
+    _messageType: string, // PStream-specific; no SIP MESSAGE equivalent
+    voiceEventSid: string,
   ): void {
-    throw new NotSupportedError('SIP call signaling is not yet implemented (VBLOCKS-6374)');
+    const session = this._getSession(callSid);
+    if (!session || session.state !== SessionState.Established) {
+      this._log.warn('sendMessage: no established session for callSid', callSid);
+      return;
+    }
+    session.message({
+      requestOptions: {
+        body: {
+          contentDisposition: 'render',
+          contentType: contentType || 'application/json',
+          content,
+        },
+      },
+    }).then(() => {
+      this.emit('ack', { acktype: 'message', callsid: callSid, voiceeventsid: voiceEventSid });
+    }).catch((error: Error) => {
+      this._log.error('Failed to send message', error);
+      this.emit('error', {
+        error: { code: 31000, message: error.message },
+        callsid: callSid,
+        voiceeventsid: voiceEventSid,
+      });
+    });
   }
 
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
+
+  private _hangupPendingInvitation(invitation: Invitation, callSid: string): void {
+    this._pendingInvitations.delete(callSid);
+    invitation.reject().catch((error: Error) => {
+      this._log.error('Failed to reject invitation during hangup', error);
+      this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+    });
+  }
+
+  private _hangupOutboundSession(session: Inviter, callSid: string): void {
+    this._outboundSessions.delete(callSid);
+
+    switch (session.state) {
+      case SessionState.Established:
+        session.bye().catch((error: Error) => {
+          this._log.error('Failed to send BYE', error);
+          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+        });
+        return;
+      case SessionState.Initial:
+      case SessionState.Establishing:
+        session.cancel().catch((error: Error) => {
+          this._log.error('Failed to cancel outgoing call', error);
+          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+        });
+        return;
+      case SessionState.Terminating:
+      case SessionState.Terminated:
+        this._log.debug('_hangupOutboundSession: session already ending', session.state);
+        return;
+      default: {
+        const _exhaustive: never = session.state;
+        this._log.warn('_hangupOutboundSession: unexpected session state', _exhaustive);
+      }
+    }
+  }
+
+  private _hangupInboundSession(session: Invitation, callSid: string): void {
+    this._inboundSessions.delete(callSid);
+
+    switch (session.state) {
+      case SessionState.Established:
+        session.bye().catch((error: Error) => {
+          this._log.error('Failed to send BYE', error);
+          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+        });
+        return;
+      case SessionState.Initial:
+      case SessionState.Establishing:
+        session.reject().catch((error: Error) => {
+          this._log.error('Failed to reject invitation during hangup', error);
+          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+        });
+        return;
+      case SessionState.Terminating:
+      case SessionState.Terminated:
+        this._log.debug('_hangupInboundSession: session already ending', session.state);
+        return;
+      default: {
+        const _exhaustive: never = session.state;
+        this._log.warn('_hangupInboundSession: unexpected session state', _exhaustive);
+      }
+    }
+  }
+
+  private _getSession(callSid: string): Session | undefined {
+    return this._outboundSessions.get(callSid) || this._inboundSessions.get(callSid);
+  }
+
+  private _handleIncomingInvite(invitation: Invitation): void {
+    const callSid = invitation.request.getHeader('X-Twilio-CallSid');
+    if (!callSid) {
+      this._log.error('Incoming INVITE missing X-Twilio-CallSid header');
+      invitation.reject().catch((error: Error) => {
+        this._log.error('Failed to reject invitation missing CallSid', error);
+      });
+      return;
+    }
+    this._pendingInvitations.set(callSid, invitation);
+
+    if (!invitation.delegate) {
+      invitation.delegate = {};
+    }
+    invitation.delegate.onCancel = () => {
+      this._pendingInvitations.delete(callSid);
+      this._inboundSessions.delete(callSid);
+      this.emit('cancel', { callsid: callSid });
+    };
+    invitation.delegate.onBye = () => {
+      this._inboundSessions.delete(callSid);
+      this.emit('hangup', { callsid: callSid });
+    };
+
+    invitation.stateChange.addListener((state: SessionState) => {
+      if (state === SessionState.Terminated) {
+        this._pendingInvitations.delete(callSid);
+        this._inboundSessions.delete(callSid);
+      }
+    });
+
+    this.emit('invite', {
+      callsid: callSid,
+      sdp: invitation.body || '',
+      parameters: {
+        CallSid: callSid,
+        From: invitation.remoteIdentity.uri.toString(),
+      },
+    });
+  }
+
+  private _sendInvite(sdp: string, callSid: string, params?: string, reconnectToken?: string): void {
+    if (!this._userAgent) {
+      this._log.warn('Cannot invite: UserAgent not initialized');
+      return;
+    }
+
+    const targetUri = UserAgent.makeURI(`sip:${this._options.sipDomain}`);
+    if (!targetUri) {
+      this._log.error('Failed to create target URI for invite');
+      this.emit('error', { error: { code: 31000, message: 'Invalid SIP target URI' }, callsid: callSid });
+      return;
+    }
+
+    const createInv = this._options.createInviter
+      || ((ua: UserAgent, uri: URI, opts?: InviterOptions) => new Inviter(ua, uri, opts));
+    const inviter = createInv(this._userAgent, targetUri);
+
+    this._outboundSessions.set(callSid, inviter);
+
+    inviter.delegate = {
+      onBye: () => {
+        this._outboundSessions.delete(callSid);
+        this.emit('hangup', { callsid: callSid });
+      },
+    };
+
+    inviter.stateChange.addListener((state: SessionState) => {
+      if (state === SessionState.Terminated) {
+        this._outboundSessions.delete(callSid);
+      }
+    });
+
+    inviter.invite({
+      requestDelegate: {
+        onProgress: () => {
+          this.emit('ringing', { callsid: callSid });
+        },
+        onAccept: () => {
+          const payload: Record<string, any> = { callsid: callSid, sdp: '' };
+          if (reconnectToken) {
+            payload.reconnect = reconnectToken;
+          }
+          this.emit('answer', payload);
+        },
+        onReject: (response: any) => {
+          const code = response?.message?.statusCode || 31000;
+          const message = response?.message?.reasonPhrase || 'Call rejected';
+          this._outboundSessions.delete(callSid);
+          this.emit('hangup', { callsid: callSid, error: { code, message } });
+        },
+      },
+    }).catch((error: Error) => {
+      this._log.error('Failed to send INVITE', error);
+      this._outboundSessions.delete(callSid);
+      this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+    });
+  }
 
   private _onTransportConnect(): void {
     this._log.info('WebSocket connected');
@@ -285,6 +571,10 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
   private _onTransportDisconnect(error?: Error): void {
     this._log.info('WebSocket disconnected', error?.message);
+
+    this._inboundSessions.clear();
+    this._outboundSessions.clear();
+    this._pendingInvitations.clear();
 
     if (this._registerer) {
       this._registerer.dispose().catch((err: Error) => {
