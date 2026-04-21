@@ -271,16 +271,19 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   }
 
   hangup(callSid: string, _message?: string | null): void {
-    if (this._pendingInvitations.has(callSid)) {
-      return this._hangupPendingInvitation(callSid);
+    const pendingInvitation = this._pendingInvitations.get(callSid);
+    if (pendingInvitation) {
+      return this._hangupPendingInvitation(pendingInvitation, callSid);
     }
 
-    if (this._outboundSessions.has(callSid)) {
-      return this._hangupOutboundSession(callSid);
+    const outboundSession = this._outboundSessions.get(callSid);
+    if (outboundSession) {
+      return this._hangupOutboundSession(outboundSession, callSid);
     }
 
-    if (this._inboundSessions.has(callSid)) {
-      return this._hangupInboundSession(callSid);
+    const inboundSession = this._inboundSessions.get(callSid);
+    if (inboundSession) {
+      return this._hangupInboundSession(inboundSession, callSid);
     }
 
     this._log.warn('hangup: no session for callSid', callSid);
@@ -385,8 +388,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  private _hangupPendingInvitation(callSid: string): void {
-    const invitation = this._pendingInvitations.get(callSid)!;
+  private _hangupPendingInvitation(invitation: Invitation, callSid: string): void {
     this._pendingInvitations.delete(callSid);
     invitation.reject().catch((error: Error) => {
       this._log.error('Failed to reject invitation during hangup', error);
@@ -394,37 +396,59 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     });
   }
 
-  private _hangupOutboundSession(callSid: string): void {
-    const session = this._outboundSessions.get(callSid)!;
+  private _hangupOutboundSession(session: Inviter, callSid: string): void {
     this._outboundSessions.delete(callSid);
 
-    if (session.state === SessionState.Established) {
-      session.bye().catch((error: Error) => {
-        this._log.error('Failed to send BYE', error);
-        this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-      });
-    } else if (session.state === SessionState.Initial || session.state === SessionState.Establishing) {
-      session.cancel().catch((error: Error) => {
-        this._log.error('Failed to cancel outgoing call', error);
-        this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-      });
+    switch (session.state) {
+      case SessionState.Established:
+        session.bye().catch((error: Error) => {
+          this._log.error('Failed to send BYE', error);
+          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+        });
+        return;
+      case SessionState.Initial:
+      case SessionState.Establishing:
+        session.cancel().catch((error: Error) => {
+          this._log.error('Failed to cancel outgoing call', error);
+          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+        });
+        return;
+      case SessionState.Terminating:
+      case SessionState.Terminated:
+        this._log.debug('_hangupOutboundSession: session already ending', session.state);
+        return;
+      default: {
+        const _exhaustive: never = session.state;
+        this._log.warn('_hangupOutboundSession: unexpected session state', _exhaustive);
+      }
     }
   }
 
-  private _hangupInboundSession(callSid: string): void {
-    const session = this._inboundSessions.get(callSid)!;
+  private _hangupInboundSession(session: Invitation, callSid: string): void {
     this._inboundSessions.delete(callSid);
 
-    if (session.state === SessionState.Established) {
-      session.bye().catch((error: Error) => {
-        this._log.error('Failed to send BYE', error);
-        this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-      });
-    } else if (session.state === SessionState.Initial || session.state === SessionState.Establishing) {
-      session.reject().catch((error: Error) => {
-        this._log.error('Failed to reject invitation during hangup', error);
-        this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-      });
+    switch (session.state) {
+      case SessionState.Established:
+        session.bye().catch((error: Error) => {
+          this._log.error('Failed to send BYE', error);
+          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+        });
+        return;
+      case SessionState.Initial:
+      case SessionState.Establishing:
+        session.reject().catch((error: Error) => {
+          this._log.error('Failed to reject invitation during hangup', error);
+          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+        });
+        return;
+      case SessionState.Terminating:
+      case SessionState.Terminated:
+        this._log.debug('_hangupInboundSession: session already ending', session.state);
+        return;
+      default: {
+        const _exhaustive: never = session.state;
+        this._log.warn('_hangupInboundSession: unexpected session state', _exhaustive);
+      }
     }
   }
 
