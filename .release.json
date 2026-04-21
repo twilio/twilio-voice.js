@@ -53,7 +53,7 @@
     "publish": {
       "commands": [
         "git checkout ${RELEASE_VERSION}",
-        "export NPM_ID_TOKEN=$(circleci run oidc get --claims '{\"aud\":\"npm:registry.npmjs.org\"}') && npm publish"
+        "NPM_ID_TOKEN=$(circleci run oidc get --claims '{\"aud\":\"npm:registry.npmjs.org\"}') npm publish"
       ]
     }
   }
