@@ -242,6 +242,10 @@ jobs:
           condition: << parameters.dryRun >>
           steps:
             - build
+            - run:
+                name: Fetch npm OIDC token
+                command: |
+                  echo 'export NPM_ID_TOKEN=$(circleci run oidc get --claims '"'"'{"aud":"npm:registry.npmjs.org"}'"'"')' >> "$BASH_ENV"
             - run: << pipeline.parameters.release_command >>
   run-chrome-extension-tests:
     parameters:
