@@ -2,7 +2,16 @@ import { EventEmitter } from 'events';
 import Backoff from './backoff';
 import Device from './device';
 import DialtonePlayer from './dialtonePlayer';
-import { SignalingAdapter } from './signaling/signalingadapter';
+import {
+  AnswerConfig,
+  DtmfConfig,
+  HangupConfig,
+  InviteConfig,
+  ReconnectConfig,
+  ReinviteConfig,
+  SendMessageConfig,
+  SignalingAdapter,
+} from './signaling/signalingadapter';
 import {
   GeneralErrors,
   getPreciseSignalingErrorByCode,
@@ -373,7 +382,8 @@ class Call extends EventEmitter {
 
         this._signalingAdapter.on('answer', onAnswerOrRinging);
         this._signalingAdapter.on('hangup', onHangup);
-        this._signalingAdapter.reinvite(offerSdp, this.parameters.CallSid);
+        const reinviteConfig: ReinviteConfig = { sdp: offerSdp };
+        this._signalingAdapter.reinvite(this.parameters.CallSid, reinviteConfig);
       });
     });
 
@@ -682,7 +692,8 @@ class Call extends EventEmitter {
         this._mediaHandler.answerIncomingCall(this.parameters.CallSid,
           this._options.offerSdp, rtcConfiguration,
           (answerSdp: string) => {
-            this._signalingAdapter.answer(answerSdp, this.parameters.CallSid);
+            const answerConfig: AnswerConfig = { sdp: answerSdp };
+            this._signalingAdapter.answer(this.parameters.CallSid, answerConfig);
           },
           onAnswer);
       } else {
@@ -708,9 +719,11 @@ class Call extends EventEmitter {
           this._signalingAdapter.on('ringing', onPstreamAnswerOrRinging);
 
           if (this._signalingReconnectToken) {
-            this._signalingAdapter.reconnect(offerSdp, outgoingCallSid, this._signalingReconnectToken);
+            const reconnectConfig: ReconnectConfig = { sdp: offerSdp, reconnectToken: this._signalingReconnectToken };
+            this._signalingAdapter.reconnect(outgoingCallSid, reconnectConfig);
           } else {
-            this._signalingAdapter.invite(offerSdp, outgoingCallSid, params);
+            const inviteConfig: InviteConfig = { sdp: offerSdp, params };
+            this._signalingAdapter.invite(outgoingCallSid, inviteConfig);
           }
 
           // NOTE(VBLOCKS-6417): in the original implementation, the RTC DTLS
@@ -947,7 +960,8 @@ class Call extends EventEmitter {
     this._log.info('Sending digits over PStream');
 
     if (this._signalingAdapter !== null && this._signalingAdapter.status !== 'disconnected') {
-      this._signalingAdapter.dtmf(this.parameters.CallSid, digits);
+      const dtmfConfig: DtmfConfig = { digits };
+      this._signalingAdapter.dtmf(this.parameters.CallSid, dtmfConfig);
     } else {
       const error = new GeneralErrors.ConnectionError('Could not send DTMF: Signaling channel is disconnected');
       this._log.debug('#error', error);
@@ -997,7 +1011,8 @@ class Call extends EventEmitter {
 
     const voiceEventSid = this._voiceEventSidGenerator();
     this._messages.set(voiceEventSid, { content, contentType, messageType, voiceEventSid });
-    this._signalingAdapter.sendMessage(callSid!, content, contentType, messageType, voiceEventSid);
+    const sendMessageConfig: SendMessageConfig = { content, contentType, messageType, voiceEventSid };
+    this._signalingAdapter.sendMessage(callSid!, sendMessageConfig);
     return voiceEventSid;
   }
 
@@ -1115,7 +1130,8 @@ class Call extends EventEmitter {
     if (this._signalingAdapter !== null && this._signalingAdapter.status !== 'disconnected' && this._shouldSendHangup) {
       const callsid: string | undefined = this.parameters.CallSid || this.outboundConnectionId;
       if (callsid) {
-        this._signalingAdapter.hangup(callsid, message);
+        const hangupConfig: HangupConfig | undefined = message != null ? { message } : undefined;
+        this._signalingAdapter.hangup(callsid, hangupConfig);
       }
     }
 
@@ -1252,11 +1268,11 @@ class Call extends EventEmitter {
   private _onConnected = (): void => {
     this._log.info('Received connected from pstream');
     if (this._signalingReconnectToken && this._mediaHandler.version) {
-      this._signalingAdapter.reconnect(
-        this._mediaHandler.version.getSDP(),
-        this.parameters.CallSid,
-        this._signalingReconnectToken,
-      );
+      const reconnectConfig: ReconnectConfig = {
+        sdp: this._mediaHandler.version.getSDP(),
+        reconnectToken: this._signalingReconnectToken,
+      };
+      this._signalingAdapter.reconnect(this.parameters.CallSid, reconnectConfig);
     }
   }
 

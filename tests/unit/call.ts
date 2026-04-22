@@ -627,8 +627,8 @@ describe('Call', function() {
           return wait.then(() => {
             onOfferReady('offer-sdp');
             sinon.assert.calledOnce(pstream.invite);
-            assert.equal(pstream.invite.args[0][0], 'offer-sdp');
-            assert.equal(pstream.invite.args[0][2],
+            assert.equal(pstream.invite.args[0][1].sdp, 'offer-sdp');
+            assert.equal(pstream.invite.args[0][1].params,
               'To=foo&a=undefined&b=true&c=false&d=&e=123&f=123&g=null&h=undefined&i=null&j=0&k=0&l=a%24b%26c%3Fd%3De');
           });
         });
@@ -639,8 +639,8 @@ describe('Call', function() {
           return wait.then(() => {
             onOfferReady('offer-sdp');
             sinon.assert.calledOnce(pstream.reconnect);
-            assert.equal(pstream.reconnect.args[0][0], 'offer-sdp');
-            assert.equal(pstream.reconnect.args[0][2], 'testReconnectToken');
+            assert.equal(pstream.reconnect.args[0][1].sdp, 'offer-sdp');
+            assert.equal(pstream.reconnect.args[0][1].reconnectToken, 'testReconnectToken');
           });
         });
 
@@ -1213,10 +1213,12 @@ describe('Call', function() {
       sinon.assert.calledOnceWithExactly(
         pstream.sendMessage,
         mockCallSid,
-        message.content,
-        undefined,
-        'user-defined-message',
-        'foobar-voice-event-sid',
+        {
+          content: message.content,
+          contentType: undefined,
+          messageType: 'user-defined-message',
+          voiceEventSid: 'foobar-voice-event-sid',
+        },
       );
     });
 
@@ -1341,7 +1343,7 @@ describe('Call', function() {
 
     it('should call pstream.dtmf if connected', () => {
       conn.sendDigits('123');
-      sinon.assert.calledWith(pstream.dtmf, conn.parameters.CallSid, '123');
+      sinon.assert.calledWith(pstream.dtmf, conn.parameters.CallSid, { digits: '123' });
     });
 
     it('should emit error if pstream is disconnected', (done) => {
@@ -1490,7 +1492,7 @@ describe('Call', function() {
 
             it('should call pstream.hangup with error message', () => {
               mediaHandler.onerror(Object.assign({ disconnect: true }, baseError));
-              sinon.assert.calledWith(pstream.hangup, conn.outboundConnectionId, 'foo');
+              sinon.assert.calledWith(pstream.hangup, conn.outboundConnectionId, { message: 'foo' });
             });
 
             it('should call mediaHandler.close', () => {
@@ -1957,7 +1959,7 @@ describe('Call', function() {
               doesMediaHandlerVersionExist && signalingReconnectToken ? '' : 'not '
             }call pstream.reconnect()`, async () => {
               if (doesMediaHandlerVersionExist && signalingReconnectToken) {
-                sinon.assert.calledWith(pstream.reconnect, mediaHandler.version.getSDP(), 'CA1234', signalingReconnectToken);
+                sinon.assert.calledWith(pstream.reconnect, 'CA1234', { sdp: mediaHandler.version.getSDP(), reconnectToken: signalingReconnectToken });
               } else {
                 sinon.assert.notCalled(pstream.reconnect);
               }
