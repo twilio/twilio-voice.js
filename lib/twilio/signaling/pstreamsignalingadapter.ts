@@ -1,5 +1,15 @@
 import { EventEmitter } from 'events';
-import { SignalingAdapter, SignalingAdapterStatus } from './signalingadapter';
+import {
+  AnswerConfig,
+  DtmfConfig,
+  HangupConfig,
+  InviteConfig,
+  ReconnectConfig,
+  ReinviteConfig,
+  SendMessageConfig,
+  SignalingAdapter,
+  SignalingAdapterStatus,
+} from './signalingadapter';
 
 const EVENTS_TO_FORWARD = [
   'ack', 'answer', 'cancel', 'candidate', 'close', 'connected',
@@ -51,15 +61,15 @@ export class PStreamSignalingAdapter extends EventEmitter implements SignalingAd
     this._pstream.updateURIs(uris);
   }
 
-  invite(sdp: string, callSid: string, params: string): void {
+  invite(callSid: string, { sdp, params }: InviteConfig): void {
     this._pstream.invite(sdp, callSid, params);
   }
 
-  answer(sdp: string, callSid: string): void {
+  answer(callSid: string, { sdp }: AnswerConfig): void {
     this._pstream.answer(sdp, callSid);
   }
 
-  hangup(callSid: string, message?: string | null): void {
+  hangup(callSid: string, { message }: HangupConfig = {}): void {
     this._pstream.hangup(callSid, message);
   }
 
@@ -67,25 +77,19 @@ export class PStreamSignalingAdapter extends EventEmitter implements SignalingAd
     this._pstream.reject(callSid);
   }
 
-  reinvite(sdp: string, callSid: string): void {
+  reinvite(callSid: string, { sdp }: ReinviteConfig): void {
     this._pstream.reinvite(sdp, callSid);
   }
 
-  reconnect(sdp: string, callSid: string, reconnectToken: string): void {
+  reconnect(callSid: string, { sdp, reconnectToken }: ReconnectConfig): void {
     this._pstream.reconnect(sdp, callSid, reconnectToken);
   }
 
-  dtmf(callSid: string, digits: string): void {
+  dtmf(callSid: string, { digits }: DtmfConfig): void {
     this._pstream.dtmf(callSid, digits);
   }
 
-  sendMessage(
-    callSid: string,
-    content: string,
-    contentType: string | undefined,
-    messageType: string,
-    voiceEventSid: string,
-  ): void {
+  sendMessage(callSid: string, { content, contentType, messageType, voiceEventSid }: SendMessageConfig): void {
     this._pstream.sendMessage(callSid, content, contentType, messageType, voiceEventSid);
   }
 

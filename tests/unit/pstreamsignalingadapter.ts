@@ -34,17 +34,17 @@ describe('PStreamSignalingAdapter', () => {
   });
 
   it('should delegate invite() to pstream', () => {
-    adapter.invite('sdp', 'callSid', 'params');
+    adapter.invite('callSid', { sdp: 'sdp', params: 'params' });
     assert(pstream.invite.calledWith('sdp', 'callSid', 'params'));
   });
 
   it('should delegate answer() to pstream', () => {
-    adapter.answer('sdp', 'callSid');
+    adapter.answer('callSid', { sdp: 'sdp' });
     assert(pstream.answer.calledWith('sdp', 'callSid'));
   });
 
   it('should delegate hangup() to pstream', () => {
-    adapter.hangup('callSid', 'msg');
+    adapter.hangup('callSid', { message: 'msg' });
     assert(pstream.hangup.calledWith('callSid', 'msg'));
   });
 
@@ -54,22 +54,22 @@ describe('PStreamSignalingAdapter', () => {
   });
 
   it('should delegate reinvite() to pstream', () => {
-    adapter.reinvite('sdp', 'callSid');
+    adapter.reinvite('callSid', { sdp: 'sdp' });
     assert(pstream.reinvite.calledWith('sdp', 'callSid'));
   });
 
   it('should delegate reconnect() to pstream', () => {
-    adapter.reconnect('sdp', 'callSid', 'token');
+    adapter.reconnect('callSid', { sdp: 'sdp', reconnectToken: 'token' });
     assert(pstream.reconnect.calledWith('sdp', 'callSid', 'token'));
   });
 
   it('should delegate dtmf() to pstream', () => {
-    adapter.dtmf('callSid', '123');
+    adapter.dtmf('callSid', { digits: '123' });
     assert(pstream.dtmf.calledWith('callSid', '123'));
   });
 
   it('should delegate sendMessage() to pstream', () => {
-    adapter.sendMessage('callSid', 'hi', 'text/plain', 'user-msg', 'evt1');
+    adapter.sendMessage('callSid', { content: 'hi', contentType: 'text/plain', messageType: 'user-msg', voiceEventSid: 'evt1' });
     assert(pstream.sendMessage.calledWith('callSid', 'hi', 'text/plain', 'user-msg', 'evt1'));
   });
 

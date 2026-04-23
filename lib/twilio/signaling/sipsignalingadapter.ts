@@ -11,7 +11,19 @@ import {
   UserAgent,
 } from 'sip.js';
 import Log from '../log';
-import { SignalingAdapter, SignalingAdapterStatus } from './signalingadapter';
+import {
+  AnswerConfig,
+  DtmfConfig,
+  HangupConfig,
+  InviteConfig,
+  ReconnectConfig,
+  ReinviteConfig,
+  SignalingAdapter,
+  SignalingAdapterStatus,
+  SendMessageConfig,
+} from './signalingadapter';
+
+type SipSendMessageConfig = Pick<SendMessageConfig, 'content' | 'contentType' | 'voiceEventSid'>;
 
 /**
  * Options for constructing a SipSignalingAdapter.
@@ -252,11 +264,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   // Call signaling
   // ---------------------------------------------------------------------------
 
-  invite(sdp: string, callSid: string, params: string): void {
+  invite(callSid: string, { sdp, params }: InviteConfig): void {
     this._sendInvite(sdp, callSid, params);
   }
 
-  answer(sdp: string, callSid: string): void {
+  answer(callSid: string, config: AnswerConfig): void {
     const invitation = this._pendingInvitations.get(callSid);
     if (!invitation) {
       this._log.warn('answer: no pending invitation for callSid', callSid);
@@ -270,7 +282,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     });
   }
 
-  hangup(callSid: string, _message?: string | null): void {
+  hangup(callSid: string, _config: HangupConfig = {}): void {
     const pendingInvitation = this._pendingInvitations.get(callSid);
     if (pendingInvitation) {
       return this._hangupPendingInvitation(pendingInvitation, callSid);
@@ -302,7 +314,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     });
   }
 
-  reinvite(sdp: string, callSid: string): void {
+  reinvite(callSid: string, config: ReinviteConfig): void {
     const session = this._getSession(callSid);
     if (!session || session.state !== SessionState.Established) {
       this._log.warn('reinvite: no established session for callSid', callSid);
@@ -322,11 +334,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     });
   }
 
-  reconnect(sdp: string, callSid: string, reconnectToken: string): void {
+  reconnect(callSid: string, { sdp, reconnectToken }: ReconnectConfig): void {
     this._sendInvite(sdp, callSid, undefined, reconnectToken);
   }
 
-  dtmf(callSid: string, digits: string): void {
+  dtmf(callSid: string, { digits }: DtmfConfig): void {
     const session = this._getSession(callSid);
     if (!session || session.state !== SessionState.Established) {
       this._log.warn('dtmf: no established session for callSid', callSid);
@@ -352,13 +364,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     sendDigits();
   }
 
-  sendMessage(
-    callSid: string,
-    content: string,
-    contentType: string | undefined,
-    _messageType: string, // PStream-specific; no SIP MESSAGE equivalent
-    voiceEventSid: string,
-  ): void {
+  sendMessage(callSid: string, { content, contentType, voiceEventSid }: SipSendMessageConfig): void {
     const session = this._getSession(callSid);
     if (!session || session.state !== SessionState.Established) {
       this._log.warn('sendMessage: no established session for callSid', callSid);
