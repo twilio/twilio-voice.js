@@ -61,18 +61,15 @@ export class PStreamSignalingAdapter extends EventEmitter implements SignalingAd
     this._pstream.updateURIs(uris);
   }
 
-  invite(callSid: string, config: InviteConfig): void {
-    const { sdp, params } = config;
+  invite(callSid: string, { sdp, params }: InviteConfig): void {
     this._pstream.invite(sdp, callSid, params);
   }
 
-  answer(callSid: string, config: AnswerConfig): void {
-    const { sdp } = config;
+  answer(callSid: string, { sdp }: AnswerConfig): void {
     this._pstream.answer(sdp, callSid);
   }
 
-  hangup(callSid: string, config: HangupConfig = {}): void {
-    const { message } = config;
+  hangup(callSid: string, { message }: HangupConfig = {}): void {
     this._pstream.hangup(callSid, message);
   }
 
@@ -80,23 +77,19 @@ export class PStreamSignalingAdapter extends EventEmitter implements SignalingAd
     this._pstream.reject(callSid);
   }
 
-  reinvite(callSid: string, config: ReinviteConfig): void {
-    const { sdp } = config;
+  reinvite(callSid: string, { sdp }: ReinviteConfig): void {
     this._pstream.reinvite(sdp, callSid);
   }
 
-  reconnect(callSid: string, config: ReconnectConfig): void {
-    const { sdp, reconnectToken } = config;
+  reconnect(callSid: string, { sdp, reconnectToken }: ReconnectConfig): void {
     this._pstream.reconnect(sdp, callSid, reconnectToken);
   }
 
-  dtmf(callSid: string, config: DtmfConfig): void {
-    const { digits } = config;
+  dtmf(callSid: string, { digits }: DtmfConfig): void {
     this._pstream.dtmf(callSid, digits);
   }
 
-  sendMessage(callSid: string, config: SendMessageConfig): void {
-    const { content, contentType, messageType, voiceEventSid } = config;
+  sendMessage(callSid: string, { content, contentType, messageType, voiceEventSid }: SendMessageConfig): void {
     this._pstream.sendMessage(callSid, content, contentType, messageType, voiceEventSid);
   }
 
