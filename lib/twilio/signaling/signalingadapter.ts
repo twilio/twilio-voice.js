@@ -12,7 +12,7 @@ export interface AnswerConfig {
 }
 
 export interface HangupConfig {
-  message?: string | null;
+  message?: string;
 }
 
 export interface ReinviteConfig {
@@ -30,7 +30,7 @@ export interface DtmfConfig {
 
 export interface SendMessageConfig {
   content: string;
-  contentType: string | undefined;
+  contentType?: string;
   messageType: string;
   voiceEventSid: string;
 }
@@ -48,7 +48,7 @@ export interface SignalingAdapter extends EventEmitter {
 
   invite(callSid: string, config: InviteConfig): void;
   answer(callSid: string, config: AnswerConfig): void;
-  hangup(callSid: string, config?: HangupConfig): void;
+  hangup(callSid: string, config: HangupConfig): void;
   reject(callSid: string): void;
   reinvite(callSid: string, config: ReinviteConfig): void;
   reconnect(callSid: string, config: ReconnectConfig): void;

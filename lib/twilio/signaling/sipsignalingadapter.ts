@@ -20,13 +20,10 @@ import {
   ReinviteConfig,
   SignalingAdapter,
   SignalingAdapterStatus,
+  SendMessageConfig,
 } from './signalingadapter';
 
-interface SipSendMessageConfig {
-  content: string;
-  contentType: string | undefined;
-  voiceEventSid: string;
-}
+type SipSendMessageConfig = Pick<SendMessageConfig, 'content' | 'contentType' | 'voiceEventSid'>;
 
 /**
  * Options for constructing a SipSignalingAdapter.
@@ -286,7 +283,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     });
   }
 
-  hangup(callSid: string, _config?: HangupConfig): void {
+  hangup(callSid: string, _config: HangupConfig = {}): void {
     const pendingInvitation = this._pendingInvitations.get(callSid);
     if (pendingInvitation) {
       return this._hangupPendingInvitation(pendingInvitation, callSid);

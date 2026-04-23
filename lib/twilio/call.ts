@@ -1130,7 +1130,7 @@ class Call extends EventEmitter {
     if (this._signalingAdapter !== null && this._signalingAdapter.status !== 'disconnected' && this._shouldSendHangup) {
       const callsid: string | undefined = this.parameters.CallSid || this.outboundConnectionId;
       if (callsid) {
-        const hangupConfig: HangupConfig | undefined = message != null ? { message } : undefined;
+        const hangupConfig: HangupConfig = message != null ? { message } : {};
         this._signalingAdapter.hangup(callsid, hangupConfig);
       }
     }

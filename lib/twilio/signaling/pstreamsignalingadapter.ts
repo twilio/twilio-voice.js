@@ -71,8 +71,9 @@ export class PStreamSignalingAdapter extends EventEmitter implements SignalingAd
     this._pstream.answer(sdp, callSid);
   }
 
-  hangup(callSid: string, config?: HangupConfig): void {
-    this._pstream.hangup(callSid, config?.message);
+  hangup(callSid: string, config: HangupConfig = {}): void {
+    const { message } = config;
+    this._pstream.hangup(callSid, message);
   }
 
   reject(callSid: string): void {
