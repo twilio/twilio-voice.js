@@ -412,7 +412,7 @@ describe('SipSignalingAdapter', () => {
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
       inviterStub._simulateState('Terminated');
       // Subsequent hangup should warn (no session found) — just verifying no crash
-      assert.doesNotThrow(() => adapter.hangup('call-1'));
+      assert.doesNotThrow(() => adapter.hangup('call-1', {}));
     });
   });
 
@@ -567,7 +567,7 @@ describe('SipSignalingAdapter', () => {
       const { adapter, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
       inviterStub.state = 'Established';
-      adapter.hangup('call-1');
+      adapter.hangup('call-1', {});
       assert(inviterStub.bye.calledOnce);
     });
 
@@ -575,7 +575,7 @@ describe('SipSignalingAdapter', () => {
       const { adapter, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
       inviterStub.state = 'Establishing';
-      adapter.hangup('call-1');
+      adapter.hangup('call-1', {});
       assert(inviterStub.cancel.calledOnce);
     });
 
@@ -583,13 +583,13 @@ describe('SipSignalingAdapter', () => {
       const { adapter, uaStub } = createAdapter();
       const inv = createInvitationStub();
       uaStub._triggerInvite(inv);
-      adapter.hangup('CA-test-call-sid');
+      adapter.hangup('CA-test-call-sid', {});
       assert(inv.reject.calledOnce);
     });
 
     it('should not throw for unknown callSid', () => {
       const { adapter } = createAdapter();
-      assert.doesNotThrow(() => adapter.hangup('unknown'));
+      assert.doesNotThrow(() => adapter.hangup('unknown', {}));
     });
   });
 
@@ -699,7 +699,7 @@ describe('SipSignalingAdapter', () => {
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
       uaStub._triggerDisconnect();
       // Session map cleared — hangup should not find session
-      assert.doesNotThrow(() => adapter.hangup('call-1'));
+      assert.doesNotThrow(() => adapter.hangup('call-1', {}));
     });
   });
 });
