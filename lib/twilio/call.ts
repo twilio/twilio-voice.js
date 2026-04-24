@@ -382,8 +382,13 @@ class Call extends EventEmitter {
 
         this._signalingAdapter.on('answer', onAnswerOrRinging);
         this._signalingAdapter.on('hangup', onHangup);
+        const callSid = this.parameters.CallSid;
+        if (!callSid) {
+          this._log.warn('Cannot reinvite: CallSid is not set');
+          return;
+        }
         const reinviteConfig: ReinviteConfig = { sdp: offerSdp };
-        this._signalingAdapter.reinvite(this.parameters.CallSid, reinviteConfig);
+        this._signalingAdapter.reinvite(callSid, reinviteConfig);
       });
     });
 
@@ -665,11 +670,13 @@ class Call extends EventEmitter {
         this._publisher.info('connection', eventName, null, this);
 
         // Report the preferred codec and params as they appear in the SDP
-        const { codecName, codecParams } = getPreferredCodecInfo(this._mediaHandler.version.getSDP());
-        this._publisher.info('settings', 'codec', {
-          codec_params: codecParams,
-          selected_codec: codecName,
-        }, this);
+        if (this._mediaHandler.version) {
+          const { codecName, codecParams } = getPreferredCodecInfo(this._mediaHandler.version.getSDP());
+          this._publisher.info('settings', 'codec', {
+            codec_params: codecParams,
+            selected_codec: codecName,
+          }, this);
+        }
 
         // Enable RTC monitoring
         this._monitor.enable(pc);
@@ -687,13 +694,18 @@ class Call extends EventEmitter {
       this._signalingAdapter.addListener('hangup', this._onHangup);
 
       if (this._direction === Call.CallDirection.Incoming) {
+        const callSid = this.parameters.CallSid;
+        if (!callSid) {
+          this._log.error('Cannot answer incoming call: CallSid is not set');
+          return;
+        }
         this._isAnswered = true;
         this._signalingAdapter.on('answer', this._onAnswer);
-        this._mediaHandler.answerIncomingCall(this.parameters.CallSid,
+        this._mediaHandler.answerIncomingCall(callSid,
           this._options.offerSdp, rtcConfiguration,
           (answerSdp: string) => {
             const answerConfig: AnswerConfig = { sdp: answerSdp };
-            this._signalingAdapter.answer(this.parameters.CallSid, answerConfig);
+            this._signalingAdapter.answer(callSid, answerConfig);
           },
           onAnswer);
       } else {
@@ -813,7 +825,10 @@ class Call extends EventEmitter {
     }
 
     this._status = Call.State.Closed;
-    this._mediaHandler.ignore(this.parameters.CallSid);
+    const callSid = this.parameters.CallSid;
+    if (callSid) {
+      this._mediaHandler.ignore(callSid);
+    }
     this._publisher.info('connection', 'ignored-by-local', null, this);
 
     if (this._onIgnore) {
@@ -886,8 +901,11 @@ class Call extends EventEmitter {
     }
 
     this._isRejected = true;
-    this._signalingAdapter.reject(this.parameters.CallSid);
-    this._mediaHandler.reject(this.parameters.CallSid);
+    const callSid = this.parameters.CallSid;
+    if (callSid) {
+      this._signalingAdapter.reject(callSid);
+      this._mediaHandler.reject(callSid);
+    }
     this._publisher.info('connection', 'rejected-by-local', null, this);
     this._cleanupEventListeners();
     this._mediaHandler.close();
@@ -960,8 +978,15 @@ class Call extends EventEmitter {
     this._log.info('Sending digits over PStream');
 
     if (this._signalingAdapter !== null && this._signalingAdapter.status !== 'disconnected') {
+      const callSid = this.parameters.CallSid;
+      if (!callSid) {
+        const error = new GeneralErrors.ConnectionError('Could not send DTMF: CallSid is not set');
+        this._log.debug('#error', error);
+        this.emit('error', error);
+        return;
+      }
       const dtmfConfig: DtmfConfig = { digits };
-      this._signalingAdapter.dtmf(this.parameters.CallSid, dtmfConfig);
+      this._signalingAdapter.dtmf(callSid, dtmfConfig);
     } else {
       const error = new GeneralErrors.ConnectionError('Could not send DTMF: Signaling channel is disconnected');
       this._log.debug('#error', error);
@@ -1003,7 +1028,7 @@ class Call extends EventEmitter {
     }
 
     const callSid = this.parameters.CallSid;
-    if (typeof this.parameters.CallSid === 'undefined') {
+    if (!callSid) {
       throw new InvalidStateError(
         'Could not send CallMessage; Call has no CallSid',
       );
@@ -1012,7 +1037,7 @@ class Call extends EventEmitter {
     const voiceEventSid = this._voiceEventSidGenerator();
     this._messages.set(voiceEventSid, { content, contentType, messageType, voiceEventSid });
     const sendMessageConfig: SendMessageConfig = { content, contentType, messageType, voiceEventSid };
-    this._signalingAdapter.sendMessage(callSid!, sendMessageConfig);
+    this._signalingAdapter.sendMessage(callSid, sendMessageConfig);
     return voiceEventSid;
   }
 
@@ -1267,12 +1292,13 @@ class Call extends EventEmitter {
    */
   private _onConnected = (): void => {
     this._log.info('Received connected from pstream');
-    if (this._signalingReconnectToken && this._mediaHandler.version) {
+    const callSid = this.parameters.CallSid;
+    if (this._signalingReconnectToken && this._mediaHandler.version && callSid) {
       const reconnectConfig: ReconnectConfig = {
         sdp: this._mediaHandler.version.getSDP(),
         reconnectToken: this._signalingReconnectToken,
       };
-      this._signalingAdapter.reconnect(this.parameters.CallSid, reconnectConfig);
+      this._signalingAdapter.reconnect(callSid, reconnectConfig);
     }
   }
 
@@ -1368,7 +1394,7 @@ class Call extends EventEmitter {
       return;
     }
 
-    const pc = this._mediaHandler.version.pc;
+    const pc = this._mediaHandler.version?.pc;
     const isIceDisconnected = pc && pc.iceConnectionState === 'disconnected';
     const hasLowBytesWarning = this._monitor.hasActiveWarning('bytesSent', 'min')
       || this._monitor.hasActiveWarning('bytesReceived', 'min');

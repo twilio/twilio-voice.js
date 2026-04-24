@@ -846,6 +846,7 @@ describe('Call', function() {
   describe('.ignore()', () => {
     context('when state is pending', () => {
       it('should call mediaHandler.ignore', () => {
+        conn.parameters.CallSid = 'CA123';
         conn.ignore();
         sinon.assert.calledOnce(mediaHandler.ignore);
       });
@@ -1010,12 +1011,14 @@ describe('Call', function() {
   describe('.reject()', () => {
     context('when state is pending', () => {
       it('should call pstream.reject', () => {
+        conn.parameters.CallSid = 'CA123';
         conn.reject();
         sinon.assert.calledOnce(pstream.reject);
-        sinon.assert.calledWith(pstream.reject, conn.parameters.CallSid);
+        sinon.assert.calledWith(pstream.reject, 'CA123');
       });
 
       it('should call mediaHandler.reject', () => {
+        conn.parameters.CallSid = 'CA123';
         conn.reject();
         sinon.assert.calledOnce(mediaHandler.reject);
       });
@@ -1342,8 +1345,9 @@ describe('Call', function() {
     });
 
     it('should call pstream.dtmf if connected', () => {
+      conn.parameters.CallSid = 'CA123';
       conn.sendDigits('123');
-      sinon.assert.calledWith(pstream.dtmf, conn.parameters.CallSid, { digits: '123' });
+      sinon.assert.calledWith(pstream.dtmf, 'CA123', { digits: '123' });
     });
 
     it('should emit error if pstream is disconnected', (done) => {
