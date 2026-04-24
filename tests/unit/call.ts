@@ -1355,6 +1355,15 @@ describe('Call', function() {
       conn.on('error', () => done());
       conn.sendDigits('123');
     });
+
+    it('should emit error if CallSid is not set', (done) => {
+      conn.on('error', (error: any) => {
+        assert(error.message.includes('Could not send DTMF: CallSid is not set'));
+        sinon.assert.notCalled(pstream.dtmf);
+        done();
+      });
+      conn.sendDigits('123');
+    });
   });
 
   context('in response to', () => {
