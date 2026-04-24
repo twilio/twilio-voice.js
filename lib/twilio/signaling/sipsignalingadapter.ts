@@ -498,7 +498,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       sdp: invitation.body || '',
       parameters: {
         CallSid: callSid,
-        From: invitation.remoteIdentity.uri.toString(),
+        From: invitation.remoteIdentity?.uri?.toString() || '',
       },
     });
   }

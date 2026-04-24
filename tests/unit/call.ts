@@ -506,6 +506,18 @@ describe('Call', function() {
           });
         });
 
+        it('should emit error and not call answerIncomingCall if CallSid is missing', () => {
+          conn.parameters = {};
+          const errorSpy = sinon.spy();
+          conn.on('error', errorSpy);
+          conn.accept();
+          return wait.then(() => {
+            sinon.assert.calledOnce(errorSpy);
+            assert(errorSpy.firstCall.args[0].message.includes('Cannot answer incoming call: CallSid is not set'));
+            sinon.assert.notCalled(mediaHandler.answerIncomingCall);
+          });
+        });
+
         it('should call mediaHandler.answerIncomingCall', () => {
           conn.accept();
           return wait.then(() => {
@@ -845,22 +857,26 @@ describe('Call', function() {
 
   describe('.ignore()', () => {
     context('when state is pending', () => {
-      it('should call mediaHandler.ignore', () => {
+      it('should call mediaHandler.ignore with the CallSid', () => {
+        conn.parameters.CallSid = 'CA123';
         conn.ignore();
-        sinon.assert.calledOnce(mediaHandler.ignore);
+        sinon.assert.calledOnceWithExactly(mediaHandler.ignore, 'CA123');
       });
 
       it('should transition state to closed', () => {
+        conn.parameters.CallSid = 'CA123';
         conn.ignore();
         assert.equal(conn.status(), Call.State.Closed);
       });
 
       it('should publish an event to insights', () => {
+        conn.parameters.CallSid = 'CA123';
         conn.ignore();
         sinon.assert.calledWith(publisher.info, 'connection', 'ignored-by-local');
       });
 
       it('should call the onIgnore callback', () => {
+        conn.parameters.CallSid = 'CA123';
         conn.ignore();
         sinon.assert.called(onIgnore);
       });
@@ -1010,37 +1026,45 @@ describe('Call', function() {
   describe('.reject()', () => {
     context('when state is pending', () => {
       it('should call pstream.reject', () => {
+        conn.parameters.CallSid = 'CA123';
         conn.reject();
         sinon.assert.calledOnce(pstream.reject);
-        sinon.assert.calledWith(pstream.reject, conn.parameters.CallSid);
+        sinon.assert.calledWith(pstream.reject, 'CA123');
       });
 
       it('should call mediaHandler.reject', () => {
+        conn.parameters.CallSid = 'CA123';
         conn.reject();
         sinon.assert.calledOnce(mediaHandler.reject);
+        sinon.assert.calledWith(mediaHandler.reject, 'CA123');
       });
 
       it('should call mediaHandler.close', () => {
+        conn.parameters.CallSid = 'CA123';
         conn.reject();
         sinon.assert.calledOnce(mediaHandler.close);
       });
 
       it('should emit cancel', (done) => {
+        conn.parameters.CallSid = 'CA123';
         conn.on('reject', () => done());
         conn.reject();
       });
 
       it('should publish an event to insights', () => {
+        conn.parameters.CallSid = 'CA123';
         conn.reject();
         sinon.assert.calledWith(publisher.info, 'connection', 'rejected-by-local');
       });
 
       it('should transition status to closed', () => {
+        conn.parameters.CallSid = 'CA123';
         conn.reject();
         assert.equal(conn.status(), 'closed');
       });
 
       it('should not emit a disconnect event', () => {
+        conn.parameters.CallSid = 'CA123';
         const callback = sinon.stub();
         conn['_mediaHandler'].close = () => mediaHandler.onclose();
         conn.on('disconnect', callback);
@@ -1050,6 +1074,7 @@ describe('Call', function() {
       });
 
       it('should not play disconnect sound', () => {
+        conn.parameters.CallSid = 'CA123';
         conn['_mediaHandler'].close = () => mediaHandler.onclose();
         conn.reject();
         clock.tick(10);
@@ -1068,6 +1093,7 @@ describe('Call', function() {
         'transportClose',
       ].forEach((eventName: string) => {
         it(`should call pstream.removeListener on ${eventName}`, () => {
+          conn.parameters.CallSid = 'CA123';
           conn.reject();
           clock.tick(10);
           assert.equal(pstream.listenerCount(eventName), 0);
@@ -1342,13 +1368,23 @@ describe('Call', function() {
     });
 
     it('should call pstream.dtmf if connected', () => {
+      conn.parameters.CallSid = 'CA123';
       conn.sendDigits('123');
-      sinon.assert.calledWith(pstream.dtmf, conn.parameters.CallSid, { digits: '123' });
+      sinon.assert.calledWith(pstream.dtmf, 'CA123', { digits: '123' });
     });
 
     it('should emit error if pstream is disconnected', (done) => {
       pstream.status = 'disconnected';
       conn.on('error', () => done());
+      conn.sendDigits('123');
+    });
+
+    it('should emit error if CallSid is not set', (done) => {
+      conn.on('error', (error: any) => {
+        assert(error.message.includes('Could not send DTMF: CallSid is not set'));
+        sinon.assert.notCalled(pstream.dtmf);
+        done();
+      });
       conn.sendDigits('123');
     });
   });
