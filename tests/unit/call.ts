@@ -845,10 +845,10 @@ describe('Call', function() {
 
   describe('.ignore()', () => {
     context('when state is pending', () => {
-      it('should call mediaHandler.ignore', () => {
+      it('should call mediaHandler.ignore with the CallSid', () => {
         conn.parameters.CallSid = 'CA123';
         conn.ignore();
-        sinon.assert.calledOnce(mediaHandler.ignore);
+        sinon.assert.calledOnceWithExactly(mediaHandler.ignore, 'CA123');
       });
 
       it('should transition state to closed', () => {
@@ -1021,6 +1021,7 @@ describe('Call', function() {
         conn.parameters.CallSid = 'CA123';
         conn.reject();
         sinon.assert.calledOnce(mediaHandler.reject);
+        sinon.assert.calledWith(mediaHandler.reject, 'CA123');
       });
 
       it('should call mediaHandler.close', () => {

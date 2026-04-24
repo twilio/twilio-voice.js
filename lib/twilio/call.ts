@@ -380,9 +380,9 @@ class Call extends EventEmitter {
           this._signalingAdapter.removeListener('hangup', onHangup);
         };
 
-        const callSid = this.parameters.CallSid;
+        const callSid = this.parameters.CallSid || this.outboundConnectionId;
         if (!callSid) {
-          this._log.warn('Cannot reinvite: CallSid is not set');
+          this._log.warn('Cannot reinvite: CallSid and outboundConnectionId are not set');
           return;
         }
         this._signalingAdapter.on('answer', onAnswerOrRinging);
@@ -696,7 +696,9 @@ class Call extends EventEmitter {
       if (this._direction === Call.CallDirection.Incoming) {
         const callSid = this.parameters.CallSid;
         if (!callSid) {
-          this._log.error('Cannot answer incoming call: CallSid is not set');
+          const error = new InvalidStateError('Cannot answer incoming call: CallSid is not set');
+          this._log.error(error.message);
+          this.emit('error', error);
           this._cleanupEventListeners();
           this._mediaHandler.close();
           return;
