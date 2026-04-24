@@ -828,11 +828,14 @@ class Call extends EventEmitter {
       return;
     }
 
-    this._status = Call.State.Closed;
     const callSid = this.parameters.CallSid;
-    if (callSid) {
-      this._mediaHandler.ignore(callSid);
+    if (!callSid) {
+      this._log.warn('ignore: CallSid is not set');
+      return;
     }
+
+    this._status = Call.State.Closed;
+    this._mediaHandler.ignore(callSid);
     this._publisher.info('connection', 'ignored-by-local', null, this);
 
     if (this._onIgnore) {
@@ -904,12 +907,15 @@ class Call extends EventEmitter {
       return;
     }
 
-    this._isRejected = true;
     const callSid = this.parameters.CallSid;
-    if (callSid) {
-      this._signalingAdapter.reject(callSid);
-      this._mediaHandler.reject(callSid);
+    if (!callSid) {
+      this._log.warn('reject: CallSid is not set');
+      return;
     }
+
+    this._isRejected = true;
+    this._signalingAdapter.reject(callSid);
+    this._mediaHandler.reject(callSid);
     this._publisher.info('connection', 'rejected-by-local', null, this);
     this._cleanupEventListeners();
     this._mediaHandler.close();
