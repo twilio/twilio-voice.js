@@ -380,6 +380,8 @@ class Call extends EventEmitter {
           this._signalingAdapter.removeListener('hangup', onHangup);
         };
 
+        // Guard: CallSid is set by the answer event; outboundConnectionId is set at
+        // construction. Both missing means the call is being torn down during ICE restart.
         const callSid = this.parameters.CallSid || this.outboundConnectionId;
         if (!callSid) {
           this._log.warn('Cannot reinvite: CallSid and outboundConnectionId are not set');
@@ -670,13 +672,11 @@ class Call extends EventEmitter {
         this._publisher.info('connection', eventName, null, this);
 
         // Report the preferred codec and params as they appear in the SDP
-        if (this._mediaHandler.version) {
-          const { codecName, codecParams } = getPreferredCodecInfo(this._mediaHandler.version.getSDP());
-          this._publisher.info('settings', 'codec', {
-            codec_params: codecParams,
-            selected_codec: codecName,
-          }, this);
-        }
+        const { codecName, codecParams } = getPreferredCodecInfo(this._mediaHandler.version.getSDP());
+        this._publisher.info('settings', 'codec', {
+          codec_params: codecParams,
+          selected_codec: codecName,
+        }, this);
 
         // Enable RTC monitoring
         this._monitor.enable(pc);
@@ -694,22 +694,13 @@ class Call extends EventEmitter {
       this._signalingAdapter.addListener('hangup', this._onHangup);
 
       if (this._direction === Call.CallDirection.Incoming) {
-        const callSid = this.parameters.CallSid;
-        if (!callSid) {
-          const error = new InvalidStateError('Cannot answer incoming call: CallSid is not set');
-          this._log.error(error.message);
-          this.emit('error', error);
-          this._cleanupEventListeners();
-          this._mediaHandler.close();
-          return;
-        }
         this._isAnswered = true;
         this._signalingAdapter.on('answer', this._onAnswer);
-        this._mediaHandler.answerIncomingCall(callSid,
+        this._mediaHandler.answerIncomingCall(this.parameters.CallSid,
           this._options.offerSdp, rtcConfiguration,
           (answerSdp: string) => {
             const answerConfig: AnswerConfig = { sdp: answerSdp };
-            this._signalingAdapter.answer(callSid, answerConfig);
+            this._signalingAdapter.answer(this.parameters.CallSid, answerConfig);
           },
           onAnswer);
       } else {
@@ -828,14 +819,8 @@ class Call extends EventEmitter {
       return;
     }
 
-    const callSid = this.parameters.CallSid;
-    if (!callSid) {
-      this._log.warn('ignore: CallSid is not set');
-      return;
-    }
-
     this._status = Call.State.Closed;
-    this._mediaHandler.ignore(callSid);
+    this._mediaHandler.ignore(this.parameters.CallSid);
     this._publisher.info('connection', 'ignored-by-local', null, this);
 
     if (this._onIgnore) {
@@ -907,15 +892,9 @@ class Call extends EventEmitter {
       return;
     }
 
-    const callSid = this.parameters.CallSid;
-    if (!callSid) {
-      this._log.warn('reject: CallSid is not set');
-      return;
-    }
-
     this._isRejected = true;
-    this._signalingAdapter.reject(callSid);
-    this._mediaHandler.reject(callSid);
+    this._signalingAdapter.reject(this.parameters.CallSid);
+    this._mediaHandler.reject(this.parameters.CallSid);
     this._publisher.info('connection', 'rejected-by-local', null, this);
     this._cleanupEventListeners();
     this._mediaHandler.close();
@@ -988,15 +967,8 @@ class Call extends EventEmitter {
     this._log.info('Sending digits over PStream');
 
     if (this._signalingAdapter !== null && this._signalingAdapter.status !== 'disconnected') {
-      const callSid = this.parameters.CallSid;
-      if (!callSid) {
-        const error = new GeneralErrors.ConnectionError('Could not send DTMF: CallSid is not set');
-        this._log.debug('#error', error);
-        this.emit('error', error);
-        return;
-      }
       const dtmfConfig: DtmfConfig = { digits };
-      this._signalingAdapter.dtmf(callSid, dtmfConfig);
+      this._signalingAdapter.dtmf(this.parameters.CallSid, dtmfConfig);
     } else {
       const error = new GeneralErrors.ConnectionError('Could not send DTMF: Signaling channel is disconnected');
       this._log.debug('#error', error);
@@ -1302,6 +1274,9 @@ class Call extends EventEmitter {
    */
   private _onConnected = (): void => {
     this._log.info('Received connected from pstream');
+    // Guard: callSid may not be set if transport reconnects before the initial
+    // answer event (e.g., rapid disconnect/reconnect on an outgoing call).
+    // Reconnect is skipped until all three preconditions are met.
     const callSid = this.parameters.CallSid;
     if (this._signalingReconnectToken && this._mediaHandler.version && callSid) {
       const reconnectConfig: ReconnectConfig = {
@@ -1404,6 +1379,8 @@ class Call extends EventEmitter {
       return;
     }
 
+    // Guard: version can be null if media failure fires before the WebRTC
+    // offer/answer exchange completes (e.g., ICE gathering timeout during setup).
     const pc = this._mediaHandler.version?.pc;
     const isIceDisconnected = pc && pc.iceConnectionState === 'disconnected';
     const hasLowBytesWarning = this._monitor.hasActiveWarning('bytesSent', 'min')
