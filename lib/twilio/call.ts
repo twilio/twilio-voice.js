@@ -685,7 +685,7 @@ class Call extends EventEmitter {
       let twilioError;
 
       if (error.code === 31208
-        || ['PermissionDeniedError', 'NotAllowedError'].indexOf(error.name) !== -1) {
+        || ['PermissionDeniedError', 'NotAllowedError'].includes(error.name)) {
         twilioError = new UserMediaErrors.PermissionDeniedError();
         this._publisher.error('get-user-media', 'denied', {
           data: {
