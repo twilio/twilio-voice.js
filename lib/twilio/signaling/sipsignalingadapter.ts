@@ -493,12 +493,17 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       }
     });
 
+    const from = invitation.remoteIdentity?.uri?.toString() || '';
+    if (!from) {
+      this._log.warn('Incoming INVITE has no parseable remoteIdentity URI');
+    }
+
     this.emit('invite', {
       callsid: callSid,
       sdp: invitation.body || '',
       parameters: {
         CallSid: callSid,
-        From: invitation.remoteIdentity?.uri?.toString() || '',
+        From: from,
       },
     });
   }

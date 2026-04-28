@@ -380,11 +380,9 @@ class Call extends EventEmitter {
           this._signalingAdapter.removeListener('hangup', onHangup);
         };
 
-        // Guard: CallSid is set by the answer event; outboundConnectionId is set at
-        // construction. Both missing means the call is being torn down during ICE restart.
-        const callSid = this.parameters.CallSid || this.outboundConnectionId;
+        const callSid = this.parameters.CallSid;
         if (!callSid) {
-          this._log.warn('Cannot reinvite: CallSid and outboundConnectionId are not set');
+          this._log.warn('Cannot reinvite: CallSid is not set');
           return;
         }
         this._signalingAdapter.on('answer', onAnswerOrRinging);
@@ -1274,9 +1272,6 @@ class Call extends EventEmitter {
    */
   private _onConnected = (): void => {
     this._log.info('Received connected from pstream');
-    // Guard: callSid may not be set if transport reconnects before the initial
-    // answer event (e.g., rapid disconnect/reconnect on an outgoing call).
-    // Reconnect is skipped until all three preconditions are met.
     const callSid = this.parameters.CallSid;
     if (this._signalingReconnectToken && this._mediaHandler.version && callSid) {
       const reconnectConfig: ReconnectConfig = {
@@ -1379,9 +1374,11 @@ class Call extends EventEmitter {
       return;
     }
 
-    // Guard: version can be null if media failure fires before the WebRTC
-    // offer/answer exchange completes (e.g., ICE gathering timeout during setup).
-    const pc = this._mediaHandler.version?.pc;
+    if (!this._mediaHandler.version) {
+      this._log.warn('Cannot handle media failure: version is not set');
+      return;
+    }
+    const pc = this._mediaHandler.version.pc;
     const isIceDisconnected = pc && pc.iceConnectionState === 'disconnected';
     const hasLowBytesWarning = this._monitor.hasActiveWarning('bytesSent', 'min')
       || this._monitor.hasActiveWarning('bytesReceived', 'min');
