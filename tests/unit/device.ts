@@ -755,10 +755,24 @@ describe('Device', function() {
               () => device.updateOptions({
                 signalingOptions: {
                   useSignalingMethod: 'sip',
+                  sipUri: 'sip:u@registrar.example.com',
                   sipCredentials: { username: 'u', password: 'p' },
                 } as any,
               }),
               /sipServer.*required/,
+            );
+          });
+
+          it('should throw if useSignalingMethod is sip but sipUri is missing', () => {
+            assert.throws(
+              () => device.updateOptions({
+                signalingOptions: {
+                  useSignalingMethod: 'sip',
+                  sipServer: 'wss://sip.example.com',
+                  sipCredentials: { username: 'u', password: 'p' },
+                } as any,
+              }),
+              /sipUri.*required/,
             );
           });
 
@@ -768,6 +782,7 @@ describe('Device', function() {
                 signalingOptions: {
                   useSignalingMethod: 'sip',
                   sipServer: 'wss://sip.example.com',
+                  sipUri: 'sip:u@registrar.example.com',
                 } as any,
               }),
               /sipCredentials.*required/,
@@ -780,6 +795,7 @@ describe('Device', function() {
                 signalingOptions: {
                   useSignalingMethod: 'sip',
                   sipServer: 'wss://sip.example.com',
+                  sipUri: 'sip:u@registrar.example.com',
                   sipCredentials: { username: '', password: 'p' },
                 },
               }),
@@ -793,6 +809,7 @@ describe('Device', function() {
                 signalingOptions: {
                   useSignalingMethod: 'sip',
                   sipServer: 'wss://sip.example.com',
+                  sipUri: 'sip:u@registrar.example.com',
                   sipCredentials: { username: 'u', password: '' },
                 },
               }),
@@ -805,6 +822,7 @@ describe('Device', function() {
               signalingOptions: {
                 useSignalingMethod: 'sip',
                 sipServer: 'wss://sip.example.com',
+                sipUri: 'sip:u@registrar.example.com',
                 sipCredentials: { username: 'u', password: 'p' },
               },
             }));

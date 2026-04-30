@@ -1,14 +1,19 @@
 import { EventEmitter } from 'events';
+import { IPeerConnection } from './sipsessiondescriptionhandler';
 
 export type SignalingAdapterStatus = 'disconnected' | 'connected' | 'ready' | 'offline';
 
 export interface InviteConfig {
   sdp: string;
   params: string;
+  peerConnection?: IPeerConnection;
+  rtcConfiguration?: RTCConfiguration;
 }
 
 export interface AnswerConfig {
   sdp: string;
+  peerConnection?: IPeerConnection;
+  rtcConfiguration?: RTCConfiguration;
 }
 
 export interface HangupConfig {
@@ -22,6 +27,8 @@ export interface ReinviteConfig {
 export interface ReconnectConfig {
   sdp: string;
   reconnectToken: string;
+  peerConnection?: IPeerConnection;
+  rtcConfiguration?: RTCConfiguration;
 }
 
 export interface DtmfConfig {

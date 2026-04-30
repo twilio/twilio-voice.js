@@ -717,6 +717,79 @@ describe('Call', function() {
       });
     });
 
+    context('when useSip is true', () => {
+      let getInputStream: () => any;
+      let wait: Promise<any>;
+
+      const setupSip = (callOptions: any = {}) => {
+        getInputStream = sinon.spy(() => 'foo');
+        Object.assign(options, { getInputStream, useSip: true, twimlParams: { To: 'foo' }, ...callOptions });
+        conn = new Call(config, options);
+        mediaHandler.setInputTracksFromStream = sinon.spy(() => {
+          const p = Promise.resolve();
+          wait = p.then(() => Promise.resolve());
+          return p;
+        });
+      };
+
+      context('outgoing', () => {
+        beforeEach(() => setupSip());
+
+        it('should call signalingAdapter.invite with peerConnection and rtcConfiguration', () => {
+          const rtcConfiguration = { iceServers: [{ urls: 'stun:foo' }] };
+          conn.accept({ rtcConfiguration });
+          return wait.then(() => {
+            sinon.assert.calledOnce(pstream.invite);
+            const inviteConfig = pstream.invite.args[0][1];
+            assert.strictEqual(inviteConfig.peerConnection, mediaHandler);
+            assert.deepStrictEqual(inviteConfig.rtcConfiguration, rtcConfiguration);
+            assert.strictEqual(inviteConfig.sdp, '');
+          });
+        });
+
+        it('should not call mediaHandler.makeOutgoingCall (SDH drives SDP instead)', () => {
+          conn.accept();
+          return wait.then(() => {
+            sinon.assert.notCalled(mediaHandler.makeOutgoingCall);
+          });
+        });
+
+        it('should call signalingAdapter.reconnect when reconnectToken is set', () => {
+          setupSip({ reconnectToken: 'testReconnectToken' });
+          conn.accept();
+          return wait.then(() => {
+            sinon.assert.calledOnce(pstream.reconnect);
+            const reconnectConfig = pstream.reconnect.args[0][1];
+            assert.strictEqual(reconnectConfig.peerConnection, mediaHandler);
+            assert.strictEqual(reconnectConfig.reconnectToken, 'testReconnectToken');
+          });
+        });
+      });
+
+      context('incoming', () => {
+        beforeEach(() => {
+          setupSip({ callParameters: { CallSid: 'CA-inbound' }, offerSdp: 'remote-offer-sdp' });
+        });
+
+        it('should call signalingAdapter.answer with peerConnection and the remote offer sdp', () => {
+          conn.accept();
+          return wait.then(() => {
+            sinon.assert.calledOnce(pstream.answer);
+            const answerConfig = pstream.answer.args[0][1];
+            assert.strictEqual(answerConfig.peerConnection, mediaHandler);
+            assert.strictEqual(answerConfig.sdp, 'remote-offer-sdp');
+          });
+        });
+
+        it('should not call mediaHandler.answerIncomingCall (SDH drives SDP instead)', () => {
+          conn.accept();
+          return wait.then(() => {
+            sinon.assert.notCalled(mediaHandler.answerIncomingCall);
+          });
+        });
+      });
+    });
+
     context('when getInputStream is present and fails with 31208', () => {
       let getInputStream: () => any;
       let wait: Promise<any>;

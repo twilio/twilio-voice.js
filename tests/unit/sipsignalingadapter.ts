@@ -2,6 +2,18 @@ import * as assert from 'assert';
 import * as sinon from 'sinon';
 import { SignalingAdapter } from '../../lib/twilio/signaling/signalingadapter';
 import { SipSignalingAdapter } from '../../lib/twilio/signaling/sipsignalingadapter';
+import { IPeerConnection, SipSessionDescriptionHandler } from '../../lib/twilio/signaling/sipsessiondescriptionhandler';
+
+function createPeerConnectionStub(): IPeerConnection {
+  return {
+    makeOutgoingCall: sinon.stub(),
+    answerIncomingCall: sinon.stub(),
+    processAnswer: sinon.stub(),
+    close: sinon.stub(),
+  };
+}
+
+const pc = (): IPeerConnection => createPeerConnectionStub();
 
 /**
  * Stub that mimics a SIP.js Registerer/Session stateChange emitter.
@@ -93,6 +105,7 @@ function createAdapter(overrides?: Partial<any>) {
   const uaStub = createUserAgentStub();
   const regStub = createRegistererStub();
   const inviterStub = createInviterStub();
+  let capturedSdhFactory: any = null;
 
   const adapter = new SipSignalingAdapter({
     sipDomain: 'sip.ashburn.dev.twilio.com',
@@ -102,6 +115,7 @@ function createAdapter(overrides?: Partial<any>) {
     region: 'ashburn',
     createUserAgent(config: any) {
       uaStub._setDelegate(config.delegate);
+      capturedSdhFactory = config.sessionDescriptionHandlerFactory;
       return uaStub as any;
     },
     createRegisterer() {
@@ -113,7 +127,13 @@ function createAdapter(overrides?: Partial<any>) {
     ...overrides,
   });
 
-  return { adapter: adapter as SignalingAdapter, uaStub, regStub, inviterStub };
+  return {
+    adapter: adapter as SignalingAdapter,
+    uaStub,
+    regStub,
+    inviterStub,
+    getSdhFactory: () => capturedSdhFactory,
+  };
 }
 
 describe('SipSignalingAdapter', () => {
@@ -355,7 +375,7 @@ describe('SipSignalingAdapter', () => {
   describe('invite()', () => {
     it('should create an Inviter and call invite()', () => {
       const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
       assert(inviterStub.invite.calledOnce);
     });
 
@@ -365,7 +385,7 @@ describe('SipSignalingAdapter', () => {
         assert.strictEqual(payload.callsid, 'call-1');
         done();
       });
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
       const rd = inviterStub._getRequestDelegate();
       rd.onProgress({});
     });
@@ -376,7 +396,7 @@ describe('SipSignalingAdapter', () => {
         assert.strictEqual(payload.callsid, 'call-1');
         done();
       });
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
       const rd = inviterStub._getRequestDelegate();
       rd.onAccept({});
     });
@@ -388,7 +408,7 @@ describe('SipSignalingAdapter', () => {
         assert(payload.error);
         done();
       });
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
       const rd = inviterStub._getRequestDelegate();
       rd.onReject({ message: { statusCode: 486, reasonPhrase: 'Busy Here' } });
     });
@@ -404,22 +424,44 @@ describe('SipSignalingAdapter', () => {
         assert(payload.error.message.includes('transport down'));
         done();
       });
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
     });
 
     it('should clean up session on SessionState.Terminated', () => {
       const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
       inviterStub._simulateState('Terminated');
       // Subsequent hangup should warn (no session found) — just verifying no crash
       assert.doesNotThrow(() => adapter.hangup('call-1', {}));
+    });
+
+    it('should rekey outbound session when 200 OK carries a server CallSid', () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
+      const rd = inviterStub._getRequestDelegate();
+      rd.onAccept({ message: { getHeader: (name: string) => name === 'X-Twilio-CallSid' ? 'CA-server-123' : undefined } });
+      // Original temp sid should no longer resolve; the server sid should.
+      inviterStub.state = 'Established';
+      adapter.hangup('CA-server-123', {});
+      assert(inviterStub.bye.calledOnce, 'bye should be sent when hanging up with the server-assigned CallSid');
+    });
+
+    it('should emit "answer" with server CallSid from X-Twilio-CallSid header', (done) => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.on('answer', (payload: any) => {
+        assert.strictEqual(payload.callsid, 'CA-server-456');
+        done();
+      });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
+      const rd = inviterStub._getRequestDelegate();
+      rd.onAccept({ message: { getHeader: (name: string) => name === 'X-Twilio-CallSid' ? 'CA-server-456' : undefined } });
     });
   });
 
   describe('reconnect()', () => {
     it('should create an Inviter and call invite()', () => {
       const { adapter, inviterStub } = createAdapter();
-      adapter.reconnect('call-1', { sdp: 'sdp', reconnectToken: 'rtoken' });
+      adapter.reconnect('call-1', { sdp: 'sdp', reconnectToken: 'rtoken', peerConnection: pc() });
       assert(inviterStub.invite.calledOnce);
     });
 
@@ -429,7 +471,7 @@ describe('SipSignalingAdapter', () => {
         assert.strictEqual(payload.reconnect, 'rtoken');
         done();
       });
-      adapter.reconnect('call-1', { sdp: 'sdp', reconnectToken: 'rtoken' });
+      adapter.reconnect('call-1', { sdp: 'sdp', reconnectToken: 'rtoken', peerConnection: pc() });
       const rd = inviterStub._getRequestDelegate();
       rd.onAccept({});
     });
@@ -494,7 +536,7 @@ describe('SipSignalingAdapter', () => {
       const { adapter, uaStub } = createAdapter();
       const inv = createInvitationStub();
       uaStub._triggerInvite(inv);
-      adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer' });
+      adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer', peerConnection: pc() });
       adapter.on('hangup', (payload: any) => {
         assert.strictEqual(payload.callsid, 'CA-test-call-sid');
         done();
@@ -508,14 +550,14 @@ describe('SipSignalingAdapter', () => {
       const { adapter, uaStub } = createAdapter();
       const inv = createInvitationStub();
       uaStub._triggerInvite(inv);
-      adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer' });
+      adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer', peerConnection: pc() });
       assert(inv.accept.calledOnce);
     });
 
     it('should warn if no pending invitation', () => {
       const { adapter } = createAdapter();
       // Should not throw — just warns
-      assert.doesNotThrow(() => adapter.answer('unknown-id', { sdp: 'sdp' }));
+      assert.doesNotThrow(() => adapter.answer('unknown-id', { sdp: 'sdp', peerConnection: pc() }));
     });
 
     it('should emit "error" if accept() fails', (done) => {
@@ -529,7 +571,7 @@ describe('SipSignalingAdapter', () => {
         assert.strictEqual(payload.callsid, 'CA-test-call-sid');
         done();
       });
-      adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer' });
+      adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer', peerConnection: pc() });
     });
   });
 
@@ -565,7 +607,7 @@ describe('SipSignalingAdapter', () => {
   describe('hangup()', () => {
     it('should call session.bye() when state is Established', () => {
       const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
       inviterStub.state = 'Established';
       adapter.hangup('call-1', {});
       assert(inviterStub.bye.calledOnce);
@@ -573,7 +615,7 @@ describe('SipSignalingAdapter', () => {
 
     it('should call inviter.cancel() when state is Establishing', () => {
       const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
       inviterStub.state = 'Establishing';
       adapter.hangup('call-1', {});
       assert(inviterStub.cancel.calledOnce);
@@ -596,7 +638,7 @@ describe('SipSignalingAdapter', () => {
   describe('reinvite()', () => {
     it('should call session.invite() for established sessions', () => {
       const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
       inviterStub.state = 'Established';
       adapter.reinvite('call-1', { sdp: 'new-sdp' });
       // session.invite is the re-INVITE call (distinct from inviter.invite for initial INVITE)
@@ -611,7 +653,7 @@ describe('SipSignalingAdapter', () => {
 
     it('should emit "answer" on requestDelegate.onAccept', (done) => {
       const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
       inviterStub.state = 'Established';
       adapter.on('answer', (payload: any) => {
         assert.strictEqual(payload.callsid, 'call-1');
@@ -624,7 +666,7 @@ describe('SipSignalingAdapter', () => {
 
     it('should warn but not throw on requestDelegate.onReject', () => {
       const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
       inviterStub.state = 'Established';
       adapter.reinvite('call-1', { sdp: 'new-sdp' });
       const rd = inviterStub.invite.lastCall.args[0]?.requestDelegate;
@@ -635,7 +677,7 @@ describe('SipSignalingAdapter', () => {
   describe('dtmf()', () => {
     it('should call session.info() for each digit', async () => {
       const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
       inviterStub.state = 'Established';
       adapter.dtmf('call-1', { digits: '12' });
       // Allow async sends to complete
@@ -652,7 +694,7 @@ describe('SipSignalingAdapter', () => {
   describe('sendMessage()', () => {
     it('should call session.message() and emit "ack"', (done) => {
       const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
       inviterStub.state = 'Established';
       adapter.on('ack', (payload: any) => {
         assert.strictEqual(payload.acktype, 'message');
@@ -669,7 +711,7 @@ describe('SipSignalingAdapter', () => {
       const { adapter } = createAdapter({
         createInviter() { return failInviterStub as any; },
       });
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
       failInviterStub._simulateState('Established');
       adapter.on('error', (payload: any) => {
         assert.strictEqual(payload.voiceeventsid, 'evt-1');
@@ -687,7 +729,7 @@ describe('SipSignalingAdapter', () => {
   describe('lifecycle cleanup', () => {
     it('destroy() should bye established sessions and clear maps', () => {
       const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
       inviterStub.state = 'Established';
       adapter.destroy();
       assert(inviterStub.bye.calledOnce);
@@ -696,10 +738,44 @@ describe('SipSignalingAdapter', () => {
     it('transport disconnect should clear session maps', () => {
       const { adapter, uaStub, inviterStub } = createAdapter();
       uaStub._triggerConnect();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob' });
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: pc() });
       uaStub._triggerDisconnect();
       // Session map cleared — hangup should not find session
       assert.doesNotThrow(() => adapter.hangup('call-1', {}));
+    });
+  });
+
+  describe('sessionDescriptionHandlerFactory', () => {
+    it('should construct a real SipSessionDescriptionHandler with the bound PeerConnection and callSid', () => {
+      const { adapter, inviterStub, getSdhFactory } = createAdapter();
+      const peerConnection = pc();
+      adapter.invite('call-abc', { sdp: 'sdp', params: 'To=bob', peerConnection });
+      const sdh = getSdhFactory()(inviterStub);
+      assert(sdh instanceof SipSessionDescriptionHandler);
+      // Drive the SDH through getDescription to prove it delegates to the bound PC.
+      sdh.getDescription();
+      const makeOutgoingCall = peerConnection.makeOutgoingCall as sinon.SinonStub;
+      assert(makeOutgoingCall.calledOnce);
+      assert.strictEqual(makeOutgoingCall.firstCall.args[0], 'call-abc');
+    });
+
+    it('should throw if no binding is registered for the session', () => {
+      const { getSdhFactory, inviterStub } = createAdapter();
+      assert.throws(() => getSdhFactory()(inviterStub), /no PeerConnection binding/);
+    });
+
+    it('should bind on answer() for inbound calls', () => {
+      const { adapter, uaStub, getSdhFactory } = createAdapter();
+      const invitation = createInvitationStub();
+      uaStub._triggerInvite(invitation);
+      const peerConnection = pc();
+      adapter.answer('CA-test-call-sid', { sdp: 'sdp-offer', peerConnection });
+      const sdh = getSdhFactory()(invitation);
+      assert(sdh instanceof SipSessionDescriptionHandler);
+      sdh.setDescription('v=0\r\no=remote\r\n');
+      const answerIncomingCall = peerConnection.answerIncomingCall as sinon.SinonStub;
+      assert(answerIncomingCall.calledOnce);
+      assert.strictEqual(answerIncomingCall.firstCall.args[0], 'CA-test-call-sid');
     });
   });
 });
