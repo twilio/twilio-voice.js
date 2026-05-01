@@ -1,5 +1,13 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.18.3 (In Progress)
+=======================
+
+Bug Fixes
+---------
+
+- Fixed an issue where preflight report samples contained `NaN` or `undefined` values for `bytesSent`, `packetsSent`, `bytesReceived`, `packetsReceived`, `packetsLost`, and `jitter` when running on Chrome 141+. Starting in Chrome 141, the `outbound-rtp` stats entry is omitted from `RTCPeerConnection.getStats()` while ICE has not yet connected; counter fields are now initialized to `0` so the sample shape matches pre-141 behavior.
+
 2.18.2 (April 21, 2026)
 =======================
 

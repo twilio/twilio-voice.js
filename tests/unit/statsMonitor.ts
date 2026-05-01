@@ -616,4 +616,77 @@ describe('StatsMonitor', () => {
       });
     });
   });
+
+  // VBLOCKS-6408: end-to-end check that a pre-ICE RTCStatsReport (where
+  // Chrome 141+ omits outbound-rtp) never produces NaN or undefined in any
+  // numeric sample field that the preflight report consumes. Drives the real
+  // getRTCStats pipeline (not the stub used above) through the monitor.
+  describe('VBLOCKS-6408 — pre-ICE sample numeric fields', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const realStats = require('../../lib/twilio/rtc/stats');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const MockRTCStatsReport = require('../../lib/twilio/rtc/mockrtcstatsreport').default;
+    const chrome141Payload = require('../payloads/rtcstatsreport-chrome141-pre-ice.json');
+    const chrome140Payload = require('../payloads/rtcstatsreport-chrome140-pre-ice.json');
+
+    // rtt is intentionally excluded: it's undefined pre-ICE in every Chrome
+    // version (it only becomes a number once a candidate pair exists).
+    const NUMERIC_SAMPLE_KEYS = [
+      'bytesReceived', 'bytesSent', 'jitter',
+      'packetsLost', 'packetsLostFraction',
+      'packetsReceived', 'packetsSent',
+    ];
+    const NUMERIC_TOTAL_KEYS = [
+      'bytesReceived', 'bytesSent',
+      'packetsLost', 'packetsLostFraction',
+      'packetsReceived', 'packetsSent',
+    ];
+
+    function assertAllFinite(sample: any, label: string) {
+      for (const k of NUMERIC_SAMPLE_KEYS) {
+        const v = sample[k];
+        assert.ok(
+          typeof v === 'number' && !isNaN(v),
+          `${label}: sample.${k} expected finite number, got ${v} (type=${typeof v})`,
+        );
+      }
+      for (const k of NUMERIC_TOTAL_KEYS) {
+        const v = sample.totals[k];
+        assert.ok(
+          typeof v === 'number' && !isNaN(v),
+          `${label}: sample.totals.${k} expected finite number, got ${v} (type=${typeof v})`,
+        );
+      }
+    }
+
+    async function collectSamples(payload: any[]): Promise<any[]> {
+      const peerConnection = {
+        getStats: () => Promise.resolve(MockRTCStatsReport.fromArray(payload)),
+      };
+      const samples: any[] = [];
+      const statsMonitor = new StatsMonitor({
+        getRTCStats: () => realStats.getRTCStats(peerConnection),
+        peerConnection,
+      });
+      statsMonitor.on('sample', (s: any) => samples.push(s));
+
+      await clock.tickAsync(1050);
+      await clock.tickAsync(1050);
+      statsMonitor.disable();
+
+      return samples;
+    }
+
+    it('emits finite numeric fields when Chrome 141 omits outbound-rtp', async () => {
+      const samples = await collectSamples(chrome141Payload);
+      assert.ok(samples.length >= 1, `expected at least one sample, got ${samples.length}`);
+      samples.forEach((s, i) => assertAllFinite(s, `chrome-141 sample[${i}]`));
+    });
+
+    it('emits finite numeric fields when Chrome 140 shape is used', async () => {
+      const samples = await collectSamples(chrome140Payload);
+      assert.ok(samples.length >= 1);
+      samples.forEach((s, i) => assertAllFinite(s, `chrome-140 sample[${i}]`));
+    });
+  });
 });

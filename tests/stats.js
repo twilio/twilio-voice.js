@@ -7,6 +7,8 @@ const ffPayload = require('./payloads/rtcstatsreport-ff.json');
 const legacyPayload = require('./payloads/rtcstatsresponse.json');
 const withTransportPayload = require('./payloads/rtcstatsreport-with-transport.json');
 const withoutTransportPayload = require('./payloads/rtcstatsreport-without-transport.json');
+const chrome141PreIcePayload = require('./payloads/rtcstatsreport-chrome141-pre-ice.json');
+const chrome140PreIcePayload = require('./payloads/rtcstatsreport-chrome140-pre-ice.json');
 const withTransportSpec = require('./spec/rtcicecandidates-with-transport.json');
 const withoutTransportSpec = require('./spec/rtcicecandidates-without-transport.json');
 const MockRTCStatsReport = require('../lib/twilio/rtc/mockrtcstatsreport').default;
@@ -216,6 +218,52 @@ describe('Stats Report', () => {
           localAddress: '107.20.226.156',
           remoteAddress: '54.172.60.181'
         });
+      });
+    });
+
+    // VBLOCKS-6408: Chrome 141+ omits the outbound-rtp stats entry while ICE
+    // has not yet connected. Before 141, the entry was present with
+    // zero-valued counters. Without zero-init, the missing fields propagate
+    // as `undefined` into StatsMonitor arithmetic, producing NaN in the
+    // preflight report.
+    context('In Chrome 141+ before ICE connects (outbound-rtp absent)', () => {
+      let stats;
+
+      before(() => {
+        const statsReport = MockRTCStatsReport.fromArray(chrome141PreIcePayload);
+        const peerConnection = { getStats() { return Promise.resolve(statsReport); } };
+        return getRTCStats(peerConnection).then(_stats => { stats = _stats; });
+      });
+
+      it('should default bytesSent and packetsSent to 0 when outbound-rtp is absent', () => {
+        assert.strictEqual(stats.bytesSent, 0);
+        assert.strictEqual(stats.packetsSent, 0);
+      });
+
+      it('should default bytesReceived / packetsReceived / packetsLost / jitter to 0 when inbound-rtp is absent', () => {
+        assert.strictEqual(stats.bytesReceived, 0);
+        assert.strictEqual(stats.packetsReceived, 0);
+        assert.strictEqual(stats.packetsLost, 0);
+        assert.strictEqual(stats.jitter, 0);
+      });
+    });
+
+    context('In Chrome 140 before ICE connects (outbound-rtp present with zeros)', () => {
+      let stats;
+
+      before(() => {
+        const statsReport = MockRTCStatsReport.fromArray(chrome140PreIcePayload);
+        const peerConnection = { getStats() { return Promise.resolve(statsReport); } };
+        return getRTCStats(peerConnection).then(_stats => { stats = _stats; });
+      });
+
+      it('should produce the same zero-valued counters as Chrome 141 path', () => {
+        assert.strictEqual(stats.bytesSent, 0);
+        assert.strictEqual(stats.packetsSent, 0);
+        assert.strictEqual(stats.bytesReceived, 0);
+        assert.strictEqual(stats.packetsReceived, 0);
+        assert.strictEqual(stats.packetsLost, 0);
+        assert.strictEqual(stats.jitter, 0);
       });
     });
   });

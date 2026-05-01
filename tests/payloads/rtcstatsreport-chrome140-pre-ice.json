@@ -1,0 +1,39 @@
+[
+  {
+    "id": "AP",
+    "timestamp": 1777589643419,
+    "type": "media-playout",
+    "kind": "audio"
+  },
+  {
+    "id": "CF01",
+    "timestamp": 1777589643419,
+    "type": "certificate"
+  },
+  {
+    "id": "OT01A",
+    "timestamp": 1777589643419,
+    "type": "outbound-rtp",
+    "kind": "audio",
+    "mediaType": "audio",
+    "ssrc": 3710253417,
+    "transportId": "T01",
+    "bytesSent": 0,
+    "packetsSent": 0
+  },
+  {
+    "id": "P",
+    "timestamp": 1777589643419,
+    "type": "peer-connection"
+  },
+  {
+    "id": "T01",
+    "timestamp": 1777589643419,
+    "type": "transport",
+    "bytesReceived": 0,
+    "bytesSent": 0,
+    "iceState": "new",
+    "packetsReceived": 0,
+    "packetsSent": 0
+  }
+]

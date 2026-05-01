@@ -12,3 +12,6 @@ docs
 lib/twilio/constants.ts
 nodemon.json
 reports
+scripts/debugging
+cypress/downloads
+cypress/screenshots

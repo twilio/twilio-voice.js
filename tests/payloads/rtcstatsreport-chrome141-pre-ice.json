@@ -1,0 +1,30 @@
+[
+  {
+    "id": "AP",
+    "timestamp": 1777589652409,
+    "type": "media-playout",
+    "kind": "audio"
+  },
+  {
+    "id": "CF01",
+    "timestamp": 1777589652409,
+    "type": "certificate"
+  },
+  {
+    "id": "P",
+    "timestamp": 1777589652409,
+    "type": "peer-connection",
+    "dataChannelsClosed": 0,
+    "dataChannelsOpened": 0
+  },
+  {
+    "id": "T01",
+    "timestamp": 1777589652409,
+    "type": "transport",
+    "bytesReceived": 0,
+    "bytesSent": 0,
+    "iceState": "new",
+    "packetsReceived": 0,
+    "packetsSent": 0
+  }
+]
