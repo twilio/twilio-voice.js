@@ -103,7 +103,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       authorizationUsername: options.credentials.username,
       authorizationPassword: options.credentials.password,
       sessionDescriptionHandlerFactory: (session: Session) => {
-        const binding = this._consumeSdhBinding(session);
+        const binding = this._getSdhBinding(session);
         return new SipSessionDescriptionHandler(
           binding.peerConnection,
           binding.callSid,
@@ -483,7 +483,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     });
   }
 
-  private _consumeSdhBinding(session: Session): SdhBinding {
+  private _getSdhBinding(session: Session): SdhBinding {
     const binding = this._sessionBindings.get(session);
     if (!binding) {
       throw new Error('SipSignalingAdapter: no PeerConnection binding registered for SIP session');

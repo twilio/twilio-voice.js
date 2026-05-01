@@ -1587,9 +1587,16 @@ class Device extends EventEmitter {
       // plain `sip:user@host` or `sip:user@host:port` forms; URIs with
       // parameters (e.g. `;transport=tcp`) would parse incorrectly. Twilio-
       // issued SIP URIs don't carry parameters today — revisit if that changes.
-      const parsedUri = new URL(sipOpts.sipUri.replace(/^sip:/, 'http://'));
+      let parsedUri: URL;
+      try {
+        parsedUri = new URL(sipOpts.sipUri.replace(/^sip:/, 'http://'));
+      } catch {
+        throw new InvalidArgumentError(
+          '`signalingOptions.sipUri` must be a valid SIP URI of the form `sip:user@host` or `sip:user@host:port`',
+        );
+      }
       return new SipSignalingAdapter({
-        sipDomain: parsedUri.hostname,
+        sipDomain: parsedUri.host,
         sipUri: sipOpts.sipUri,
         sipTransportServer: sipOpts.sipServer,
         credentials: sipOpts.sipCredentials,

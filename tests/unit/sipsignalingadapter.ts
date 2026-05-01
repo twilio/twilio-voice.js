@@ -6,6 +6,7 @@ import { IPeerConnection, SipSessionDescriptionHandler } from '../../lib/twilio/
 
 function createPeerConnectionStub(): IPeerConnection {
   return {
+    onerror: () => { /* replaced by SDH constructor when used */ },
     makeOutgoingCall: sinon.stub(),
     answerIncomingCall: sinon.stub(),
     processAnswer: sinon.stub(),

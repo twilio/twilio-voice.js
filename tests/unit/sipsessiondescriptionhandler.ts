@@ -19,6 +19,7 @@ interface PcStub extends IPeerConnection {
 
 function createPeerConnectionStub(overrides: Partial<PcStub> = {}): PcStub {
   const stub: PcStub = {
+    onerror: () => { /* replaced by SDH constructor */ },
     makeOutgoingCall: sinon.stub(),
     answerIncomingCall: sinon.stub(),
     processAnswer: sinon.stub(),
@@ -147,6 +148,78 @@ describe('SipSessionDescriptionHandler', () => {
       const { handler } = createHandler(pc);
       handler.close();
       sinon.assert.calledOnce(pc.close);
+    });
+
+    it('rejects any pending operation promises', async () => {
+      const pc = createPeerConnectionStub(); // makeOutgoingCall never calls back
+      const { handler } = createHandler(pc);
+      const pending = handler.getDescription();
+      handler.close();
+      await assert.rejects(pending, /closed/);
+    });
+  });
+
+  describe('error propagation', () => {
+    it('rejects getDescription if pc.onerror fires before the callback', async () => {
+      const pc = createPeerConnectionStub();
+      const { handler } = createHandler(pc);
+      const pending = handler.getDescription();
+      const twilioError = new Error('media failure');
+      pc.onerror({ info: { code: 31000, message: 'media failure', twilioError } });
+      await assert.rejects(pending, /media failure/);
+    });
+
+    it('rejects with the twilioError instance when one is provided', async () => {
+      class FakeTwilioError extends Error { constructor() { super('twilio-flavored'); } }
+      const twilioError = new FakeTwilioError();
+      const pc = createPeerConnectionStub();
+      const { handler } = createHandler(pc);
+      const pending = handler.getDescription();
+      pc.onerror({ info: { code: 31000, message: 'ignored', twilioError } });
+      await assert.rejects(pending, (err: Error) => err === twilioError);
+    });
+
+    it('rejects setDescription (processAnswer path) if pc.onerror fires', async () => {
+      const pc = createPeerConnectionStub({
+        makeOutgoingCall: sinon.stub().callsFake(
+          (_sid: string, _cfg: RTCConfiguration, cb: (sdp: string) => void) => cb(OFFER_SDP),
+        ) as sinon.SinonStub,
+      });
+      const { handler } = createHandler(pc);
+      await handler.getDescription();
+      const pending = handler.setDescription(ANSWER_SDP);
+      pc.onerror({ info: { code: 31000, message: 'answer failed' } });
+      await assert.rejects(pending, /answer failed/);
+    });
+
+    it('rejects setDescription (answerIncomingCall path) if pc.onerror fires', async () => {
+      const pc = createPeerConnectionStub();
+      const { handler } = createHandler(pc);
+      const pending = handler.setDescription(OFFER_SDP);
+      pc.onerror({ info: { code: 31000, message: 'answer creation failed' } });
+      await assert.rejects(pending, /answer creation failed/);
+    });
+
+    it('still invokes the previous onerror handler (so Call can emit error)', () => {
+      const previousOnError = sinon.spy();
+      const pc = createPeerConnectionStub({ onerror: previousOnError });
+      createHandler(pc);
+      const errorPayload = { info: { code: 31000, message: 'boom' } };
+      pc.onerror(errorPayload);
+      sinon.assert.calledOnceWithExactly(previousOnError, errorPayload);
+    });
+
+    it('does not reject after the operation resolves', async () => {
+      const pc = createPeerConnectionStub({
+        makeOutgoingCall: sinon.stub().callsFake(
+          (_sid: string, _cfg: RTCConfiguration, cb: (sdp: string) => void) => cb(OFFER_SDP),
+        ) as sinon.SinonStub,
+      });
+      const { handler } = createHandler(pc);
+      const description = await handler.getDescription();
+      assert.strictEqual(description.body, OFFER_SDP);
+      // Firing onerror after the Promise resolved must not throw or cause issues.
+      assert.doesNotThrow(() => pc.onerror({ info: { code: 31000, message: 'late error' } }));
     });
   });
 

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { IPeerConnection } from './sipsessiondescriptionhandler';
+import type { IPeerConnection } from './sipsessiondescriptionhandler';
 
 export type SignalingAdapterStatus = 'disconnected' | 'connected' | 'ready' | 'offline';
 
