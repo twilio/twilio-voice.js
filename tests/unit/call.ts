@@ -2066,6 +2066,16 @@ describe('Call', function() {
           });
         });
       });
+
+      it('should not call pstream.reconnect when CallSid is missing', async () => {
+        conn = new Call(config, Object.assign(options));
+        conn.accept();
+        await clock.tickAsync(0);
+        // @ts-ignore
+        conn._signalingReconnectToken = 'foo';
+        pstream.emit('connected');
+        sinon.assert.notCalled(pstream.reconnect);
+      });
     });
 
     describe('pstream.answer event', () => {
@@ -2639,6 +2649,14 @@ describe('Call', function() {
       Util.isChrome = sinon.stub().returns(true);
     });
 
+    it('should not attempt media reconnect when version is null', () => {
+      mediaHandler.version = null;
+      const callback = sinon.stub();
+      conn.on('reconnecting', callback);
+      mediaHandler.onfailed();
+      sinon.assert.notCalled(callback);
+    });
+
     context('on ICE Gathering failures', () => {
       it('should emit reconnecting', () => {
         const callback = sinon.stub();
@@ -2752,6 +2770,14 @@ describe('Call', function() {
       mediaHandler.onconnected();
 
       sinon.assert.callCount(callback, 1);
+    });
+
+    it('should not call reinvite when CallSid is not set', () => {
+      conn = new Call(config, Object.assign(options));
+      conn.parameters = {};
+      mediaHandler.iceRestart = sinon.spy((cb: Function) => cb('offer-sdp'));
+      conn['_mediaReconnectBackoff'].emit('ready');
+      sinon.assert.notCalled(pstream.reinvite);
     });
   });
 });

@@ -388,10 +388,15 @@ class Call extends EventEmitter {
           this._signalingAdapter.removeListener('hangup', onHangup);
         };
 
+        const callSid = this.parameters.CallSid;
+        if (!callSid) {
+          this._log.warn('Cannot reinvite: CallSid is not set');
+          return;
+        }
         this._signalingAdapter.on('answer', onAnswerOrRinging);
         this._signalingAdapter.on('hangup', onHangup);
         const reinviteConfig: ReinviteConfig = { sdp: offerSdp };
-        this._signalingAdapter.reinvite(this.parameters.CallSid, reinviteConfig);
+        this._signalingAdapter.reinvite(callSid, reinviteConfig);
       });
     });
 
@@ -1068,7 +1073,7 @@ class Call extends EventEmitter {
     }
 
     const callSid = this.parameters.CallSid;
-    if (typeof this.parameters.CallSid === 'undefined') {
+    if (!callSid) {
       throw new InvalidStateError(
         'Could not send CallMessage; Call has no CallSid',
       );
@@ -1077,7 +1082,7 @@ class Call extends EventEmitter {
     const voiceEventSid = this._voiceEventSidGenerator();
     this._messages.set(voiceEventSid, { content, contentType, messageType, voiceEventSid });
     const sendMessageConfig: SendMessageConfig = { content, contentType, messageType, voiceEventSid };
-    this._signalingAdapter.sendMessage(callSid!, sendMessageConfig);
+    this._signalingAdapter.sendMessage(callSid, sendMessageConfig);
     return voiceEventSid;
   }
 
@@ -1332,12 +1337,13 @@ class Call extends EventEmitter {
    */
   private _onConnected = (): void => {
     this._log.info('Received connected from pstream');
-    if (this._signalingReconnectToken && this._mediaHandler.version) {
+    const callSid = this.parameters.CallSid;
+    if (this._signalingReconnectToken && this._mediaHandler.version && callSid) {
       const reconnectConfig: ReconnectConfig = {
         sdp: this._mediaHandler.version.getSDP(),
         reconnectToken: this._signalingReconnectToken,
       };
-      this._signalingAdapter.reconnect(this.parameters.CallSid, reconnectConfig);
+      this._signalingAdapter.reconnect(callSid, reconnectConfig);
     }
   }
 
@@ -1433,6 +1439,10 @@ class Call extends EventEmitter {
       return;
     }
 
+    if (!this._mediaHandler.version) {
+      this._log.warn('Cannot handle media failure: version is not set');
+      return;
+    }
     const pc = this._mediaHandler.version.pc;
     const isIceDisconnected = pc && pc.iceConnectionState === 'disconnected';
     const hasLowBytesWarning = this._monitor.hasActiveWarning('bytesSent', 'min')
