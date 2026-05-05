@@ -136,7 +136,18 @@ function getRTCIceCandidateStatsReport(peerConnection) {
  * @property {Number} [localAddress]
  * @property {Number} [remoteAddress]
  */
-function RTCSample() { }
+function RTCSample() {
+  // Chrome 141+ omits the outbound-rtp (and sometimes inbound-rtp) stats
+  // entry while ICE has not yet connected. Pre-populating counter fields
+  // with 0 preserves the pre-141 sample shape so downstream arithmetic in
+  // StatsMonitor._createSample doesn't produce NaN.
+  this.bytesReceived = 0;
+  this.bytesSent = 0;
+  this.jitter = 0;
+  this.packetsLost = 0;
+  this.packetsReceived = 0;
+  this.packetsSent = 0;
+}
 
 /**
  * Create an RTCSample object from an RTCStatsReport
