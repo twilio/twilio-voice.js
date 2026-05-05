@@ -5,6 +5,7 @@ import {
   InviterOptions,
   Registerer,
   RegistererState,
+  SessionDescriptionHandler,
   Session,
   SessionState,
   URI,
@@ -63,6 +64,25 @@ interface SdhBinding {
 }
 
 /**
+ * Fallback SDH returned from the factory when no binding is registered
+ * for a session. Every operation rejects with a clear error so SIP.js's
+ * Promise-based accept/invite paths fail cleanly instead of crashing
+ * synchronously inside setupSessionDescriptionHandler.
+ */
+function createUnboundSdh(): SessionDescriptionHandler {
+  const reject = () => Promise.reject(
+    new Error('SipSignalingAdapter: no PeerConnection binding registered for SIP session'),
+  );
+  return {
+    getDescription: reject,
+    hasDescription: () => false,
+    setDescription: reject,
+    sendDtmf: () => false,
+    close: () => { /* no-op */ },
+  };
+}
+
+/**
  * SignalingAdapter implementation backed by SIP.js. Handles WebSocket
  * connection, SIP registration lifecycle, and call-level signaling
  * (INVITE, BYE, re-INVITE, INFO, MESSAGE).
@@ -103,7 +123,17 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       authorizationUsername: options.credentials.username,
       authorizationPassword: options.credentials.password,
       sessionDescriptionHandlerFactory: (session: Session) => {
-        const binding = this._getSdhBinding(session);
+        // Throwing here would bubble through SIP.js's synchronous setup path
+        // (session.js setupSessionDescriptionHandler) in non-obvious ways. If
+        // the binding is missing (programming error — answer() forgot to bind,
+        // or SIP.js calls the factory earlier than expected), return a
+        // fail-safe SDH that rejects every Promise. SIP.js catches rejections
+        // in setOfferAndGetAnswer/getOffer, so the session terminates cleanly.
+        const binding = this._sessionBindings.get(session);
+        if (!binding) {
+          this._log.error('sessionDescriptionHandlerFactory: no binding for session');
+          return createUnboundSdh();
+        }
         return new SipSessionDescriptionHandler(
           binding.peerConnection,
           binding.callSid,
@@ -279,6 +309,15 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     this._bindSession(invitation, callSid, config);
     invitation.accept().catch((error: Error) => {
       this._log.error('Failed to accept invitation', error);
+      // Drop the half-bound session so a later hangup/retry for this callSid
+      // doesn't dispatch against a Terminated-but-still-mapped invitation.
+      this._inboundSessions.delete(callSid);
+      this._sessionBindings.delete(invitation);
+      // TODO(VBLOCKS-6604): when the SIP.js error carries a response
+      // statusCode (486, 480, 503, ...), translate it through
+      // getPreciseSignalingErrorByCode rather than hardcoding 31000.
+      // Consistent treatment needed across reject()/hangup()/reconnect()/
+      // sendMessage() as well.
       this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
     });
   }
@@ -338,7 +377,6 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   reconnect(callSid: string, config: ReconnectConfig): void {
     this._sendInvite(callSid, {
       sdp: config.sdp,
-      params: '',
       peerConnection: config.peerConnection,
       rtcConfiguration: config.rtcConfiguration,
     }, config.reconnectToken);
@@ -483,14 +521,6 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     });
   }
 
-  private _getSdhBinding(session: Session): SdhBinding {
-    const binding = this._sessionBindings.get(session);
-    if (!binding) {
-      throw new Error('SipSignalingAdapter: no PeerConnection binding registered for SIP session');
-    }
-    return binding;
-  }
-
   private _handleIncomingInvite(invitation: Invitation): void {
     const callSid = invitation.request.getHeader('X-Twilio-CallSid');
     if (!callSid) {
@@ -579,6 +609,13 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
           if (serverCallSid && serverCallSid !== callSid) {
             this._outboundSessions.delete(callSid);
             this._outboundSessions.set(serverCallSid, inviter);
+            // Keep the SdhBinding in sync so any future reader (debug
+            // logging, SDH refactors that construct lazily) sees the
+            // server-issued CallSid rather than the client temp sid.
+            const binding = this._sessionBindings.get(inviter);
+            if (binding) {
+              binding.callSid = serverCallSid;
+            }
             callSid = serverCallSid;
           }
           const payload: Record<string, any> = {

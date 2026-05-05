@@ -1589,14 +1589,21 @@ class Device extends EventEmitter {
       // issued SIP URIs don't carry parameters today — revisit if that changes.
       let parsedUri: URL;
       try {
-        parsedUri = new URL(sipOpts.sipUri.replace(/^sip:/, 'http://'));
+        // Case-insensitive scheme match — RFC 3261 allows `SIP:` as well.
+        // `sips:` is not supported: Twilio's SIP-over-WebSocket relies on
+        // the WSS transport for security, and Twilio-issued URIs use `sip:`.
+        parsedUri = new URL(sipOpts.sipUri.replace(/^sip:/i, 'http://'));
       } catch {
         throw new InvalidArgumentError(
           '`signalingOptions.sipUri` must be a valid SIP URI of the form `sip:user@host` or `sip:user@host:port`',
         );
       }
       return new SipSignalingAdapter({
-        sipDomain: parsedUri.host,
+        // Use hostname (not host) so any port in the sipUri is dropped —
+        // the target Request-URI should be `sip:host`, with transport/port
+        // handled by the WebSocket transport config. Twilio-issued SIP URIs
+        // don't currently carry ports.
+        sipDomain: parsedUri.hostname,
         sipUri: sipOpts.sipUri,
         sipTransportServer: sipOpts.sipServer,
         credentials: sipOpts.sipCredentials,

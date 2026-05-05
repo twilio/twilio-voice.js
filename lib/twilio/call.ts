@@ -189,6 +189,14 @@ class Call extends EventEmitter {
   private _isAnswered: boolean = false;
 
   /**
+   * Whether the SIP-path onopen wrapper has already been installed. Guards
+   * against repeated `accept()` invocations chaining wrappers onto the
+   * previous one (each layer would retain its own onAnswerFired closure
+   * and fire independently against stale state).
+   */
+  private _sipOnOpenWrapped: boolean = false;
+
+  /**
    * Whether the call has been cancelled.
    */
   private _isCancelled: boolean = false;
@@ -689,9 +697,11 @@ class Call extends EventEmitter {
 
       const callSid = this.parameters.CallSid;
 
-      if (this._options.useSip) {
+      if (this._options.useSip && !this._sipOnOpenWrapped) {
         // PeerConnection.onopen fires from multiple stable-state observers,
-        // so we gate onAnswer to a single call.
+        // so we gate onAnswer to a single call. _sipOnOpenWrapped prevents a
+        // repeat accept() from chaining another wrapper over this one.
+        this._sipOnOpenWrapped = true;
         const previousOnOpen = this._mediaHandler.onopen;
         let onAnswerFired = false;
         this._mediaHandler.onopen = () => {
@@ -709,8 +719,9 @@ class Call extends EventEmitter {
 
       const answerViaSip = () => {
         this._isAnswered = true;
+        // SDP intentionally omitted: the SIP adapter derives the answer
+        // from the invitation body via its SDH, not from the caller.
         this._signalingAdapter.answer(callSid, {
-          sdp: this._options.offerSdp || '',
           peerConnection: this._mediaHandler,
           rtcConfiguration,
         });
@@ -739,9 +750,11 @@ class Call extends EventEmitter {
           };
           this._signalingAdapter.reconnect(outgoingCallSid, reconnectConfig);
         } else {
+          // params are intentionally omitted: the SIP adapter does not
+          // currently embed caller-supplied params in the INVITE. If/when
+          // that's added, pass them as extraHeaders through InviteConfig.
           const inviteConfig: InviteConfig = {
             sdp: '',
-            params,
             peerConnection: this._mediaHandler,
             rtcConfiguration,
           };

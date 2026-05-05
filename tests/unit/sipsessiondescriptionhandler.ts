@@ -92,6 +92,38 @@ describe('SipSessionDescriptionHandler', () => {
       assert.strictEqual(pc.processAnswer.firstCall.args[0], ANSWER_SDP);
       sinon.assert.notCalled(pc.answerIncomingCall);
     });
+
+    it('routes a subsequent inbound re-INVITE through answerIncomingCall (hasSentOffer resets after exchange)', async () => {
+      // SIP.js memoizes the SDH on the Session, so the same SDH may see a
+      // follow-up inbound re-INVITE after an outbound exchange completes.
+      const pc = createPeerConnectionStub({
+        makeOutgoingCall: sinon.stub().callsFake(
+          (_sid: string, _cfg: RTCConfiguration, cb: (sdp: string) => void) => cb(OFFER_SDP),
+        ) as sinon.SinonStub,
+        processAnswer: sinon.stub().callsFake(
+          (_sdp: string, cb: (pc: RTCPeerConnection) => void) => cb({} as RTCPeerConnection),
+        ) as sinon.SinonStub,
+        answerIncomingCall: sinon.stub().callsFake(
+          (
+            _sid: string,
+            _sdp: string,
+            _cfg: RTCConfiguration,
+            onAnswerReady: (answer: string) => void,
+            onMediaStarted: (pc: RTCPeerConnection) => void,
+          ) => {
+            onAnswerReady(ANSWER_SDP);
+            onMediaStarted({} as RTCPeerConnection);
+          },
+        ) as sinon.SinonStub,
+      });
+      const { handler } = createHandler(pc);
+      // Outbound exchange: offer -> answer.
+      await handler.getDescription();
+      await handler.setDescription(ANSWER_SDP);
+      // Simulated inbound re-INVITE: remote sends us an offer.
+      await handler.setDescription(OFFER_SDP);
+      sinon.assert.calledOnce(pc.answerIncomingCall);
+    });
   });
 
   describe('setDescription without prior offer (inbound)', () => {
@@ -143,11 +175,11 @@ describe('SipSessionDescriptionHandler', () => {
   });
 
   describe('close', () => {
-    it('delegates to pc.close', () => {
+    it('does not close the PeerConnection (Call owns its lifecycle)', () => {
       const pc = createPeerConnectionStub();
       const { handler } = createHandler(pc);
       handler.close();
-      sinon.assert.calledOnce(pc.close);
+      sinon.assert.notCalled(pc.close);
     });
 
     it('rejects any pending operation promises', async () => {
@@ -207,6 +239,20 @@ describe('SipSessionDescriptionHandler', () => {
       const errorPayload = { info: { code: 31000, message: 'boom' } };
       pc.onerror(errorPayload);
       sinon.assert.calledOnceWithExactly(previousOnError, errorPayload);
+    });
+
+    it('rejects every concurrently-pending operation when pc.onerror fires', async () => {
+      // SIP.js can issue overlapping setDescription calls (PRACK/UPDATE
+      // during early media); all pending Promises must settle on error.
+      const pc = createPeerConnectionStub(); // no callbacks fire — both ops stay pending
+      const { handler } = createHandler(pc);
+      const first = handler.getDescription();
+      const second = handler.setDescription(OFFER_SDP);
+      pc.onerror({ info: { code: 31000, message: 'bulk failure' } });
+      await Promise.all([
+        assert.rejects(first, /bulk failure/),
+        assert.rejects(second, /bulk failure/),
+      ]);
     });
 
     it('does not reject after the operation resolves', async () => {

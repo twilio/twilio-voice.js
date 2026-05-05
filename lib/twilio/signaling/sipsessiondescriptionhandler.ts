@@ -64,9 +64,11 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   private _cachedAnswer: string | null = null;
   private _hasSentOffer: boolean = false;
   // PeerConnection reports failures via onerror, not the success callbacks
-  // we pass in. When an operation is pending we store its reject handler
-  // here; the onerror hook in the constructor triggers it.
-  private _rejectPending: ((error: Error) => void) | null = null;
+  // we pass in. Every in-flight operation adds its reject handler here;
+  // the onerror hook in the constructor rejects all of them. SIP.js can
+  // issue overlapping setDescription calls (e.g. PRACK/UPDATE during early
+  // media), so a single-slot field would let earlier Promises hang.
+  private _pendingRejects: Set<(error: Error) => void> = new Set();
 
   constructor(
     private _pc: IPeerConnection,
@@ -101,7 +103,14 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   setDescription(sdp: string): Promise<void> {
     if (this._hasSentOffer) {
       return this._awaitOperation<void>((resolve) => {
-        this._pc.processAnswer(sdp, () => resolve());
+        this._pc.processAnswer(sdp, () => {
+          // Outbound offer/answer exchange complete. Clear the flag so a
+          // subsequent re-INVITE on the same session (SIP.js memoizes the
+          // SDH per Session) can route correctly — inbound re-INVITE must
+          // go down answerIncomingCall, outbound must set the flag again.
+          this._hasSentOffer = false;
+          resolve();
+        });
       });
     }
     return this._awaitOperation<void>((resolve) => {
@@ -116,29 +125,32 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   }
 
   close(): void {
+    // Call owns the PeerConnection lifecycle and closes it in its own
+    // teardown paths. SIP.js invokes close() on the SDH at session end —
+    // we must NOT close the PC here, or it would be closed twice (risking
+    // duplicate close events or log warnings on torn-down handlers).
     this._failPending(new Error('SipSessionDescriptionHandler closed'));
-    this._pc.close();
   }
 
   sendDtmf(_tones: string): boolean {
+    // DTMF is routed through SipSignalingAdapter.dtmf() as SIP INFO, not
+    // the SDH path. Returning false tells SIP.js "I don't implement DTMF."
     return false;
   }
 
   private _awaitOperation<T>(start: (resolve: (value: T) => void) => void): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      this._rejectPending = reject;
+      this._pendingRejects.add(reject);
       start((value) => {
-        this._rejectPending = null;
+        this._pendingRejects.delete(reject);
         resolve(value);
       });
     });
   }
 
   private _failPending(error: Error): void {
-    const reject = this._rejectPending;
-    if (reject) {
-      this._rejectPending = null;
-      reject(error);
-    }
+    const rejects = Array.from(this._pendingRejects);
+    this._pendingRejects.clear();
+    rejects.forEach((reject) => reject(error));
   }
 }

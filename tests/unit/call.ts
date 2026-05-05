@@ -754,6 +754,32 @@ describe('Call', function() {
           });
         });
 
+        it('should install the onopen wrapper at most once across repeat accept() calls', () => {
+          conn.accept();
+          return wait.then(() => {
+            const afterFirst = mediaHandler.onopen;
+            // Force the Call back to Pending so a second accept() actually
+            // proceeds. This simulates any future bug where accept's guard is
+            // bypassed; the wrapper must NOT chain a second layer.
+            (conn as any)._status = Call.State.Pending;
+            conn.accept();
+            return wait.then(() => {
+              assert.strictEqual(mediaHandler.onopen, afterFirst,
+                'onopen should not have been re-wrapped on the second accept()');
+              // Also verify firing it once fires onAnswer exactly once (not
+              // twice from stacked wrappers).
+              const publisherInfo = publisher.info as sinon.SinonSpy;
+              publisherInfo.resetHistory();
+              mediaHandler.onopen();
+              const answeredCalls = publisherInfo.getCalls().filter(
+                (c: sinon.SinonSpyCall) => c.args[1] === 'accepted-by-remote' || c.args[1] === 'accepted-by-local',
+              );
+              assert.strictEqual(answeredCalls.length, 1,
+                'onAnswer should fire once, not once per stacked wrapper');
+            });
+          });
+        });
+
         it('should call signalingAdapter.reconnect when reconnectToken is set', () => {
           setupSip({ reconnectToken: 'testReconnectToken' });
           conn.accept();
@@ -771,13 +797,13 @@ describe('Call', function() {
           setupSip({ callParameters: { CallSid: 'CA-inbound' }, offerSdp: 'remote-offer-sdp' });
         });
 
-        it('should call signalingAdapter.answer with peerConnection and the remote offer sdp', () => {
+        it('should call signalingAdapter.answer with peerConnection and no sdp (SDH derives it)', () => {
           conn.accept();
           return wait.then(() => {
             sinon.assert.calledOnce(pstream.answer);
             const answerConfig = pstream.answer.args[0][1];
             assert.strictEqual(answerConfig.peerConnection, mediaHandler);
-            assert.strictEqual(answerConfig.sdp, 'remote-offer-sdp');
+            assert.strictEqual(answerConfig.sdp, undefined);
           });
         });
 
