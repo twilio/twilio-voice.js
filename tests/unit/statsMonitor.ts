@@ -685,7 +685,7 @@ describe('StatsMonitor', () => {
 
     it('emits finite numeric fields when Chrome 140 shape is used', async () => {
       const samples = await collectSamples(chrome140Payload);
-      assert.ok(samples.length >= 1);
+      assert.ok(samples.length >= 1, `expected at least one sample, got ${samples.length}`);
       samples.forEach((s, i) => assertAllFinite(s, `chrome-140 sample[${i}]`));
     });
   });
