@@ -5,6 +5,7 @@ import {
   InviterOptions,
   Registerer,
   RegistererState,
+  SessionDescriptionHandler,
   Session,
   SessionState,
   URI,
@@ -22,6 +23,10 @@ import {
   SignalingAdapterStatus,
   SendMessageConfig,
 } from './signalingadapter';
+import {
+  IPeerConnection,
+  SipSessionDescriptionHandler,
+} from './sipsessiondescriptionhandler';
 
 type SipSendMessageConfig = Pick<SendMessageConfig, 'content' | 'contentType' | 'voiceEventSid'>;
 
@@ -49,24 +54,31 @@ export interface SipSignalingAdapterOptions {
 }
 
 /**
- * A no-op SessionDescriptionHandler for SIP.js. SDP relay through
- * SIP.js is deferred to VBLOCKS-6372 (SipSessionDescriptionHandler).
- * This stub satisfies the SIP.js SDH interface without doing any
- * real media work — actual SDP exchange is handled out-of-band by
- * PeerConnection via Call.ts.
+ * Binding registered on the adapter before a SIP.js Session is created,
+ * carrying everything the SDH factory needs to construct a real SDH.
  */
-function createNoOpSDH(): any {
+interface SdhBinding {
+  callSid: string;
+  peerConnection: IPeerConnection;
+  rtcConfiguration?: RTCConfiguration;
+}
+
+/**
+ * Fallback SDH returned from the factory when no binding is registered
+ * for a session. Every operation rejects with a clear error so SIP.js's
+ * Promise-based accept/invite paths fail cleanly instead of crashing
+ * synchronously inside setupSessionDescriptionHandler.
+ */
+function createUnboundSdh(): SessionDescriptionHandler {
+  const reject = () => Promise.reject(
+    new Error('SipSignalingAdapter: no PeerConnection binding registered for SIP session'),
+  );
   return {
-    close(): void { /* no-op */ },
-    getDescription(): Promise<any> {
-      return Promise.resolve({ body: '', contentType: 'application/sdp' });
-    },
-    hasDescription(contentType: string): boolean {
-      return contentType === 'application/sdp';
-    },
-    setDescription(): Promise<void> {
-      return Promise.resolve();
-    },
+    getDescription: reject,
+    hasDescription: () => false,
+    setDescription: reject,
+    sendDtmf: () => false,
+    close: () => { /* no-op */ },
   };
 }
 
@@ -81,6 +93,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   private _inboundSessions: Map<string, Invitation> = new Map();
   private _outboundSessions: Map<string, Inviter> = new Map();
   private _pendingInvitations: Map<string, Invitation> = new Map();
+  private _sessionBindings: WeakMap<Session, SdhBinding> = new WeakMap();
   private _registerer: any | null = null;
   private _region: string | undefined;
   private _status: SignalingAdapterStatus = 'disconnected';
@@ -109,7 +122,24 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       },
       authorizationUsername: options.credentials.username,
       authorizationPassword: options.credentials.password,
-      sessionDescriptionHandlerFactory: () => createNoOpSDH(),
+      sessionDescriptionHandlerFactory: (session: Session) => {
+        // Throwing here would bubble through SIP.js's synchronous setup path
+        // (session.js setupSessionDescriptionHandler) in non-obvious ways. If
+        // the binding is missing (programming error — answer() forgot to bind,
+        // or SIP.js calls the factory earlier than expected), return a
+        // fail-safe SDH that rejects every Promise. SIP.js catches rejections
+        // in setOfferAndGetAnswer/getOffer, so the session terminates cleanly.
+        const binding = this._sessionBindings.get(session);
+        if (!binding) {
+          this._log.error('sessionDescriptionHandlerFactory: no binding for session');
+          return createUnboundSdh();
+        }
+        return new SipSessionDescriptionHandler(
+          binding.peerConnection,
+          binding.callSid,
+          binding.rtcConfiguration,
+        );
+      },
       delegate: {
         onConnect: () => this._onTransportConnect(),
         onDisconnect: (error?: Error) => this._onTransportDisconnect(error),
@@ -264,8 +294,8 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   // Call signaling
   // ---------------------------------------------------------------------------
 
-  invite(callSid: string, { sdp, params }: InviteConfig): void {
-    this._sendInvite(sdp, callSid, params);
+  invite(callSid: string, config: InviteConfig): void {
+    this._sendInvite(callSid, config);
   }
 
   answer(callSid: string, config: AnswerConfig): void {
@@ -276,8 +306,18 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     }
     this._pendingInvitations.delete(callSid);
     this._inboundSessions.set(callSid, invitation);
+    this._bindSession(invitation, callSid, config);
     invitation.accept().catch((error: Error) => {
       this._log.error('Failed to accept invitation', error);
+      // Drop the half-bound session so a later hangup/retry for this callSid
+      // doesn't dispatch against a Terminated-but-still-mapped invitation.
+      this._inboundSessions.delete(callSid);
+      this._sessionBindings.delete(invitation);
+      // TODO(VBLOCKS-6604): when the SIP.js error carries a response
+      // statusCode (486, 480, 503, ...), translate it through
+      // getPreciseSignalingErrorByCode rather than hardcoding 31000.
+      // Consistent treatment needed across reject()/hangup()/reconnect()/
+      // sendMessage() as well.
       this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
     });
   }
@@ -334,8 +374,12 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     });
   }
 
-  reconnect(callSid: string, { sdp, reconnectToken }: ReconnectConfig): void {
-    this._sendInvite(sdp, callSid, undefined, reconnectToken);
+  reconnect(callSid: string, config: ReconnectConfig): void {
+    this._sendInvite(callSid, {
+      sdp: config.sdp,
+      peerConnection: config.peerConnection,
+      rtcConfiguration: config.rtcConfiguration,
+    }, config.reconnectToken);
   }
 
   dtmf(callSid: string, { digits }: DtmfConfig): void {
@@ -462,6 +506,21 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     return this._outboundSessions.get(callSid) || this._inboundSessions.get(callSid);
   }
 
+  private _bindSession(
+    session: Session,
+    callSid: string,
+    config: { peerConnection?: IPeerConnection; rtcConfiguration?: RTCConfiguration },
+  ): void {
+    if (!config.peerConnection) {
+      throw new Error('SipSignalingAdapter: peerConnection is required on the SIP path');
+    }
+    this._sessionBindings.set(session, {
+      callSid,
+      peerConnection: config.peerConnection,
+      rtcConfiguration: config.rtcConfiguration,
+    });
+  }
+
   private _handleIncomingInvite(invitation: Invitation): void {
     const callSid = invitation.request.getHeader('X-Twilio-CallSid');
     if (!callSid) {
@@ -508,7 +567,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     });
   }
 
-  private _sendInvite(sdp: string, callSid: string, params?: string, reconnectToken?: string): void {
+  private _sendInvite(tempCallSid: string, config: InviteConfig, reconnectToken?: string): void {
     if (!this._userAgent) {
       this._log.warn('Cannot invite: UserAgent not initialized');
       return;
@@ -517,7 +576,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     const targetUri = UserAgent.makeURI(`sip:${this._options.sipDomain}`);
     if (!targetUri) {
       this._log.error('Failed to create target URI for invite');
-      this.emit('error', { error: { code: 31000, message: 'Invalid SIP target URI' }, callsid: callSid });
+      this.emit('error', { error: { code: 31000, message: 'Invalid SIP target URI' }, callsid: tempCallSid });
       return;
     }
 
@@ -525,6 +584,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       || ((ua: UserAgent, uri: URI, opts?: InviterOptions) => new Inviter(ua, uri, opts));
     const inviter = createInv(this._userAgent, targetUri);
 
+    // Starts as the client-generated temp sid; replaced with the server-issued
+    // CallSid from the 200 OK's X-Twilio-CallSid header once the INVITE is accepted.
+    let callSid = tempCallSid;
+
+    this._bindSession(inviter, tempCallSid, config);
     this._outboundSessions.set(callSid, inviter);
 
     inviter.delegate = {
@@ -545,8 +609,24 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
         onProgress: () => {
           this.emit('ringing', { callsid: callSid });
         },
-        onAccept: () => {
-          const payload: Record<string, any> = { callsid: callSid, sdp: '' };
+        onAccept: (response: any) => {
+          const serverCallSid = response?.message?.getHeader?.('X-Twilio-CallSid');
+          if (serverCallSid && serverCallSid !== callSid) {
+            this._outboundSessions.delete(callSid);
+            this._outboundSessions.set(serverCallSid, inviter);
+            // Keep the SdhBinding in sync so any future reader (debug
+            // logging, SDH refactors that construct lazily) sees the
+            // server-issued CallSid rather than the client temp sid.
+            const binding = this._sessionBindings.get(inviter);
+            if (binding) {
+              binding.callSid = serverCallSid;
+            }
+            callSid = serverCallSid;
+          }
+          const payload: Record<string, any> = {
+            callsid: callSid,
+            sdp: '',
+          };
           if (reconnectToken) {
             payload.reconnect = reconnectToken;
           }

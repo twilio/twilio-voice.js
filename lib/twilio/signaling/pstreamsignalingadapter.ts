@@ -66,6 +66,9 @@ export class PStreamSignalingAdapter extends EventEmitter implements SignalingAd
   }
 
   answer(callSid: string, { sdp }: AnswerConfig): void {
+    if (typeof sdp !== 'string') {
+      throw new Error('PStreamSignalingAdapter.answer: sdp is required');
+    }
     this._pstream.answer(sdp, callSid);
   }
 

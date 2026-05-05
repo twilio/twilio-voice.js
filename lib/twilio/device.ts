@@ -994,6 +994,9 @@ class Device extends EventEmitter {
     if (typeof opts.sipServer !== 'string' || !opts.sipServer) {
       throw new InvalidArgumentError('`signalingOptions.sipServer` is required when `useSignalingMethod` is "sip"');
     }
+    if (typeof opts.sipUri !== 'string' || !opts.sipUri) {
+      throw new InvalidArgumentError('`signalingOptions.sipUri` is required when `useSignalingMethod` is "sip"');
+    }
     if (typeof opts.sipCredentials?.username !== 'string' || !opts.sipCredentials.username
         || typeof opts.sipCredentials?.password !== 'string' || !opts.sipCredentials.password) {
       throw new InvalidArgumentError(
@@ -1075,6 +1078,7 @@ class Device extends EventEmitter {
     options = Object.assign({
       MediaStream: this._options.MediaStream,
       RTCPeerConnection: this._options.RTCPeerConnection,
+      useSip: this._options.signalingOptions?.useSignalingMethod === 'sip',
       beforeAccept: (currentCall: Call) => {
         if (!this._activeCall || this._activeCall === currentCall) {
           return;
@@ -1579,13 +1583,31 @@ class Device extends EventEmitter {
     if (this._options.signalingOptions?.useSignalingMethod === 'sip') {
       this._log.info('Setting up SIP signaling');
       const sipOpts = this._options.signalingOptions as Device.SIPSignalingOptions;
-      const domain = new URL(sipOpts.sipServer).hostname;
+      // Reuse the browser's URL parser by swapping the scheme. Only safe for
+      // plain `sip:user@host` or `sip:user@host:port` forms; URIs with
+      // parameters (e.g. `;transport=tcp`) would parse incorrectly. Twilio-
+      // issued SIP URIs don't carry parameters today — revisit if that changes.
+      let parsedUri: URL;
+      try {
+        // Case-insensitive scheme match — RFC 3261 allows `SIP:` as well.
+        // `sips:` is not supported: Twilio's SIP-over-WebSocket relies on
+        // the WSS transport for security, and Twilio-issued URIs use `sip:`.
+        parsedUri = new URL(sipOpts.sipUri.replace(/^sip:/i, 'http://'));
+      } catch {
+        throw new InvalidArgumentError(
+          '`signalingOptions.sipUri` must be a valid SIP URI of the form `sip:user@host` or `sip:user@host:port`',
+        );
+      }
       return new SipSignalingAdapter({
-        sipDomain: domain,
-        sipUri: `sip:${sipOpts.sipCredentials.username}@${domain}`,
+        // Use hostname (not host) so any port in the sipUri is dropped —
+        // the target Request-URI should be `sip:host`, with transport/port
+        // handled by the WebSocket transport config. Twilio-issued SIP URIs
+        // don't currently carry ports.
+        sipDomain: parsedUri.hostname,
+        sipUri: sipOpts.sipUri,
         sipTransportServer: sipOpts.sipServer,
         credentials: sipOpts.sipCredentials,
-        region: sipOpts.region || domain.split('.')[1],
+        region: sipOpts.region,
       });
     }
 
@@ -1941,8 +1963,14 @@ namespace Device {
    */
   export interface SIPSignalingOptions {
     useSignalingMethod: 'sip';
-    /** The SIP WebSocket server URL (e.g. `'wss://sip.example.com'`). */
+    /** The SIP WebSocket transport URL (e.g. `'wss://sip.example.com'`). */
     sipServer: string;
+    /**
+     * The SIP identity URI for this client
+     * (e.g. `'sip:alice@registrar.example.com'`). The domain portion is the
+     * SIP registrar, which can differ from the WebSocket transport host.
+     */
+    sipUri: string;
     /** SIP digest authentication credentials. */
     sipCredentials: { username: string; password: string };
     /** Optional region hint for edge/region metadata (e.g. `'ashburn'`). */

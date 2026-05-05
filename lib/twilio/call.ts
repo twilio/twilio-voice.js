@@ -189,6 +189,14 @@ class Call extends EventEmitter {
   private _isAnswered: boolean = false;
 
   /**
+   * Whether the SIP-path onopen wrapper has already been installed. Guards
+   * against repeated `accept()` invocations chaining wrappers onto the
+   * previous one (each layer would retain its own onAnswerFired closure
+   * and fire independently against stale state).
+   */
+  private _sipOnOpenWrapped: boolean = false;
+
+  /**
    * Whether the call has been cancelled.
    */
   private _isCancelled: boolean = false;
@@ -690,24 +698,76 @@ class Call extends EventEmitter {
       }
 
       this._signalingAdapter.addListener('hangup', this._onHangup);
+      this._signalingAdapter.on('answer', this._onAnswer);
 
-      if (this._direction === Call.CallDirection.Incoming) {
+      const callSid = this.parameters.CallSid;
+
+      if (this._options.useSip && !this._sipOnOpenWrapped) {
+        // PeerConnection.onopen fires from multiple stable-state observers,
+        // so we gate onAnswer to a single call. _sipOnOpenWrapped prevents a
+        // repeat accept() from chaining another wrapper over this one.
+        this._sipOnOpenWrapped = true;
+        const previousOnOpen = this._mediaHandler.onopen;
+        let onAnswerFired = false;
+        this._mediaHandler.onopen = () => {
+          previousOnOpen();
+          if (!onAnswerFired && this._mediaHandler.version?.pc) {
+            onAnswerFired = true;
+            onAnswer(this._mediaHandler.version.pc);
+          }
+        };
+      }
+
+      const params = Array.from(this.customParameters.entries()).map(pair =>
+        `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
+      const outgoingCallSid = this._options.reconnectCallSid || this.outboundConnectionId!;
+
+      const answerViaSip = () => {
         this._isAnswered = true;
-        this._signalingAdapter.on('answer', this._onAnswer);
-        this._mediaHandler.answerIncomingCall(this.parameters.CallSid,
-          this._options.offerSdp, rtcConfiguration,
+        // SDP intentionally omitted: the SIP adapter derives the answer
+        // from the invitation body via its SDH, not from the caller.
+        this._signalingAdapter.answer(callSid, {
+          peerConnection: this._mediaHandler,
+          rtcConfiguration,
+        });
+      };
+
+      const answerViaMediaHandler = () => {
+        this._isAnswered = true;
+        this._mediaHandler.answerIncomingCall(
+          callSid,
+          this._options.offerSdp,
+          rtcConfiguration,
           (answerSdp: string) => {
-            const answerConfig: AnswerConfig = { sdp: answerSdp };
-            this._signalingAdapter.answer(this.parameters.CallSid, answerConfig);
+            this._signalingAdapter.answer(callSid, { sdp: answerSdp });
           },
-          onAnswer);
-      } else {
-        const params = Array.from(this.customParameters.entries()).map(pair =>
-         `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
-        this._signalingAdapter.on('answer', this._onAnswer);
+          onAnswer,
+        );
+      };
 
-        const outgoingCallSid = this._options.reconnectCallSid || this.outboundConnectionId!;
+      const inviteViaSip = () => {
+        if (this._signalingReconnectToken) {
+          const reconnectConfig: ReconnectConfig = {
+            sdp: '',
+            reconnectToken: this._signalingReconnectToken,
+            peerConnection: this._mediaHandler,
+            rtcConfiguration,
+          };
+          this._signalingAdapter.reconnect(outgoingCallSid, reconnectConfig);
+        } else {
+          // params are intentionally omitted: the SIP adapter does not
+          // currently embed caller-supplied params in the INVITE. If/when
+          // that's added, pass them as extraHeaders through InviteConfig.
+          const inviteConfig: InviteConfig = {
+            sdp: '',
+            peerConnection: this._mediaHandler,
+            rtcConfiguration,
+          };
+          this._signalingAdapter.invite(outgoingCallSid, inviteConfig);
+        }
+      };
 
+      const inviteViaMediaHandler = () => {
         this._mediaHandler.makeOutgoingCall(outgoingCallSid, rtcConfiguration, (offerSdp: string) => {
           const onPstreamAnswerOrRinging = (payload: any) => {
             if (!payload.sdp) { return; }
@@ -737,7 +797,12 @@ class Call extends EventEmitter {
           // self._setupDTLSTransport in the media handler after this method
           // finishes. See peerconnection.makeOutgoingCall.
         });
+      };
+
+      if (this._direction === Call.CallDirection.Incoming) {
+        return this._options.useSip ? answerViaSip() : answerViaMediaHandler();
       }
+      return this._options.useSip ? inviteViaSip() : inviteViaMediaHandler();
     };
 
     if (this._options.beforeAccept) {
@@ -2149,6 +2214,13 @@ namespace Call {
      * TwiML params for the call. May be set for either outgoing or incoming calls.
      */
     twimlParams?: Record<string, any>;
+
+    /**
+     * When true, the call uses the SIP.js-backed signaling path. The SDP
+     * exchange runs through SipSessionDescriptionHandler instead of being
+     * performed eagerly by Call.
+     */
+    useSip?: boolean;
 
     /**
      * Voice event SID generator.

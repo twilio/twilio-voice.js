@@ -1,14 +1,25 @@
 import { EventEmitter } from 'events';
+import type { IPeerConnection } from './sipsessiondescriptionhandler';
 
 export type SignalingAdapterStatus = 'disconnected' | 'connected' | 'ready' | 'offline';
 
 export interface InviteConfig {
   sdp: string;
-  params: string;
+  // Optional: PStream encodes these as the INVITE body; reconnect flows
+  // and the SIP adapter don't carry caller-supplied params, so callers
+  // can omit this field instead of passing a dummy empty string.
+  params?: string;
+  peerConnection?: IPeerConnection;
+  rtcConfiguration?: RTCConfiguration;
 }
 
 export interface AnswerConfig {
-  sdp: string;
+  // Optional because the SIP adapter derives the answer SDP from the
+  // invitation body via the SDH, rather than receiving it from the
+  // caller. The PStream adapter requires it and will reject undefined.
+  sdp?: string;
+  peerConnection?: IPeerConnection;
+  rtcConfiguration?: RTCConfiguration;
 }
 
 export interface HangupConfig {
@@ -22,6 +33,8 @@ export interface ReinviteConfig {
 export interface ReconnectConfig {
   sdp: string;
   reconnectToken: string;
+  peerConnection?: IPeerConnection;
+  rtcConfiguration?: RTCConfiguration;
 }
 
 export interface DtmfConfig {
