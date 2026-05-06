@@ -16,9 +16,9 @@ import {
   AnswerConfig,
   DtmfConfig,
   HangupConfig,
+  IceRestartConfig,
   InviteConfig,
   ReconnectConfig,
-  ReinviteConfig,
   SignalingAdapter,
   SignalingAdapterStatus,
   SendMessageConfig,
@@ -354,23 +354,49 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     });
   }
 
-  reinvite(callSid: string, config: ReinviteConfig): void {
+  /**
+   * Trigger an ICE restart by sending a re-INVITE with
+   * offerOptions.iceRestart:true. SIP.js asks the SDH to produce the
+   * fresh-ICE offer via getDescription(options), so config.mediaHandler
+   * is unused here (the PStream adapter needs it; we preserve the shared
+   * interface). All failure paths (no session, onReject, catch) emit
+   * 'hangup' for the callSid so Call can clean up its inline re-INVITE
+   * listeners and transition out of the reconnecting state.
+   */
+  iceRestart(callSid: string, _config: IceRestartConfig): void {
     const session = this._getSession(callSid);
     if (!session || session.state !== SessionState.Established) {
-      this._log.warn('reinvite: no established session for callSid', callSid);
+      this._log.warn('iceRestart: no established session for callSid', callSid);
+      this.emit('hangup', {
+        callsid: callSid,
+        error: { code: 31000, message: 'No established session for ICE restart' },
+      });
       return;
     }
-    session.invite({
+    const inviteOptions: any = {
       requestDelegate: {
         onAccept: () => {
           this.emit('answer', { callsid: callSid, sdp: '' });
         },
         onReject: (response: any) => {
-          this._log.warn('re-INVITE rejected', response?.message?.statusCode);
+          const code = response?.message?.statusCode;
+          this._log.warn('ICE-restart re-INVITE rejected', code);
+          this.emit('hangup', {
+            callsid: callSid,
+            error: { code: code || 31000, message: `ICE-restart re-INVITE rejected (${code || 'unknown'})` },
+          });
         },
       },
-    }).catch((error: Error) => {
-      this._log.warn('Failed to send re-INVITE', error);
+      sessionDescriptionHandlerOptions: {
+        offerOptions: { iceRestart: true },
+      },
+    };
+    session.invite(inviteOptions).catch((error: Error) => {
+      this._log.warn('Failed to send ICE-restart re-INVITE', error);
+      this.emit('hangup', {
+        callsid: callSid,
+        error: { code: 31000, message: `Failed to send ICE-restart re-INVITE: ${error.message}` },
+      });
     });
   }
 
