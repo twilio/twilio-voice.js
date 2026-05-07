@@ -139,6 +139,12 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
       if (this._iceRestartPending) {
         this._iceRestartPending = false;
         this._failPending(new Error(message || 'PeerConnection failed'));
+        // Skip previousOnFailed: _failPending rejects session.invite(),
+        // the adapter's .catch emits 'hangup', and Call._onHangup handles
+        // the event. Running previousOnFailed here would also trigger
+        // Call._onMediaFailure(ConnectionFailed) — double-dispatch that
+        // kicks off another backoff cycle and emits a duplicate error.
+        return;
       }
       previousOnFailed(message);
     };

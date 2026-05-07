@@ -705,11 +705,14 @@ describe('SipSignalingAdapter', () => {
       rd.onAccept();
     });
 
-    it('emits hangup (with error) when session is not established', (done) => {
+    it('emits hangup WITHOUT an error field when session is not established (Call cleans up listeners silently)', (done) => {
       const { adapter } = createAdapter();
       adapter.on('hangup', (payload: any) => {
         assert.strictEqual(payload.callsid, 'nope');
-        assert.ok(payload.error);
+        // No error field: Call._onHangup would translate `error` into an
+        // emit('error', ConnectionError), which is not wanted for this
+        // benign teardown race.
+        assert.strictEqual(payload.error, undefined);
         done();
       });
       adapter.iceRestart('nope', { mediaHandler: mediaHandlerStub() });

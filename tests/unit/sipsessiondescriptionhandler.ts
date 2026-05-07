@@ -170,6 +170,16 @@ describe('SipSessionDescriptionHandler', () => {
       sinon.assert.calledOnceWithExactly(previousOnFailed, 'network down');
     });
 
+    it('does NOT invoke previousOnFailed when onfailed fires DURING an ICE restart (avoids double-dispatch with session.invite rejection)', async () => {
+      const previousOnFailed = sinon.spy();
+      const pc = createPeerConnectionStub({ onfailed: previousOnFailed }); // iceRestart stub never calls back
+      const { handler } = createHandler(pc);
+      const pending = (handler.getDescription as any)(ICE_RESTART_OPTS);
+      pc.onfailed('createOffer rejected');
+      await assert.rejects(pending, /createOffer rejected/);
+      sinon.assert.notCalled(previousOnFailed);
+    });
+
     it('does NOT reject a pending setDescription when pc.onfailed fires outside of an ICE restart (runtime ICE failure)', async () => {
       const pc = createPeerConnectionStub(); // answerIncomingCall never calls back
       const { handler } = createHandler(pc);
@@ -184,8 +194,12 @@ describe('SipSessionDescriptionHandler', () => {
       await Promise.resolve();
       await Promise.resolve();
       assert.strictEqual(settled, false);
-      // Clean up the hung Promise so mocha doesn't warn about it.
-      void pending;
+      // Closing the SDH must drain _pendingRejects so the Promise actually
+      // settles — exercises the close() reject path and ensures no Promise
+      // leaks across tests.
+      handler.close();
+      await pending;
+      assert.strictEqual(settled, true);
     });
   });
 

@@ -377,10 +377,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     const session = this._getSession(callSid);
     if (!session || session.state !== SessionState.Established) {
       this._log.warn('iceRestart: no established session for callSid', callSid);
-      this.emit('hangup', {
-        callsid: callSid,
-        error: { code: 31000, message: 'No established session for ICE restart' },
-      });
+      this.emit('hangup', { callsid: callSid });
       return;
     }
     const inviteOptions: IceRestartInviteOptions = {
