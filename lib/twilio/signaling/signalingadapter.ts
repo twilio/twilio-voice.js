@@ -26,19 +26,12 @@ export interface HangupConfig {
   message?: string;
 }
 
-/**
- * Narrow view of the media handler that SignalingAdapter.iceRestart()
- * needs. Satisfied structurally by PeerConnection.
- */
-export interface IMediaHandler {
-  iceRestart(onOfferReady: (offerSdp: string) => void): void;
-}
-
 export interface IceRestartConfig {
   // Used by the PStream adapter to generate the fresh-ICE offer; the
   // SIP adapter ignores it because SIP.js asks the SDH to produce the
-  // offer via session.invite() + offerOptions.iceRestart.
-  mediaHandler: IMediaHandler;
+  // offer via session.invite() + offerOptions.iceRestart. Satisfied
+  // structurally by PeerConnection.
+  mediaHandler: { iceRestart(onOfferReady: (offerSdp: string) => void): void };
 }
 
 export interface ReconnectConfig {

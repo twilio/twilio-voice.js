@@ -376,6 +376,10 @@ class Call extends EventEmitter {
       }
 
       const onAnswerOrRinging = (payload: any) => {
+        // The adapter is shared across concurrent calls; ignore events for
+        // other calls so their answer/hangup doesn't abort this call's
+        // in-flight ICE restart by removing the listeners below.
+        if (payload?.callsid !== callSid) { return; }
         this._signalingAdapter.removeListener('answer', onAnswerOrRinging);
         this._signalingAdapter.removeListener('hangup', onHangup);
 
@@ -391,7 +395,8 @@ class Call extends EventEmitter {
         this._mediaHandler.processAnswer(payload.sdp, () => { /* noop for ICE restart */ });
       };
 
-      const onHangup = () => {
+      const onHangup = (payload: any) => {
+        if (payload?.callsid !== callSid) { return; }
         this._signalingAdapter.removeListener('answer', onAnswerOrRinging);
         this._signalingAdapter.removeListener('hangup', onHangup);
       };

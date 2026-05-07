@@ -11,7 +11,7 @@ import {
  * is fragile across versions. We only need offerOptions for ICE-restart
  * plumbing, so we widen the public type here.
  */
-interface SessionDescriptionHandlerOptions extends BaseSessionDescriptionHandlerOptions {
+export interface SessionDescriptionHandlerOptions extends BaseSessionDescriptionHandlerOptions {
   offerOptions?: RTCOfferOptions;
 }
 
@@ -85,16 +85,20 @@ const APPLICATION_SDP = 'application/sdp';
  * handlers (Call owns them) so Call still emits its error events. The
  * onfailed wrap is scoped: it only rejects pending Promises when the SDH
  * itself initiated an ICE restart, so that runtime ICE failures do not
- * reject unrelated in-flight setDescription Promises.
+ * reject unrelated in-flight get/setDescription Promises.
  */
 export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   private _cachedAnswer: string | null = null;
   private _hasSentOffer: boolean = false;
   // True while an ICE-restart getDescription() is in flight. Scopes the
   // onfailed wrap: pc.onfailed fires both for createOffer rejection (what
-  // we want to reject the pending Promise for) and for ICE state = failed
-  // at runtime (what we do NOT want to reject unrelated in-flight
-  // setDescription Promises for).
+  // we want to reject the pending getDescription Promise for) and for ICE
+  // state = failed at runtime (what we do NOT want to reject unrelated
+  // in-flight get/setDescription Promises for).
+  //
+  // Invariant: at most one ICE-restart getDescription in flight per SDH.
+  // Enforced by the caller — Call._mediaReconnectBackoff fires serially,
+  // so overlapping ICE restarts cannot reach this SDH.
   private _iceRestartPending: boolean = false;
   // PeerConnection reports failures via onerror, not the success callbacks
   // we pass in. Every in-flight operation adds its reject handler here;
@@ -118,6 +122,10 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   ) {
     const previousOnError = this._pc.onerror;
     this._pc.onerror = (error: PeerConnectionError) => {
+      // Clear _iceRestartPending so a later runtime onfailed doesn't re-enter
+      // _failPending. Harmless today (pending set is already drained) but keeps
+      // the flag's meaning ("ICE restart in flight") accurate.
+      this._iceRestartPending = false;
       this._failPending(error?.info?.twilioError || new Error(error?.info?.message || 'PeerConnection error'));
       previousOnError(error);
     };

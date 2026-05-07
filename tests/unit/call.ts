@@ -2794,11 +2794,18 @@ describe('Call', function() {
       conn = new Call(config, Object.assign(options));
       conn.parameters = { CallSid: 'CAtest' };
       pstream.iceRestart = sinon.stub();
+      // Capture per-event baselines BEFORE the backoff adds its listeners so we
+      // can assert each event's count returns to its baseline after hangup (an
+      // aggregate sum could mask a leak where a listener is added as another
+      // is removed).
+      const answerBaseline = pstream.listenerCount('answer');
+      const hangupBaseline = pstream.listenerCount('hangup');
       conn['_mediaReconnectBackoff'].emit('ready');
-      const before = pstream.listenerCount('answer') + pstream.listenerCount('hangup');
+      assert.strictEqual(pstream.listenerCount('answer'), answerBaseline + 1);
+      assert.strictEqual(pstream.listenerCount('hangup'), hangupBaseline + 1);
       pstream.emit('hangup', { callsid: 'CAtest', error: { code: 488, message: 'rejected' } });
-      const after = pstream.listenerCount('answer') + pstream.listenerCount('hangup');
-      assert.ok(after < before, 'expected listener count to decrease after hangup');
+      assert.strictEqual(pstream.listenerCount('answer'), answerBaseline);
+      assert.strictEqual(pstream.listenerCount('hangup'), hangupBaseline);
     });
   });
 });

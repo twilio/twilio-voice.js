@@ -7,6 +7,7 @@ import {
   RegistererState,
   SessionDescriptionHandler,
   Session,
+  SessionInviteOptions,
   SessionState,
   URI,
   UserAgent,
@@ -25,8 +26,17 @@ import {
 } from './signalingadapter';
 import {
   IPeerConnection,
+  SessionDescriptionHandlerOptions,
   SipSessionDescriptionHandler,
 } from './sipsessiondescriptionhandler';
+
+// SIP.js's SessionInviteOptions.sessionDescriptionHandlerOptions is typed
+// as the base SessionDescriptionHandlerOptions, which does not expose
+// offerOptions. Override that field with our SDH's extended type so the
+// iceRestart flag is typechecked at the call site.
+type IceRestartInviteOptions = Omit<SessionInviteOptions, 'sessionDescriptionHandlerOptions'> & {
+  sessionDescriptionHandlerOptions?: SessionDescriptionHandlerOptions;
+};
 
 type SipSendMessageConfig = Pick<SendMessageConfig, 'content' | 'contentType' | 'voiceEventSid'>;
 
@@ -373,7 +383,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       });
       return;
     }
-    const inviteOptions: any = {
+    const inviteOptions: IceRestartInviteOptions = {
       requestDelegate: {
         onAccept: () => {
           this.emit('answer', { callsid: callSid, sdp: '' });
