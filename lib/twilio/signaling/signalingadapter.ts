@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import type { IMediaHandler } from './mediahandler';
 import type { IPeerConnection } from './sipsessiondescriptionhandler';
 
 export type SignalingAdapterStatus = 'disconnected' | 'connected' | 'ready' | 'offline';
@@ -29,9 +30,8 @@ export interface HangupConfig {
 export interface IceRestartConfig {
   // Used by the PStream adapter to generate the fresh-ICE offer; the
   // SIP adapter ignores it because SIP.js asks the SDH to produce the
-  // offer via session.invite() + offerOptions.iceRestart. Satisfied
-  // structurally by PeerConnection.
-  mediaHandler: { iceRestart(onOfferReady: (offerSdp: string) => void): void };
+  // offer via session.invite() + offerOptions.iceRestart.
+  mediaHandler: IMediaHandler;
 }
 
 export interface ReconnectConfig {
