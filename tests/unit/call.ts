@@ -2803,7 +2803,7 @@ describe('Call', function() {
       conn['_mediaReconnectBackoff'].emit('ready');
       assert.strictEqual(pstream.listenerCount('answer'), answerBaseline + 1);
       assert.strictEqual(pstream.listenerCount('hangup'), hangupBaseline + 1);
-      pstream.emit('hangup', { callsid: 'CAtest', error: { code: 488, message: 'rejected' } });
+      pstream.emit('hangup', { callsid: 'CAtest' });
       assert.strictEqual(pstream.listenerCount('answer'), answerBaseline);
       assert.strictEqual(pstream.listenerCount('hangup'), hangupBaseline);
     });

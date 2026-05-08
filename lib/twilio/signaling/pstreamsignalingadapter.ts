@@ -83,9 +83,13 @@ export class PStreamSignalingAdapter extends EventEmitter implements SignalingAd
   iceRestart(callSid: string, { mediaHandler }: IceRestartConfig): void {
     // Call (on PStream) owns offer generation: mediaHandler produces a
     // fresh-ICE offer; we ship it via the existing reinvite wire.
-    mediaHandler.iceRestart((offerSdp: string) => {
-      this._pstream.reinvite(offerSdp, callSid);
-    });
+    try {
+      mediaHandler.iceRestart((offerSdp: string) => {
+        this._pstream.reinvite(offerSdp, callSid);
+      });
+    } catch {
+      this.emit('hangup', { callsid: callSid });
+    }
   }
 
   reconnect(callSid: string, { sdp, reconnectToken }: ReconnectConfig): void {

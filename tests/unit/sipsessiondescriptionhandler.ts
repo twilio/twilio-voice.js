@@ -166,6 +166,9 @@ describe('SipSessionDescriptionHandler', () => {
       const previousOnFailed = sinon.spy();
       const pc = createPeerConnectionStub({ onfailed: previousOnFailed });
       createHandler(pc);
+      // _iceRestartPending is false here (no ICE restart in flight), so the
+      // wrap falls through to previousOnFailed. See the next test for the
+      // ICE-restart branch where previousOnFailed is intentionally skipped.
       pc.onfailed('network down');
       sinon.assert.calledOnceWithExactly(previousOnFailed, 'network down');
     });

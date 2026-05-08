@@ -383,6 +383,10 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     const inviteOptions: IceRestartInviteOptions = {
       requestDelegate: {
         onAccept: () => {
+          // SDP intentionally empty: the SDH consumed the remote answer via
+          // SIP.js's setDescription before this event fires, so Call's
+          // onAnswerOrRinging skips processAnswer on empty SDP. Passing a
+          // real SDP here would trigger a double-processAnswer.
           this.emit('answer', { callsid: callSid, sdp: '' });
         },
         onReject: (response: any) => {
@@ -390,7 +394,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
           this._log.warn('ICE-restart re-INVITE rejected', code);
           this.emit('hangup', {
             callsid: callSid,
-            error: { code: code || 31000, message: `ICE-restart re-INVITE rejected (${code || 'unknown'})` },
+            error: { code: code ?? 31000, message: `ICE-restart re-INVITE rejected (${code ?? 'unknown'})` },
           });
         },
       },
