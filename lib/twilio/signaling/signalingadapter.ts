@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import type { IMediaHandler } from './mediahandler';
 import type { IPeerConnection } from './sipsessiondescriptionhandler';
 
 export type SignalingAdapterStatus = 'disconnected' | 'connected' | 'ready' | 'offline';
@@ -26,8 +27,11 @@ export interface HangupConfig {
   message?: string;
 }
 
-export interface ReinviteConfig {
-  sdp: string;
+export interface IceRestartConfig {
+  // Used by the PStream adapter to generate the fresh-ICE offer; the
+  // SIP adapter ignores it because SIP.js asks the SDH to produce the
+  // offer via session.invite() + offerOptions.iceRestart.
+  mediaHandler: IMediaHandler;
 }
 
 export interface ReconnectConfig {
@@ -63,8 +67,19 @@ export interface SignalingAdapter extends EventEmitter {
   answer(callSid: string, config: AnswerConfig): void;
   hangup(callSid: string, config: HangupConfig): void;
   reject(callSid: string): void;
-  reinvite(callSid: string, config: ReinviteConfig): void;
   reconnect(callSid: string, config: ReconnectConfig): void;
+
+  /**
+   * Trigger an ICE restart for the given call. Each adapter encapsulates
+   * its own offer-generation strategy:
+   *  - PStream: asks config.mediaHandler to generate the offer, then
+   *    ships it via the existing reinvite wire.
+   *  - SIP: calls session.invite() with offerOptions.iceRestart so SIP.js
+   *    asks the SDH to produce the offer itself.
+   * On failure, emits 'hangup' for the callSid so Call can clean up its
+   * reinvite listeners.
+   */
+  iceRestart(callSid: string, config: IceRestartConfig): void;
 
   dtmf(callSid: string, config: DtmfConfig): void;
   sendMessage(callSid: string, config: SendMessageConfig): void;

@@ -33,6 +33,30 @@ describe('PStreamSignalingAdapter', () => {
     adapter = new PStreamSignalingAdapter(pstream);
   });
 
+  it('iceRestart() asks the mediaHandler for an offer, then ships it via reinvite', () => {
+    const mediaHandler = {
+      iceRestart: sinon.stub().callsFake((cb: (sdp: string) => void) => cb('restarted-offer-sdp')),
+    };
+    adapter.iceRestart('callSid', { mediaHandler });
+    sinon.assert.calledOnce(mediaHandler.iceRestart);
+    assert(pstream.reinvite.calledWith('restarted-offer-sdp', 'callSid'));
+  });
+
+  it('iceRestart() emits hangup (no error field) when mediaHandler.iceRestart throws synchronously', (done) => {
+    const mediaHandler = {
+      iceRestart: sinon.stub().throws(new Error('boom')),
+    };
+    adapter.on('hangup', (payload: any) => {
+      assert.strictEqual(payload.callsid, 'callSid');
+      // No error field: the media-failure path already surfaces this to the
+      // customer; we just need Call to clean up its inline listeners.
+      assert.strictEqual(payload.error, undefined);
+      done();
+    });
+    adapter.iceRestart('callSid', { mediaHandler });
+    sinon.assert.notCalled(pstream.reinvite);
+  });
+
   it('should delegate invite() to pstream', () => {
     adapter.invite('callSid', { sdp: 'sdp', params: 'params' });
     assert(pstream.invite.calledWith('sdp', 'callSid', 'params'));
@@ -51,11 +75,6 @@ describe('PStreamSignalingAdapter', () => {
   it('should delegate reject() to pstream', () => {
     adapter.reject('callSid');
     assert(pstream.reject.calledWith('callSid'));
-  });
-
-  it('should delegate reinvite() to pstream', () => {
-    adapter.reinvite('callSid', { sdp: 'sdp' });
-    assert(pstream.reinvite.calledWith('sdp', 'callSid'));
   });
 
   it('should delegate reconnect() to pstream', () => {

@@ -7,6 +7,7 @@ import {
   RegistererState,
   SessionDescriptionHandler,
   Session,
+  SessionInviteOptions,
   SessionState,
   URI,
   UserAgent,
@@ -16,17 +17,26 @@ import {
   AnswerConfig,
   DtmfConfig,
   HangupConfig,
+  IceRestartConfig,
   InviteConfig,
   ReconnectConfig,
-  ReinviteConfig,
   SignalingAdapter,
   SignalingAdapterStatus,
   SendMessageConfig,
 } from './signalingadapter';
 import {
   IPeerConnection,
+  SessionDescriptionHandlerOptions,
   SipSessionDescriptionHandler,
 } from './sipsessiondescriptionhandler';
+
+// SIP.js's SessionInviteOptions.sessionDescriptionHandlerOptions is typed
+// as the base SessionDescriptionHandlerOptions, which does not expose
+// offerOptions. Override that field with our SDH's extended type so the
+// iceRestart flag is typechecked at the call site.
+type IceRestartInviteOptions = Omit<SessionInviteOptions, 'sessionDescriptionHandlerOptions'> & {
+  sessionDescriptionHandlerOptions?: SessionDescriptionHandlerOptions;
+};
 
 type SipSendMessageConfig = Pick<SendMessageConfig, 'content' | 'contentType' | 'voiceEventSid'>;
 
@@ -354,23 +364,50 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     });
   }
 
-  reinvite(callSid: string, config: ReinviteConfig): void {
+  /**
+   * Trigger an ICE restart by sending a re-INVITE with
+   * offerOptions.iceRestart:true. SIP.js asks the SDH to produce the
+   * fresh-ICE offer via getDescription(options), so config.mediaHandler
+   * is unused here (the PStream adapter needs it; we preserve the shared
+   * interface). All failure paths (no session, onReject, catch) emit
+   * 'hangup' for the callSid so Call can clean up its inline re-INVITE
+   * listeners and transition out of the reconnecting state.
+   */
+  iceRestart(callSid: string, _config: IceRestartConfig): void {
     const session = this._getSession(callSid);
     if (!session || session.state !== SessionState.Established) {
-      this._log.warn('reinvite: no established session for callSid', callSid);
+      this._log.warn('iceRestart: no established session for callSid', callSid);
+      this.emit('hangup', { callsid: callSid });
       return;
     }
-    session.invite({
+    const inviteOptions: IceRestartInviteOptions = {
       requestDelegate: {
         onAccept: () => {
+          // SDP intentionally empty: the SDH consumed the remote answer via
+          // SIP.js's setDescription before this event fires, so Call's
+          // onAnswerOrRinging skips processAnswer on empty SDP. Passing a
+          // real SDP here would trigger a double-processAnswer.
           this.emit('answer', { callsid: callSid, sdp: '' });
         },
         onReject: (response: any) => {
-          this._log.warn('re-INVITE rejected', response?.message?.statusCode);
+          const code = response?.message?.statusCode;
+          this._log.warn('ICE-restart re-INVITE rejected', code);
+          this.emit('hangup', {
+            callsid: callSid,
+            error: { code: code ?? 31000, message: `ICE-restart re-INVITE rejected (${code ?? 'unknown'})` },
+          });
         },
       },
-    }).catch((error: Error) => {
-      this._log.warn('Failed to send re-INVITE', error);
+      sessionDescriptionHandlerOptions: {
+        offerOptions: { iceRestart: true },
+      },
+    };
+    session.invite(inviteOptions).catch((error: Error) => {
+      this._log.warn('Failed to send ICE-restart re-INVITE', error);
+      this.emit('hangup', {
+        callsid: callSid,
+        error: { code: 31000, message: `Failed to send ICE-restart re-INVITE: ${error.message}` },
+      });
     });
   }
 

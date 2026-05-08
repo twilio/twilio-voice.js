@@ -8,7 +8,6 @@ import {
   HangupConfig,
   InviteConfig,
   ReconnectConfig,
-  ReinviteConfig,
   SendMessageConfig,
   SignalingAdapter,
 } from './signaling/signalingadapter';
@@ -370,34 +369,44 @@ class Call extends EventEmitter {
 
     this._mediaReconnectBackoff = new Backoff(BACKOFF_CONFIG);
     this._mediaReconnectBackoff.on('ready', () => {
-      this._mediaHandler.iceRestart((offerSdp: string) => {
-        const onAnswerOrRinging = (payload: any) => {
-          this._signalingAdapter.removeListener('answer', onAnswerOrRinging);
-          this._signalingAdapter.removeListener('hangup', onHangup);
+      const callSid = this.parameters.CallSid;
+      if (!callSid) {
+        this._log.warn('Cannot reinvite: CallSid is not set');
+        return;
+      }
 
-          if (!payload.sdp || !this._mediaHandler.version
-              || this._mediaHandler.version.pc.signalingState !== 'have-local-offer') {
-            return;
-          }
+      const onAnswerOrRinging = (payload: any) => {
+        // The adapter is shared across concurrent calls; ignore events for
+        // other calls so their answer/hangup doesn't abort this call's
+        // in-flight ICE restart by removing the listeners below.
+        if (payload?.callsid !== callSid) { return; }
+        this._signalingAdapter.removeListener('answer', onAnswerOrRinging);
+        this._signalingAdapter.removeListener('hangup', onHangup);
 
-          this._mediaHandler.processAnswer(payload.sdp, () => { /* noop for ICE restart */ });
-        };
-
-        const onHangup = () => {
-          this._signalingAdapter.removeListener('answer', onAnswerOrRinging);
-          this._signalingAdapter.removeListener('hangup', onHangup);
-        };
-
-        const callSid = this.parameters.CallSid;
-        if (!callSid) {
-          this._log.warn('Cannot reinvite: CallSid is not set');
+        // On the SIP path, the remote answer reaches PeerConnection via
+        // the SDH before the adapter emits 'answer', so payload.sdp is
+        // empty — the guard below skips a redundant processAnswer. On
+        // the PStream path, payload.sdp carries the real answer SDP.
+        if (!payload.sdp || !this._mediaHandler.version
+            || this._mediaHandler.version.pc.signalingState !== 'have-local-offer') {
           return;
         }
-        this._signalingAdapter.on('answer', onAnswerOrRinging);
-        this._signalingAdapter.on('hangup', onHangup);
-        const reinviteConfig: ReinviteConfig = { sdp: offerSdp };
-        this._signalingAdapter.reinvite(callSid, reinviteConfig);
-      });
+
+        this._mediaHandler.processAnswer(payload.sdp, () => { /* noop for ICE restart */ });
+      };
+
+      const onHangup = (payload: any) => {
+        if (payload?.callsid !== callSid) { return; }
+        this._signalingAdapter.removeListener('answer', onAnswerOrRinging);
+        this._signalingAdapter.removeListener('hangup', onHangup);
+      };
+
+      this._signalingAdapter.on('answer', onAnswerOrRinging);
+      this._signalingAdapter.on('hangup', onHangup);
+      // Adapter encapsulates its own offer-generation strategy. On
+      // failure the adapter emits 'hangup' for this callSid so the
+      // cleanup listeners above run.
+      this._signalingAdapter.iceRestart(callSid, { mediaHandler: this._mediaHandler });
     });
 
     // temporary call sid to be used for outgoing calls

@@ -11,18 +11,23 @@ const OFFER_SDP = 'v=0\r\no=offerer\r\n';
 const ANSWER_SDP = 'v=0\r\no=answerer\r\n';
 
 interface PcStub extends IPeerConnection {
+  onerror: (error: any) => void;
+  onfailed: (message: string) => void;
   makeOutgoingCall: sinon.SinonStub;
   answerIncomingCall: sinon.SinonStub;
   processAnswer: sinon.SinonStub;
+  iceRestart: sinon.SinonStub;
   close: sinon.SinonStub;
 }
 
 function createPeerConnectionStub(overrides: Partial<PcStub> = {}): PcStub {
   const stub: PcStub = {
     onerror: () => { /* replaced by SDH constructor */ },
+    onfailed: () => { /* replaced by SDH constructor */ },
     makeOutgoingCall: sinon.stub(),
     answerIncomingCall: sinon.stub(),
     processAnswer: sinon.stub(),
+    iceRestart: sinon.stub(),
     close: sinon.stub(),
     ...overrides,
   };
@@ -73,6 +78,132 @@ describe('SipSessionDescriptionHandler', () => {
       assert.deepStrictEqual(description, { body: OFFER_SDP, contentType: APPLICATION_SDP });
     });
 
+  });
+
+  describe('getDescription with ICE restart', () => {
+    const ICE_RESTART_OFFER_SDP = 'v=0\r\no=ice-restart\r\n';
+    const ICE_RESTART_OPTS = { offerOptions: { iceRestart: true } };
+
+    it('routes through pc.iceRestart when options.offerOptions.iceRestart is true', async () => {
+      const pc = createPeerConnectionStub({
+        iceRestart: sinon.stub().callsFake(
+          (cb: (sdp: string) => void) => cb(ICE_RESTART_OFFER_SDP),
+        ) as sinon.SinonStub,
+      });
+      const { handler } = createHandler(pc);
+      const description = await (handler.getDescription as any)(ICE_RESTART_OPTS);
+      assert.deepStrictEqual(description, { body: ICE_RESTART_OFFER_SDP, contentType: APPLICATION_SDP });
+      sinon.assert.calledOnce(pc.iceRestart);
+      sinon.assert.notCalled(pc.makeOutgoingCall);
+    });
+
+    it('falls back to makeOutgoingCall when options does NOT include iceRestart', async () => {
+      const pc = createPeerConnectionStub({
+        makeOutgoingCall: sinon.stub().callsFake(
+          (_sid: string, _cfg: RTCConfiguration, cb: (sdp: string) => void) => cb(OFFER_SDP),
+        ) as sinon.SinonStub,
+      });
+      const { handler } = createHandler(pc);
+      await handler.getDescription();
+      sinon.assert.calledOnce(pc.makeOutgoingCall);
+      sinon.assert.notCalled(pc.iceRestart);
+    });
+
+    it('does NOT leak iceRestart routing across calls (each getDescription reads options independently)', async () => {
+      const pc = createPeerConnectionStub({
+        makeOutgoingCall: sinon.stub().callsFake(
+          (_sid: string, _cfg: RTCConfiguration, cb: (sdp: string) => void) => cb(OFFER_SDP),
+        ) as sinon.SinonStub,
+        iceRestart: sinon.stub().callsFake(
+          (cb: (sdp: string) => void) => cb(ICE_RESTART_OFFER_SDP),
+        ) as sinon.SinonStub,
+        processAnswer: sinon.stub().callsFake(
+          (_sdp: string, cb: (pc: RTCPeerConnection) => void) => cb({} as RTCPeerConnection),
+        ) as sinon.SinonStub,
+      });
+      const { handler } = createHandler(pc);
+      await (handler.getDescription as any)(ICE_RESTART_OPTS);
+      await handler.setDescription(ANSWER_SDP);
+      // No options this time: must fall back to makeOutgoingCall.
+      await handler.getDescription();
+      sinon.assert.calledOnce(pc.iceRestart);
+      sinon.assert.calledOnce(pc.makeOutgoingCall);
+    });
+
+    it('routes the subsequent setDescription through processAnswer (ICE restart has outbound-offer semantics)', async () => {
+      const pc = createPeerConnectionStub({
+        iceRestart: sinon.stub().callsFake(
+          (cb: (sdp: string) => void) => cb(ICE_RESTART_OFFER_SDP),
+        ) as sinon.SinonStub,
+        processAnswer: sinon.stub().callsFake(
+          (_sdp: string, cb: (pc: RTCPeerConnection) => void) => cb({} as RTCPeerConnection),
+        ) as sinon.SinonStub,
+      });
+      const { handler } = createHandler(pc);
+      await (handler.getDescription as any)(ICE_RESTART_OPTS);
+      await handler.setDescription(ANSWER_SDP);
+      sinon.assert.calledOnce(pc.processAnswer);
+      sinon.assert.notCalled(pc.answerIncomingCall);
+    });
+
+    it('rejects the pending getDescription if pc.onerror fires during ICE restart', async () => {
+      const pc = createPeerConnectionStub(); // iceRestart stub never calls back
+      const { handler } = createHandler(pc);
+      const pending = (handler.getDescription as any)(ICE_RESTART_OPTS);
+      pc.onerror({ info: { code: 31000, message: 'ice restart failure' } });
+      await assert.rejects(pending, /ice restart failure/);
+    });
+
+    it('rejects the pending getDescription if pc.onfailed fires during ICE restart (createOffer rejection path)', async () => {
+      const pc = createPeerConnectionStub(); // iceRestart stub never calls back
+      const { handler } = createHandler(pc);
+      const pending = (handler.getDescription as any)(ICE_RESTART_OPTS);
+      pc.onfailed('createOffer rejected');
+      await assert.rejects(pending, /createOffer rejected/);
+    });
+
+    it('still invokes the previous onfailed handler when pc.onfailed fires', () => {
+      const previousOnFailed = sinon.spy();
+      const pc = createPeerConnectionStub({ onfailed: previousOnFailed });
+      createHandler(pc);
+      // _iceRestartPending is false here (no ICE restart in flight), so the
+      // wrap falls through to previousOnFailed. See the next test for the
+      // ICE-restart branch where previousOnFailed is intentionally skipped.
+      pc.onfailed('network down');
+      sinon.assert.calledOnceWithExactly(previousOnFailed, 'network down');
+    });
+
+    it('does NOT invoke previousOnFailed when onfailed fires DURING an ICE restart (avoids double-dispatch with session.invite rejection)', async () => {
+      const previousOnFailed = sinon.spy();
+      const pc = createPeerConnectionStub({ onfailed: previousOnFailed }); // iceRestart stub never calls back
+      const { handler } = createHandler(pc);
+      const pending = (handler.getDescription as any)(ICE_RESTART_OPTS);
+      pc.onfailed('createOffer rejected');
+      await assert.rejects(pending, /createOffer rejected/);
+      sinon.assert.notCalled(previousOnFailed);
+    });
+
+    it('does NOT reject a pending setDescription when pc.onfailed fires outside of an ICE restart (runtime ICE failure)', async () => {
+      const pc = createPeerConnectionStub(); // answerIncomingCall never calls back
+      const { handler } = createHandler(pc);
+      let settled = false;
+      const pending = handler.setDescription(OFFER_SDP).then(
+        () => { settled = true; },
+        () => { settled = true; },
+      );
+      // Simulate runtime ICE failure (no ICE restart requested).
+      pc.onfailed('ICE connection failed');
+      // Yield a microtask or two to let any spurious reject propagate.
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(settled, false);
+      // Closing the SDH must drain _pendingRejects so the Promise actually
+      // settles — exercises the close() reject path and ensures no Promise
+      // leaks across tests.
+      handler.close();
+      await pending;
+      assert.strictEqual(settled, true);
+    });
   });
 
   describe('setDescription after offer (outbound answer)', () => {

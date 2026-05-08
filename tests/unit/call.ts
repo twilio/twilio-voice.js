@@ -2772,12 +2772,40 @@ describe('Call', function() {
       sinon.assert.callCount(callback, 1);
     });
 
-    it('should not call reinvite when CallSid is not set', () => {
+    it('should not call adapter.iceRestart when CallSid is not set', () => {
       conn = new Call(config, Object.assign(options));
       conn.parameters = {};
-      mediaHandler.iceRestart = sinon.spy((cb: Function) => cb('offer-sdp'));
+      pstream.iceRestart = sinon.stub();
       conn['_mediaReconnectBackoff'].emit('ready');
-      sinon.assert.notCalled(pstream.reinvite);
+      sinon.assert.notCalled(pstream.iceRestart);
+    });
+
+    it('should call adapter.iceRestart(callSid, {mediaHandler}) when the backoff fires', () => {
+      conn = new Call(config, Object.assign(options));
+      conn.parameters = { CallSid: 'CAtest' };
+      pstream.iceRestart = sinon.stub();
+      conn['_mediaReconnectBackoff'].emit('ready');
+      sinon.assert.calledOnce(pstream.iceRestart);
+      assert.strictEqual(pstream.iceRestart.firstCall.args[0], 'CAtest');
+      assert.deepStrictEqual(pstream.iceRestart.firstCall.args[1], { mediaHandler: conn['_mediaHandler'] });
+    });
+
+    it('self-cleans answer/hangup listeners when adapter emits hangup for the callSid (re-INVITE failure path)', () => {
+      conn = new Call(config, Object.assign(options));
+      conn.parameters = { CallSid: 'CAtest' };
+      pstream.iceRestart = sinon.stub();
+      // Capture per-event baselines BEFORE the backoff adds its listeners so we
+      // can assert each event's count returns to its baseline after hangup (an
+      // aggregate sum could mask a leak where a listener is added as another
+      // is removed).
+      const answerBaseline = pstream.listenerCount('answer');
+      const hangupBaseline = pstream.listenerCount('hangup');
+      conn['_mediaReconnectBackoff'].emit('ready');
+      assert.strictEqual(pstream.listenerCount('answer'), answerBaseline + 1);
+      assert.strictEqual(pstream.listenerCount('hangup'), hangupBaseline + 1);
+      pstream.emit('hangup', { callsid: 'CAtest' });
+      assert.strictEqual(pstream.listenerCount('answer'), answerBaseline);
+      assert.strictEqual(pstream.listenerCount('hangup'), hangupBaseline);
     });
   });
 });

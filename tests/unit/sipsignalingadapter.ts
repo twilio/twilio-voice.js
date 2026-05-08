@@ -7,9 +7,11 @@ import { IPeerConnection, SipSessionDescriptionHandler } from '../../lib/twilio/
 function createPeerConnectionStub(): IPeerConnection {
   return {
     onerror: () => { /* replaced by SDH constructor when used */ },
+    onfailed: () => { /* replaced by SDH constructor when used */ },
     makeOutgoingCall: sinon.stub(),
     answerIncomingCall: sinon.stub(),
     processAnswer: sinon.stub(),
+    iceRestart: sinon.stub(),
     close: sinon.stub(),
   };
 }
@@ -669,23 +671,28 @@ describe('SipSignalingAdapter', () => {
     });
   });
 
-  describe('reinvite()', () => {
-    it('should call session.invite() for established sessions', () => {
+  describe('iceRestart()', () => {
+    const mediaHandlerStub = () => ({ iceRestart: sinon.stub() });
+
+    it('passes offerOptions.iceRestart:true to session.invite', () => {
       const { adapter, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
       inviterStub.state = 'Established';
-      adapter.reinvite('call-1', { sdp: 'new-sdp' });
-      // session.invite is the re-INVITE call (distinct from inviter.invite for initial INVITE)
-      // inviterStub.invite is called once for initial, then once for reinvite = 2 total
-      assert.strictEqual(inviterStub.invite.callCount, 2);
+      adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+      const reinviteOpts = inviterStub.invite.lastCall.args[0];
+      assert.strictEqual(reinviteOpts?.sessionDescriptionHandlerOptions?.offerOptions?.iceRestart, true);
     });
 
-    it('should not throw for non-established session', () => {
-      const { adapter } = createAdapter();
-      assert.doesNotThrow(() => adapter.reinvite('unknown', { sdp: 'sdp' }));
+    it('does NOT consult the mediaHandler (SIP SDH generates the offer itself)', () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      const mediaHandler = mediaHandlerStub();
+      adapter.iceRestart('call-1', { mediaHandler });
+      sinon.assert.notCalled(mediaHandler.iceRestart);
     });
 
-    it('should emit "answer" on requestDelegate.onAccept', (done) => {
+    it('emits "answer" on requestDelegate.onAccept', (done) => {
       const { adapter, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
       inviterStub.state = 'Established';
@@ -693,18 +700,50 @@ describe('SipSignalingAdapter', () => {
         assert.strictEqual(payload.callsid, 'call-1');
         done();
       });
-      adapter.reinvite('call-1', { sdp: 'new-sdp' });
+      adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
       const rd = inviterStub.invite.lastCall.args[0]?.requestDelegate;
       rd.onAccept();
     });
 
-    it('should warn but not throw on requestDelegate.onReject', () => {
+    it('emits hangup WITHOUT an error field when session is not established (Call cleans up listeners silently)', (done) => {
+      const { adapter } = createAdapter();
+      adapter.on('hangup', (payload: any) => {
+        assert.strictEqual(payload.callsid, 'nope');
+        // No error field: Call._onHangup would translate `error` into an
+        // emit('error', ConnectionError), which is not wanted for this
+        // benign teardown race.
+        assert.strictEqual(payload.error, undefined);
+        done();
+      });
+      adapter.iceRestart('nope', { mediaHandler: mediaHandlerStub() });
+    });
+
+    it('emits hangup (with status code) on requestDelegate.onReject', (done) => {
       const { adapter, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
       inviterStub.state = 'Established';
-      adapter.reinvite('call-1', { sdp: 'new-sdp' });
+      adapter.on('hangup', (payload: any) => {
+        assert.strictEqual(payload.callsid, 'call-1');
+        assert.strictEqual(payload.error.code, 488);
+        done();
+      });
+      adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
       const rd = inviterStub.invite.lastCall.args[0]?.requestDelegate;
-      assert.doesNotThrow(() => rd.onReject({ message: { statusCode: 488 } }));
+      rd.onReject({ message: { statusCode: 488 } });
+    });
+
+    it('emits hangup when session.invite rejects asynchronously (via .catch)', (done) => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      // Make session.invite return a rejected Promise on the next call.
+      inviterStub.invite = sinon.stub().returns(Promise.reject(new Error('invite failed')));
+      adapter.on('hangup', (payload: any) => {
+        assert.strictEqual(payload.callsid, 'call-1');
+        assert.ok(payload.error);
+        done();
+      });
+      adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
     });
   });
 
