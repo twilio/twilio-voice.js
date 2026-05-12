@@ -3,7 +3,7 @@ const viewerResponseHandler = require('./handler');
 
 const EXPECTED_CSP =
   "default-src 'self'; " +
-  "script-src 'self' 'unsafe-inline'; " +
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
   "script-src-attr 'none'; " +
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
   "img-src 'self' data: https://img.shields.io https://dl.circleci.com; " +
@@ -11,12 +11,12 @@ const EXPECTED_CSP =
   "font-src 'self' data: https://fonts.gstatic.com; " +
   "object-src 'none'; " +
   "base-uri 'self'; " +
-  "frame-ancestors 'none'; " +
+  "frame-ancestors 'self'; " +
   "form-action 'self'";
 
 const SECURITY_HEADERS = {
   'content-security-policy': { value: EXPECTED_CSP },
-  'x-frame-options': { value: 'DENY' },
+  'x-frame-options': { value: 'SAMEORIGIN' },
   'cross-origin-opener-policy': { value: 'same-origin' },
   'strict-transport-security': { value: 'max-age=63072000; includeSubDomains' },
   'x-content-type-options': { value: 'nosniff' },

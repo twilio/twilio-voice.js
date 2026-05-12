@@ -29,7 +29,7 @@ function handler(event) {
     headers['content-security-policy'] = {
       value:
         "default-src 'self'; " +
-        "script-src 'self' 'unsafe-inline'; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
         "script-src-attr 'none'; " +
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
         "img-src 'self' data: https://img.shields.io https://dl.circleci.com; " +
@@ -37,10 +37,10 @@ function handler(event) {
         "font-src 'self' data: https://fonts.gstatic.com; " +
         "object-src 'none'; " +
         "base-uri 'self'; " +
-        "frame-ancestors 'none'; " +
+        "frame-ancestors 'self'; " +
         "form-action 'self'"
     };
-    headers['x-frame-options'] = { value: 'DENY' };
+    headers['x-frame-options'] = { value: 'SAMEORIGIN' };
     headers['cross-origin-opener-policy'] = { value: 'same-origin' };
     headers['strict-transport-security'] = { value: 'max-age=63072000; includeSubDomains' };
     headers['x-content-type-options'] = { value: 'nosniff' };
