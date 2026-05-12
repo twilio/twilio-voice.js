@@ -31,10 +31,10 @@ function handler(event) {
         "default-src 'self'; " +
         "script-src 'self' 'unsafe-inline'; " +
         "script-src-attr 'none'; " +
-        "style-src 'self' 'unsafe-inline'; " +
-        "img-src 'self' data:; " +
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+        "img-src 'self' data: https://img.shields.io https://dl.circleci.com; " +
         "connect-src 'self'; " +
-        "font-src 'self' data:; " +
+        "font-src 'self' data: https://fonts.gstatic.com; " +
         "object-src 'none'; " +
         "base-uri 'self'; " +
         "frame-ancestors 'none'; " +
