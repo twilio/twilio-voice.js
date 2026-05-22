@@ -5,6 +5,7 @@ import {
   InviterOptions,
   Registerer,
   RegistererState,
+  RequestPendingError,
   SessionDescriptionHandler,
   Session,
   SessionInviteOptions,
@@ -12,6 +13,7 @@ import {
   URI,
   UserAgent,
 } from 'sip.js';
+import Backoff from '../backoff';
 import Log from '../log';
 import {
   AnswerConfig,
@@ -29,6 +31,17 @@ import {
   SessionDescriptionHandlerOptions,
   SipSessionDescriptionHandler,
 } from './sipsessiondescriptionhandler';
+
+// Reconnect backoff policy mirrors WSTransport's two-tier model:
+// - Preferred: short retries on the same URI for a bounded window (15s).
+// - Primary: unbounded fallback retries with a higher delay cap.
+// Twilio's SIP-over-WS exposes a single URI today, so primary retries the
+// same URI. Multi-edge SIP is on the roadmap; when it lands, primary is
+// the tier that should rotate through fallback edges (see WSTransport).
+const PREFERRED_BACKOFF_CONFIG = { factor: 2.0, jitter: 0.40, min: 100, max: 1000 };
+const PRIMARY_BACKOFF_CONFIG = { factor: 2.0, jitter: 0.40, min: 100, max: 20000 };
+const MAX_PREFERRED_DURATION_MS = 15000;
+const MAX_PRIMARY_DURATION_MS = Infinity;
 
 // SIP.js's SessionInviteOptions.sessionDescriptionHandlerOptions is typed
 // as the base SessionDescriptionHandlerOptions, which does not expose
@@ -110,6 +123,21 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   private _token: string = '';
   private _uri: string;
   private _userAgent: any | null = null;
+  private _backoff: { preferred: Backoff, primary: Backoff } | null = null;
+  private _backoffStartTime: { preferred: number | null, primary: number | null } = {
+    preferred: null,
+    primary: null,
+  };
+  private _isReconnecting: boolean = false;
+  private _wasRegistered: boolean = false;
+  // Tracks call SIDs whose in-flight ICE-restart re-INVITE was orphaned by a
+  // WS disconnect. When the rejection finally arrives (typically a 408 from
+  // the dead socket), it represents stale state — not a server hangup.
+  // Suppress the hangup emit so Call can issue a fresh ICE restart instead.
+  private _staleIceRestarts: Set<string> = new Set();
+  // Call SIDs with an active ICE-restart re-INVITE. Used to mark them stale
+  // on WS disconnect.
+  private _inFlightIceRestarts: Set<string> = new Set();
 
   constructor(options: SipSignalingAdapterOptions) {
     super();
@@ -199,6 +227,14 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     }
 
     const isPresent = mediaCapabilities?.audio === true;
+    this._wasRegistered = isPresent;
+
+    // Defer registerer ops while reconnecting; _onReconnectSuccess will re-create
+    // the registerer based on _wasRegistered once the transport is back.
+    if (this._isReconnecting) {
+      this._log.debug('Skipping register call while reconnecting');
+      return;
+    }
 
     if (!isPresent) {
       if (this._registerer) {
@@ -214,6 +250,14 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     // SIP.js Registerer handles refresh internally, so skip if one already exists.
     if (this._registerer) {
       this._log.debug('Registerer already exists, skipping duplicate register call');
+      return;
+    }
+
+    this._createAndStartRegisterer();
+  }
+
+  private _createAndStartRegisterer(): void {
+    if (!this._userAgent) {
       return;
     }
 
@@ -261,6 +305,18 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   destroy(): void {
     this._log.info('Destroying SipSignalingAdapter');
 
+    this._isReconnecting = false;
+    if (this._backoff) {
+      this._backoff.preferred.reset();
+      this._backoff.preferred.removeAllListeners();
+      this._backoff.primary.reset();
+      this._backoff.primary.removeAllListeners();
+      this._backoff = null;
+    }
+    this._backoffStartTime.preferred = null;
+    this._backoffStartTime.primary = null;
+    this._wasRegistered = false;
+
     const byeEstablished = (session: Session) => {
       if (session.state === SessionState.Established) {
         session.bye().catch((error: Error) => {
@@ -273,6 +329,8 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     this._inboundSessions.clear();
     this._outboundSessions.clear();
     this._pendingInvitations.clear();
+    this._inFlightIceRestarts.clear();
+    this._staleIceRestarts.clear();
 
     if (this._registerer) {
       this._registerer.dispose().catch((error: Error) => {
@@ -380,9 +438,12 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       this.emit('hangup', { callsid: callSid });
       return;
     }
+    this._inFlightIceRestarts.add(callSid);
     const inviteOptions: IceRestartInviteOptions = {
       requestDelegate: {
         onAccept: () => {
+          this._inFlightIceRestarts.delete(callSid);
+          this._staleIceRestarts.delete(callSid);
           // SDP intentionally empty: the SDH consumed the remote answer via
           // SIP.js's setDescription before this event fires, so Call's
           // onAnswerOrRinging skips processAnswer on empty SDP. Passing a
@@ -390,6 +451,15 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
           this.emit('answer', { callsid: callSid, sdp: '' });
         },
         onReject: (response: any) => {
+          this._inFlightIceRestarts.delete(callSid);
+          if (this._staleIceRestarts.has(callSid)) {
+            // Re-INVITE rejected because the WS dropped while it was in flight.
+            // Don't emit hangup — _onReconnectSuccess will emit
+            // 'iceRestartNeeded' once the transport is back so Call can
+            // re-trigger.
+            this._log.info('Suppressing stale ICE-restart re-INVITE rejection');
+            return;
+          }
           const code = response?.message?.statusCode;
           this._log.warn('ICE-restart re-INVITE rejected', code);
           this.emit('hangup', {
@@ -403,6 +473,16 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       },
     };
     session.invite(inviteOptions).catch((error: Error) => {
+      // A previous re-INVITE is still in flight — its requestDelegate owns the
+      // outcome. Treating this as fatal here would tear down the call before
+      // the in-flight re-INVITE has a chance to succeed or surface the real
+      // failure (timeout, reject, etc.).
+      if (error instanceof RequestPendingError) {
+        this._log.info('iceRestart skipped: previous re-INVITE still pending');
+        return;
+      }
+      this._inFlightIceRestarts.delete(callSid);
+      this._staleIceRestarts.delete(callSid);
       this._log.warn('Failed to send ICE-restart re-INVITE', error);
       this.emit('hangup', {
         callsid: callSid,
@@ -700,10 +780,30 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   private _onTransportDisconnect(error?: Error): void {
     this._log.info('WebSocket disconnected', error?.message);
 
-    this._inboundSessions.clear();
-    this._outboundSessions.clear();
-    this._pendingInvitations.clear();
+    if (this._isReconnecting || !this._userAgent) {
+      return;
+    }
+    // _status is still 'disconnected' only if onConnect never fired, i.e. the
+    // initial userAgent.start() handshake failed. There's no session to
+    // recover, and start()'s caller already surfaces that error.
+    if (this._status === 'disconnected') {
+      return;
+    }
 
+    this._isReconnecting = true;
+
+    // Any in-flight ICE-restart re-INVITE is now orphaned on a dead socket.
+    // Mark stale so its eventual rejection (typically 408) doesn't tear down
+    // the call — Call will retry ICE restart from its own backoff.
+    this._log.info(`_onTransportDisconnect: marking ${this._inFlightIceRestarts.size} in-flight re-INVITE(s) stale`);
+    this._inFlightIceRestarts.forEach((callSid: string) => {
+      this._staleIceRestarts.add(callSid);
+    });
+
+    // Dispose the registerer — SIP.js requires a fresh Registerer after the
+    // transport reconnects. Do NOT clear session maps; they remain addressable
+    // through the blip so hangup(callSid) can still route and existing
+    // sessions stay valid if WS recovers in time.
     if (this._registerer) {
       this._registerer.dispose().catch((err: Error) => {
         this._log.warn('Error disposing registerer during disconnect', err);
@@ -711,10 +811,109 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       this._registerer = null;
     }
 
-    if (this._status !== 'disconnected') {
-      this._status = 'disconnected';
-      this.emit('transportClose');
-      this.emit('offline', this);
+    this._status = 'disconnected';
+    this.emit('transportClose');
+
+    if (!this._backoff) {
+      this._backoff = this._setupBackoffs();
     }
+    this._backoff.preferred.backoff();
+  }
+
+  private _setupBackoffs(): { preferred: Backoff, primary: Backoff } {
+    const preferred = new Backoff(PREFERRED_BACKOFF_CONFIG);
+    preferred.on('backoff', (attempt: number) => {
+      if (attempt === 0) {
+        this._backoffStartTime.preferred = Date.now();
+      }
+    });
+    preferred.on('ready', (attempt: number) => this._onPreferredBackoffReady(attempt));
+
+    const primary = new Backoff(PRIMARY_BACKOFF_CONFIG);
+    primary.on('backoff', (attempt: number) => {
+      if (attempt === 0) {
+        this._backoffStartTime.primary = Date.now();
+      }
+    });
+    primary.on('ready', (attempt: number) => this._onPrimaryBackoffReady(attempt));
+
+    return { preferred, primary };
+  }
+
+  private _onPreferredBackoffReady(attempt: number): void {
+    if (!this._userAgent || !this._isReconnecting || !this._backoff) {
+      return;
+    }
+
+    if (this._backoffStartTime.preferred !== null
+        && Date.now() - this._backoffStartTime.preferred > MAX_PREFERRED_DURATION_MS) {
+      this._log.info('Max preferred reconnect duration exceeded; falling back to primary backoff.');
+      this._backoff.primary.backoff();
+      return;
+    }
+
+    this._attemptReconnect(attempt, 'preferred');
+  }
+
+  private _onPrimaryBackoffReady(attempt: number): void {
+    if (!this._userAgent || !this._isReconnecting || !this._backoff) {
+      return;
+    }
+
+    if (this._backoffStartTime.primary !== null
+        && Date.now() - this._backoffStartTime.primary > MAX_PRIMARY_DURATION_MS) {
+      this._log.warn('Max primary reconnect duration exceeded; not attempting a connection.');
+      return;
+    }
+
+    this._attemptReconnect(attempt, 'primary');
+  }
+
+  private _attemptReconnect(attempt: number, tier: 'preferred' | 'primary'): void {
+    if (!this._userAgent || !this._backoff) {
+      return;
+    }
+    this._log.info(`Reconnect attempt #${attempt} (${tier})`);
+    this._userAgent.reconnect()
+      .then(() => this._onReconnectSuccess())
+      .catch((err: Error) => {
+        this._log.warn('Reconnect attempt failed', err?.message);
+        this._backoff?.[tier].backoff();
+      });
+  }
+
+  private _onReconnectSuccess(): void {
+    this._log.info('Reconnect succeeded');
+    this._isReconnecting = false;
+    this._resetBackoffs();
+
+    // SIP.js's onConnect delegate normally fires from reconnect() and runs
+    // _onTransportConnect. Defensive sync if it didn't.
+    if (this._status === 'disconnected') {
+      this._onTransportConnect();
+    }
+
+    if (this._wasRegistered) {
+      this._createAndStartRegisterer();
+    }
+
+    // Calls whose ICE-restart re-INVITE was orphaned by the disconnect now
+    // need a fresh re-INVITE — the server never received the new ICE/DTLS
+    // creds. Tell Call to re-trigger.
+    const stale: string[] = [];
+    this._staleIceRestarts.forEach((callSid: string) => stale.push(callSid));
+    this._staleIceRestarts.clear();
+    this._log.info(`_onReconnectSuccess: ${stale.length} stale ICE-restart(s) to re-trigger`);
+    stale.forEach((callSid: string) => {
+      this._log.info(`Emitting iceRestartNeeded for ${callSid}`);
+      this.emit('iceRestartNeeded', { callsid: callSid });
+    });
+  }
+
+  private _resetBackoffs(): void {
+    this._backoffStartTime.preferred = null;
+    this._backoffStartTime.primary = null;
+    this._backoff?.preferred.reset();
+    this._backoff?.primary.reset();
   }
 }

@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import * as sinon from 'sinon';
+import { RequestPendingError } from 'sip.js';
 import { SignalingAdapter } from '../../lib/twilio/signaling/signalingadapter';
 import { SipSignalingAdapter } from '../../lib/twilio/signaling/sipsignalingadapter';
 import { IPeerConnection, SipSessionDescriptionHandler } from '../../lib/twilio/signaling/sipsessiondescriptionhandler';
@@ -90,12 +91,14 @@ function createInvitationStub(headers?: Record<string, string>) {
 
 function createUserAgentStub() {
   let delegate: any = {};
+  let reconnectImpl: () => Promise<void> = () => Promise.resolve();
   return {
     start: sinon.stub().resolves(),
     stop: sinon.stub().resolves(),
-    reconnect: sinon.stub().resolves(),
+    reconnect: sinon.stub().callsFake(() => reconnectImpl()),
     _getDelegate() { return delegate; },
     _setDelegate(d: any) { delegate = d; },
+    _setReconnectImpl(fn: () => Promise<void>) { reconnectImpl = fn; },
     _triggerConnect() { delegate.onConnect?.(); },
     _triggerDisconnect(err?: Error) { delegate.onDisconnect?.(err); },
     _triggerInvite(inv?: any) { delegate.onInvite?.(inv); },
@@ -194,11 +197,15 @@ describe('SipSignalingAdapter', () => {
       uaStub._triggerDisconnect();
     });
 
-    it('should emit "offline" when transport disconnects', (done) => {
+    it('should NOT emit "offline" on transient transport disconnect', () => {
+      // Offline is reserved for terminal failure (retry budget exhausted).
+      // A bare disconnect kicks off reconnection — no offline yet.
       const { adapter, uaStub } = createAdapter();
       uaStub._triggerConnect();
-      adapter.on('offline', () => done());
+      const offlineSpy = sinon.spy();
+      adapter.on('offline', offlineSpy);
       uaStub._triggerDisconnect();
+      assert.strictEqual(offlineSpy.callCount, 0);
     });
 
     it('should set status to "disconnected" when transport disconnects', () => {
@@ -208,13 +215,13 @@ describe('SipSignalingAdapter', () => {
       assert.strictEqual(adapter.status, 'disconnected');
     });
 
-    it('should not emit "offline" if already disconnected', () => {
+    it('should not emit "transportClose" if already disconnected', () => {
       const { adapter, uaStub } = createAdapter();
-      // Status is already 'disconnected' (initial state), so disconnect should not emit 'offline'
-      const offlineSpy = sinon.spy();
-      adapter.on('offline', offlineSpy);
+      // Status is already 'disconnected' (initial state, no prior connect)
+      const closeSpy = sinon.spy();
+      adapter.on('transportClose', closeSpy);
       uaStub._triggerDisconnect();
-      assert.strictEqual(offlineSpy.callCount, 0);
+      assert.strictEqual(closeSpy.callCount, 0);
     });
 
     it('should dispose registerer on transport disconnect', () => {
@@ -745,6 +752,19 @@ describe('SipSignalingAdapter', () => {
       });
       adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
     });
+
+    it('does not emit hangup when session.invite rejects with RequestPendingError', async () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      inviterStub.invite = sinon.stub().returns(Promise.reject(new RequestPendingError('Reinvite in progress')));
+      const onHangup = sinon.stub();
+      adapter.on('hangup', onHangup);
+      adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+      await new Promise(resolve => setTimeout(resolve, 0));
+      sinon.assert.notCalled(onHangup);
+    });
+
   });
 
   describe('dtmf()', () => {
@@ -808,13 +828,16 @@ describe('SipSignalingAdapter', () => {
       assert(inviterStub.bye.calledOnce);
     });
 
-    it('transport disconnect should clear session maps', () => {
+    it('transport disconnect should preserve session maps so hangup can still route', () => {
       const { adapter, uaStub, inviterStub } = createAdapter();
       uaStub._triggerConnect();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
       uaStub._triggerDisconnect();
-      // Session map cleared — hangup should not find session
+      // Session is still addressable through the blip; hangup routes to cancel
+      // (Inviter in Initial state issues cancel) and fails gracefully via
+      // the existing .catch() path — does not throw to consumer.
       assert.doesNotThrow(() => adapter.hangup('call-1', {}));
+      assert(inviterStub.cancel.calledOnce);
     });
   });
 
@@ -896,6 +919,275 @@ describe('SipSignalingAdapter', () => {
       const answerIncomingCall = peerConnection.answerIncomingCall as sinon.SinonStub;
       assert(answerIncomingCall.calledOnce);
       assert.strictEqual(answerIncomingCall.firstCall.args[0], 'CA-test-call-sid');
+    });
+  });
+
+  describe('reconnect lifecycle', () => {
+    let clock: sinon.SinonFakeTimers;
+    let randomStub: sinon.SinonStub;
+
+    beforeEach(() => {
+      clock = sinon.useFakeTimers();
+      // Pin Math.random so jitter resolves to exactly the computed delay
+      // (deviation = floor(0 * jitter * ms) = 0; (0 & 1) === 0 path subtracts 0).
+      randomStub = sinon.stub(Math, 'random').returns(0);
+    });
+
+    afterEach(() => {
+      clock.restore();
+      randomStub.restore();
+    });
+
+    it('emits transportClose but NOT offline on transient disconnect', () => {
+      const { adapter, uaStub } = createAdapter();
+      uaStub._triggerConnect();
+      const closeSpy = sinon.spy();
+      const offlineSpy = sinon.spy();
+      adapter.on('transportClose', closeSpy);
+      adapter.on('offline', offlineSpy);
+      uaStub._triggerDisconnect();
+      assert.strictEqual(closeSpy.callCount, 1);
+      assert.strictEqual(offlineSpy.callCount, 0);
+    });
+
+    it('does NOT clear session maps on transient disconnect', async () => {
+      const { adapter, uaStub, inviterStub } = createAdapter();
+      uaStub._triggerConnect();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      uaStub._triggerDisconnect();
+      // Sessions still addressable through the blip — hangup routes (does not warn-and-skip)
+      adapter.hangup('call-1', {});
+      assert(inviterStub.cancel.calledOnce);
+    });
+
+    it('schedules userAgent.reconnect after the backoff delay', async () => {
+      const { uaStub } = createAdapter();
+      uaStub._triggerConnect();
+      uaStub._triggerDisconnect();
+      assert.strictEqual(uaStub.reconnect.callCount, 0, 'should not reconnect synchronously');
+      await clock.tickAsync(100);
+      assert.strictEqual(uaStub.reconnect.callCount, 1);
+    });
+
+    it('retries with exponential backoff on reconnect failure', async () => {
+      const { uaStub } = createAdapter();
+      uaStub._setReconnectImpl(() => Promise.reject(new Error('still down')));
+      uaStub._triggerConnect();
+      uaStub._triggerDisconnect();
+      await clock.tickAsync(100);   // attempt #0
+      assert.strictEqual(uaStub.reconnect.callCount, 1);
+      await clock.tickAsync(200);   // attempt #1: 100 * 2^1 = 200
+      assert.strictEqual(uaStub.reconnect.callCount, 2);
+      await clock.tickAsync(400);   // attempt #2: 100 * 2^2 = 400
+      assert.strictEqual(uaStub.reconnect.callCount, 3);
+    });
+
+    it('emits connected then ready after successful reconnect when previously registered', async () => {
+      // Make createRegisterer return a fresh stub on each call so we can drive
+      // the post-reconnect Registerer's stateChange independently.
+      const registerers: ReturnType<typeof createRegistererStub>[] = [];
+      const uaStub = createUserAgentStub();
+      const inviterStub = createInviterStub();
+      const adapter = new SipSignalingAdapter({
+        sipDomain: 'sip.ashburn.dev.twilio.com',
+        sipUri: 'sip:alice@sip.ashburn.dev.twilio.com',
+        sipTransportServer: 'wss://sip.ashburn.dev.twilio.com',
+        credentials: { username: 'alice', password: 'secret' },
+        region: 'ashburn',
+        createUserAgent(config: any) { uaStub._setDelegate(config.delegate); return uaStub as any; },
+        createRegisterer() { const r = createRegistererStub(); registerers.push(r); return r as any; },
+        createInviter() { return inviterStub as any; },
+      });
+
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      registerers[0]._simulateState('Registered');
+
+      const events: string[] = [];
+      adapter.on('connected', () => events.push('connected'));
+      adapter.on('ready', () => events.push('ready'));
+
+      uaStub._triggerDisconnect();
+      // Mock SIP.js's behavior: reconnect() resolves AND fires onConnect.
+      uaStub._setReconnectImpl(() => {
+        uaStub._triggerConnect();
+        return Promise.resolve();
+      });
+      await clock.tickAsync(100);
+      // _onReconnectSuccess creates a new registerer; drive it to Registered.
+      assert.strictEqual(registerers.length, 2, 'a new Registerer should be created');
+      registerers[1]._simulateState('Registered');
+
+      assert.deepStrictEqual(events, ['connected', 'ready']);
+    });
+
+    it('does NOT re-register if consumer never registered before disconnect', async () => {
+      const registerers: ReturnType<typeof createRegistererStub>[] = [];
+      const uaStub = createUserAgentStub();
+      const adapter = new SipSignalingAdapter({
+        sipDomain: 'sip.ashburn.dev.twilio.com',
+        sipUri: 'sip:alice@sip.ashburn.dev.twilio.com',
+        sipTransportServer: 'wss://sip.ashburn.dev.twilio.com',
+        credentials: { username: 'alice', password: 'secret' },
+        region: 'ashburn',
+        createUserAgent(config: any) { uaStub._setDelegate(config.delegate); return uaStub as any; },
+        createRegisterer() { const r = createRegistererStub(); registerers.push(r); return r as any; },
+        createInviter() { return createInviterStub() as any; },
+      });
+
+      uaStub._triggerConnect();
+      // No register() call before disconnect.
+      uaStub._triggerDisconnect();
+      uaStub._setReconnectImpl(() => { uaStub._triggerConnect(); return Promise.resolve(); });
+      await clock.tickAsync(100);
+      assert.strictEqual(registerers.length, 0, 'no Registerer should be created post-reconnect');
+      assert.strictEqual(adapter.status, 'connected');
+    });
+
+    it('disposes the old Registerer and creates a fresh one on reconnect', async () => {
+      const registerers: ReturnType<typeof createRegistererStub>[] = [];
+      const uaStub = createUserAgentStub();
+      const adapter = new SipSignalingAdapter({
+        sipDomain: 'sip.ashburn.dev.twilio.com',
+        sipUri: 'sip:alice@sip.ashburn.dev.twilio.com',
+        sipTransportServer: 'wss://sip.ashburn.dev.twilio.com',
+        credentials: { username: 'alice', password: 'secret' },
+        region: 'ashburn',
+        createUserAgent(config: any) { uaStub._setDelegate(config.delegate); return uaStub as any; },
+        createRegisterer() { const r = createRegistererStub(); registerers.push(r); return r as any; },
+        createInviter() { return createInviterStub() as any; },
+      });
+
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      registerers[0]._simulateState('Registered');
+
+      uaStub._triggerDisconnect();
+      assert(registerers[0].dispose.calledOnce);
+
+      uaStub._setReconnectImpl(() => { uaStub._triggerConnect(); return Promise.resolve(); });
+      await clock.tickAsync(100);
+      assert.strictEqual(registerers.length, 2);
+      assert(registerers[1].register.calledOnce);
+    });
+
+    it('falls back from preferred to primary backoff after the preferred budget expires', async () => {
+      // Mirrors WSTransport: preferred has a 15s budget; on expiry, primary
+      // backoff kicks in (max 20s delay, infinite duration). Adapter does NOT
+      // emit offline from network failure alone — same as PStream.
+      const { adapter, uaStub } = createAdapter();
+      uaStub._setReconnectImpl(() => Promise.reject(new Error('down')));
+      uaStub._triggerConnect();
+
+      const offlineSpy = sinon.spy();
+      adapter.on('offline', offlineSpy);
+
+      uaStub._triggerDisconnect();
+      // Drive past the 15s preferred budget. Reconnect is still being called
+      // afterward (under primary backoff) and offline has NOT fired.
+      await clock.tickAsync(20000);
+      const callCountAfterPreferred = uaStub.reconnect.callCount;
+      assert(callCountAfterPreferred > 0, 'reconnect should have been attempted under preferred');
+      assert.strictEqual(offlineSpy.callCount, 0, 'offline must not fire on transient network failure');
+
+      // Advance well past the preferred budget into primary territory.
+      // Primary's first delay is 100ms, then 200, 400, ..., capped at 20000.
+      // After many seconds, additional reconnect attempts should keep firing.
+      await clock.tickAsync(60000);
+      assert(
+        uaStub.reconnect.callCount > callCountAfterPreferred,
+        'primary backoff should keep retrying after preferred expires',
+      );
+      assert.strictEqual(offlineSpy.callCount, 0);
+      assert.strictEqual(adapter.status, 'disconnected');
+    });
+
+    it('resets backoff after a successful reconnect (subsequent disconnect retries from attempt 0)', async () => {
+      const { uaStub } = createAdapter();
+      uaStub._triggerConnect();
+      uaStub._triggerDisconnect();
+      uaStub._setReconnectImpl(() => { uaStub._triggerConnect(); return Promise.resolve(); });
+      await clock.tickAsync(100);
+      assert.strictEqual(uaStub.reconnect.callCount, 1);
+
+      // Second disconnect — should retry at the min delay again, not at a higher attempt.
+      uaStub._setReconnectImpl(() => Promise.resolve());
+      uaStub._triggerDisconnect();
+      await clock.tickAsync(99);
+      assert.strictEqual(uaStub.reconnect.callCount, 1, 'no reconnect before min delay');
+      await clock.tickAsync(1);
+      assert.strictEqual(uaStub.reconnect.callCount, 2);
+    });
+
+    it('ignores duplicate disconnect events while already reconnecting', async () => {
+      const { uaStub } = createAdapter();
+      uaStub._triggerConnect();
+      uaStub._triggerDisconnect();
+      uaStub._triggerDisconnect();   // duplicate — should be ignored
+      uaStub._triggerDisconnect();   // duplicate — should be ignored
+      await clock.tickAsync(100);
+      assert.strictEqual(uaStub.reconnect.callCount, 1);
+    });
+
+    it('destroy() cancels any in-flight reconnect', async () => {
+      const { adapter, uaStub } = createAdapter();
+      uaStub._triggerConnect();
+      uaStub._triggerDisconnect();
+      adapter.destroy();
+      await clock.tickAsync(5000);
+      assert.strictEqual(uaStub.reconnect.callCount, 0);
+    });
+
+    it('register() is a no-op while reconnecting', () => {
+      const createRegisterer = sinon.stub().callsFake(() => createRegistererStub() as any);
+      const { adapter, uaStub } = createAdapter({ createRegisterer });
+      uaStub._setReconnectImpl(() => Promise.reject(new Error('down')));
+      uaStub._triggerConnect();
+      uaStub._triggerDisconnect();
+      createRegisterer.resetHistory();
+      assert.doesNotThrow(() => adapter.register({ audio: true }));
+      assert.strictEqual(createRegisterer.callCount, 0);
+    });
+
+    it('suppresses hangup and emits iceRestartNeeded for an in-flight ICE-restart re-INVITE orphaned by a WS disconnect', async () => {
+      const { adapter, uaStub, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      uaStub._triggerConnect();
+
+      // Issue ICE restart while WS is up
+      adapter.iceRestart('call-1', { mediaHandler: { iceRestart: sinon.stub() } });
+      const rd = inviterStub.invite.lastCall.args[0]?.requestDelegate;
+
+      const onHangup = sinon.stub();
+      const onIceRestartNeeded = sinon.stub();
+      adapter.on('hangup', onHangup);
+      adapter.on('iceRestartNeeded', onIceRestartNeeded);
+
+      // WS dies while re-INVITE is in flight
+      uaStub._triggerDisconnect();
+      // Late rejection arrives (e.g. a 408 from the dead socket)
+      rd.onReject({ message: { statusCode: 408 } });
+      sinon.assert.notCalled(onHangup);
+
+      // WS reconnects successfully
+      uaStub._setReconnectImpl(() => { uaStub._triggerConnect(); return Promise.resolve(); });
+      await clock.tickAsync(100);
+
+      sinon.assert.calledOnce(onIceRestartNeeded);
+      assert.strictEqual(onIceRestartNeeded.firstCall.args[0].callsid, 'call-1');
+    });
+
+    it('hangup() during reconnect window does not throw to the consumer', async () => {
+      const { adapter, uaStub, inviterStub } = createAdapter();
+      uaStub._setReconnectImpl(() => Promise.reject(new Error('down')));
+      uaStub._triggerConnect();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      uaStub._triggerDisconnect();
+
+      // Simulate the closed-WS error from SIP.js: cancel() rejects.
+      inviterStub.cancel = sinon.stub().rejects(new Error('transport closed'));
+      assert.doesNotThrow(() => adapter.hangup('call-1', {}));
     });
   });
 });

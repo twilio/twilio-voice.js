@@ -617,6 +617,7 @@ class Call extends EventEmitter {
     this._signalingAdapter.on('transportClose', this._onTransportClose);
     this._signalingAdapter.on('connected', this._onConnected);
     this._signalingAdapter.on('message', this._onMessageReceived);
+    this._signalingAdapter.on('iceRestartNeeded', this._onIceRestartNeeded);
 
     this.on('error', error => {
       this._publisher.error('connection', 'error', {
@@ -1152,6 +1153,7 @@ class Call extends EventEmitter {
       this._signalingAdapter.removeListener('transportClose', this._onTransportClose);
       this._signalingAdapter.removeListener('connected', this._onConnected);
       this._signalingAdapter.removeListener('message', this._onMessageReceived);
+      this._signalingAdapter.removeListener('iceRestartNeeded', this._onIceRestartNeeded);
     };
 
     // This is kind of a hack, but it lets us avoid rewriting more code.
@@ -1357,6 +1359,21 @@ class Call extends EventEmitter {
   }
 
   /**
+   * Called when the SIP signaling adapter recovered the WS while an
+   * ICE-restart re-INVITE was orphaned. The remote never received the new
+   * ICE/DTLS creds, so kick a fresh ICE restart.
+   */
+  private _onIceRestartNeeded = (payload: { callsid?: string }): void => {
+    if (payload?.callsid !== this.parameters.CallSid
+        || this.status() === Call.State.Closed) {
+      return;
+    }
+    this._log.info('iceRestartNeeded after WS recovery; retrying ICE restart');
+    this._mediaReconnectStartTime = Date.now();
+    this._onMediaFailure(Call.MediaFailure.ConnectionFailed);
+  }
+
+  /**
    * Called when the {@link Call} is hung up.
    * @param payload
    */
@@ -1425,6 +1442,14 @@ class Call extends EventEmitter {
 
       // This is a retry. Previous ICE Restart failed
       if (isEndOfIceCycle) {
+
+        // While signaling is down, an ICE restart re-INVITE cannot reach the
+        // server, so don't burn the budget or retry. iceRestartNeeded from the
+        // adapter will resume the loop with a fresh budget once WS recovers.
+        if (this._signalingAdapter.status === 'disconnected') {
+          this._log.info('Skipping ICE restart retry while signaling is disconnected');
+          return;
+        }
 
         // We already exceeded max retry time.
         if (Date.now() - this._mediaReconnectStartTime > BACKOFF_CONFIG.max) {
@@ -1654,7 +1679,14 @@ class Call extends EventEmitter {
     this._log.error('Received transportClose from pstream');
     this._log.debug('#transportClose');
     this.emit('transportClose');
-    if (this._signalingReconnectToken) {
+    // Stay alive while the call is in-progress. The transport may recover and
+    // (for SIP) the adapter will tell us to re-trigger ICE restart via
+    // 'iceRestartNeeded'. If recovery doesn't happen in time, media-reconnect
+    // backoff will eventually close the call. We only mark Closed up-front
+    // when the call hasn't been answered yet.
+    if (this._status === Call.State.Open
+        || this._status === Call.State.Reconnecting
+        || this._signalingReconnectToken) {
       this._status = Call.State.Reconnecting;
       this._signalingStatus = Call.State.Reconnecting;
       this._publisher.info('connection', 'reconnecting', null, this);
