@@ -829,6 +829,10 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
     this._status = 'disconnected';
     this.emit('transportClose');
+    // Mirror PStream: emit offline on every transport close so Device flips
+    // to Unregistered and sets _shouldReRegister, matching PStream-mode
+    // behavior end-to-end.
+    this.emit('offline', this);
 
     if (!this._backoff) {
       this._backoff = this._setupBackoffs();

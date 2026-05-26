@@ -197,15 +197,15 @@ describe('SipSignalingAdapter', () => {
       uaStub._triggerDisconnect();
     });
 
-    it('should NOT emit "offline" on transient transport disconnect', () => {
-      // Offline is reserved for terminal failure (retry budget exhausted).
-      // A bare disconnect kicks off reconnection — no offline yet.
+    it('should emit "offline" on transport disconnect (PStream parity)', () => {
+      // Mirrors PStream: every transport close emits offline so Device flips
+      // to Unregistered and sets _shouldReRegister.
       const { adapter, uaStub } = createAdapter();
       uaStub._triggerConnect();
       const offlineSpy = sinon.spy();
       adapter.on('offline', offlineSpy);
       uaStub._triggerDisconnect();
-      assert.strictEqual(offlineSpy.callCount, 0);
+      assert.strictEqual(offlineSpy.callCount, 1);
     });
 
     it('should set status to "disconnected" when transport disconnects', () => {
@@ -941,7 +941,7 @@ describe('SipSignalingAdapter', () => {
       randomStub.restore();
     });
 
-    it('emits transportClose but NOT offline on transient disconnect', () => {
+    it('emits transportClose and offline on transient disconnect (PStream parity)', () => {
       const { adapter, uaStub } = createAdapter();
       uaStub._triggerConnect();
       const closeSpy = sinon.spy();
@@ -950,7 +950,7 @@ describe('SipSignalingAdapter', () => {
       adapter.on('offline', offlineSpy);
       uaStub._triggerDisconnect();
       assert.strictEqual(closeSpy.callCount, 1);
-      assert.strictEqual(offlineSpy.callCount, 0);
+      assert.strictEqual(offlineSpy.callCount, 1);
     });
 
     it('does NOT clear session maps on transient disconnect', async () => {
@@ -1106,9 +1106,11 @@ describe('SipSignalingAdapter', () => {
     });
 
     it('falls back from preferred to primary backoff after the preferred budget expires', async () => {
-      // Mirrors WSTransport: preferred has a 15s budget; on expiry, primary
-      // backoff kicks in (max 20s delay, infinite duration). Adapter does NOT
-      // emit offline from network failure alone — same as PStream.
+      // Mirrors WSTransport on the backoff side: preferred has a 15s budget;
+      // on expiry, primary backoff kicks in (max 20s delay, infinite duration).
+      // Adapter mirrors PStream on the offline side: emits offline on the
+      // initial transport close (so Device flips to Unregistered) but does
+      // not re-emit during ongoing backoff retries.
       const { adapter, uaStub } = createAdapter();
       uaStub._setReconnectImpl(() => Promise.reject(new Error('down')));
       uaStub._triggerConnect();
@@ -1117,12 +1119,15 @@ describe('SipSignalingAdapter', () => {
       adapter.on('offline', offlineSpy);
 
       uaStub._triggerDisconnect();
+      // offline fires once on the initial close (PStream parity).
+      assert.strictEqual(offlineSpy.callCount, 1);
+
       // Drive past the 15s preferred budget. Reconnect is still being called
-      // afterward (under primary backoff) and offline has NOT fired.
+      // afterward (under primary backoff); offline should NOT re-fire.
       await clock.tickAsync(20000);
       const callCountAfterPreferred = uaStub.reconnect.callCount;
       assert(callCountAfterPreferred > 0, 'reconnect should have been attempted under preferred');
-      assert.strictEqual(offlineSpy.callCount, 0, 'offline must not fire on transient network failure');
+      assert.strictEqual(offlineSpy.callCount, 1, 'offline must not re-fire during ongoing backoff');
 
       // Advance well past the preferred budget into primary territory.
       // Primary's first delay is 100ms, then 200, 400, ..., capped at 20000.
@@ -1132,7 +1137,7 @@ describe('SipSignalingAdapter', () => {
         uaStub.reconnect.callCount > callCountAfterPreferred,
         'primary backoff should keep retrying after preferred expires',
       );
-      assert.strictEqual(offlineSpy.callCount, 0);
+      assert.strictEqual(offlineSpy.callCount, 1);
       assert.strictEqual(adapter.status, 'disconnected');
     });
 
