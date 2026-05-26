@@ -485,16 +485,15 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       },
     };
     session.invite(inviteOptions).catch((error: Error) => {
+      this._inFlightIceRestarts.delete(inflight);
       // A previous re-INVITE is still in flight — its requestDelegate owns the
       // outcome. Treating this as fatal here would tear down the call before
       // the in-flight re-INVITE has a chance to succeed or surface the real
       // failure (timeout, reject, etc.).
       if (error instanceof RequestPendingError) {
-        this._inFlightIceRestarts.delete(inflight);
         this._log.info('iceRestart skipped: previous re-INVITE still pending');
         return;
       }
-      this._inFlightIceRestarts.delete(inflight);
       this._log.warn('Failed to send ICE-restart re-INVITE', error);
       this.emit('hangup', {
         callsid: callSid,
@@ -776,6 +775,9 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   }
 
   private _onTransportConnect(): void {
+    if (this._status === 'connected') {
+      return;
+    }
     this._log.info('WebSocket connected');
     this._status = 'connected';
 
@@ -905,11 +907,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     this._isReconnecting = false;
     this._resetBackoffs();
 
-    // SIP.js's onConnect delegate normally fires from reconnect() and runs
-    // _onTransportConnect. Defensive sync if it didn't.
-    if (this._status === 'disconnected') {
-      this._onTransportConnect();
-    }
+    this._onTransportConnect();
 
     if (this._wasRegistered) {
       this._createAndStartRegisterer();

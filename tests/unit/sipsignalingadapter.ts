@@ -757,11 +757,14 @@ describe('SipSignalingAdapter', () => {
       const { adapter, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
       inviterStub.state = 'Established';
-      inviterStub.invite = sinon.stub().returns(Promise.reject(new RequestPendingError('Reinvite in progress')));
+      const reinvitePromise = Promise.reject(new RequestPendingError('Reinvite in progress'));
+      inviterStub.invite = sinon.stub().returns(reinvitePromise);
       const onHangup = sinon.stub();
       adapter.on('hangup', onHangup);
       adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
-      await new Promise(resolve => setTimeout(resolve, 0));
+      // Await the same promise the adapter is awaiting so its .catch handler
+      // runs before we assert. Robust under fake timers.
+      await reinvitePromise.catch(() => undefined);
       sinon.assert.notCalled(onHangup);
     });
 
@@ -1021,6 +1024,37 @@ describe('SipSignalingAdapter', () => {
       assert.deepStrictEqual(events, ['connected', 'ready']);
     });
 
+    it('emits connected exactly once when SIP.js fires onConnect async after reconnect() resolves', async () => {
+      const uaStub = createUserAgentStub();
+      const adapter = new SipSignalingAdapter({
+        sipDomain: 'sip.ashburn.dev.twilio.com',
+        sipUri: 'sip:alice@sip.ashburn.dev.twilio.com',
+        sipTransportServer: 'wss://sip.ashburn.dev.twilio.com',
+        credentials: { username: 'alice', password: 'secret' },
+        region: 'ashburn',
+        createUserAgent(config: any) { uaStub._setDelegate(config.delegate); return uaStub as any; },
+        createRegisterer() { return createRegistererStub() as any; },
+        createInviter() { return createInviterStub() as any; },
+      });
+
+      uaStub._triggerConnect();
+      uaStub._triggerDisconnect();
+
+      const onConnected = sinon.stub();
+      adapter.on('connected', onConnected);
+
+      // reconnect() resolves first; SIP.js's onConnect fires later as a
+      // microtask. Without idempotent _onTransportConnect this would emit
+      // 'connected' twice.
+      uaStub._setReconnectImpl(() => {
+        Promise.resolve().then(() => uaStub._triggerConnect());
+        return Promise.resolve();
+      });
+      await clock.tickAsync(100);
+
+      sinon.assert.calledOnce(onConnected);
+    });
+
     it('does NOT re-register if consumer never registered before disconnect', async () => {
       const registerers: ReturnType<typeof createRegistererStub>[] = [];
       const uaStub = createUserAgentStub();
@@ -1100,6 +1134,43 @@ describe('SipSignalingAdapter', () => {
       );
       assert.strictEqual(offlineSpy.callCount, 0);
       assert.strictEqual(adapter.status, 'disconnected');
+    });
+
+    it('grants a fresh 15s preferred budget on a second disconnect after a successful reconnect', async () => {
+      // The Backoff instances are reused across cycles. The preferred budget
+      // clock relies on the 'backoff' listener re-stamping _backoffStartTime
+      // when attempt === 0. This test pins that contract.
+      const { adapter, uaStub } = createAdapter();
+      uaStub._triggerConnect();
+
+      // First cycle: blow through the 15s preferred budget, then heal.
+      uaStub._setReconnectImpl(() => Promise.reject(new Error('down')));
+      uaStub._triggerDisconnect();
+      await clock.tickAsync(20000);   // past preferred budget, into primary
+      uaStub._setReconnectImpl(() => { uaStub._triggerConnect(); return Promise.resolve(); });
+      await clock.tickAsync(20000);   // primary attempt eventually succeeds
+      assert.strictEqual(adapter.status, 'connected');
+
+      // Second disconnect: reconnect always fails. Track per-tier attempts via
+      // log messages (preferred vs primary).
+      const logSpy = sinon.spy((adapter as any)._log, 'info');
+      uaStub._setReconnectImpl(() => Promise.reject(new Error('down')));
+      uaStub._triggerDisconnect();
+
+      // Within 14s the cycle should still be in preferred — never primary.
+      await clock.tickAsync(14000);
+      const primaryEntries = logSpy.getCalls().filter(c =>
+        typeof c.args[0] === 'string' && c.args[0].includes('(primary)'),
+      );
+      assert.strictEqual(primaryEntries.length, 0, 'should still be in preferred tier within 15s');
+
+      // Past 15s, the budget exhausts and primary kicks in.
+      await clock.tickAsync(2000);
+      const primaryEntriesAfter = logSpy.getCalls().filter(c =>
+        typeof c.args[0] === 'string' && c.args[0].includes('(primary)'),
+      );
+      assert(primaryEntriesAfter.length > 0, 'primary should engage after fresh 15s budget expires');
+      logSpy.restore();
     });
 
     it('resets backoff after a successful reconnect (subsequent disconnect retries from attempt 0)', async () => {

@@ -2830,20 +2830,11 @@ describe('Call', function() {
         conn.parameters = { CallSid: 'CAtest' };
       });
 
-      it('triggers a fresh ICE restart for the matching callSid', () => {
+      it('triggers a fresh ICE restart and resets the media-reconnect budget for the matching callSid', () => {
         // Open state so _onMediaFailure goes through the entry-into-Reconnecting
-        // path that issues a backoff.
-        conn['_mediaStatus'] = Call.State.Open;
-        conn['_mediaReconnectBackoff'].backoff = sinon.stub();
-        conn['_mediaReconnectBackoff'].reset = sinon.stub();
-        mediaHandler.version.pc.iceConnectionState = 'failed';
-
-        pstream.emit('iceRestartNeeded', { callsid: 'CAtest' });
-
-        sinon.assert.calledOnce(conn['_mediaReconnectBackoff'].backoff);
-      });
-
-      it('resets the media-reconnect budget so the post-recovery retry has a fresh window', () => {
+        // path that issues a backoff. Pre-set an expired start time so we can
+        // verify the budget actually gets renewed.
+        conn['_status'] = Call.State.Open;
         conn['_mediaStatus'] = Call.State.Open;
         conn['_mediaReconnectStartTime'] = Date.now() - 60000;   // already expired
         conn['_mediaReconnectBackoff'].backoff = sinon.stub();
@@ -2852,12 +2843,14 @@ describe('Call', function() {
 
         pstream.emit('iceRestartNeeded', { callsid: 'CAtest' });
 
+        sinon.assert.calledOnce(conn['_mediaReconnectBackoff'].backoff);
         // After reset, _mediaReconnectStartTime should be ~now, not -60s.
         const elapsed = Date.now() - conn['_mediaReconnectStartTime'];
         assert(elapsed < 1000, `expected fresh start time, got elapsed=${elapsed}`);
       });
 
       it('ignores events for a different callSid', () => {
+        conn['_status'] = Call.State.Open;
         conn['_mediaStatus'] = Call.State.Open;
         conn['_mediaReconnectBackoff'].backoff = sinon.stub();
         conn['_mediaReconnectBackoff'].reset = sinon.stub();
@@ -2867,8 +2860,8 @@ describe('Call', function() {
         sinon.assert.notCalled(conn['_mediaReconnectBackoff'].backoff);
       });
 
-      it('ignores events when the call is Closed', () => {
-        conn['_status'] = Call.State.Closed;
+      it('ignores events when the call is not Open or Reconnecting', () => {
+        conn['_status'] = Call.State.Pending;
         conn['_mediaReconnectBackoff'].backoff = sinon.stub();
 
         pstream.emit('iceRestartNeeded', { callsid: 'CAtest' });

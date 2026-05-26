@@ -1364,8 +1364,10 @@ class Call extends EventEmitter {
    * ICE/DTLS creds, so kick a fresh ICE restart.
    */
   private _onIceRestartNeeded = (payload: { callsid?: string }): void => {
-    if (payload?.callsid !== this.parameters.CallSid
-        || this.status() === Call.State.Closed) {
+    if (payload?.callsid !== this.parameters.CallSid) {
+      return;
+    }
+    if (this.status() !== Call.State.Open && this.status() !== Call.State.Reconnecting) {
       return;
     }
     this._log.info('iceRestartNeeded after WS recovery; retrying ICE restart');
