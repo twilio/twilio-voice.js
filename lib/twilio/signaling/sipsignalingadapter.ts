@@ -87,6 +87,16 @@ interface SdhBinding {
 }
 
 /**
+ * Per-invocation handle for an in-flight ICE-restart re-INVITE. Captured by
+ * the requestDelegate closures so onAccept/onReject can act on the specific
+ * invite that produced them, even after the adapter has moved on.
+ */
+interface InflightIceRestart {
+  callSid: string;
+  stale: boolean;
+}
+
+/**
  * Fallback SDH returned from the factory when no binding is registered
  * for a session. Every operation rejects with a clear error so SIP.js's
  * Promise-based accept/invite paths fail cleanly instead of crashing
@@ -130,14 +140,16 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   };
   private _isReconnecting: boolean = false;
   private _wasRegistered: boolean = false;
-  // Tracks call SIDs whose in-flight ICE-restart re-INVITE was orphaned by a
-  // WS disconnect. When the rejection finally arrives (typically a 408 from
-  // the dead socket), it represents stale state — not a server hangup.
-  // Suppress the hangup emit so Call can issue a fresh ICE restart instead.
-  private _staleIceRestarts: Set<string> = new Set();
-  // Call SIDs with an active ICE-restart re-INVITE. Used to mark them stale
-  // on WS disconnect.
-  private _inFlightIceRestarts: Set<string> = new Set();
+  // Each in-flight ICE-restart re-INVITE has an entry captured by its
+  // requestDelegate closures. On WS disconnect, every entry is marked stale so
+  // the eventual rejection (typically a 408) is suppressed instead of tearing
+  // down the call. The entry survives _onReconnectSuccess, so a late SIP.js
+  // Timer B (~32s) rejection that lands after reconnect is still suppressed.
+  private _inFlightIceRestarts: Set<InflightIceRestart> = new Set();
+  // Call SIDs whose in-flight re-INVITE was orphaned by a disconnect and
+  // therefore need an iceRestartNeeded emit on reconnect success. Tracked
+  // separately from _inFlightIceRestarts so onAccept/onReject don't interfere.
+  private _pendingIceRestartRecovery: Set<string> = new Set();
 
   constructor(options: SipSignalingAdapterOptions) {
     super();
@@ -330,7 +342,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     this._outboundSessions.clear();
     this._pendingInvitations.clear();
     this._inFlightIceRestarts.clear();
-    this._staleIceRestarts.clear();
+    this._pendingIceRestartRecovery.clear();
 
     if (this._registerer) {
       this._registerer.dispose().catch((error: Error) => {
@@ -438,12 +450,12 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       this.emit('hangup', { callsid: callSid });
       return;
     }
-    this._inFlightIceRestarts.add(callSid);
+    const inflight: InflightIceRestart = { callSid, stale: false };
+    this._inFlightIceRestarts.add(inflight);
     const inviteOptions: IceRestartInviteOptions = {
       requestDelegate: {
         onAccept: () => {
-          this._inFlightIceRestarts.delete(callSid);
-          this._staleIceRestarts.delete(callSid);
+          this._inFlightIceRestarts.delete(inflight);
           // SDP intentionally empty: the SDH consumed the remote answer via
           // SIP.js's setDescription before this event fires, so Call's
           // onAnswerOrRinging skips processAnswer on empty SDP. Passing a
@@ -451,12 +463,12 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
           this.emit('answer', { callsid: callSid, sdp: '' });
         },
         onReject: (response: any) => {
-          this._inFlightIceRestarts.delete(callSid);
-          if (this._staleIceRestarts.has(callSid)) {
+          this._inFlightIceRestarts.delete(inflight);
+          if (inflight.stale) {
             // Re-INVITE rejected because the WS dropped while it was in flight.
-            // Don't emit hangup — _onReconnectSuccess will emit
-            // 'iceRestartNeeded' once the transport is back so Call can
-            // re-trigger.
+            // Don't emit hangup — _onReconnectSuccess emits 'iceRestartNeeded'
+            // so Call can re-trigger. The flag survives _onReconnectSuccess,
+            // so even a late Timer B rejection (~32s) is still suppressed.
             this._log.info('Suppressing stale ICE-restart re-INVITE rejection');
             return;
           }
@@ -478,11 +490,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       // the in-flight re-INVITE has a chance to succeed or surface the real
       // failure (timeout, reject, etc.).
       if (error instanceof RequestPendingError) {
+        this._inFlightIceRestarts.delete(inflight);
         this._log.info('iceRestart skipped: previous re-INVITE still pending');
         return;
       }
-      this._inFlightIceRestarts.delete(callSid);
-      this._staleIceRestarts.delete(callSid);
+      this._inFlightIceRestarts.delete(inflight);
       this._log.warn('Failed to send ICE-restart re-INVITE', error);
       this.emit('hangup', {
         callsid: callSid,
@@ -793,11 +805,13 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     this._isReconnecting = true;
 
     // Any in-flight ICE-restart re-INVITE is now orphaned on a dead socket.
-    // Mark stale so its eventual rejection (typically 408) doesn't tear down
-    // the call — Call will retry ICE restart from its own backoff.
+    // Mark each entry stale so its eventual rejection (typically 408) doesn't
+    // tear down the call, and queue its callSid for an iceRestartNeeded emit
+    // once the transport recovers.
     this._log.info(`_onTransportDisconnect: marking ${this._inFlightIceRestarts.size} in-flight re-INVITE(s) stale`);
-    this._inFlightIceRestarts.forEach((callSid: string) => {
-      this._staleIceRestarts.add(callSid);
+    this._inFlightIceRestarts.forEach((inflight: InflightIceRestart) => {
+      inflight.stale = true;
+      this._pendingIceRestartRecovery.add(inflight.callSid);
     });
 
     // Dispose the registerer — SIP.js requires a fresh Registerer after the
@@ -874,15 +888,19 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       return;
     }
     this._log.info(`Reconnect attempt #${attempt} (${tier})`);
-    this._userAgent.reconnect()
-      .then(() => this._onReconnectSuccess())
-      .catch((err: Error) => {
-        this._log.warn('Reconnect attempt failed', err?.message);
+    this._userAgent.reconnect().then(
+      () => this._onReconnectSuccess(),
+      (err: Error) => {
+        this._log.warn('Reconnect attempt failed', err);
         this._backoff?.[tier].backoff();
-      });
+      },
+    );
   }
 
   private _onReconnectSuccess(): void {
+    if (!this._userAgent) {
+      return;
+    }
     this._log.info('Reconnect succeeded');
     this._isReconnecting = false;
     this._resetBackoffs();
@@ -899,12 +917,13 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
     // Calls whose ICE-restart re-INVITE was orphaned by the disconnect now
     // need a fresh re-INVITE — the server never received the new ICE/DTLS
-    // creds. Tell Call to re-trigger.
-    const stale: string[] = [];
-    this._staleIceRestarts.forEach((callSid: string) => stale.push(callSid));
-    this._staleIceRestarts.clear();
-    this._log.info(`_onReconnectSuccess: ${stale.length} stale ICE-restart(s) to re-trigger`);
-    stale.forEach((callSid: string) => {
+    // creds. Tell Call to re-trigger. _inFlightIceRestarts entries stay marked
+    // stale so their eventual rejection is still suppressed.
+    const recovery: string[] = [];
+    this._pendingIceRestartRecovery.forEach((callSid: string) => recovery.push(callSid));
+    this._pendingIceRestartRecovery.clear();
+    this._log.info(`_onReconnectSuccess: ${recovery.length} stale ICE-restart(s) to re-trigger`);
+    recovery.forEach((callSid: string) => {
       this._log.info(`Emitting iceRestartNeeded for ${callSid}`);
       this.emit('iceRestartNeeded', { callsid: callSid });
     });

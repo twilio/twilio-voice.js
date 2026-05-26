@@ -2790,6 +2790,93 @@ describe('Call', function() {
       assert.deepStrictEqual(pstream.iceRestart.firstCall.args[1], { mediaHandler: conn['_mediaHandler'] });
     });
 
+    context('skips retry while signaling is disconnected', () => {
+      beforeEach(() => {
+        // Drive the call into media-Reconnecting so the next failure hits the
+        // retry-cycle branch.
+        conn.parameters = { CallSid: 'CAtest' };
+        conn['_mediaStatus'] = Call.State.Reconnecting;
+        conn['_mediaReconnectStartTime'] = Date.now();
+      });
+
+      it('does NOT call backoff or onerror when adapter.status is disconnected', () => {
+        pstream.status = 'disconnected';
+        // Pretend the budget has expired — without the guard, this would call
+        // mediaHandler.onerror and tear down the call.
+        conn['_mediaReconnectStartTime'] = Date.now() - 60000;
+        conn['_mediaReconnectBackoff'].backoff = sinon.stub();
+        mediaHandler.onerror = sinon.stub();
+
+        mediaHandler.onfailed();
+
+        sinon.assert.notCalled(conn['_mediaReconnectBackoff'].backoff);
+        sinon.assert.notCalled(mediaHandler.onerror);
+      });
+
+      it('still retries when adapter.status is connected', () => {
+        pstream.status = 'connected';
+        conn['_mediaReconnectBackoff'].backoff = sinon.stub();
+        mediaHandler.onerror = sinon.stub();
+
+        mediaHandler.onfailed();
+
+        sinon.assert.calledOnce(conn['_mediaReconnectBackoff'].backoff);
+        sinon.assert.notCalled(mediaHandler.onerror);
+      });
+    });
+
+    context('iceRestartNeeded handler', () => {
+      beforeEach(() => {
+        conn.parameters = { CallSid: 'CAtest' };
+      });
+
+      it('triggers a fresh ICE restart for the matching callSid', () => {
+        // Open state so _onMediaFailure goes through the entry-into-Reconnecting
+        // path that issues a backoff.
+        conn['_mediaStatus'] = Call.State.Open;
+        conn['_mediaReconnectBackoff'].backoff = sinon.stub();
+        conn['_mediaReconnectBackoff'].reset = sinon.stub();
+        mediaHandler.version.pc.iceConnectionState = 'failed';
+
+        pstream.emit('iceRestartNeeded', { callsid: 'CAtest' });
+
+        sinon.assert.calledOnce(conn['_mediaReconnectBackoff'].backoff);
+      });
+
+      it('resets the media-reconnect budget so the post-recovery retry has a fresh window', () => {
+        conn['_mediaStatus'] = Call.State.Open;
+        conn['_mediaReconnectStartTime'] = Date.now() - 60000;   // already expired
+        conn['_mediaReconnectBackoff'].backoff = sinon.stub();
+        conn['_mediaReconnectBackoff'].reset = sinon.stub();
+        mediaHandler.version.pc.iceConnectionState = 'failed';
+
+        pstream.emit('iceRestartNeeded', { callsid: 'CAtest' });
+
+        // After reset, _mediaReconnectStartTime should be ~now, not -60s.
+        const elapsed = Date.now() - conn['_mediaReconnectStartTime'];
+        assert(elapsed < 1000, `expected fresh start time, got elapsed=${elapsed}`);
+      });
+
+      it('ignores events for a different callSid', () => {
+        conn['_mediaStatus'] = Call.State.Open;
+        conn['_mediaReconnectBackoff'].backoff = sinon.stub();
+        conn['_mediaReconnectBackoff'].reset = sinon.stub();
+
+        pstream.emit('iceRestartNeeded', { callsid: 'CAother' });
+
+        sinon.assert.notCalled(conn['_mediaReconnectBackoff'].backoff);
+      });
+
+      it('ignores events when the call is Closed', () => {
+        conn['_status'] = Call.State.Closed;
+        conn['_mediaReconnectBackoff'].backoff = sinon.stub();
+
+        pstream.emit('iceRestartNeeded', { callsid: 'CAtest' });
+
+        sinon.assert.notCalled(conn['_mediaReconnectBackoff'].backoff);
+      });
+    });
+
     it('self-cleans answer/hangup listeners when adapter emits hangup for the callSid (re-INVITE failure path)', () => {
       conn = new Call(config, Object.assign(options));
       conn.parameters = { CallSid: 'CAtest' };

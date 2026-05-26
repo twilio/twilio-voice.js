@@ -1178,6 +1178,34 @@ describe('SipSignalingAdapter', () => {
       assert.strictEqual(onIceRestartNeeded.firstCall.args[0].callsid, 'call-1');
     });
 
+    it('still suppresses hangup if the orphaned re-INVITE rejection arrives AFTER reconnect succeeds', async () => {
+      const { adapter, uaStub, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      uaStub._triggerConnect();
+
+      adapter.iceRestart('call-1', { mediaHandler: { iceRestart: sinon.stub() } });
+      const rd = inviterStub.invite.lastCall.args[0]?.requestDelegate;
+
+      const onHangup = sinon.stub();
+      const onIceRestartNeeded = sinon.stub();
+      adapter.on('hangup', onHangup);
+      adapter.on('iceRestartNeeded', onIceRestartNeeded);
+
+      // WS dies — re-INVITE is now orphaned
+      uaStub._triggerDisconnect();
+
+      // WS recovers BEFORE Timer B fires the late rejection
+      uaStub._setReconnectImpl(() => { uaStub._triggerConnect(); return Promise.resolve(); });
+      await clock.tickAsync(100);
+      sinon.assert.calledOnce(onIceRestartNeeded);
+
+      // SIP.js Timer B finally times out the orphaned re-INVITE long after
+      // recovery; the late 408 must not tear down the (now reconnected) call.
+      rd.onReject({ message: { statusCode: 408 } });
+      sinon.assert.notCalled(onHangup);
+    });
+
     it('hangup() during reconnect window does not throw to the consumer', async () => {
       const { adapter, uaStub, inviterStub } = createAdapter();
       uaStub._setReconnectImpl(() => Promise.reject(new Error('down')));
