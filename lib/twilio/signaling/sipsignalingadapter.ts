@@ -450,6 +450,14 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       this.emit('hangup', { callsid: callSid });
       return;
     }
+    // Sending session.invite() over a dead transport queues a doomed re-INVITE
+    // that will 408 once SIP.js Timer B expires (~32s). Record the intent and
+    // let _onReconnectSuccess emit 'iceRestartNeeded' once the WS is back.
+    if (this._isReconnecting) {
+      this._log.info(`iceRestart deferred while reconnecting: ${callSid}`);
+      this._pendingIceRestartRecovery.add(callSid);
+      return;
+    }
     const inflight: InflightIceRestart = { callSid, stale: false };
     this._inFlightIceRestarts.add(inflight);
     const inviteOptions: IceRestartInviteOptions = {

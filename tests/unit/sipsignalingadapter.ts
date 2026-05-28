@@ -1282,6 +1282,78 @@ describe('SipSignalingAdapter', () => {
       sinon.assert.notCalled(onHangup);
     });
 
+    it('defers iceRestart while reconnecting: no re-INVITE sent', async () => {
+      const { adapter, uaStub, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      uaStub._triggerConnect();
+      // Reset to count only iceRestart-driven invite() calls below.
+      inviterStub.invite.resetHistory();
+
+      uaStub._triggerDisconnect();
+      adapter.iceRestart('call-1', { mediaHandler: { iceRestart: sinon.stub() } });
+
+      sinon.assert.notCalled(inviterStub.invite);
+    });
+
+    it('emits iceRestartNeeded once after reconnect for a restart deferred during the outage', async () => {
+      const { adapter, uaStub, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      uaStub._triggerConnect();
+
+      const onIceRestartNeeded = sinon.stub();
+      adapter.on('iceRestartNeeded', onIceRestartNeeded);
+
+      uaStub._triggerDisconnect();
+      adapter.iceRestart('call-1', { mediaHandler: { iceRestart: sinon.stub() } });
+
+      uaStub._setReconnectImpl(() => { uaStub._triggerConnect(); return Promise.resolve(); });
+      await clock.tickAsync(100);
+
+      sinon.assert.calledOnce(onIceRestartNeeded);
+      assert.strictEqual(onIceRestartNeeded.firstCall.args[0].callsid, 'call-1');
+    });
+
+    it('two iceRestart calls for the same callSid during one outage emit iceRestartNeeded once', async () => {
+      const { adapter, uaStub, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      uaStub._triggerConnect();
+
+      const onIceRestartNeeded = sinon.stub();
+      adapter.on('iceRestartNeeded', onIceRestartNeeded);
+
+      uaStub._triggerDisconnect();
+      adapter.iceRestart('call-1', { mediaHandler: { iceRestart: sinon.stub() } });
+      adapter.iceRestart('call-1', { mediaHandler: { iceRestart: sinon.stub() } });
+
+      uaStub._setReconnectImpl(() => { uaStub._triggerConnect(); return Promise.resolve(); });
+      await clock.tickAsync(100);
+
+      sinon.assert.calledOnce(onIceRestartNeeded);
+    });
+
+    it('emits iceRestartNeeded for each distinct callSid deferred during the outage', async () => {
+      const { adapter, uaStub, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      adapter.invite('call-2', { sdp: 'sdp', params: 'To=carol', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      uaStub._triggerConnect();
+
+      const seen: string[] = [];
+      adapter.on('iceRestartNeeded', (p: any) => seen.push(p.callsid));
+
+      uaStub._triggerDisconnect();
+      adapter.iceRestart('call-1', { mediaHandler: { iceRestart: sinon.stub() } });
+      adapter.iceRestart('call-2', { mediaHandler: { iceRestart: sinon.stub() } });
+
+      uaStub._setReconnectImpl(() => { uaStub._triggerConnect(); return Promise.resolve(); });
+      await clock.tickAsync(100);
+
+      assert.deepStrictEqual(seen.sort(), ['call-1', 'call-2']);
+    });
+
     it('hangup() during reconnect window does not throw to the consumer', async () => {
       const { adapter, uaStub, inviterStub } = createAdapter();
       uaStub._setReconnectImpl(() => Promise.reject(new Error('down')));
