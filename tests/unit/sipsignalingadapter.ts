@@ -1294,6 +1294,7 @@ describe('SipSignalingAdapter', () => {
       adapter.iceRestart('call-1', { mediaHandler: { iceRestart: sinon.stub() } });
 
       sinon.assert.notCalled(inviterStub.invite);
+      assert.ok((adapter as any)._pendingIceRestartRecovery.has('call-1'));
     });
 
     it('emits iceRestartNeeded once after reconnect for a restart deferred during the outage', async () => {
@@ -1338,6 +1339,8 @@ describe('SipSignalingAdapter', () => {
       const { adapter, uaStub, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
       adapter.invite('call-2', { sdp: 'sdp', params: 'To=carol', peerConnection: createPeerConnectionStub() });
+      // createAdapter() returns a single shared inviterStub backing both
+      // sessions, so setting state once marks 'call-1' and 'call-2' Established.
       inviterStub.state = 'Established';
       uaStub._triggerConnect();
 
@@ -1352,6 +1355,25 @@ describe('SipSignalingAdapter', () => {
       await clock.tickAsync(100);
 
       assert.deepStrictEqual(seen.sort(), ['call-1', 'call-2']);
+    });
+
+    it('hangup() during reconnect clears the pending recovery so iceRestartNeeded is not re-emitted', async () => {
+      const { adapter, uaStub, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      uaStub._triggerConnect();
+
+      const onIceRestartNeeded = sinon.stub();
+      adapter.on('iceRestartNeeded', onIceRestartNeeded);
+
+      uaStub._triggerDisconnect();
+      adapter.iceRestart('call-1', { mediaHandler: { iceRestart: sinon.stub() } });
+      adapter.hangup('call-1', {});
+
+      uaStub._setReconnectImpl(() => { uaStub._triggerConnect(); return Promise.resolve(); });
+      await clock.tickAsync(100);
+
+      sinon.assert.notCalled(onIceRestartNeeded);
     });
 
     it('hangup() during reconnect window does not throw to the consumer', async () => {
