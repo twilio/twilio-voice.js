@@ -403,6 +403,10 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   }
 
   hangup(callSid: string, _config: HangupConfig = {}): void {
+    // Don't let _onReconnectSuccess emit 'iceRestartNeeded' for a call hung up
+    // mid-reconnect.
+    this._pendingIceRestartRecovery.delete(callSid);
+
     const pendingInvitation = this._pendingInvitations.get(callSid);
     if (pendingInvitation) {
       return this._hangupPendingInvitation(pendingInvitation, callSid);
@@ -441,13 +445,23 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
    * is unused here (the PStream adapter needs it; we preserve the shared
    * interface). All failure paths (no session, onReject, catch) emit
    * 'hangup' for the callSid so Call can clean up its inline re-INVITE
-   * listeners and transition out of the reconnecting state.
+   * listeners and transition out of the reconnecting state. The exception is
+   * when the transport is reconnecting: instead of emitting 'hangup' we queue
+   * the callSid for an 'iceRestartNeeded' emit on reconnect.
    */
   iceRestart(callSid: string, _config: IceRestartConfig): void {
     const session = this._getSession(callSid);
     if (!session || session.state !== SessionState.Established) {
       this._log.warn('iceRestart: no established session for callSid', callSid);
       this.emit('hangup', { callsid: callSid });
+      return;
+    }
+    // Sending session.invite() over a dead transport queues a doomed re-INVITE
+    // that will 408 once SIP.js Timer B expires (~32s). Record the intent and
+    // let _onReconnectSuccess emit 'iceRestartNeeded' once the WS is back.
+    if (this._isReconnecting) {
+      this._log.info(`iceRestart deferred while reconnecting: ${callSid}`);
+      this._pendingIceRestartRecovery.add(callSid);
       return;
     }
     const inflight: InflightIceRestart = { callSid, stale: false };
