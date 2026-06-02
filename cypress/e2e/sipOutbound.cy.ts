@@ -28,20 +28,14 @@ describe('SIP Outbound Call', function() {
 
   afterEach(() => {
     if (device) {
-      device.disconnectAll();
       device.destroy();
     }
   });
 
-  it('should place an outbound call via SIP and reach a non-pending state', async () => {
+  it('should place an outbound call via SIP and connect', async () => {
     const call = await device.connect({ params: { To: 'alice' } });
-    const status = call.status();
-    assert(
-      status === Call.State.Connecting ||
-      status === Call.State.Ringing ||
-      status === Call.State.Open,
-      `Expected connecting, ringing, or open but got ${status}`,
-    );
+    await expectEvent('accept', call);
+    assert.strictEqual(call.status(), Call.State.Open);
   });
 
   it('should transition to closed after disconnect', async () => {
