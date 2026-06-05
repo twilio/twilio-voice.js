@@ -9,6 +9,11 @@ module.exports = defineConfig({
     APPLICATION_SID: process.env.APPLICATION_SID,
     APPLICATION_SID_STIR: process.env.APPLICATION_SID_STIR,
     CALLER_ID: process.env.CALLER_ID,
+    SIP_SERVER: process.env.SIP_SERVER,
+    SIP_URI: process.env.SIP_URI,
+    SIP_USERNAME: process.env.SIP_USERNAME,
+    SIP_PASSWORD: process.env.SIP_PASSWORD,
+    SIP_REGION: process.env.SIP_REGION,
   },
   e2e: {
     defaultCommandTimeout: 10000,

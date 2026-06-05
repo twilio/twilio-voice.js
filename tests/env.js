@@ -9,6 +9,11 @@ const processEnv = {
   API_KEY_SID: Cypress.env('API_KEY_SID'),
   API_KEY_SECRET: Cypress.env('API_KEY_SECRET'),
   AUTH_TOKEN: Cypress.env('AUTH_TOKEN'),
+  SIP_SERVER: Cypress.env('SIP_SERVER'),
+  SIP_URI: Cypress.env('SIP_URI'),
+  SIP_USERNAME: Cypress.env('SIP_USERNAME'),
+  SIP_PASSWORD: Cypress.env('SIP_PASSWORD'),
+  SIP_REGION: Cypress.env('SIP_REGION'),
 };
 
 // Copy environment variables
@@ -20,6 +25,11 @@ const env = [
   ['API_KEY_SECRET', 'apiKeySecret'],
   ['API_KEY_SID', 'apiKeySid'],
   ['AUTH_TOKEN', 'authToken'],
+  ['SIP_SERVER', 'sipServer'],
+  ['SIP_URI', 'sipUri'],
+  ['SIP_USERNAME', 'sipUsername'],
+  ['SIP_PASSWORD', 'sipPassword'],
+  ['SIP_REGION', 'sipRegion'],
 ].reduce((env, [processEnvKey, envKey]) => {
   if (processEnvKey in processEnv) {
     env[envKey] = processEnv[processEnvKey];
