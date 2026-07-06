@@ -1,0 +1,127 @@
+# Throwaway de-risking spike for VBLOCKS-6902.
+# Probes what a GHA runner can actually do for voice-js e2e BEFORE the full
+# e2e workflow (VBLOCKS-6876) is built. workflow_dispatch only, no secrets.
+# Runs on both ubuntu-latest (fork fallback) and the internal ubuntu-x64 group
+# so the two runner postures can be compared side by side.
+#
+# What voice-js actually hits (lib/twilio/regions.ts):
+#   Signaling: wss://voice-js.<edge>.twilio.com/signal   (default edge = roaming)
+#   Insights:  eventgw.twilio.com
+#   Media ICE: STUN/TURN are vended dynamically by Twilio NTS at call setup,
+#              NOT hardcoded in the SDK. We probe the NTS public endpoints as a
+#              proxy for the runner's network posture (UDP egress + TURN/443).
+#              Green here is necessary-but-not-sufficient; live media is 6876.
+name: Runner Capability Spike
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-x64]
+    name: Probe (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Runner identity
+        run: |
+          echo "## Runner: ${{ matrix.runner }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- os: $(uname -a)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- arch: $(uname -m)" >> "$GITHUB_STEP_SUMMARY"
+
+      # --- Probe 1: Browser availability ------------------------------------
+      # voice-js e2e needs a browser with fake-media WebRTC. The internal
+      # ubuntu-x64 image may not ship one; ubuntu-latest does.
+      - name: Browser availability
+        continue-on-error: true
+        run: |
+          echo "### Browsers" >> "$GITHUB_STEP_SUMMARY"
+          for b in google-chrome google-chrome-stable chromium chromium-browser firefox; do
+            if command -v "$b" >/dev/null 2>&1; then
+              echo "- FOUND $b -> $("$b" --version 2>/dev/null || echo '?')" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- missing $b" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+      # --- Probe 2: Signaling (WSS) reachability ----------------------------
+      # TCP+TLS reach to the real signaling + insights hosts. Default edge is
+      # roaming; ashburn included as a concrete US edge.
+      - name: Signaling / insights reachability
+        continue-on-error: true
+        run: |
+          echo "### Signaling (TCP/TLS :443)" >> "$GITHUB_STEP_SUMMARY"
+          for host in voice-js.roaming.twilio.com voice-js.ashburn.twilio.com eventgw.twilio.com; do
+            if timeout 10 bash -c "echo | openssl s_client -connect ${host}:443 -servername ${host}" >/dev/null 2>&1; then
+              echo "- OK   ${host}:443 (TLS handshake)" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- FAIL ${host}:443" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+      # --- Probe 3: WebRTC network posture (STUN / TURN) --------------------
+      # STUN over UDP/3478 = can the runner do UDP hole-punching at all.
+      # TURN over TCP/443  = the fallback relay path when UDP is blocked.
+      # Endpoints are Twilio NTS public defaults. This is a network-capability
+      # proxy, not proof that per-call media flows (that is 6876 with a token).
+      - name: WebRTC UDP egress + STUN binding
+        continue-on-error: true
+        run: |
+          echo "### WebRTC network posture" >> "$GITHUB_STEP_SUMMARY"
+          sudo apt-get update -qq && sudo apt-get install -y -qq stun-client netcat-openbsd >/dev/null 2>&1 || true
+
+          # STUN binding request over UDP/3478 (necessary condition for ICE srflx)
+          if command -v stunclient >/dev/null 2>&1; then
+            if timeout 15 stunclient global.stun.twilio.com 3478 2>&1 | tee /tmp/stun.txt | grep -qiE "Mapped|Binding"; then
+              echo "- OK   STUN udp/3478 -> $(grep -iE 'Mapped' /tmp/stun.txt | head -1)" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- FAIL STUN udp/3478 (no binding response; UDP likely blocked)" >> "$GITHUB_STEP_SUMMARY"
+              cat /tmp/stun.txt || true
+            fi
+          else
+            echo "- SKIP stunclient not installable" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # TURN frontend TCP reachability on 443 (the UDP-blocked fallback path)
+          if timeout 10 bash -c "echo | openssl s_client -connect global.turn.twilio.com:443" >/dev/null 2>&1; then
+            echo "- OK   TURN tcp/443 (TLS reachable)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- FAIL TURN tcp/443" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # --- Probe 4: ngrok inbound tunnel ------------------------------------
+      # Top portability risk: the relay-server userDefinedMessage specs need a
+      # publicly reachable inbound callback URL (currently ngrok). A locked-down
+      # runner may block inbound tunnels entirely. No auth token -> anonymous
+      # tunnel; we only need to learn whether the tunnel can be established and
+      # reached from outside.
+      - name: ngrok inbound tunnel feasibility
+        continue-on-error: true
+        run: |
+          echo "### ngrok inbound tunnel" >> "$GITHUB_STEP_SUMMARY"
+          curl -sSL https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz -o /tmp/ngrok.tgz 2>/dev/null || true
+          tar -xzf /tmp/ngrok.tgz -C /tmp 2>/dev/null || true
+          if [ ! -x /tmp/ngrok ]; then
+            echo "- SKIP ngrok binary not fetched" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python3 -m http.server 8080 >/dev/null 2>&1 &
+          /tmp/ngrok http 8080 --log=stdout >/tmp/ngrok.log 2>&1 &
+          sleep 8
+          URL=$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | grep -oE 'https://[a-z0-9.-]+ngrok[a-z0-9.-]*' | head -1)
+          if [ -n "$URL" ]; then
+            echo "- OK   tunnel up: ${URL}" >> "$GITHUB_STEP_SUMMARY"
+            if curl -sS --max-time 10 "$URL" >/dev/null 2>&1; then
+              echo "- OK   tunnel reachable from runner egress" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- WARN tunnel established but not reachable" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            echo "- FAIL tunnel not established (inbound tunnels may be blocked)" >> "$GITHUB_STEP_SUMMARY"
+            tail -20 /tmp/ngrok.log >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          fi
