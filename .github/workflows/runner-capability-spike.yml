@@ -15,6 +15,11 @@ name: Runner Capability Spike
 
 on:
   workflow_dispatch:
+  # TEMPORARY (VBLOCKS-6902): run on this branch's PR so the spike is
+  # dispatchable without merging to master. Revert to workflow_dispatch-only
+  # before this workflow lands.
+  pull_request:
+    branches: [master]
 
 permissions:
   contents: read
