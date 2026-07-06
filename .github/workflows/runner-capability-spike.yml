@@ -29,7 +29,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, ubuntu-x64]
+        # Org locked runners to Enterprise-managed only; plain ubuntu-latest
+        # has no runner and would hang queued. ubuntu-latest-large is the
+        # standard-tier Enterprise runner, ubuntu-x64 the 16-core tier.
+        runner: [ubuntu-latest-large, ubuntu-x64]
     name: Probe (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
     steps:
