@@ -1,0 +1,92 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  ARTIFACTORY_URL: ${{ vars.ARTIFACTORY_URL }}
+
+jobs:
+  test:
+    name: Lint & Build
+    runs-on: ubuntu-x64
+    if: github.repository_owner == 'twilio'
+    permissions:
+      contents: read
+      id-token: write
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Artifactory OIDC Auth
+        uses: ./.github/actions/artifactory-oidc
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      # Full test/integration suite (Docker + browsers) runs in CircleCI.
+      - run: npm run lint
+      - run: npm run build
+
+  deploy:
+    name: Publish to npm
+    needs: [test]
+    runs-on: ubuntu-x64
+    if: github.repository_owner == 'twilio'
+    timeout-minutes: 10
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Artifactory OIDC Auth
+        uses: ./.github/actions/artifactory-oidc
+
+      # https://docs.npmjs.com/trusted-publishers — never cache in release builds
+      # Node 24+ required for npm OIDC trusted publisher support (npm >= 11.5.1)
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+
+      - name: Validate tag format and version match
+        run: |
+          # twilio-voice.js tags are un-prefixed: 2.18.3 or 2.18.3-rc1
+          TAG="${GITHUB_REF#refs/tags/}"
+          if [[ ! "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "::error::Release tag must be in the form 2.18.3 or 2.18.3-rc1 (got '$TAG')"
+            exit 1
+          fi
+          VERSION="$TAG"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag $TAG does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+
+      - run: npm run build
+
+      - name: Publish to npm
+        # Publishes to PUBLIC npm via OIDC trusted publishing; Artifactory is only
+        # used above for resolving dependencies during npm ci. Prereleases
+        # (2.18.3-rc1) go to the `next` dist-tag instead of `latest`.
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          if [[ "$TAG" == *-* ]]; then
+            npm publish --registry https://registry.npmjs.org --ignore-scripts --provenance --access public --tag next
+          else
+            npm publish --registry https://registry.npmjs.org --ignore-scripts --provenance --access public
+          fi
