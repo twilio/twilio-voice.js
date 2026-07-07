@@ -91,23 +91,36 @@ jobs:
         run: |
           say() { echo "SPIKE|${R}|$*"; echo "- $*" >> "$GITHUB_STEP_SUMMARY"; }
           echo "### WebRTC network posture" >> "$GITHUB_STEP_SUMMARY"
-          # stunclient ships in the stuntman-client package (NOT stun-client,
-          # which provides a different `stun` binary). Log apt failures so a
-          # SKIP means "unavailable", not silently swallowed.
-          sudo apt-get update -qq || say "WARN apt-get update failed"
-          sudo apt-get install -y -qq stuntman-client >/dev/null 2>&1 || say "WARN stuntman-client install failed"
 
-          # STUN binding request over UDP/3478 (necessary condition for ICE srflx)
-          if command -v stunclient >/dev/null 2>&1; then
-            STUN_OUT=$(timeout 15 stunclient global.stun.twilio.com 3478 2>&1 || true)
-            echo "$STUN_OUT"
-            if echo "$STUN_OUT" | grep -qiE "Mapped|Binding"; then
-              say "OK   STUN udp/3478 -> $(echo "$STUN_OUT" | grep -iE 'Mapped' | head -1)"
-            else
-              say "FAIL STUN udp/3478 (no binding response; UDP likely blocked)"
-            fi
+          # STUN binding request over UDP/3478 (necessary condition for ICE
+          # srflx). No apt dependency: Python 3 is preinstalled, and a STUN
+          # binding request is a fixed 20-byte packet. A success response whose
+          # transaction ID echoes ours proves UDP egress + a server-reflexive
+          # address came back.
+          STUN_OUT=$(timeout 15 python3 - <<'PY' 2>&1 || true
+          import socket, os, struct
+          # type=0x0001 (Binding Request), len=0, magic cookie, 12-byte txn id
+          txn = os.urandom(12)
+          pkt = struct.pack('>HHI', 0x0001, 0, 0x2112A442) + txn
+          s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+          s.settimeout(8)
+          try:
+              s.sendto(pkt, ('global.stun.twilio.com', 3478))
+              data, _ = s.recvfrom(2048)
+          except Exception as e:
+              print('NORESP', e); raise SystemExit(0)
+          # success response type is 0x0101; txn id must echo
+          if len(data) >= 20 and data[0:2] == b'\x01\x01' and data[8:20] == txn:
+              print('OK STUN binding success (srflx returned)')
+          else:
+              print('BADRESP', data[:4].hex())
+          PY
+          )
+          echo "$STUN_OUT"
+          if echo "$STUN_OUT" | grep -q "OK STUN binding success"; then
+            say "OK   STUN udp/3478 (binding success; UDP egress works)"
           else
-            say "SKIP stunclient not installable"
+            say "FAIL STUN udp/3478 (no valid binding response; UDP likely blocked)"
           fi
 
           # TURN frontend TCP reachability on 443 (the UDP-blocked fallback path)
