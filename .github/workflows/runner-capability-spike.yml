@@ -1,8 +1,12 @@
 # Throwaway de-risking spike for VBLOCKS-6902.
 # Probes what a GHA runner can actually do for voice-js e2e BEFORE the full
-# e2e workflow (VBLOCKS-6876) is built. workflow_dispatch only, no secrets.
-# Runs on both ubuntu-latest (fork fallback) and the internal ubuntu-x64 group
-# so the two runner postures can be compared side by side.
+# e2e workflow (VBLOCKS-6876) is built. No secrets. Runs on both Enterprise
+# runner tiers (ubuntu-latest-large, ubuntu-x64) so postures compare side by
+# side. (No fork runner: voice-js runs no fork CI, so ubuntu-latest is N/A.)
+#
+# Every result line is emitted with a "SPIKE|" prefix to stdout AND appended to
+# the step summary, so verdicts are readable both in the UI and via the gh CLI
+# (`gh run view --job=<id> --log | grep 'SPIKE|'`).
 #
 # What voice-js actually hits (lib/twilio/regions.ts):
 #   Signaling: wss://voice-js.<edge>.twilio.com/signal   (default edge = roaming)
@@ -35,25 +39,29 @@ jobs:
         runner: [ubuntu-latest-large, ubuntu-x64]
     name: Probe (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
+    env:
+      R: ${{ matrix.runner }}
     steps:
       - name: Runner identity
         run: |
-          echo "## Runner: ${{ matrix.runner }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- os: $(uname -a)" >> "$GITHUB_STEP_SUMMARY"
-          echo "- arch: $(uname -m)" >> "$GITHUB_STEP_SUMMARY"
+          say() { echo "SPIKE|${R}|$*"; echo "- $*" >> "$GITHUB_STEP_SUMMARY"; }
+          echo "## Runner: ${R}" >> "$GITHUB_STEP_SUMMARY"
+          say "os: $(uname -a)"
+          say "arch: $(uname -m)"
 
       # --- Probe 1: Browser availability ------------------------------------
       # voice-js e2e needs a browser with fake-media WebRTC. The internal
-      # ubuntu-x64 image may not ship one; ubuntu-latest does.
+      # ubuntu-x64 image may not ship one; ubuntu-latest-large should.
       - name: Browser availability
         continue-on-error: true
         run: |
+          say() { echo "SPIKE|${R}|$*"; echo "- $*" >> "$GITHUB_STEP_SUMMARY"; }
           echo "### Browsers" >> "$GITHUB_STEP_SUMMARY"
           for b in google-chrome google-chrome-stable chromium chromium-browser firefox; do
             if command -v "$b" >/dev/null 2>&1; then
-              echo "- FOUND $b -> $("$b" --version 2>/dev/null || echo '?')" >> "$GITHUB_STEP_SUMMARY"
+              say "FOUND $b -> $("$b" --version 2>/dev/null || echo '?')"
             else
-              echo "- missing $b" >> "$GITHUB_STEP_SUMMARY"
+              say "missing $b"
             fi
           done
 
@@ -63,12 +71,13 @@ jobs:
       - name: Signaling / insights reachability
         continue-on-error: true
         run: |
+          say() { echo "SPIKE|${R}|$*"; echo "- $*" >> "$GITHUB_STEP_SUMMARY"; }
           echo "### Signaling (TCP/TLS :443)" >> "$GITHUB_STEP_SUMMARY"
           for host in voice-js.roaming.twilio.com voice-js.ashburn.twilio.com eventgw.twilio.com; do
             if timeout 10 bash -c "echo | openssl s_client -connect ${host}:443 -servername ${host}" >/dev/null 2>&1; then
-              echo "- OK   ${host}:443 (TLS handshake)" >> "$GITHUB_STEP_SUMMARY"
+              say "OK   ${host}:443 (TLS handshake)"
             else
-              echo "- FAIL ${host}:443" >> "$GITHUB_STEP_SUMMARY"
+              say "FAIL ${host}:443"
             fi
           done
 
@@ -80,26 +89,28 @@ jobs:
       - name: WebRTC UDP egress + STUN binding
         continue-on-error: true
         run: |
+          say() { echo "SPIKE|${R}|$*"; echo "- $*" >> "$GITHUB_STEP_SUMMARY"; }
           echo "### WebRTC network posture" >> "$GITHUB_STEP_SUMMARY"
           sudo apt-get update -qq && sudo apt-get install -y -qq stun-client netcat-openbsd >/dev/null 2>&1 || true
 
           # STUN binding request over UDP/3478 (necessary condition for ICE srflx)
           if command -v stunclient >/dev/null 2>&1; then
-            if timeout 15 stunclient global.stun.twilio.com 3478 2>&1 | tee /tmp/stun.txt | grep -qiE "Mapped|Binding"; then
-              echo "- OK   STUN udp/3478 -> $(grep -iE 'Mapped' /tmp/stun.txt | head -1)" >> "$GITHUB_STEP_SUMMARY"
+            STUN_OUT=$(timeout 15 stunclient global.stun.twilio.com 3478 2>&1 || true)
+            echo "$STUN_OUT"
+            if echo "$STUN_OUT" | grep -qiE "Mapped|Binding"; then
+              say "OK   STUN udp/3478 -> $(echo "$STUN_OUT" | grep -iE 'Mapped' | head -1)"
             else
-              echo "- FAIL STUN udp/3478 (no binding response; UDP likely blocked)" >> "$GITHUB_STEP_SUMMARY"
-              cat /tmp/stun.txt || true
+              say "FAIL STUN udp/3478 (no binding response; UDP likely blocked)"
             fi
           else
-            echo "- SKIP stunclient not installable" >> "$GITHUB_STEP_SUMMARY"
+            say "SKIP stunclient not installable"
           fi
 
           # TURN frontend TCP reachability on 443 (the UDP-blocked fallback path)
           if timeout 10 bash -c "echo | openssl s_client -connect global.turn.twilio.com:443" >/dev/null 2>&1; then
-            echo "- OK   TURN tcp/443 (TLS reachable)" >> "$GITHUB_STEP_SUMMARY"
+            say "OK   TURN tcp/443 (TLS reachable)"
           else
-            echo "- FAIL TURN tcp/443" >> "$GITHUB_STEP_SUMMARY"
+            say "FAIL TURN tcp/443"
           fi
 
       # --- Probe 4: ngrok inbound tunnel ------------------------------------
@@ -111,11 +122,12 @@ jobs:
       - name: ngrok inbound tunnel feasibility
         continue-on-error: true
         run: |
+          say() { echo "SPIKE|${R}|$*"; echo "- $*" >> "$GITHUB_STEP_SUMMARY"; }
           echo "### ngrok inbound tunnel" >> "$GITHUB_STEP_SUMMARY"
           curl -sSL https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz -o /tmp/ngrok.tgz 2>/dev/null || true
           tar -xzf /tmp/ngrok.tgz -C /tmp 2>/dev/null || true
           if [ ! -x /tmp/ngrok ]; then
-            echo "- SKIP ngrok binary not fetched" >> "$GITHUB_STEP_SUMMARY"
+            say "SKIP ngrok binary not fetched"
             exit 0
           fi
           python3 -m http.server 8080 >/dev/null 2>&1 &
@@ -123,13 +135,14 @@ jobs:
           sleep 8
           URL=$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | grep -oE 'https://[a-z0-9.-]+ngrok[a-z0-9.-]*' | head -1)
           if [ -n "$URL" ]; then
-            echo "- OK   tunnel up: ${URL}" >> "$GITHUB_STEP_SUMMARY"
+            say "OK   tunnel up: ${URL}"
             if curl -sS --max-time 10 "$URL" >/dev/null 2>&1; then
-              echo "- OK   tunnel reachable from runner egress" >> "$GITHUB_STEP_SUMMARY"
+              say "OK   tunnel reachable from runner egress"
             else
-              echo "- WARN tunnel established but not reachable" >> "$GITHUB_STEP_SUMMARY"
+              say "WARN tunnel established but not reachable"
             fi
           else
-            echo "- FAIL tunnel not established (inbound tunnels may be blocked)" >> "$GITHUB_STEP_SUMMARY"
-            tail -20 /tmp/ngrok.log >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+            say "FAIL tunnel not established (inbound tunnels may be blocked)"
+            echo "--- ngrok.log tail ---"
+            tail -20 /tmp/ngrok.log 2>/dev/null || true
           fi
