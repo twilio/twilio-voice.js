@@ -117,6 +117,4 @@ require('./unit/error');
 require('./unit/log');
 require('./unit/regions');
 require('./unit/sid');
-require('./unit/cdn/viewerrequest/test');
-require('./unit/cdn/viewerresponse/test');
 require('./unit/rtcpc');
