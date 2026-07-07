@@ -91,7 +91,11 @@ jobs:
         run: |
           say() { echo "SPIKE|${R}|$*"; echo "- $*" >> "$GITHUB_STEP_SUMMARY"; }
           echo "### WebRTC network posture" >> "$GITHUB_STEP_SUMMARY"
-          sudo apt-get update -qq && sudo apt-get install -y -qq stun-client netcat-openbsd >/dev/null 2>&1 || true
+          # stunclient ships in the stuntman-client package (NOT stun-client,
+          # which provides a different `stun` binary). Log apt failures so a
+          # SKIP means "unavailable", not silently swallowed.
+          sudo apt-get update -qq || say "WARN apt-get update failed"
+          sudo apt-get install -y -qq stuntman-client >/dev/null 2>&1 || say "WARN stuntman-client install failed"
 
           # STUN binding request over UDP/3478 (necessary condition for ICE srflx)
           if command -v stunclient >/dev/null 2>&1; then
