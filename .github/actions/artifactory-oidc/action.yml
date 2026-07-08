@@ -1,11 +1,18 @@
 name: 'Artifactory OIDC Auth'
 description: 'Exchange GitHub OIDC token for Artifactory access token and configure npm'
 
+inputs:
+  artifactory_url:
+    description: 'Base URL of the Artifactory instance (e.g. https://twilio.jfrog.io)'
+    required: true
+
 runs:
   using: 'composite'
   steps:
     - name: Exchange OIDC token for Artifactory access token
       shell: bash
+      env:
+        ARTIFACTORY_URL: ${{ inputs.artifactory_url }}
       run: |
         set -euo pipefail
 
@@ -27,7 +34,10 @@ runs:
         HOST=$(echo "${BASE_URL}" | sed -E 's#^https?://##; s#/.*$##')
 
         # 1. Request a GitHub OIDC JWT with Artifactory as the audience.
-        GITHUB_JWT=$(curl -sS \
+        #    -f: fail (non-zero exit) on HTTP >=400 so a 401/403/500 here surfaces
+        #    as the real root cause, instead of "null" flowing on as subject_token
+        #    and misreporting later as an exchange failure.
+        GITHUB_JWT=$(curl -sSf \
           -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
           "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${BASE_URL}" \
           | jq -r '.value')

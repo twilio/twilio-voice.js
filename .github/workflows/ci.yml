@@ -17,15 +17,14 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
-# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR branch).
+# Cancel superseded runs on PR branches, but never cancel a master run (that's
+# the recorded build of record).
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 env:
-  ARTIFACTORY_URL: ${{ vars.ARTIFACTORY_URL }}
   # Install-hardening: block browser-binary downloads during `npm ci` so a
   # compromised transitive postinstall can't pull arbitrary binaries. The build
   # jobs never launch browsers; e2e (6876) manages its own browser provisioning.
@@ -39,11 +38,17 @@ jobs:
     # Defense-in-depth: never run on a fork PR (voice-js runs no fork CI).
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-x64
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Artifactory OIDC Auth
         if: ${{ !github.event.pull_request.head.repo.fork }}
         uses: ./.github/actions/artifactory-oidc
+        with:
+          artifactory_url: ${{ vars.ARTIFACTORY_URL }}
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 22
@@ -55,11 +60,17 @@ jobs:
     name: typecheck
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-x64
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Artifactory OIDC Auth
         if: ${{ !github.event.pull_request.head.repo.fork }}
         uses: ./.github/actions/artifactory-oidc
+        with:
+          artifactory_url: ${{ vars.ARTIFACTORY_URL }}
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 22
@@ -72,6 +83,10 @@ jobs:
     name: test (node ${{ matrix.node }})
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-x64
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -81,6 +96,8 @@ jobs:
       - name: Artifactory OIDC Auth
         if: ${{ !github.event.pull_request.head.repo.fork }}
         uses: ./.github/actions/artifactory-oidc
+        with:
+          artifactory_url: ${{ vars.ARTIFACTORY_URL }}
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: ${{ matrix.node }}
@@ -101,11 +118,17 @@ jobs:
     name: build
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-x64
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Artifactory OIDC Auth
         if: ${{ !github.event.pull_request.head.repo.fork }}
         uses: ./.github/actions/artifactory-oidc
+        with:
+          artifactory_url: ${{ vars.ARTIFACTORY_URL }}
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 22
@@ -126,6 +149,7 @@ jobs:
     needs: [lint, typecheck, test, build]
     if: always()
     runs-on: ubuntu-x64
+    timeout-minutes: 5
     steps:
       - name: Check all job statuses
         run: |

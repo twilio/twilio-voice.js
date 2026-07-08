@@ -325,48 +325,48 @@ workflows:
               browser: ["chrome", "firefox"]
               bver: ["beta", "unstable", "stable"]
               build_label: ["Daily build"]
-  pull-request-workflow:
-    when:
-        and:
-          - equal: [true, <<pipeline.parameters.pr_workflow>>]
-          - equal: [false, <<pipeline.parameters.release_workflow>>]
-    jobs:
-      - run-build-checks:
-          context:
-            - vblocks-js
-          name: Build Checks
-          datadog-test-service: "pull-request-unit-tests"
-      - run-integration-tests:
-          name: Integration tests <<matrix.browser>> <<matrix.bver>>
-          context:
-            - dockerhub-pulls
-            - vblocks-js
-          start_relay_server: true
-          browser: <<matrix.browser>>
-          datadog-test-service: "pull-request-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
-          matrix:
-            parameters:
-              browser: ["chrome", "firefox"]
-              bver: ["beta", "unstable", "stable"]
-              build_label: ["Integration tests"]
-      - run-chrome-extension-tests:
-          name: Chrome extension tests <<matrix.browser>> <<matrix.bver>>
-          context: 
-            - vblocks-js
-          matrix:
-            parameters:
-              browser: ["chrome"]
-              bver: ["beta", "stable"]
-      # NOTE(csantos): Will be addressed on a future epic
-      # - run-network-tests:
-      #     name: Network Tests <<matrix.browser>> <<matrix.bver>>
-      #     context:
-      #       - dockerhub-pulls
-      #       - vblocks-js
-      #     matrix:
-      #       parameters:
-      #         browser: ["chrome", "firefox"]
-      #         bver: ["stable"]
+  # pull-request-workflow:
+  #   when:
+  #       and:
+  #         - equal: [true, <<pipeline.parameters.pr_workflow>>]
+  #         - equal: [false, <<pipeline.parameters.release_workflow>>]
+  #   jobs:
+  #     - run-build-checks:
+  #         context:
+  #           - vblocks-js
+  #         name: Build Checks
+  #         datadog-test-service: "pull-request-unit-tests"
+  #     - run-integration-tests:
+  #         name: Integration tests <<matrix.browser>> <<matrix.bver>>
+  #         context:
+  #           - dockerhub-pulls
+  #           - vblocks-js
+  #         start_relay_server: true
+  #         browser: <<matrix.browser>>
+  #         datadog-test-service: "pull-request-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
+  #         matrix:
+  #           parameters:
+  #             browser: ["chrome", "firefox"]
+  #             bver: ["beta", "unstable", "stable"]
+  #             build_label: ["Integration tests"]
+  #     - run-chrome-extension-tests:
+  #         name: Chrome extension tests <<matrix.browser>> <<matrix.bver>>
+  #         context:
+  #           - vblocks-js
+  #         matrix:
+  #           parameters:
+  #             browser: ["chrome"]
+  #             bver: ["beta", "stable"]
+  #     # NOTE(csantos): Will be addressed on a future epic
+  #     # - run-network-tests:
+  #     #     name: Network Tests <<matrix.browser>> <<matrix.bver>>
+  #     #     context:
+  #     #       - dockerhub-pulls
+  #     #       - vblocks-js
+  #     #     matrix:
+  #     #       parameters:
+  #     #         browser: ["chrome", "firefox"]
+  #     #         bver: ["stable"]
   release-workflow:
     when: <<pipeline.parameters.release_workflow>>
     jobs:
