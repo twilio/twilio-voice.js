@@ -3,7 +3,7 @@ description: 'Exchange GitHub OIDC token for Artifactory access token and config
 
 inputs:
   artifactory_url:
-    description: 'Base URL of the Artifactory instance (e.g. https://twilio.jfrog.io)'
+    description: 'Base URL of the Artifactory instance'
     required: true
 
 runs:
