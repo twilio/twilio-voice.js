@@ -293,11 +293,6 @@ class Device extends EventEmitter {
   private _boundConfirmClose: typeof Device.prototype._confirmClose;
 
   /**
-   * {@link Device.destroy} bound to the specific {@link Device} instance.
-   */
-  private _boundDestroy: typeof Device.prototype.destroy;
-
-  /**
    * {@link Device._onPageHide} bound to the specific {@link Device} instance.
    */
   private _boundOnPageHide: typeof Device.prototype._onPageHide;
@@ -522,7 +517,6 @@ class Device extends EventEmitter {
       }
     }
 
-    this._boundDestroy = this.destroy.bind(this);
     this._boundConfirmClose = this._confirmClose.bind(this);
     this._boundOnPageHide = this._onPageHide.bind(this);
     this._boundOnPageShow = this._onPageShow.bind(this);
