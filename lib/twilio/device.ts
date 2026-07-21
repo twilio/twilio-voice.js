@@ -298,6 +298,16 @@ class Device extends EventEmitter {
   private _boundDestroy: typeof Device.prototype.destroy;
 
   /**
+   * {@link Device._onPageHide} bound to the specific {@link Device} instance.
+   */
+  private _boundOnPageHide: typeof Device.prototype._onPageHide;
+
+  /**
+   * {@link Device._onPageShow} bound to the specific {@link Device} instance.
+   */
+  private _boundOnPageShow: typeof Device.prototype._onPageShow;
+
+  /**
    * An audio input MediaStream to pass to new {@link Call} instances.
    */
   private _callInputStream: MediaStream | null = null;
@@ -514,9 +524,12 @@ class Device extends EventEmitter {
 
     this._boundDestroy = this.destroy.bind(this);
     this._boundConfirmClose = this._confirmClose.bind(this);
+    this._boundOnPageHide = this._onPageHide.bind(this);
+    this._boundOnPageShow = this._onPageShow.bind(this);
 
     if (typeof window !== 'undefined' && window.addEventListener) {
-      window.addEventListener('pagehide', this._boundDestroy);
+      window.addEventListener('pagehide', this._boundOnPageHide);
+      window.addEventListener('pageshow', this._boundOnPageShow);
     }
 
     this.updateOptions(options);
@@ -628,7 +641,8 @@ class Device extends EventEmitter {
 
     if (typeof window !== 'undefined' && window.removeEventListener) {
       window.removeEventListener('beforeunload', this._boundConfirmClose);
-      window.removeEventListener('pagehide', this._boundDestroy);
+      window.removeEventListener('pagehide', this._boundOnPageHide);
+      window.removeEventListener('pageshow', this._boundOnPageShow);
     }
 
     this._setState(Device.State.Destroyed);
@@ -1163,6 +1177,46 @@ class Device extends EventEmitter {
   private _maybeStopIncomingSound(): void {
     if (!this._calls.length) {
       this._soundcache.get(Device.SoundName.Incoming).stop();
+    }
+  }
+
+  /**
+   * Called on the window's `pagehide` event. When the page is entering the
+   * back/forward cache (`event.persisted === true`) and there are no active
+   * calls, the signaling connection is quiesced without permanently destroying
+   * the {@link Device}, so it can be restored on `pageshow`. Otherwise the
+   * {@link Device} is destroyed, preserving the historical behavior (a normal
+   * page unload, or a persisted transition while media is active and cannot
+   * survive the cache).
+   */
+  private _onPageHide(event?: PageTransitionEvent): void {
+    if (event && event.persisted && this._calls.length === 0) {
+      this._log.debug('Page entering BFCache; quiescing signaling');
+      this._stopRegistrationTimer();
+      this._destroyStream();
+    } else {
+      this.destroy();
+    }
+  }
+
+  /**
+   * Called on the window's `pageshow` event. When the page is restored from the
+   * back/forward cache (`event.persisted === true`), re-register if the
+   * {@link Device} was registered before entering the cache. A previously
+   * destroyed or unregistered {@link Device} is left untouched.
+   */
+  private _onPageShow(event?: PageTransitionEvent): void {
+    if (!event || !event.persisted) {
+      return;
+    }
+    if (this.state === Device.State.Destroyed) {
+      return;
+    }
+    if (this._shouldReRegister && this.state === Device.State.Unregistered) {
+      this._log.debug('Page restored from BFCache; re-registering');
+      this.register().catch((error: any) => {
+        this._log.warn('Failed to re-register after BFCache restore', error);
+      });
     }
   }
 

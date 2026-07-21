@@ -1814,15 +1814,105 @@ describe('Device', function() {
             });
           });
 
-          describe('on pagehide', () => {
-            it('should call destroy once on pagehide', () => {
-              stub = sinon.createStubInstance(Device);
-              Device.prototype.constructor.call(stub, token);
-              root.window.dispatchEvent('pagehide');
-              sinon.assert.calledOnce(stub.destroy);
-            });
-          });
         });
+      });
+    });
+
+    describe('page lifecycle (BFCache)', () => {
+      const registerFromScratch = async () => {
+        await setupStream();
+        const regPromise = device.register();
+        await clock.tickAsync(0);
+        pstream.emit('ready');
+        await regPromise;
+      };
+
+      // Drives the async register() started inside _onPageShow to completion by
+      // resolving the freshly created signaling stream.
+      const driveReregister = async () => {
+        await clock.tickAsync(0);
+        pstream.emit('connected', { region: 'US_EAST_VIRGINIA' });
+        await clock.tickAsync(0);
+        pstream.emit('ready');
+        await clock.tickAsync(0);
+      };
+
+      it('should destroy the device on a normal (no-arg) pagehide', () => {
+        const spy = device.destroy = sinon.spy(device.destroy);
+        root.window.dispatchEvent('pagehide');
+        sinon.assert.calledOnce(spy);
+        assert.equal(device.state, Device.State.Destroyed);
+      });
+
+      it('should destroy the device on a non-persisted pagehide', () => {
+        root.window.dispatchEvent('pagehide', { persisted: false });
+        assert.equal(device.state, Device.State.Destroyed);
+      });
+
+      it('should not destroy the device on a persisted pagehide', async () => {
+        await registerFromScratch();
+        root.window.dispatchEvent('pagehide', { persisted: true });
+        assert.notEqual(device.state, Device.State.Destroyed);
+        assert.equal(device.state, Device.State.Unregistered);
+        assert.equal(device['_shouldReRegister'], true);
+        sinon.assert.calledOnce(pstream.destroy);
+      });
+
+      it('should re-register exactly once after BFCache restore if previously registered', async () => {
+        await registerFromScratch();
+        root.window.dispatchEvent('pagehide', { persisted: true });
+        root.window.dispatchEvent('pageshow', { persisted: true });
+        await driveReregister();
+        assert.equal(device.state, Device.State.Registered);
+        // One stream for the initial registration, one for the restore.
+        sinon.assert.calledTwice(PStream);
+        // The fresh stream is registered exactly once.
+        sinon.assert.calledOnce(pstream.register);
+      });
+
+      it('should remain unregistered after BFCache restore if not previously registered', async () => {
+        const spy = device.register = sinon.spy(device.register);
+        root.window.dispatchEvent('pagehide', { persisted: true });
+        root.window.dispatchEvent('pageshow', { persisted: true });
+        await clock.tickAsync(0);
+        assert.equal(device.state, Device.State.Unregistered);
+        assert.equal(device['_shouldReRegister'], false);
+        sinon.assert.notCalled(spy);
+      });
+
+      it('should not duplicate streams or registrations across repeated BFCache cycles', async () => {
+        await registerFromScratch();
+        for (let i = 0; i < 2; i++) {
+          const streamsBefore = PStream.callCount;
+          root.window.dispatchEvent('pagehide', { persisted: true });
+          root.window.dispatchEvent('pageshow', { persisted: true });
+          await driveReregister();
+          // Exactly one new stream and one registration per restore.
+          assert.equal(PStream.callCount - streamsBefore, 1);
+          sinon.assert.calledOnce(pstream.register);
+          assert.equal(device.state, Device.State.Registered);
+        }
+      });
+
+      it('should not revive an explicitly destroyed device on pageshow', async () => {
+        await registerFromScratch();
+        device.destroy();
+        assert.equal(device.state, Device.State.Destroyed);
+
+        const spy = device.register = sinon.spy(device.register);
+        // The listener was removed by destroy(), so a dispatched pageshow is a
+        // no-op; the state guard also prevents revival if invoked directly.
+        root.window.dispatchEvent('pageshow', { persisted: true });
+        device['_onPageShow']({ persisted: true } as any);
+        assert.equal(device.state, Device.State.Destroyed);
+        sinon.assert.notCalled(spy);
+      });
+
+      it('should destroy the device on a persisted pagehide when a call is active', async () => {
+        await registerFromScratch();
+        device['_calls'].push({ reject: sinon.stub(), disconnect: sinon.stub() } as any);
+        root.window.dispatchEvent('pagehide', { persisted: true });
+        assert.equal(device.state, Device.State.Destroyed);
       });
     });
   });

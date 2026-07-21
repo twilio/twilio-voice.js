@@ -1,5 +1,13 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.18.4 (Work in progress)
+===================
+
+Bug Fixes
+---------
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/446) where the `Device` was permanently destroyed when Chrome restored a page from the back/forward cache (BFCache) in Chrome 149+. The SDK now inspects `PageTransitionEvent.persisted`: on a persisted `pagehide` (no active calls) it quiesces the signaling connection instead of destroying the `Device`, and on a persisted `pageshow` it re-establishes signaling and re-registers if the `Device` was previously registered. Normal (non-persisted) page unloads continue to destroy the `Device`, and an explicitly destroyed `Device` is not revived. Thanks @anene for reporting this.
+
 2.18.3 (May 11, 2026)
 =====================
 
