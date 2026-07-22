@@ -1914,6 +1914,29 @@ describe('Device', function() {
         root.window.dispatchEvent('pagehide', { persisted: true });
         assert.equal(device.state, Device.State.Destroyed);
       });
+
+      it('should destroy the device on a persisted pagehide when a call has been accepted', async () => {
+        await registerFromScratch();
+        device['_activeCall'] = { reject: sinon.stub(), disconnect: sinon.stub() } as any;
+        root.window.dispatchEvent('pagehide', { persisted: true });
+        assert.equal(device.state, Device.State.Destroyed);
+      });
+
+      it('should destroy the device on a persisted pagehide when a call is mid-setup (connect() in flight)', async () => {
+        await registerFromScratch();
+        const connectPromise = device.connect();
+        root.window.dispatchEvent('pagehide', { persisted: true });
+        assert.equal(device.state, Device.State.Destroyed);
+        await assert.rejects(() => connectPromise);
+      });
+
+      it('should destroy the device on a persisted pagehide when an incoming call is mid-setup', async () => {
+        await registerFromScratch();
+        pstream.emit('invite', { callsid: 'foo', sdp: 'bar' });
+        assert(!!device['_makeCallPromise']);
+        root.window.dispatchEvent('pagehide', { persisted: true });
+        assert.equal(device.state, Device.State.Destroyed);
+      });
     });
   });
 });

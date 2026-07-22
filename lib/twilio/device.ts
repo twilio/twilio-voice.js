@@ -1184,7 +1184,7 @@ class Device extends EventEmitter {
    * survive the cache).
    */
   private _onPageHide(event?: PageTransitionEvent): void {
-    if (event && event.persisted && this._calls.length === 0) {
+    if (event && event.persisted && this._calls.length === 0 && !this._activeCall && !this._makeCallPromise) {
       this._log.debug('Page entering BFCache; quiescing signaling');
       this._stopRegistrationTimer();
       this._destroyStream();
