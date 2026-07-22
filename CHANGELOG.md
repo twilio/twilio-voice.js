@@ -1,5 +1,15 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.18.4 (Work in progress)
+===================
+
+Bug Fixes
+---------
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/446) where the `Device` was permanently destroyed when Chrome restored a page from the back/forward cache (BFCache) in Chrome 149+. When a page is cached (and no calls are active), the `Device` now closes its signaling connection instead of destroying itself, and reconnects and re-registers when the page is restored. Normal page unloads still destroy the `Device`, and a `Device` you destroy yourself is never revived. Thanks @anene for reporting this.
+
+  Note: during a BFCache round-trip, the `Device` emits `unregistered` when the page is cached and `registered` again when it is restored. If your app shows registration status in the UI, expect it to briefly flip to unregistered and back.
+
 2.18.3 (May 11, 2026)
 =====================
 
