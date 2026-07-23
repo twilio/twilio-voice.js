@@ -6,6 +6,8 @@
 Bug Fixes
 ---------
 
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/272) where the local DTMF tones played back to the caller by `call.sendDigits()` advanced a pause character (`w`) after only 200ms instead of the full 500ms pause. This made the caller hear a shorter pause than the recipient received, and the gap accumulated with each `w`. Local playback now uses the same 500ms pause duration as the DTMF sent over the wire, so both ends stay in sync. Thanks @a-lindsay for reporting this.
+
 - Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/446) where the `Device` was permanently destroyed when Chrome restored a page from the back/forward cache (BFCache) in Chrome 149+. When a page is cached (and no calls are active), the `Device` now closes its signaling connection instead of destroying itself, and reconnects and re-registers when the page is restored. Normal page unloads still destroy the `Device`, and a `Device` you destroy yourself is never revived. Thanks @anene for reporting this.
 
   Note: during a BFCache round-trip, the `Device` emits `unregistered` when the page is cached and `registered` again when it is restored. If your app shows registration status in the UI, expect it to briefly flip to unregistered and back.
