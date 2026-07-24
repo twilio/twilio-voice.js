@@ -49,6 +49,10 @@ jobs:
       - name: Install Cypress binary
         run: ./node_modules/.bin/cypress install
 
+      # lib/twilio/constants.ts is gitignored and generated at build time.
+      - name: Build constants
+        run: npm run build:constants
+
       # Container jobs skip the image's own ENTRYPOINT that normally starts these.
       - name: Start Xvfb and dbus
         shell: bash
