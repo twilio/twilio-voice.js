@@ -13,11 +13,11 @@ describe('Edges', function() {
       let token1: string;
       let token2: string;
 
-      before(() => {
+      before(async () => {
         identity1 = 'id1-' + Date.now();
         identity2 = 'id2-' + Date.now();
-        token1 = generateAccessToken(identity1);
-        token2 = generateAccessToken(identity2);
+        token1 = await generateAccessToken(identity1);
+        token2 = await generateAccessToken(identity2);
         device1 = new Device(token1, { edge });
         device2 = new Device(token2, { edge });
 

@@ -12,9 +12,9 @@ describe('mutable options', function() {
   let device: Device | null = null;
   let token: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     const id = `device-id-${Date.now()}`;
-    token = generateAccessToken(id);
+    token = await generateAccessToken(id);
   });
 
   afterEach(() => {
@@ -94,7 +94,7 @@ describe('mutable options', function() {
         [receiver, receiverId, receiverToken],
       ] = await Promise.all(['caller', 'receiver'].map(async (n): Promise<[Device, string, string]> => {
         const id = `device-${n}-${timestamp}`;
-        const t = generateAccessToken(id);
+        const t = await generateAccessToken(id);
         const dev = new Device(t);
         await dev.register();
         return [dev, id, t];

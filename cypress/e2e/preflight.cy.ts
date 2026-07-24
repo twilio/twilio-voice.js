@@ -40,8 +40,8 @@ describe('Preflight Test', function() {
     receiverIdentity = 'id1-' + Date.now();
     callerIdentity = 'id2-' + Date.now();
 
-    const receiverToken = generateAccessToken(receiverIdentity);
-    callerToken = generateAccessToken(callerIdentity);
+    const receiverToken = await generateAccessToken(receiverIdentity);
+    callerToken = await generateAccessToken(callerIdentity);
     receiverDevice = new Device(receiverToken);
     receiverDevice.on('error', () => { });
     await receiverDevice.register();

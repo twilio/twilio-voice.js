@@ -1,14 +1,33 @@
 const { defineConfig } = require('cypress');
 
+/**
+ * Fetch a fresh GitHub Actions OIDC token for calling the e2e credential-vending
+ * Function, or fall back to VENDOR_TOKEN for local development.
+ * @returns {Promise<string>}
+ */
+async function mintVendorToken() {
+  const requestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+  const requestUrl = process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
+  if (!requestToken || !requestUrl) {
+    return process.env.VENDOR_TOKEN;
+  }
+  const audience = encodeURIComponent(process.env.VENDOR_AUDIENCE);
+  const response = await fetch(`${requestUrl}&audience=${audience}`, {
+    headers: { Authorization: `bearer ${requestToken}` }
+  });
+  if (!response.ok) {
+    throw new Error(`OIDC token request failed: ${response.status}`);
+  }
+  const body = await response.json();
+  return body.value;
+}
+
 module.exports = defineConfig({
   env: {
-    ACCOUNT_SID: process.env.ACCOUNT_SID,
     AUTH_TOKEN: process.env.AUTH_TOKEN,
-    API_KEY_SECRET: process.env.API_KEY_SECRET,
-    API_KEY_SID: process.env.API_KEY_SID,
-    APPLICATION_SID: process.env.APPLICATION_SID,
-    APPLICATION_SID_STIR: process.env.APPLICATION_SID_STIR,
-    CALLER_ID: process.env.CALLER_ID,
+    VENDOR_URL: process.env.VENDOR_URL,
+    VENDOR_TOKEN: process.env.VENDOR_TOKEN,
+    VENDOR_AUDIENCE: process.env.VENDOR_AUDIENCE,
   },
   e2e: {
     defaultCommandTimeout: 10000,
@@ -25,6 +44,7 @@ module.exports = defineConfig({
           console.log(message);
           return null;
         },
+        mintVendorToken,
       });
     },
     specPattern: 'cypress/e2e/**/*.cy.ts',

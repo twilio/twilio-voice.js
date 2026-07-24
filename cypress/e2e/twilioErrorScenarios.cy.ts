@@ -78,7 +78,7 @@ describe('TwilioError Scenarios', function() {
   it('should emit an error event for an expired token', async () => {
     // Generate a token with 1 second TTL
     const identity = 'id-expired-' + Date.now();
-    const token = generateAccessToken(identity, 1);
+    const token = await generateAccessToken(identity, 1);
     const device = new Device(token);
 
     // Wait for the token to expire before trying to register
