@@ -61,6 +61,38 @@ describe('Call sendDigits', function() {
     assert.doesNotThrow(() => call1.sendDigits('1w2'));
   });
 
+  it('should pause local DTMF playback for the full pause duration on "w"', () => {
+    // Regression test for https://github.com/twilio/twilio-voice.js/issues/272.
+    // Local playback (what the caller hears) must advance a pause ('w') after the
+    // full 500ms pause, not the 200ms tone gap. For '7w8' that puts the gap
+    // between the two tones at ~700ms (200ms tone gap + 500ms pause); the old bug
+    // advanced after ~400ms. Digits 7 and 8 are unique to this test so pending
+    // playback timers from other tests cannot contaminate the timing.
+    const dialtonePlayer = (call1 as any)._options.dialtonePlayer;
+    if (!dialtonePlayer) {
+      // No AudioContext-backed dialtone player in this environment; nothing to measure.
+      return;
+    }
+
+    const start = Date.now();
+    const first: { [sound: string]: number } = {};
+    cy.stub(dialtonePlayer, 'play').callsFake((sound: string) => {
+      if (!(sound in first)) {
+        first[sound] = Date.now() - start;
+      }
+    });
+
+    call1.sendDigits('7w8');
+
+    // Wait past the full sequence (~700ms) with a buffer, then assert timing.
+    cy.wait(1500).then(() => {
+      assert.ok(first.dtmf7 !== undefined, 'dtmf7 should have played');
+      assert.ok(first.dtmf8 !== undefined, 'dtmf8 should have played');
+      const gap = first.dtmf8 - first.dtmf7;
+      assert.ok(gap >= 600, `expected pause gap >= 600ms but was ${gap}ms`);
+    });
+  });
+
   it('should throw on invalid characters', () => {
     assert.throws(() => call1.sendDigits('abc'), (err: any) => {
       return err.name === 'InvalidArgumentError';

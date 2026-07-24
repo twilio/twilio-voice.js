@@ -1302,7 +1302,7 @@ describe('Call', function() {
           clock.tick(1);
           digits.split('').forEach((digit) => {
             if (digit === 'w') {
-              clock.tick(200);
+              clock.tick(500);
               return;
             }
             let dtmf = `dtmf${digit}`;
@@ -1314,6 +1314,29 @@ describe('Call', function() {
           });
         });
       })
+    });
+
+    it('should pause local playback for the full pause duration on "w"', () => {
+      const dialtonePlayer: any = { play: sinon.stub() };
+      options.dialtonePlayer = dialtonePlayer;
+      conn = new Call(config, options);
+
+      const sender = { insertDTMF: sinon.spy() };
+      mediaHandler.getOrCreateDTMFSender = () => sender;
+      conn.sendDigits('1w2');
+
+      clock.tick(1);
+      sinon.assert.calledWithExactly(dialtonePlayer.play, 'dtmf1');
+      sinon.assert.neverCalledWith(dialtonePlayer.play, 'dtmf2');
+
+      // '2' plays after the 200ms tone gap plus the 500ms pause (t=700). Just
+      // before that, it must not have played -- proving the pause is 500ms and
+      // not the 200ms tone gap.
+      clock.tick(698);
+      sinon.assert.neverCalledWith(dialtonePlayer.play, 'dtmf2');
+
+      clock.tick(1);
+      sinon.assert.calledWithExactly(dialtonePlayer.play, 'dtmf2');
     });
 
     it('should call pstream.dtmf if connected', () => {

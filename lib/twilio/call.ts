@@ -855,7 +855,11 @@ class Call extends EventEmitter {
         }
       }
       if (sequence.length) {
-        setTimeout(() => playNextDigit(), 200);
+        // NOTE: A pause ('w') maps to an empty string in the sequence and plays
+        // no sound. Wait the full pause duration so local playback stays in sync
+        // with the DTMF sent over the wire, which pauses for DTMF_PAUSE_DURATION.
+        const delay = digit ? 200 : DTMF_PAUSE_DURATION;
+        setTimeout(() => playNextDigit(), delay);
       }
     };
     playNextDigit();
