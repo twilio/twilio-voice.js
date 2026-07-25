@@ -68,9 +68,10 @@ jobs:
           VENDOR_AUDIENCE: ${{ vars.VENDOR_URL }}
         run: npm run test:integration:chrome
 
+      # Cypress can't auto-detect Firefox's beta/nightly builds by name.
       - name: Run e2e integration tests (firefox)
         if: matrix.browser == 'firefox'
         env:
           VENDOR_URL: ${{ vars.VENDOR_URL }}
           VENDOR_AUDIENCE: ${{ vars.VENDOR_URL }}
-        run: npm run test:integration:firefox
+        run: npm run test:integration -- --browser /usr/local/bin/firefox
