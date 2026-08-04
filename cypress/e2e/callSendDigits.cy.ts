@@ -62,14 +62,9 @@ describe('Call sendDigits', function() {
   });
 
   it('should keep local DTMF playback for "w" in sync with the wire', () => {
-    // Regression test for VBLOCKS-6989 (follow-up to issue #272). The wire path
-    // hands the run after a pause to the DTMF sender 500ms after the run before
-    // it. Local playback (what the caller hears) must match. For '7w8' the '8'
-    // plays ~500ms after '7' (the 500ms pause overlaps the single leading tone:
-    // 200ms tone gap + 300ms remaining pause). The prior bug advanced after
-    // ~700ms, drifting the caller's tones later than the wire. Digits 7 and 8
-    // are unique to this test so pending playback timers from other tests cannot
-    // contaminate the timing.
+    // VBLOCKS-6989: the wire sends the run after a pause 500ms after the run
+    // before it, so '8' must play ~500ms after '7' locally too. Digits 7 and 8
+    // are unique to this test so other tests' pending timers cannot skew it.
     const dialtonePlayer = (call1 as any)._options.dialtonePlayer;
     if (!dialtonePlayer) {
       // No AudioContext-backed dialtone player in this environment; nothing to measure.
@@ -97,14 +92,11 @@ describe('Call sendDigits', function() {
   });
 
   it('should not drift local DTMF playback as digits precede a "w"', () => {
-    // Regression test for VBLOCKS-6989. The run before the pause here is two
-    // tones ('45'), yet the run after the pause ('6') must still start ~500ms
-    // after the run before it -- the same as the one-tone '7w8' case above. That
-    // is the point of the fix: the pause overlaps the run's tones instead of
-    // stacking on top of them, so the drift does not grow with the number of
-    // digits before the pause. The pre-6989 behavior put '6' at ~900ms. Digits
-    // 4, 5 and 6 are unique to this test so pending playback timers from other
-    // tests cannot contaminate the timing.
+    // VBLOCKS-6989: two tones precede the pause here instead of one, and '6'
+    // must still start ~500ms in, proving the pause does not stack on top of
+    // the tones. Before the fix '6' landed at ~900ms. Two tones is the longest
+    // run that still fits inside the 500ms pause. Digits 4, 5 and 6 are unique
+    // to this test so other tests' pending timers cannot skew it.
     const dialtonePlayer = (call1 as any)._options.dialtonePlayer;
     if (!dialtonePlayer) {
       // No AudioContext-backed dialtone player in this environment; nothing to measure.

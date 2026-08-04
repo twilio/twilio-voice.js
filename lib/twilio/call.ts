@@ -39,6 +39,9 @@ const BACKOFF_CONFIG = {
 };
 
 const DTMF_INTER_TONE_GAP: number = 70;
+// Cadence of the feedback tones the caller hears. Intentionally independent of
+// the wire's tone timing: this is audible feedback, not a mirror of what the
+// recipient receives.
 const DTMF_LOCAL_TONE_GAP: number = 200;
 const DTMF_PAUSE_DURATION: number = 500;
 const DTMF_TONE_DURATION: number = 160;
@@ -862,12 +865,9 @@ class Call extends EventEmitter {
         if (digit) {
           delay = DTMF_LOCAL_TONE_GAP;
         } else {
-          // A pause ('w') maps to an empty string in the sequence and plays no
-          // sound. The wire path (insertDTMF) starts its DTMF_PAUSE_DURATION
-          // timer at the *start* of a tone run, so the pause overlaps the run's
-          // tones. Local playback is sequential, so subtract the time already
-          // spent on this run's tones to keep the next run's start aligned with
-          // the wire's next insertDTMF call. Floored at 0 for long runs.
+          // A pause ('w') is an empty string here and plays no sound. The wire
+          // starts its pause timer at the start of a run, so the pause overlaps
+          // that run's tones. Subtract the tones already played to match it.
           delay = Math.max(0, DTMF_PAUSE_DURATION - tonesInRun * DTMF_LOCAL_TONE_GAP);
           tonesInRun = 0;
         }
