@@ -57,9 +57,17 @@ jobs:
       - name: Start Xvfb and dbus
         shell: bash
         run: |
+          set -u
           sudo dbus-daemon --system --fork
           Xvfb $DISPLAY -screen 0 1280x1024x24 &
-          sleep 1
+          xvfb_pid=$!
+          socket="/tmp/.X11-unix/X${DISPLAY#:}"
+          for _ in $(seq 1 50); do
+            [ -e "$socket" ] && break
+            kill -0 "$xvfb_pid" 2>/dev/null || { echo "Xvfb exited during startup"; exit 1; }
+            sleep 0.2
+          done
+          [ -e "$socket" ] || { echo "Xvfb did not create display $DISPLAY within 10s"; exit 1; }
 
       - name: Run e2e integration tests (chrome)
         if: matrix.browser == 'chrome'

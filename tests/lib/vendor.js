@@ -9,29 +9,36 @@
  */
 async function callVendor(action, params) {
   const proxyUrl = Cypress.env('VENDOR_PROXY_URL');
+  const proxySecret = Cypress.env('VENDOR_PROXY_SECRET');
 
   if (!proxyUrl) {
     throw new Error('callVendor: VENDOR_PROXY_URL is not set');
   }
 
+  if (!proxySecret) {
+    throw new Error('callVendor: VENDOR_PROXY_SECRET is not set');
+  }
+
   const response = await fetch(proxyUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Vendor-Proxy-Secret': proxySecret,
+    },
     body: JSON.stringify(Object.assign({ action }, params)),
   });
 
   const text = await response.text();
-  let parsed;
+
+  if (!response.ok) {
+    throw new Error(`callVendor: ${action} failed (${response.status}): ${text}`);
+  }
+
   try {
-    parsed = JSON.parse(text);
+    return JSON.parse(text);
   } catch (e) {
     throw new Error(`callVendor: non-JSON response from vendor: ${text}`);
   }
-
-  if (!response.ok) {
-    throw new Error(`callVendor: ${action} failed (${response.status}): ${parsed.error || JSON.stringify(parsed)}`);
-  }
-  return parsed;
 }
 
 module.exports = callVendor;

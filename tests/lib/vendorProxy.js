@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('crypto');
 const http = require('http');
 
 // GitHub Actions OIDC tokens are valid for ~5 minutes; a 4-min ceiling leaves a
@@ -11,15 +12,25 @@ const TOKEN_MAX_AGE_MS = 4 * 60 * 1000;
  * Runs in the Cypress Node process and adds the authorization header, so tests
  * running in browser do not handle credentials.
  *
- * Tests POST to /vend with the vending request body. The status code and body
- * of the vending response are returned as-is.
+ * Tests POST to /vend with the vending request body and the per-run secret in
+ * the X-Vendor-Proxy-Secret header. The status code and body of the vending
+ * response are returned as-is.
 */
 class VendorProxy {
   constructor() {
     this._server = null;
+    this._secret = crypto.randomUUID();
     this._cachedToken = null;
     this._cachedTokenMintedAt = 0;
     this._cachedTokenPromise = null;
+  }
+
+  /**
+   * @returns {string} the per-run secret /vend requires, for injection into the
+   *   Cypress test env
+   */
+  get secret() {
+    return this._secret;
   }
 
   /**
@@ -49,7 +60,7 @@ class VendorProxy {
   async _handleRequest(req, res) {
     // This port is a different origin than the page Cypress serves.
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Vendor-Proxy-Secret');
 
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
@@ -63,14 +74,23 @@ class VendorProxy {
       return;
     }
 
+    if (req.headers['x-vendor-proxy-secret'] !== this._secret) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'forbidden' }));
+      return;
+    }
+
     try {
       const body = await readBody(req);
       const { status, text } = await this._forward(body);
       res.writeHead(status, { 'Content-Type': 'application/json' });
       res.end(text);
     } catch (error) {
+      // Cypress surfaces this process's stderr in the run output, which is the
+      // only place the cause is visible; the response body stays generic.
+      console.error('[vendorProxy] /vend failed', error);
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: error.message }));
+      res.end(JSON.stringify({ error: 'internal error' }));
     }
   }
 

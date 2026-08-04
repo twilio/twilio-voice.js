@@ -86,6 +86,7 @@ describe('SHAKEN/STIR', function() {
         });
 
         it('should show isVerified on aliceStir call', () => {
+          assert.notEqual(call2!.callerInfo, null, 'callerInfo is null - STIR attestation did not fire');
           assert.equal(call2!.callerInfo!.isVerified, true);
         });
 

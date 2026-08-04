@@ -24,6 +24,7 @@ module.exports = defineConfig({
 
       const vendorProxy = new VendorProxy();
       config.env.VENDOR_PROXY_URL = await vendorProxy.start();
+      config.env.VENDOR_PROXY_SECRET = vendorProxy.secret;
       on('after:run', () => vendorProxy.stop());
 
       return config;
