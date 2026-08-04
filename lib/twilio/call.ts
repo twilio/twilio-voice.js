@@ -39,6 +39,7 @@ const BACKOFF_CONFIG = {
 };
 
 const DTMF_INTER_TONE_GAP: number = 70;
+const DTMF_LOCAL_TONE_GAP: number = 200;
 const DTMF_PAUSE_DURATION: number = 500;
 const DTMF_TONE_DURATION: number = 160;
 
@@ -845,9 +846,11 @@ class Call extends EventEmitter {
       sequence.push(dtmf);
     });
 
+    let tonesInRun = 0;
     const playNextDigit = () => {
       const digit = sequence.shift() as Device.SoundName | undefined;
       if (digit) {
+        tonesInRun++;
         if (this._options.dialtonePlayer && !customSounds[digit]) {
           this._options.dialtonePlayer.play(digit);
         } else {
@@ -855,10 +858,19 @@ class Call extends EventEmitter {
         }
       }
       if (sequence.length) {
-        // NOTE: A pause ('w') maps to an empty string in the sequence and plays
-        // no sound. Wait the full pause duration so local playback stays in sync
-        // with the DTMF sent over the wire, which pauses for DTMF_PAUSE_DURATION.
-        const delay = digit ? 200 : DTMF_PAUSE_DURATION;
+        let delay: number;
+        if (digit) {
+          delay = DTMF_LOCAL_TONE_GAP;
+        } else {
+          // A pause ('w') maps to an empty string in the sequence and plays no
+          // sound. The wire path (insertDTMF) starts its DTMF_PAUSE_DURATION
+          // timer at the *start* of a tone run, so the pause overlaps the run's
+          // tones. Local playback is sequential, so subtract the time already
+          // spent on this run's tones to keep the next run's start aligned with
+          // the wire's next insertDTMF call. Floored at 0 for long runs.
+          delay = Math.max(0, DTMF_PAUSE_DURATION - tonesInRun * DTMF_LOCAL_TONE_GAP);
+          tonesInRun = 0;
+        }
         setTimeout(() => playNextDigit(), delay);
       }
     };

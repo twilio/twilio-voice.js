@@ -1300,9 +1300,15 @@ describe('Call', function() {
           conn.sendDigits(digits);
 
           clock.tick(1);
+          let tonesInRun = 0;
           digits.split('').forEach((digit) => {
             if (digit === 'w') {
-              clock.tick(500);
+              // The pause overlaps the tones of the run before it, so it only
+              // adds 500ms minus the time already spent on those tones. Mirrors
+              // the compensation in sendDigits, which floors at 0; sinon fires a
+              // floored (0ms) setTimeout after 1ms, so advance by at least 1.
+              clock.tick(Math.max(1, 500 - tonesInRun * 200));
+              tonesInRun = 0;
               return;
             }
             let dtmf = `dtmf${digit}`;
@@ -1310,13 +1316,14 @@ describe('Call', function() {
             if (dtmf === 'dtmf#') { dtmf = 'dtmfh'; }
 
             assert(dtmf, digit);
+            tonesInRun++;
             clock.tick(200);
           });
         });
       })
     });
 
-    it('should pause local playback for the full pause duration on "w"', () => {
+    it('should start the run after a "w" pause 500ms after the run before it', () => {
       const dialtonePlayer: any = { play: sinon.stub() };
       options.dialtonePlayer = dialtonePlayer;
       conn = new Call(config, options);
@@ -1329,14 +1336,66 @@ describe('Call', function() {
       sinon.assert.calledWithExactly(dialtonePlayer.play, 'dtmf1');
       sinon.assert.neverCalledWith(dialtonePlayer.play, 'dtmf2');
 
-      // '2' plays after the 200ms tone gap plus the 500ms pause (t=700). Just
-      // before that, it must not have played -- proving the pause is 500ms and
-      // not the 200ms tone gap.
-      clock.tick(698);
+      // The wire path calls insertDTMF for the '2' run 500ms after the '1' run.
+      // Local playback must match: '2' plays at t=500 (not t=700). The pause
+      // overlaps the single 200ms tone of the '1' run, so the effective pause
+      // delay is 500 - 200 = 300ms.
+      clock.tick(498);
       sinon.assert.neverCalledWith(dialtonePlayer.play, 'dtmf2');
 
       clock.tick(1);
       sinon.assert.calledWithExactly(dialtonePlayer.play, 'dtmf2');
+    });
+
+    it('should keep local playback in sync with the wire across a "w" pause', () => {
+      // Regression test for VBLOCKS-6989. The wire path (insertDTMF) hands each
+      // `digits.split('w')` run to the DTMF sender exactly 500ms
+      // (DTMF_PAUSE_DURATION) apart, regardless of how many digits precede the
+      // pause. Local playback must start the run after the pause at the same
+      // time, so the drift does not grow with the length of the run before the
+      // pause.
+      // The key property: local playback of the run after the pause starts at
+      // the same time no matter how many digits precede the pause (no drift).
+      // For runs short enough to fit inside the 500ms pause, that time is
+      // exactly 500ms; longer runs cannot beat sequential playback so they floor
+      // at run-length * 200ms. Before the fix, local start was 700 / 900 / 1100.
+      ['1w2', '12w3', '123w4'].forEach((digits) => {
+        const dialtonePlayer: any = { play: sinon.stub() };
+        options.dialtonePlayer = dialtonePlayer;
+        conn = new Call(config, options);
+
+        // Record when the wire hands each run to the sender.
+        const insertTimes: number[] = [];
+        const sender = { insertDTMF: () => insertTimes.push(Date.now()) };
+        mediaHandler.getOrCreateDTMFSender = () => sender;
+
+        // Record when each tone is played locally.
+        const playTimes: { [sound: string]: number } = {};
+        dialtonePlayer.play.callsFake((sound: string) => {
+          if (!(sound in playTimes)) { playTimes[sound] = Date.now(); }
+        });
+
+        const start = Date.now();
+        conn.sendDigits(digits);
+        clock.tick(2000);
+
+        const tonesBeforePause = digits.split('w')[0].length;
+        const firstOfSecondRun = `dtmf${digits.split('w')[1][0]}`;
+        const expected = Math.max(500, tonesBeforePause * 200);
+
+        // The wire calls insertDTMF for the second run 500ms after the first,
+        // regardless of run length.
+        assert.strictEqual(insertTimes[1] - insertTimes[0], 500);
+
+        // Local playback of that run starts at the wire-aligned time. The ±1ms
+        // allowance covers sinon clamping a floored setTimeout(0) to 1ms; real
+        // browsers fire it in ~0-4ms, immaterial next to a 500ms pause.
+        const localStart = playTimes[firstOfSecondRun] - start;
+        assert.ok(
+          Math.abs(localStart - expected) <= 1,
+          `expected local run to start ~${expected}ms after start but was ${localStart}ms`,
+        );
+      });
     });
 
     it('should call pstream.dtmf if connected', () => {
