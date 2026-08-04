@@ -57,7 +57,7 @@ jobs:
       - name: Start Xvfb and dbus
         shell: bash
         run: |
-          set -u
+          set -euo pipefail
           sudo dbus-daemon --system --fork
           Xvfb $DISPLAY -screen 0 1280x1024x24 &
           xvfb_pid=$!
