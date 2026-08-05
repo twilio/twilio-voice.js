@@ -7,6 +7,8 @@ module.exports = defineConfig({
   },
   e2e: {
     defaultCommandTimeout: 10000,
+    // Retry failing tests in CI only; fail fast when debugging locally.
+    retries: { runMode: 3, openMode: 0 },
     supportFile: false,
     async setupNodeEvents(on, config) {
       on('before:browser:launch', (browser, launchOptions) => {
