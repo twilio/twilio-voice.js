@@ -2,7 +2,6 @@ import * as assert from 'assert';
 import { EventEmitter } from 'events';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
-import * as env from '../../tests/env';
 import { generateAccessToken } from '../../tests/lib/token';
 
 describe('SHAKEN/STIR', function() {
@@ -15,11 +14,11 @@ describe('SHAKEN/STIR', function() {
   let token1: string;
   let token2: string;
 
-  before(() => {
+  before(async () => {
     identity1 = 'id1-' + Date.now();
     identity2 = 'aliceStir';
-    token1 = generateAccessToken(identity1, undefined, (env as any).appSidStir);
-    token2 = generateAccessToken(identity2, undefined, (env as any).appSidStir);
+    token1 = await generateAccessToken(identity1, undefined, undefined, 'stir');
+    token2 = await generateAccessToken(identity2, undefined, undefined, 'stir');
     device1 = new Device(token1);
     device2 = new Device(token2);
 
@@ -47,11 +46,14 @@ describe('SHAKEN/STIR', function() {
       let call1: Call;
       let call2: Call;
 
-      before(() => new Promise<void>(async resolve => {
-        device2.once(Device.EventName.Incoming, (call: Call) => {
-          resolve();
-          call2 = call;
+      before(async () => {
+        const incomingPromise = new Promise<void>(resolve => {
+          device2.once(Device.EventName.Incoming, (call: Call) => {
+            call2 = call;
+            resolve();
+          });
         });
+
         const devShim = device2 as any;
         devShim._stream.transport.__onSocketMessage = devShim._stream.transport._onSocketMessage;
         devShim._stream.transport._onSocketMessage = (message: any) => {
@@ -67,10 +69,10 @@ describe('SHAKEN/STIR', function() {
           return devShim._stream.transport.__onSocketMessage(message);
         };
 
-        call1 = await (device1['connect'] as any)({
-          params: { CallerId: (env as any).callerId },
-        });
-      }));
+        call1 = await (device1['connect'] as any)();
+
+        await incomingPromise;
+      });
 
       describe('and device 2 accepts', () => {
         beforeEach(() => {
@@ -84,6 +86,7 @@ describe('SHAKEN/STIR', function() {
         });
 
         it('should show isVerified on aliceStir call', () => {
+          assert.notEqual(call2!.callerInfo, null, 'callerInfo is null - STIR attestation did not fire');
           assert.equal(call2!.callerInfo!.isVerified, true);
         });
 

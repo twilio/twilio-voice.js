@@ -19,8 +19,8 @@ describe('Call Events', function() {
     before(async () => {
       const identity1 = 'id1-' + Date.now();
       const identity2 = 'id2-' + Date.now();
-      const token1 = generateAccessToken(identity1);
-      const token2 = generateAccessToken(identity2);
+      const token1 = await generateAccessToken(identity1);
+      const token2 = await generateAccessToken(identity2);
       device1 = new Device(token1);
       device2 = new Device(token2);
 
@@ -76,8 +76,8 @@ describe('Call Events', function() {
     before(async () => {
       const identity1 = 'id1-' + Date.now();
       const identity2 = 'id2-' + Date.now();
-      const token1 = generateAccessToken(identity1);
-      const token2 = generateAccessToken(identity2);
+      const token1 = await generateAccessToken(identity1);
+      const token2 = await generateAccessToken(identity2);
       device1 = new Device(token1);
       device2 = new Device(token2);
 
@@ -132,8 +132,8 @@ describe('Call Events', function() {
     before(async () => {
       const identity1 = 'id1-' + Date.now();
       const identity2 = 'id2-' + Date.now();
-      const token1 = generateAccessToken(identity1);
-      const token2 = generateAccessToken(identity2);
+      const token1 = await generateAccessToken(identity1);
+      const token2 = await generateAccessToken(identity2);
       device1 = new Device(token1);
       device2 = new Device(token2);
 

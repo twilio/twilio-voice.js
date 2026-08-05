@@ -35,9 +35,9 @@ describe('Device Properties', function() {
       }
     });
 
-    it('should have identity set to null before registration', () => {
+    it('should have identity set to null before registration', async () => {
       const identity = 'id-' + Date.now();
-      const token = generateAccessToken(identity);
+      const token = await generateAccessToken(identity);
       device = new Device(token);
 
       assert.strictEqual(device.identity, null);
@@ -45,7 +45,7 @@ describe('Device Properties', function() {
 
     it('should have identity populated after registration', async () => {
       const identity = 'id-' + Date.now();
-      const token = generateAccessToken(identity);
+      const token = await generateAccessToken(identity);
       device = new Device(token);
 
       await device.register();
@@ -54,7 +54,7 @@ describe('Device Properties', function() {
 
     it('should have edge set after registration', async () => {
       const identity = 'id-' + Date.now();
-      const token = generateAccessToken(identity);
+      const token = await generateAccessToken(identity);
       device = new Device(token, { edge: 'ashburn' });
 
       await device.register();
@@ -63,7 +63,7 @@ describe('Device Properties', function() {
 
     it('should have home set after registration', async () => {
       const identity = 'id-' + Date.now();
-      const token = generateAccessToken(identity);
+      const token = await generateAccessToken(identity);
       device = new Device(token);
 
       await device.register();
@@ -71,9 +71,9 @@ describe('Device Properties', function() {
       assert(device.home!.length > 0, 'home should not be empty');
     });
 
-    it('should have token set', () => {
+    it('should have token set', async () => {
       const identity = 'id-' + Date.now();
-      const token = generateAccessToken(identity);
+      const token = await generateAccessToken(identity);
       device = new Device(token);
 
       assert.strictEqual(device.token, token);
@@ -81,7 +81,7 @@ describe('Device Properties', function() {
 
     it('should have isBusy as false when not on a call', async () => {
       const identity = 'id-' + Date.now();
-      const token = generateAccessToken(identity);
+      const token = await generateAccessToken(identity);
       device = new Device(token);
 
       await device.register();
@@ -90,7 +90,7 @@ describe('Device Properties', function() {
 
     it('should have audio (AudioHelper) available after registration', async () => {
       const identity = 'id-' + Date.now();
-      const token = generateAccessToken(identity);
+      const token = await generateAccessToken(identity);
       device = new Device(token);
 
       await device.register();
@@ -99,7 +99,7 @@ describe('Device Properties', function() {
 
     it('should have calls as an empty array by default', async () => {
       const identity = 'id-' + Date.now();
-      const token = generateAccessToken(identity);
+      const token = await generateAccessToken(identity);
       device = new Device(token);
 
       await device.register();
@@ -126,8 +126,8 @@ describe('Device Properties', function() {
     it('should be true when on an active call and false after disconnect', async () => {
       const identity1 = 'id1-' + Date.now();
       const identity2 = 'id2-' + Date.now();
-      const token1 = generateAccessToken(identity1);
-      const token2 = generateAccessToken(identity2);
+      const token1 = await generateAccessToken(identity1);
+      const token2 = await generateAccessToken(identity2);
       device1 = new Device(token1);
       device2 = new Device(token2);
 

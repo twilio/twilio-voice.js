@@ -15,9 +15,9 @@ describe('Logger', function() {
     assert(typeof Logger.setLevel === 'function', 'setLevel should be a function');
   });
 
-  it('should be configurable via Device options logLevel', () => {
+  it('should be configurable via Device options logLevel', async () => {
     const identity = 'id-' + Date.now();
-    const token = generateAccessToken(identity);
+    const token = await generateAccessToken(identity);
 
     // Should not throw when setting various log levels
     assert.doesNotThrow(() => {
@@ -41,9 +41,9 @@ describe('Logger', function() {
     });
   });
 
-  it('should accept numeric log levels via Device options', () => {
+  it('should accept numeric log levels via Device options', async () => {
     const identity = 'id-' + Date.now();
-    const token = generateAccessToken(identity);
+    const token = await generateAccessToken(identity);
 
     // loglevel uses numeric levels: 0=TRACE, 1=DEBUG, 2=INFO, 3=WARN, 4=ERROR, 5=SILENT
     assert.doesNotThrow(() => {

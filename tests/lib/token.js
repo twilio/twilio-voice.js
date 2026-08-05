@@ -1,18 +1,15 @@
 const Twilio = require('twilio');
 const env = require('../env.js');
+const callVendor = require('./vendor');
 
-function generateAccessToken(identity, ttl, appSid) {
-  const accessToken = new Twilio.jwt.AccessToken(env.accountSid,
-    env.apiKeySid,
-    env.apiKeySecret,
-    { ttl: ttl || 300, identity });
-
-  accessToken.addGrant(new Twilio.jwt.AccessToken.VoiceGrant({
-    incomingAllow: true,
-    outgoingApplicationSid: appSid || env.appSid,
-  }));
-
-  return accessToken.toJwt();
+async function generateAccessToken(identity, ttl, appSid, variant) {
+  const { token } = await callVendor('mint-voice-token', {
+    identity,
+    ttl: ttl || 300,
+    outgoingApplicationSid: appSid,
+    variant,
+  });
+  return token;
 }
 
 function generateCapabilityToken() {
