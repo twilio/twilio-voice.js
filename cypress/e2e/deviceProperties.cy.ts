@@ -139,9 +139,12 @@ describe('Device Properties', function() {
 
       assert.strictEqual(device1.isBusy, true);
 
-      const acceptPromise = expectEvent('accept', outgoingCall);
+      // Each Call emits `accept` on its own signaling and media, so the
+      // callee's accept must be awaited before asserting on device2.
+      const outgoingAcceptPromise = expectEvent('accept', outgoingCall);
+      const incomingAcceptPromise = expectEvent('accept', incomingCall);
       incomingCall.accept();
-      await acceptPromise;
+      await Promise.all([outgoingAcceptPromise, incomingAcceptPromise]);
 
       assert.strictEqual(device1.isBusy, true);
       assert.strictEqual(device2.isBusy, true);
