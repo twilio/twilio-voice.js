@@ -1249,7 +1249,20 @@ describe('Call', function() {
     });
 
     describe('when playing sound', () => {
-      const digits = '0123w456789w*#w';
+      // Runs of two tones keep both pauses non-zero (500 - 2*200 = 100ms), so the
+      // pause compensation is actually exercised. The expected times below are
+      // stated as absolute constants rather than re-derived from the production
+      // formula, so a change to either the tone gap or the pause arithmetic
+      // fails this test instead of being mirrored by it.
+      const digits = '01w23w*#';
+      const schedule = [
+        { sound: 'dtmf0', at: 0 },
+        { sound: 'dtmf1', at: 200 },
+        { sound: 'dtmf2', at: 500 },
+        { sound: 'dtmf3', at: 700 },
+        { sound: 'dtmfs', at: 1000 },
+        { sound: 'dtmfh', at: 1200 },
+      ];
       let dialtonePlayer: any;
 
       [{
@@ -1259,16 +1272,20 @@ describe('Call', function() {
           options.dialtonePlayer = dialtonePlayer;
           return options;
         },
-        assert: (dtmf: string, digit: string) => {
-          sinon.assert.callCount(dialtonePlayer.play, digits.replace(/w/g, '').indexOf(digit) + 1);
+        assertPlayed: (dtmf: string) => {
           sinon.assert.calledWithExactly(dialtonePlayer.play, dtmf);
+        },
+        assertNotPlayed: (dtmf: string) => {
+          sinon.assert.neverCalledWith(dialtonePlayer.play, dtmf);
         },
       },{
         name: 'soundcache',
         getOptions: () => options,
-        assert: (dtmf: string) => {
-          const playStub = soundcache.get(dtmf as Device.SoundName).play;
-          sinon.assert.callCount(playStub, 1);
+        assertPlayed: (dtmf: string) => {
+          sinon.assert.callCount(soundcache.get(dtmf as Device.SoundName).play, 1);
+        },
+        assertNotPlayed: (dtmf: string) => {
+          sinon.assert.notCalled(soundcache.get(dtmf as Device.SoundName).play);
         },
       },{
         name: 'customSounds',
@@ -1286,11 +1303,13 @@ describe('Call', function() {
               }, {} as any)
           };
         },
-        assert: (dtmf: string, digit: string) => {
-          const playStub = soundcache.get(dtmf as Device.SoundName).play;
-          sinon.assert.callCount(playStub, 1);
+        assertPlayed: (dtmf: string) => {
+          sinon.assert.callCount(soundcache.get(dtmf as Device.SoundName).play, 1);
         },
-      }].forEach(({ name, assert, getOptions }) => {
+        assertNotPlayed: (dtmf: string) => {
+          sinon.assert.notCalled(soundcache.get(dtmf as Device.SoundName).play);
+        },
+      }].forEach(({ name, assertPlayed, assertNotPlayed, getOptions }) => {
         it(`should play the sound for each letter using ${name}`, () => {
           const o = getOptions();
           conn = new Call(config, o);
@@ -1299,24 +1318,22 @@ describe('Call', function() {
           mediaHandler.getOrCreateDTMFSender = () => sender;
           conn.sendDigits(digits);
 
-          clock.tick(1);
-          digits.split('').forEach((digit) => {
-            if (digit === 'w') {
-              clock.tick(500);
-              return;
+          // The first tone plays synchronously, so there is no "before" to probe.
+          let now = 0;
+          schedule.forEach(({ sound, at }) => {
+            if (at > 0) {
+              clock.tick(at - 1 - now);
+              assertNotPlayed(sound);
+              clock.tick(1);
+              now = at;
             }
-            let dtmf = `dtmf${digit}`;
-            if (dtmf === 'dtmf*') { dtmf = 'dtmfs'; }
-            if (dtmf === 'dtmf#') { dtmf = 'dtmfh'; }
-
-            assert(dtmf, digit);
-            clock.tick(200);
+            assertPlayed(sound);
           });
         });
       })
     });
 
-    it('should pause local playback for the full pause duration on "w"', () => {
+    it('should start the run after a "w" pause 500ms after the run before it', () => {
       const dialtonePlayer: any = { play: sinon.stub() };
       options.dialtonePlayer = dialtonePlayer;
       conn = new Call(config, options);
@@ -1329,14 +1346,64 @@ describe('Call', function() {
       sinon.assert.calledWithExactly(dialtonePlayer.play, 'dtmf1');
       sinon.assert.neverCalledWith(dialtonePlayer.play, 'dtmf2');
 
-      // '2' plays after the 200ms tone gap plus the 500ms pause (t=700). Just
-      // before that, it must not have played -- proving the pause is 500ms and
-      // not the 200ms tone gap.
-      clock.tick(698);
+      // The wire path calls insertDTMF for the '2' run 500ms after the '1' run.
+      // Local playback must match: '2' plays at t=500. The pause overlaps the
+      // single 200ms tone of the '1' run, so the effective pause delay is
+      // 500 - 200 = 300ms.
+      clock.tick(498);
       sinon.assert.neverCalledWith(dialtonePlayer.play, 'dtmf2');
 
       clock.tick(1);
       sinon.assert.calledWithExactly(dialtonePlayer.play, 'dtmf2');
+    });
+
+    it('should keep local playback in sync with the wire across a "w" pause', () => {
+      // VBLOCKS-6989: local playback must follow the same schedule as the DTMF
+      // handed to the sender, with no drift as tones or pauses accumulate.
+      // `wire` is when insertDTMF is called for each non-empty run, `local` is
+      // when each tone plays, both in ms from the sendDigits call. '123w4' is
+      // the exception: three 200ms tones already run past the 500ms handoff, so
+      // its second run starts at 600.
+      [
+        { digits: '1w2',   wire: [0, 500],       local: { dtmf1: 0,   dtmf2: 500 } },
+        { digits: '12w3',  wire: [0, 500],       local: { dtmf1: 0,   dtmf3: 500 } },
+        { digits: '123w4', wire: [0, 500],       local: { dtmf1: 0,   dtmf4: 600 } },
+        { digits: '1w2w3', wire: [0, 500, 1000], local: { dtmf1: 0,   dtmf2: 500, dtmf3: 1000 } },
+        { digits: '1ww2',  wire: [0, 1000],      local: { dtmf1: 0,   dtmf2: 1000 } },
+        { digits: 'w12',   wire: [500],          local: { dtmf1: 500, dtmf2: 700 } },
+      ].forEach(({ digits, wire, local }) => {
+        const dialtonePlayer: any = { play: sinon.stub() };
+        options.dialtonePlayer = dialtonePlayer;
+        conn = new Call(config, options);
+
+        const start = Date.now();
+
+        // Record when the wire hands each run to the sender.
+        const insertTimes: number[] = [];
+        const sender = { insertDTMF: () => insertTimes.push(Date.now() - start) };
+        mediaHandler.getOrCreateDTMFSender = () => sender;
+
+        // Record when each tone is played locally.
+        const playTimes: { [sound: string]: number } = {};
+        dialtonePlayer.play.callsFake((sound: string) => {
+          if (!(sound in playTimes)) { playTimes[sound] = Date.now() - start; }
+        });
+
+        conn.sendDigits(digits);
+        clock.tick(3000);
+
+        assert.deepStrictEqual(insertTimes, wire, `wire handoffs for '${digits}'`);
+
+        Object.entries(local).forEach(([sound, expected]) => {
+          // The ±1ms allowance covers sinon clamping a floored setTimeout(0) to
+          // 1ms; real browsers fire it in ~0-4ms, immaterial next to a pause.
+          const actual = playTimes[sound];
+          assert.ok(
+            actual !== undefined && Math.abs(actual - expected) <= 1,
+            `'${digits}': expected ${sound} at ~${expected}ms but was ${actual}ms`,
+          );
+        });
+      });
     });
 
     it('should call pstream.dtmf if connected', () => {
