@@ -14,6 +14,7 @@ import {
   UserAgent,
 } from 'sip.js';
 import Backoff from '../backoff';
+import { GeneralErrors, SignalingErrors } from '../errors';
 import Log from '../log';
 import {
   AnswerConfig,
@@ -31,6 +32,7 @@ import {
   SessionDescriptionHandlerOptions,
   SipSessionDescriptionHandler,
 } from './sipsessiondescriptionhandler';
+import { CloseCodeRecorder, installCloseCodeHook } from './sipclosecodehook';
 
 // Reconnect backoff policy mirrors WSTransport's two-tier model:
 // - Preferred: short retries on the same URI for a bounded window (15s).
@@ -42,6 +44,20 @@ const PREFERRED_BACKOFF_CONFIG = { factor: 2.0, jitter: 0.40, min: 100, max: 100
 const PRIMARY_BACKOFF_CONFIG = { factor: 2.0, jitter: 0.40, min: 100, max: 20000 };
 const MAX_PREFERRED_DURATION_MS = 15000;
 const MAX_PRIMARY_DURATION_MS = Infinity;
+
+// Per-attempt ceiling on userAgent.reconnect(). SIP.js's transport applies
+// its own connectionTimeout (set below to the same 5s), but reconnect()
+// wraps more than the socket connect, so we bound the whole attempt here to
+// guarantee the backoff tier always advances.
+const CONNECT_TIMEOUT_MS = 5000;
+// A connection must stay open at least this long before it counts as
+// successful and the backoff counters reset. Without the gate, a flapping
+// connection restarts backoff from `min` on every reconnect and hammers the
+// server. Mirrors WSTransport's CONNECT_SUCCESS_TIMEOUT.
+const CONNECT_SUCCESS_TIMEOUT_MS = 10000;
+// WebSocket close codes that indicate the server was unreachable rather
+// than a clean shutdown. 1006: abnormal close. 1015: TLS handshake failure.
+const ABNORMAL_CLOSE_CODES = [1006, 1015];
 
 // SIP.js's SessionInviteOptions.sessionDescriptionHandlerOptions is typed
 // as the base SessionDescriptionHandlerOptions, which does not expose
@@ -140,6 +156,21 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   };
   private _isReconnecting: boolean = false;
   private _wasRegistered: boolean = false;
+  // Timestamp of the most recent transport connect, or null while down. Used
+  // to decide whether a connection lasted long enough (CONNECT_SUCCESS_TIMEOUT_MS)
+  // to count as successful and reset the backoff counters.
+  private _timeOpened: number | null = null;
+  // Set after the first abnormal close so a *repeat* failure rotates to a
+  // fallback edge, while a one-off drop from a previously healthy connection
+  // retries the same edge first. Mirrors WSTransport's _shouldFallback.
+  private _shouldFallback: boolean = false;
+  // Invites issued while the transport was down, replayed on reconnect.
+  // Mirrors PStream's _messageQueue and its per-method retry policy: invite
+  // queues, ICE-restart re-INVITE does not (it defers via
+  // _pendingIceRestartRecovery instead).
+  private _messageQueue: Array<() => void> = [];
+  // Populated by the close-code hook installed over the SIP.js transport.
+  private _closeCodeRecorder: CloseCodeRecorder = {};
   // Each in-flight ICE-restart re-INVITE has an entry captured by its
   // requestDelegate closures. On WS disconnect, every entry is marked stale so
   // the eventual rejection (typically a 408) is suppressed instead of tearing
@@ -169,6 +200,10 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       transportOptions: {
         server: options.sipTransportServer,
         reconnectionAttempts: 0,
+        // SIP.js's own per-attempt socket connect timeout, in SECONDS. Pinned
+        // rather than left to its default so the value is visible alongside
+        // CONNECT_TIMEOUT_MS, which bounds the whole reconnect attempt.
+        connectionTimeout: CONNECT_TIMEOUT_MS / 1000,
       },
       authorizationUsername: options.credentials.username,
       authorizationPassword: options.credentials.password,
@@ -196,6 +231,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
         onInvite: (invitation: Invitation) => this._handleIncomingInvite(invitation),
       },
     });
+
+    // SIP.js only surfaces the close code inside an Error message, so hook the
+    // transport's close handler to capture it structurally. Installed once:
+    // SIP.js reuses the same Transport instance across reconnect().
+    this._closeCodeRecorder = installCloseCodeHook(this._userAgent.transport, this._log);
 
     this._userAgent.start().catch((error: Error) => {
       this._log.error('Failed to start UserAgent', error);
@@ -343,6 +383,9 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     this._pendingInvitations.clear();
     this._inFlightIceRestarts.clear();
     this._pendingIceRestartRecovery.clear();
+    this._messageQueue.length = 0;
+    this._timeOpened = null;
+    this._shouldFallback = false;
 
     if (this._registerer) {
       this._registerer.dispose().catch((error: Error) => {
@@ -715,6 +758,21 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       return;
     }
 
+    // Writing an INVITE to a dead socket produces a doomed transaction that
+    // only fails once SIP.js's Timer B expires (~32s). Queue it instead and
+    // replay on reconnect, matching PStream's shouldRetry=true for invite.
+    //
+    // Gated on _isReconnecting rather than "not yet connected": Device awaits
+    // the transport-connected promise before it ever calls invite, so the
+    // pre-connect window is not reachable in practice, and treating it as
+    // down would queue invites that have no reconnect cycle to flush them.
+    if (this._isReconnecting) {
+      this._log.info(`Transport is down; queueing invite for ${tempCallSid}`);
+      this._messageQueue.push(() => this._sendInvite(tempCallSid, config, reconnectToken));
+      this._emitTransportError();
+      return;
+    }
+
     const targetUri = UserAgent.makeURI(`sip:${this._options.sipDomain}`);
     if (!targetUri) {
       this._log.error('Failed to create target URI for invite');
@@ -794,6 +852,13 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     }
     this._log.info('WebSocket connected');
     this._status = 'connected';
+    // Cleared here rather than in _onReconnectSuccess: SIP.js fires onConnect
+    // before userAgent.reconnect() resolves, and the queue flush below must
+    // not see a stale "still reconnecting" state or it would re-queue every
+    // message it just drained.
+    this._isReconnecting = false;
+    this._timeOpened = Date.now();
+    this._shouldFallback = false;
 
     const payload: Record<string, any> = {
       region: this._region,
@@ -803,6 +868,36 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     };
 
     this.emit('connected', payload);
+
+    this._flushMessageQueue();
+  }
+
+  /**
+   * Replay anything that was queued while the transport was down. Mirrors
+   * PStream._handleTransportOpen. The queue is drained before replaying so a
+   * send that fails again re-queues onto an empty queue rather than looping.
+   */
+  private _flushMessageQueue(): void {
+    if (!this._messageQueue.length) {
+      return;
+    }
+    const queued = this._messageQueue.splice(0, this._messageQueue.length);
+    this._log.info(`Flushing ${queued.length} queued message(s)`);
+    queued.forEach((send: () => void) => send());
+  }
+
+  /**
+   * Emit the transport-unavailable error PStream raises when a send cannot
+   * be delivered, so Device and Call see the same signal on both adapters.
+   */
+  private _emitTransportError(): void {
+    this.emit('error', {
+      error: {
+        code: 31009,
+        message: 'No transport available to send or receive messages',
+        twilioError: new GeneralErrors.TransportError(),
+      },
+    });
   }
 
   private _onTransportDisconnect(error?: Error): void {
@@ -819,6 +914,18 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     }
 
     this._isReconnecting = true;
+
+    this._handleCloseCode();
+
+    // Reset the backoff counters only if the connection lasted long enough to
+    // count as successful. A short-lived connection keeps the existing
+    // counters so a flapping transport keeps backing off instead of
+    // restarting from `min` on every cycle.
+    if (this._timeOpened !== null && Date.now() - this._timeOpened > CONNECT_SUCCESS_TIMEOUT_MS) {
+      this._log.info('Connection was open long enough to be successful; resetting backoffs');
+      this._resetBackoffs();
+    }
+    this._timeOpened = null;
 
     // Any in-flight ICE-restart re-INVITE is now orphaned on a dead socket.
     // Mark each entry stale so its eventual rejection (typically 408) doesn't
@@ -851,24 +958,65 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     if (!this._backoff) {
       this._backoff = this._setupBackoffs();
     }
+    // Stamp the start of this reconnect cycle explicitly. The attempt counter
+    // survives an unsuccessful (short-lived) connection, so it cannot be used
+    // to detect the start of a cycle; without this the preferred window would
+    // never expire and we would never fall back to the primary tier.
+    this._backoffStartTime.preferred = Date.now();
     this._backoff.preferred.backoff();
   }
 
-  private _setupBackoffs(): { preferred: Backoff, primary: Backoff } {
-    const preferred = new Backoff(PREFERRED_BACKOFF_CONFIG);
-    preferred.on('backoff', (attempt: number) => {
-      if (attempt === 0) {
-        this._backoffStartTime.preferred = Date.now();
-      }
+  /**
+   * Inspect the WebSocket close code recorded by the close-code hook and, for
+   * codes that mean the server was unreachable, emit the same error
+   * WSTransport raises and work out whether the next attempt should rotate to
+   * a fallback edge.
+   *
+   * NOTE: the rotation decision is computed and stored but cannot yet be
+   * acted on. Twilio's SIP-over-WS exposes a single URI, so updateURIs() is a
+   * no-op and there is nothing to rotate to. This keeps the decision correct
+   * and tested so multi-URI fallback only has to consume _shouldFallback.
+   */
+  private _handleCloseCode(): void {
+    const closeCode = this._closeCodeRecorder.lastCloseCode;
+    if (closeCode === undefined || !ABNORMAL_CLOSE_CODES.includes(closeCode)) {
+      return;
+    }
+
+    this._log.error(`Received websocket close event code: ${closeCode}`);
+    this.emit('error', {
+      error: {
+        code: 31005,
+        message: 'Websocket connection to Twilio\'s signaling servers were ' +
+          'unexpectedly ended. If this is happening consistently, there may ' +
+          'be an issue resolving the hostname provided. If a region or an ' +
+          'edge is being specified in Device setup, ensure it is valid.',
+        twilioError: new SignalingErrors.ConnectionError(),
+      },
     });
+
+    // A drop from a healthy connection is treated as transient and retries the
+    // same edge. Only a repeat failure, or a failure that never reached a
+    // connected state, warrants rotating away.
+    const wasConnected = this._timeOpened !== null;
+    const shouldRotateUri = this._shouldFallback || !wasConnected;
+    this._log.info(
+      `Abnormal close (code ${closeCode}); wasConnected=${wasConnected}, ` +
+      `shouldRotateUri=${shouldRotateUri} (single URI today, so no rotation is performed)`,
+    );
+
+    this._shouldFallback = true;
+  }
+
+  private _setupBackoffs(): { preferred: Backoff, primary: Backoff } {
+    // Cycle start times are stamped by the callers that begin a cycle
+    // (_onTransportDisconnect for preferred, _onPreferredBackoffReady when it
+    // hands off to primary) rather than from an `attempt === 0` check here,
+    // since attempt counters persist across unsuccessful connections.
+    const preferred = new Backoff(PREFERRED_BACKOFF_CONFIG);
     preferred.on('ready', (attempt: number) => this._onPreferredBackoffReady(attempt));
 
     const primary = new Backoff(PRIMARY_BACKOFF_CONFIG);
-    primary.on('backoff', (attempt: number) => {
-      if (attempt === 0) {
-        this._backoffStartTime.primary = Date.now();
-      }
-    });
     primary.on('ready', (attempt: number) => this._onPrimaryBackoffReady(attempt));
 
     return { preferred, primary };
@@ -882,6 +1030,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     if (this._backoffStartTime.preferred !== null
         && Date.now() - this._backoffStartTime.preferred > MAX_PREFERRED_DURATION_MS) {
       this._log.info('Max preferred reconnect duration exceeded; falling back to primary backoff.');
+      this._backoffStartTime.primary = Date.now();
       this._backoff.primary.backoff();
       return;
     }
@@ -908,9 +1057,38 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       return;
     }
     this._log.info(`Reconnect attempt #${attempt} (${tier})`);
+
+    // Bound the attempt. Without this a reconnect() that never settles would
+    // stall the tier forever, since the next backoff is only scheduled from
+    // this promise's handlers.
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      this._log.warn(`Reconnect attempt timed out after ${CONNECT_TIMEOUT_MS}ms`);
+      this._backoff?.[tier].backoff();
+    }, CONNECT_TIMEOUT_MS);
+
     this._userAgent.reconnect().then(
-      () => this._onReconnectSuccess(),
+      () => {
+        if (settled) {
+          // Timed out already and a retry is scheduled. Adopting this late
+          // success would double-run the post-reconnect work.
+          this._log.info('Ignoring reconnect success that landed after the attempt timed out');
+          return;
+        }
+        settled = true;
+        clearTimeout(timeout);
+        this._onReconnectSuccess();
+      },
       (err: Error) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timeout);
         this._log.warn('Reconnect attempt failed', err);
         this._backoff?.[tier].backoff();
       },
@@ -923,7 +1101,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     }
     this._log.info('Reconnect succeeded');
     this._isReconnecting = false;
-    this._resetBackoffs();
+    // NOTE: the backoff counters are deliberately NOT reset here. Reconnecting
+    // is not proof of a healthy connection; only staying open past
+    // CONNECT_SUCCESS_TIMEOUT_MS is, and _onTransportDisconnect performs that
+    // check. Resetting on every successful connect would let a flapping
+    // transport retry from `min` indefinitely.
 
     this._onTransportConnect();
 
