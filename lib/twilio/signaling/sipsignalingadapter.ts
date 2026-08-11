@@ -45,18 +45,17 @@ const PRIMARY_BACKOFF_CONFIG = { factor: 2.0, jitter: 0.40, min: 100, max: 20000
 const MAX_PREFERRED_DURATION_MS = 15000;
 const MAX_PRIMARY_DURATION_MS = Infinity;
 
-// Per-attempt ceiling on userAgent.reconnect(). SIP.js's transport applies
-// its own connectionTimeout (set below to the same 5s), but reconnect()
-// wraps more than the socket connect, so we bound the whole attempt here to
-// guarantee the backoff tier always advances.
-const CONNECT_TIMEOUT_MS = 5000;
-// A connection must stay open at least this long before it counts as
-// successful and the backoff counters reset. Without the gate, a flapping
-// connection restarts backoff from `min` on every reconnect and hammers the
-// server. Mirrors WSTransport's CONNECT_SUCCESS_TIMEOUT.
+// SIP.js's socket connect timeout, pinned to its default.
+const SIP_CONNECTION_TIMEOUT_MS = 5000;
+// Backstop for a reconnect() that never settles. Must be longer, or we abandon
+// sockets SIP.js is still connecting and the retry just re-attaches.
+const CONNECT_TIMEOUT_MS = SIP_CONNECTION_TIMEOUT_MS + 1000;
+// How long a connection must stay open to count as successful and reset the
+// backoff counters. Without the gate a flapping connection restarts from `min`
+// every time and hammers the server.
 const CONNECT_SUCCESS_TIMEOUT_MS = 10000;
-// WebSocket close codes that indicate the server was unreachable rather
-// than a clean shutdown. 1006: abnormal close. 1015: TLS handshake failure.
+// Close codes meaning the server was unreachable rather than shut down
+// cleanly. 1006: abnormal close. 1015: TLS handshake failure.
 const ABNORMAL_CLOSE_CODES = [1006, 1015];
 
 // SIP.js's SessionInviteOptions.sessionDescriptionHandlerOptions is typed
@@ -113,6 +112,14 @@ interface InflightIceRestart {
 }
 
 /**
+ * A send deferred while the transport was down.
+ */
+interface QueuedMessage {
+  callSid: string;
+  send: () => void;
+}
+
+/**
  * Fallback SDH returned from the factory when no binding is registered
  * for a session. Every operation rejects with a clear error so SIP.js's
  * Promise-based accept/invite paths fail cleanly instead of crashing
@@ -156,30 +163,25 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   };
   private _isReconnecting: boolean = false;
   private _wasRegistered: boolean = false;
-  // Timestamp of the most recent transport connect, or null while down. Used
-  // to decide whether a connection lasted long enough (CONNECT_SUCCESS_TIMEOUT_MS)
-  // to count as successful and reset the backoff counters.
+  // Timestamp of the most recent connect, or null while down. Feeds the
+  // CONNECT_SUCCESS_TIMEOUT_MS check.
   private _timeOpened: number | null = null;
-  // Set after the first abnormal close so a *repeat* failure rotates to a
-  // fallback edge, while a one-off drop from a previously healthy connection
-  // retries the same edge first. Mirrors WSTransport's _shouldFallback.
-  private _shouldFallback: boolean = false;
   // Invites issued while the transport was down, replayed on reconnect.
-  // Mirrors PStream's _messageQueue and its per-method retry policy: invite
-  // queues, ICE-restart re-INVITE does not (it defers via
-  // _pendingIceRestartRecovery instead).
-  private _messageQueue: Array<() => void> = [];
+  // Mirrors PStream's per-method retry policy: invite queues, ICE-restart
+  // re-INVITE defers via _pendingIceRestartRecovery instead. Keyed by callSid
+  // so hangup() can drop an entry cancelled before the flush.
+  private _messageQueue: QueuedMessage[] = [];
   // Populated by the close-code hook installed over the SIP.js transport.
   private _closeCodeRecorder: CloseCodeRecorder = {};
-  // Each in-flight ICE-restart re-INVITE has an entry captured by its
-  // requestDelegate closures. On WS disconnect, every entry is marked stale so
-  // the eventual rejection (typically a 408) is suppressed instead of tearing
-  // down the call. The entry survives _onReconnectSuccess, so a late SIP.js
-  // Timer B (~32s) rejection that lands after reconnect is still suppressed.
+  // One entry per in-flight ICE-restart re-INVITE, captured by its
+  // requestDelegate closures. On disconnect each is marked stale so its
+  // eventual rejection (typically a 408) is suppressed rather than tearing the
+  // call down. Entries survive the reconnect, so even a late SIP.js Timer B
+  // rejection (~32s) is still suppressed.
   private _inFlightIceRestarts: Set<InflightIceRestart> = new Set();
-  // Call SIDs whose in-flight re-INVITE was orphaned by a disconnect and
-  // therefore need an iceRestartNeeded emit on reconnect success. Tracked
-  // separately from _inFlightIceRestarts so onAccept/onReject don't interfere.
+  // Call SIDs whose re-INVITE was orphaned by a disconnect and need an
+  // iceRestartNeeded emit once the transport is back. Separate from
+  // _inFlightIceRestarts so onAccept/onReject don't interfere.
   private _pendingIceRestartRecovery: Set<string> = new Set();
 
   constructor(options: SipSignalingAdapterOptions) {
@@ -200,10 +202,8 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       transportOptions: {
         server: options.sipTransportServer,
         reconnectionAttempts: 0,
-        // SIP.js's own per-attempt socket connect timeout, in SECONDS. Pinned
-        // rather than left to its default so the value is visible alongside
-        // CONNECT_TIMEOUT_MS, which bounds the whole reconnect attempt.
-        connectionTimeout: CONNECT_TIMEOUT_MS / 1000,
+        // In SECONDS. See SIP_CONNECTION_TIMEOUT_MS.
+        connectionTimeout: SIP_CONNECTION_TIMEOUT_MS / 1000,
       },
       authorizationUsername: options.credentials.username,
       authorizationPassword: options.credentials.password,
@@ -232,9 +232,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       },
     });
 
-    // SIP.js only surfaces the close code inside an Error message, so hook the
-    // transport's close handler to capture it structurally. Installed once:
-    // SIP.js reuses the same Transport instance across reconnect().
+    // Installed once: SIP.js reuses the same Transport across reconnect().
     this._closeCodeRecorder = installCloseCodeHook(this._userAgent.transport, this._log);
 
     this._userAgent.start().catch((error: Error) => {
@@ -281,7 +279,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     const isPresent = mediaCapabilities?.audio === true;
     this._wasRegistered = isPresent;
 
-    // Defer registerer ops while reconnecting; _onReconnectSuccess will re-create
+    // Defer registerer ops while reconnecting; _onTransportConnect will re-create
     // the registerer based on _wasRegistered once the transport is back.
     if (this._isReconnecting) {
       this._log.debug('Skipping register call while reconnecting');
@@ -385,7 +383,6 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     this._pendingIceRestartRecovery.clear();
     this._messageQueue.length = 0;
     this._timeOpened = null;
-    this._shouldFallback = false;
 
     if (this._registerer) {
       this._registerer.dispose().catch((error: Error) => {
@@ -446,9 +443,17 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   }
 
   hangup(callSid: string, _config: HangupConfig = {}): void {
-    // Don't let _onReconnectSuccess emit 'iceRestartNeeded' for a call hung up
-    // mid-reconnect.
+    // Don't let the post-reconnect path emit 'iceRestartNeeded' for a call
+    // hung up mid-reconnect.
     this._pendingIceRestartRecovery.delete(callSid);
+
+    // A call cancelled while its INVITE is queued has no session to tear down,
+    // so dropping the entry is the whole hangup. Otherwise the flush would
+    // place a call the user gave up on.
+    if (this._dequeueMessages(callSid)) {
+      this._log.info(`hangup: dropped queued invite for ${callSid}`);
+      return;
+    }
 
     const pendingInvitation = this._pendingInvitations.get(callSid);
     if (pendingInvitation) {
@@ -482,15 +487,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   }
 
   /**
-   * Trigger an ICE restart by sending a re-INVITE with
-   * offerOptions.iceRestart:true. SIP.js asks the SDH to produce the
-   * fresh-ICE offer via getDescription(options), so config.mediaHandler
-   * is unused here (the PStream adapter needs it; we preserve the shared
-   * interface). All failure paths (no session, onReject, catch) emit
-   * 'hangup' for the callSid so Call can clean up its inline re-INVITE
-   * listeners and transition out of the reconnecting state. The exception is
-   * when the transport is reconnecting: instead of emitting 'hangup' we queue
-   * the callSid for an 'iceRestartNeeded' emit on reconnect.
+   * Re-INVITE with offerOptions.iceRestart:true. SIP.js asks the SDH for the
+   * fresh-ICE offer, so config.mediaHandler is unused here (kept for the
+   * shared interface). Every failure path emits 'hangup' so Call can drop its
+   * inline listeners, except while reconnecting, which defers to
+   * 'iceRestartNeeded'.
    */
   iceRestart(callSid: string, _config: IceRestartConfig): void {
     const session = this._getSession(callSid);
@@ -499,9 +500,8 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       this.emit('hangup', { callsid: callSid });
       return;
     }
-    // Sending session.invite() over a dead transport queues a doomed re-INVITE
-    // that will 408 once SIP.js Timer B expires (~32s). Record the intent and
-    // let _onReconnectSuccess emit 'iceRestartNeeded' once the WS is back.
+    // A re-INVITE over a dead transport just 408s once Timer B expires (~32s).
+    // Record the intent; _onTransportConnect emits 'iceRestartNeeded' instead.
     if (this._isReconnecting) {
       this._log.info(`iceRestart deferred while reconnecting: ${callSid}`);
       this._pendingIceRestartRecovery.add(callSid);
@@ -522,10 +522,8 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
         onReject: (response: any) => {
           this._inFlightIceRestarts.delete(inflight);
           if (inflight.stale) {
-            // Re-INVITE rejected because the WS dropped while it was in flight.
-            // Don't emit hangup — _onReconnectSuccess emits 'iceRestartNeeded'
-            // so Call can re-trigger. The flag survives _onReconnectSuccess,
-            // so even a late Timer B rejection (~32s) is still suppressed.
+            // The WS dropped while this was in flight. Don't hang up;
+            // _onTransportConnect emits 'iceRestartNeeded' so Call re-triggers.
             this._log.info('Suppressing stale ICE-restart re-INVITE rejection');
             return;
           }
@@ -758,17 +756,18 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       return;
     }
 
-    // Writing an INVITE to a dead socket produces a doomed transaction that
-    // only fails once SIP.js's Timer B expires (~32s). Queue it instead and
-    // replay on reconnect, matching PStream's shouldRetry=true for invite.
+    // An INVITE written to a dead socket only fails once SIP.js's Timer B
+    // expires (~32s), so queue and replay on reconnect instead.
     //
-    // Gated on _isReconnecting rather than "not yet connected": Device awaits
-    // the transport-connected promise before it ever calls invite, so the
-    // pre-connect window is not reachable in practice, and treating it as
-    // down would queue invites that have no reconnect cycle to flush them.
+    // Gated on _isReconnecting, not "not yet connected": Device awaits the
+    // connected promise before inviting, and queueing pre-connect would strand
+    // invites with no reconnect cycle to flush them.
     if (this._isReconnecting) {
       this._log.info(`Transport is down; queueing invite for ${tempCallSid}`);
-      this._messageQueue.push(() => this._sendInvite(tempCallSid, config, reconnectToken));
+      this._messageQueue.push({
+        callSid: tempCallSid,
+        send: () => this._sendInvite(tempCallSid, config, reconnectToken),
+      });
       this._emitTransportError();
       return;
     }
@@ -852,13 +851,10 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     }
     this._log.info('WebSocket connected');
     this._status = 'connected';
-    // Cleared here rather than in _onReconnectSuccess: SIP.js fires onConnect
-    // before userAgent.reconnect() resolves, and the queue flush below must
-    // not see a stale "still reconnecting" state or it would re-queue every
-    // message it just drained.
+    // Cleared here, not in _onReconnectSuccess: onConnect fires first, and the
+    // flush below would re-queue everything it just drained.
     this._isReconnecting = false;
     this._timeOpened = Date.now();
-    this._shouldFallback = false;
 
     const payload: Record<string, any> = {
       region: this._region,
@@ -870,12 +866,30 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     this.emit('connected', payload);
 
     this._flushMessageQueue();
+
+    // Everything below belongs here, not in _onReconnectSuccess: an abandoned
+    // attempt whose socket opens anyway leaves this delegate as the only
+    // signal, and slow reconnects were landing unregistered.
+    if (this._wasRegistered) {
+      this._createAndStartRegisterer();
+    }
+
+    // The server never received the orphaned re-INVITE's ICE/DTLS creds, so
+    // Call has to re-trigger. _inFlightIceRestarts entries stay stale so their
+    // eventual rejection is still suppressed.
+    const recovery: string[] = [];
+    this._pendingIceRestartRecovery.forEach((callSid: string) => recovery.push(callSid));
+    this._pendingIceRestartRecovery.clear();
+    this._log.info(`_onTransportConnect: ${recovery.length} stale ICE-restart(s) to re-trigger`);
+    recovery.forEach((callSid: string) => {
+      this._log.info(`Emitting iceRestartNeeded for ${callSid}`);
+      this.emit('iceRestartNeeded', { callsid: callSid });
+    });
   }
 
   /**
-   * Replay anything that was queued while the transport was down. Mirrors
-   * PStream._handleTransportOpen. The queue is drained before replaying so a
-   * send that fails again re-queues onto an empty queue rather than looping.
+   * Replay whatever queued while the transport was down. Drained before
+   * replaying, so a send that fails again re-queues rather than looping.
    */
   private _flushMessageQueue(): void {
     if (!this._messageQueue.length) {
@@ -883,12 +897,27 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     }
     const queued = this._messageQueue.splice(0, this._messageQueue.length);
     this._log.info(`Flushing ${queued.length} queued message(s)`);
-    queued.forEach((send: () => void) => send());
+    queued.forEach((message: QueuedMessage) => message.send());
   }
 
   /**
-   * Emit the transport-unavailable error PStream raises when a send cannot
-   * be delivered, so Device and Call see the same signal on both adapters.
+   * Drop every queued message belonging to a callSid. Returns true if
+   * anything was removed.
+   */
+  private _dequeueMessages(callSid: string): boolean {
+    const remaining = this._messageQueue.filter(
+      (message: QueuedMessage) => message.callSid !== callSid,
+    );
+    if (remaining.length === this._messageQueue.length) {
+      return false;
+    }
+    this._messageQueue = remaining;
+    return true;
+  }
+
+  /**
+   * The transport-unavailable error PStream raises on an undeliverable send,
+   * so Device and Call see the same signal on both adapters.
    */
   private _emitTransportError(): void {
     this.emit('error', {
@@ -917,20 +946,17 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
     this._handleCloseCode();
 
-    // Reset the backoff counters only if the connection lasted long enough to
-    // count as successful. A short-lived connection keeps the existing
-    // counters so a flapping transport keeps backing off instead of
-    // restarting from `min` on every cycle.
+    // Only a connection that lasted counts as successful. A short-lived one
+    // keeps its counters so a flapping transport keeps backing off.
     if (this._timeOpened !== null && Date.now() - this._timeOpened > CONNECT_SUCCESS_TIMEOUT_MS) {
       this._log.info('Connection was open long enough to be successful; resetting backoffs');
       this._resetBackoffs();
     }
     this._timeOpened = null;
 
-    // Any in-flight ICE-restart re-INVITE is now orphaned on a dead socket.
-    // Mark each entry stale so its eventual rejection (typically 408) doesn't
-    // tear down the call, and queue its callSid for an iceRestartNeeded emit
-    // once the transport recovers.
+    // In-flight re-INVITEs are now orphaned on a dead socket. Mark them stale
+    // so their rejection doesn't tear the call down, and queue them for an
+    // iceRestartNeeded emit once the transport recovers.
     this._log.info(`_onTransportDisconnect: marking ${this._inFlightIceRestarts.size} in-flight re-INVITE(s) stale`);
     this._inFlightIceRestarts.forEach((inflight: InflightIceRestart) => {
       inflight.stale = true;
@@ -958,27 +984,25 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     if (!this._backoff) {
       this._backoff = this._setupBackoffs();
     }
-    // Stamp the start of this reconnect cycle explicitly. The attempt counter
-    // survives an unsuccessful (short-lived) connection, so it cannot be used
-    // to detect the start of a cycle; without this the preferred window would
-    // never expire and we would never fall back to the primary tier.
+    // Stamp the cycle start explicitly. The attempt counter survives a
+    // short-lived connection, so it can't mark the start; without this the
+    // preferred window never expires and primary never engages.
     this._backoffStartTime.preferred = Date.now();
+    // preferred.backoff() clears its own pending timer; nothing re-arms primary
+    // here, so drop its leftover or it fires inside this cycle.
+    this._backoff.primary.reset();
     this._backoff.preferred.backoff();
   }
 
   /**
-   * Inspect the WebSocket close code recorded by the close-code hook and, for
-   * codes that mean the server was unreachable, emit the same error
-   * WSTransport raises and work out whether the next attempt should rotate to
-   * a fallback edge.
-   *
-   * NOTE: the rotation decision is computed and stored but cannot yet be
-   * acted on. Twilio's SIP-over-WS exposes a single URI, so updateURIs() is a
-   * no-op and there is nothing to rotate to. This keeps the decision correct
-   * and tested so multi-URI fallback only has to consume _shouldFallback.
+   * For close codes meaning the server was unreachable, emit the same error
+   * WSTransport raises.
    */
   private _handleCloseCode(): void {
     const closeCode = this._closeCodeRecorder.lastCloseCode;
+    // Consume either way: a disconnect with no close event must not inherit it.
+    this._closeCodeRecorder.lastCloseCode = undefined;
+
     if (closeCode === undefined || !ABNORMAL_CLOSE_CODES.includes(closeCode)) {
       return;
     }
@@ -994,25 +1018,12 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
         twilioError: new SignalingErrors.ConnectionError(),
       },
     });
-
-    // A drop from a healthy connection is treated as transient and retries the
-    // same edge. Only a repeat failure, or a failure that never reached a
-    // connected state, warrants rotating away.
-    const wasConnected = this._timeOpened !== null;
-    const shouldRotateUri = this._shouldFallback || !wasConnected;
-    this._log.info(
-      `Abnormal close (code ${closeCode}); wasConnected=${wasConnected}, ` +
-      `shouldRotateUri=${shouldRotateUri} (single URI today, so no rotation is performed)`,
-    );
-
-    this._shouldFallback = true;
   }
 
   private _setupBackoffs(): { preferred: Backoff, primary: Backoff } {
-    // Cycle start times are stamped by the callers that begin a cycle
-    // (_onTransportDisconnect for preferred, _onPreferredBackoffReady when it
-    // hands off to primary) rather than from an `attempt === 0` check here,
-    // since attempt counters persist across unsuccessful connections.
+    // Cycle start times are stamped by the callers that begin a cycle, not by
+    // an `attempt === 0` check here, since counters persist across
+    // unsuccessful connections.
     const preferred = new Backoff(PREFERRED_BACKOFF_CONFIG);
     preferred.on('ready', (attempt: number) => this._onPreferredBackoffReady(attempt));
 
@@ -1058,9 +1069,8 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     }
     this._log.info(`Reconnect attempt #${attempt} (${tier})`);
 
-    // Bound the attempt. Without this a reconnect() that never settles would
-    // stall the tier forever, since the next backoff is only scheduled from
-    // this promise's handlers.
+    // The next backoff is only scheduled from this promise's handlers, so a
+    // reconnect() that never settles would stall the tier forever.
     let settled = false;
     const timeout = setTimeout(() => {
       if (settled) {
@@ -1074,8 +1084,8 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     this._userAgent.reconnect().then(
       () => {
         if (settled) {
-          // Timed out already and a retry is scheduled. Adopting this late
-          // success would double-run the post-reconnect work.
+          // A retry is already scheduled, and if the socket did open the
+          // onConnect delegate has already run the post-connect work.
           this._log.info('Ignoring reconnect success that landed after the attempt timed out');
           return;
         }
@@ -1100,31 +1110,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       return;
     }
     this._log.info('Reconnect succeeded');
-    this._isReconnecting = false;
-    // NOTE: the backoff counters are deliberately NOT reset here. Reconnecting
-    // is not proof of a healthy connection; only staying open past
-    // CONNECT_SUCCESS_TIMEOUT_MS is, and _onTransportDisconnect performs that
-    // check. Resetting on every successful connect would let a flapping
-    // transport retry from `min` indefinitely.
-
+    // The counters are deliberately NOT reset here: connecting is not proof of
+    // health, only staying open past CONNECT_SUCCESS_TIMEOUT_MS is, and
+    // _onTransportDisconnect makes that call. The post-connect work lives in
+    // _onTransportConnect, which onConnect normally reaches first.
     this._onTransportConnect();
-
-    if (this._wasRegistered) {
-      this._createAndStartRegisterer();
-    }
-
-    // Calls whose ICE-restart re-INVITE was orphaned by the disconnect now
-    // need a fresh re-INVITE — the server never received the new ICE/DTLS
-    // creds. Tell Call to re-trigger. _inFlightIceRestarts entries stay marked
-    // stale so their eventual rejection is still suppressed.
-    const recovery: string[] = [];
-    this._pendingIceRestartRecovery.forEach((callSid: string) => recovery.push(callSid));
-    this._pendingIceRestartRecovery.clear();
-    this._log.info(`_onReconnectSuccess: ${recovery.length} stale ICE-restart(s) to re-trigger`);
-    recovery.forEach((callSid: string) => {
-      this._log.info(`Emitting iceRestartNeeded for ${callSid}`);
-      this.emit('iceRestartNeeded', { callsid: callSid });
-    });
   }
 
   private _resetBackoffs(): void {

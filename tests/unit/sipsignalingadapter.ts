@@ -97,10 +97,12 @@ function createUserAgentStub() {
     start: sinon.stub().resolves(),
     stop: sinon.stub().resolves(),
     reconnect: sinon.stub().callsFake(() => reconnectImpl()),
-    // Mimics SIP.js's Transport closely enough for installCloseCodeHook to
-    // wrap it, so the close-code path is exercised end to end rather than
-    // stubbed out.
-    transport: { onWebSocketClose: (_ev: any, _ws: any) => { /* base no-op */ } },
+    // Real enough for installCloseCodeHook to wrap, so the close-code path is
+    // exercised end to end. `ws` is the active socket the hook guards against.
+    transport: {
+      ws: { id: 'active-socket' } as any,
+      onWebSocketClose: (_ev: any, _ws: any) => { /* base no-op */ },
+    },
     _getDelegate() { return delegate; },
     _setDelegate(d: any) { delegate = d; },
     _setReconnectImpl(fn: () => Promise<void>) { reconnectImpl = fn; },
@@ -113,8 +115,12 @@ function createUserAgentStub() {
      * the close handler runs first, then onDisconnect is dispatched.
      */
     _triggerDisconnectWithCode(code: number) {
-      this.transport.onWebSocketClose({ code }, {});
+      this.transport.onWebSocketClose({ code }, this.transport.ws);
       delegate.onDisconnect?.(new Error(`WebSocket closed (code: ${code})`));
+    },
+    // A close from a socket SIP.js has already replaced. It drops these.
+    _triggerStaleClose(code: number) {
+      this.transport.onWebSocketClose({ code }, { id: 'replaced-socket' });
     },
   };
 }
@@ -1200,8 +1206,7 @@ describe('SipSignalingAdapter', () => {
       await clock.tickAsync(100);
       assert.strictEqual(uaStub.reconnect.callCount, 1);
 
-      // Drop again immediately. The connection never proved itself, so the
-      // attempt counter carries over and the next retry waits 200ms, not 100ms.
+      // Never proved itself, so the counter carries over: 200ms, not 100ms.
       uaStub._setReconnectImpl(() => Promise.resolve());
       uaStub._triggerDisconnect();
       await clock.tickAsync(199);
@@ -1218,8 +1223,7 @@ describe('SipSignalingAdapter', () => {
       await clock.tickAsync(100);
       assert.strictEqual(uaStub.reconnect.callCount, 1);
 
-      // Stay up past CONNECT_SUCCESS_TIMEOUT_MS, so this counts as a genuinely
-      // successful connection and the next cycle starts from the min delay.
+      // Past CONNECT_SUCCESS_TIMEOUT_MS, so the next cycle starts from min.
       await clock.tickAsync(10001);
       uaStub._setReconnectImpl(() => Promise.resolve());
       uaStub._triggerDisconnect();
@@ -1231,9 +1235,7 @@ describe('SipSignalingAdapter', () => {
 
     it('gives up on a reconnect attempt that never settles and schedules the next one', async () => {
       const { uaStub } = createAdapter();
-      // A reconnect that hangs forever. Without a per-attempt timeout the tier
-      // would stall, since the next backoff is only scheduled from this
-      // promise's handlers.
+      // Hangs forever. Without a per-attempt timeout the tier stalls.
       uaStub._setReconnectImpl(() => new Promise<void>(() => { /* never settles */ }));
       uaStub._triggerConnect();
       uaStub._triggerDisconnect();
@@ -1241,8 +1243,8 @@ describe('SipSignalingAdapter', () => {
       await clock.tickAsync(100);
       assert.strictEqual(uaStub.reconnect.callCount, 1);
 
-      // Still inside the 5s attempt window, so no retry yet.
-      await clock.tickAsync(4999);
+      // Still inside the 6s attempt window, so no retry yet.
+      await clock.tickAsync(5999);
       assert.strictEqual(uaStub.reconnect.callCount, 1, 'should not retry before the connect timeout');
 
       // Timeout fires and schedules the next backoff (attempt 1 => 200ms).
@@ -1261,17 +1263,59 @@ describe('SipSignalingAdapter', () => {
       assert.strictEqual(uaStub.reconnect.callCount, 1);
 
       // Let the attempt time out; a retry is now scheduled.
-      await clock.tickAsync(5000);
+      await clock.tickAsync(6000);
 
       // Only count what happens after the timeout.
       const connectedSpy = sinon.spy();
       adapter.on('connected', connectedSpy);
 
-      // The original promise resolves late. Adopting it would re-run the
-      // post-reconnect path while a retry is already pending.
+      // Adopting a late resolve would re-run the post-reconnect path.
       resolveReconnect();
       await clock.tickAsync(0);
       assert.strictEqual(connectedSpy.callCount, 0);
+    });
+
+    it('re-registers and re-triggers ICE restarts when the socket opens after the attempt timed out', async () => {
+      // An abandoned attempt's socket can still open, and the scheduled retry
+      // no-ops once _isReconnecting clears. onConnect is the only signal left.
+      const registerers: ReturnType<typeof createRegistererStub>[] = [];
+      const { adapter, uaStub, inviterStub } = createAdapter({
+        createRegisterer() {
+          const registerer = createRegistererStub();
+          registerers.push(registerer);
+          return registerer as any;
+        },
+      });
+
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      registerers[0]._simulateState('Registered');
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+
+      let resolveReconnect: () => void = () => { /* replaced below */ };
+      uaStub._setReconnectImpl(() => new Promise<void>((resolve) => { resolveReconnect = resolve; }));
+      uaStub._triggerDisconnect();
+      adapter.iceRestart('call-1', { mediaHandler: {} as any });
+
+      const iceRestartNeededSpy = sinon.spy();
+      adapter.on('iceRestartNeeded', iceRestartNeededSpy);
+
+      await clock.tickAsync(100);
+      assert.strictEqual(uaStub.reconnect.callCount, 1);
+
+      // Let the attempt time out. It is abandoned and a retry is scheduled.
+      await clock.tickAsync(6000);
+      assert.strictEqual(registerers.length, 1, 'nothing recovered yet');
+
+      // The socket opens anyway, and only then does the abandoned promise settle.
+      uaStub._triggerConnect();
+      resolveReconnect();
+      await clock.tickAsync(0);
+
+      assert.strictEqual(registerers.length, 2, 'a fresh Registerer must be created');
+      assert.strictEqual(iceRestartNeededSpy.callCount, 1);
+      assert.deepStrictEqual(iceRestartNeededSpy.firstCall.args[0], { callsid: 'call-1' });
     });
 
     it('ignores duplicate disconnect events while already reconnecting', async () => {
@@ -1311,22 +1355,88 @@ describe('SipSignalingAdapter', () => {
       assert.strictEqual(errorSpy.callCount, 0);
     });
 
-    it('rotates away only on a repeat abnormal close, not on the first drop from a healthy connection', async () => {
+    it('ignores an abnormal close from a socket sip.js has already replaced', () => {
       const { adapter, uaStub } = createAdapter();
       uaStub._triggerConnect();
-      // EventEmitter throws on an unhandled 'error' event.
-      adapter.on('error', () => { /* asserted in the tests above */ });
+      const errorSpy = sinon.spy();
+      adapter.on('error', errorSpy);
 
-      // First drop: we were connected, so this is treated as transient and the
-      // same edge is retried.
+      // sip.js drops these itself, so the live connection must not inherit it.
+      uaStub._triggerStaleClose(1006);
+      uaStub._triggerDisconnect();
+
+      assert.strictEqual(errorSpy.callCount, 0);
+    });
+
+    it('does not re-report a spent close code on a disconnect that carried no close event', async () => {
+      const { adapter, uaStub } = createAdapter();
+      uaStub._triggerConnect();
+      const errorSpy = sinon.spy();
+      adapter.on('error', errorSpy);
+
       uaStub._triggerDisconnectWithCode(1006);
-      assert.strictEqual((adapter as any)._shouldFallback, true, 'flag is armed for the next failure');
+      assert.strictEqual(errorSpy.callCount, 1);
 
-      // Reconnect, then drop again. _shouldFallback is already set, so a
-      // rotation would be requested if there were another URI to rotate to.
+      // This disconnect carries no close event, so it must not inherit the 1006.
       uaStub._setReconnectImpl(() => { uaStub._triggerConnect(); return Promise.resolve(); });
       await clock.tickAsync(100);
-      assert.strictEqual((adapter as any)._shouldFallback, false, 'cleared once reconnected');
+      uaStub._triggerDisconnect();
+
+      assert.strictEqual(errorSpy.callCount, 1, 'the spent close code must not be reported twice');
+    });
+
+    it('surfaces the underlying error when sip.js times out the socket first', async () => {
+      const { adapter, uaStub } = createAdapter();
+      uaStub._triggerConnect();
+
+      // An equal backstop would fire first and abandon this attempt.
+      uaStub._setReconnectImpl(() => new Promise<void>((_resolve, reject) => {
+        setTimeout(() => reject(new Error('Connect timed out')), 5000);
+      }));
+      const warnSpy = sinon.spy((adapter as any)._log, 'warn');
+      uaStub._triggerDisconnect();
+      await clock.tickAsync(5100);
+
+      const messages = warnSpy.getCalls().map((c: any) => String(c.args[0]));
+      assert(
+        messages.some((m: string) => m.includes('Reconnect attempt failed')),
+        'the underlying connect error must reach the rejection handler',
+      );
+      assert(
+        !messages.some((m: string) => m.includes('timed out after')),
+        'our ceiling must not pre-empt sip.js',
+      );
+      warnSpy.restore();
+    });
+
+    it('does not fire a backoff left pending by a reconnect cycle that already ended', async () => {
+      const { adapter, uaStub } = createAdapter();
+      uaStub._triggerConnect();
+
+      // Cycle 1: fail past the preferred budget so primary engages.
+      uaStub._setReconnectImpl(() => Promise.reject(new Error('down')));
+      uaStub._triggerDisconnect();
+      await clock.tickAsync(30000);
+
+      // Back and down again inside CONNECT_SUCCESS_TIMEOUT_MS, so primary's
+      // pending timer survives into the next cycle.
+      uaStub._triggerConnect();
+      await clock.tickAsync(100);
+
+      const logSpy = sinon.spy((adapter as any)._log, 'info');
+      uaStub._triggerDisconnect();
+
+      // Cycle 2 stays on preferred for 15s, so any primary attempt here is the
+      // leftover.
+      await clock.tickAsync(14000);
+      const primaryEntries = logSpy.getCalls().filter((c: any) =>
+        typeof c.args[0] === 'string' && c.args[0].includes('(primary)'),
+      );
+      assert.strictEqual(
+        primaryEntries.length, 0,
+        'a backoff armed by the previous cycle must not fire inside the new one',
+      );
+      logSpy.restore();
     });
 
     it('destroy() cancels any in-flight reconnect', async () => {
@@ -1366,8 +1476,7 @@ describe('SipSignalingAdapter', () => {
       const { adapter, uaStub } = createAdapter({ createInviter });
       uaStub._triggerConnect();
       uaStub._triggerDisconnect();
-      // EventEmitter throws on an unhandled 'error' event; the 31009 payload is
-      // asserted in the test above.
+      // EventEmitter throws on unhandled 'error'; 31009 asserted above.
       adapter.on('error', () => { /* no-op */ });
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
 
@@ -1381,6 +1490,35 @@ describe('SipSignalingAdapter', () => {
       assert.strictEqual(createInviter.callCount, 1, 'queue was drained, not replayed');
     });
 
+    it('hangup() drops a queued invite instead of placing the call on reconnect', async () => {
+      const inviters: ReturnType<typeof createInviterStub>[] = [];
+      const createInviter = sinon.stub().callsFake(() => {
+        const inviter = createInviterStub();
+        inviters.push(inviter);
+        return inviter as any;
+      });
+      const { adapter, uaStub } = createAdapter({ createInviter });
+      uaStub._triggerConnect();
+      uaStub._triggerDisconnect();
+      // EventEmitter throws on unhandled 'error'; 31009 asserted above.
+      adapter.on('error', () => { /* no-op */ });
+
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      adapter.invite('call-2', { sdp: 'sdp', params: 'To=carol', peerConnection: createPeerConnectionStub() });
+
+      // No session exists yet, so dropping the queued entry is the hangup.
+      adapter.hangup('call-1', {});
+
+      uaStub._setReconnectImpl(() => { uaStub._triggerConnect(); return Promise.resolve(); });
+      await clock.tickAsync(100);
+
+      assert.strictEqual(createInviter.callCount, 1, 'only the call that was not cancelled goes out');
+
+      // The survivor must be call-2: its hangup routes to the one inviter.
+      adapter.hangup('call-2', {});
+      assert.strictEqual(inviters[0].cancel.callCount, 1);
+    });
+
     it('does not queue an ICE-restart re-INVITE (reinvite is not retried)', async () => {
       const { adapter, uaStub, inviterStub } = createAdapter();
       uaStub._triggerConnect();
@@ -1392,8 +1530,7 @@ describe('SipSignalingAdapter', () => {
       adapter.iceRestart('call-1', { mediaHandler: {} as any });
       assert.strictEqual(inviterStub.invite.callCount, 0, 'no re-INVITE while down');
 
-      // On reconnect it must be re-triggered via iceRestartNeeded, not replayed
-      // from the message queue.
+      // Re-triggered via iceRestartNeeded, not replayed from the queue.
       const iceRestartNeededSpy = sinon.spy();
       adapter.on('iceRestartNeeded', iceRestartNeededSpy);
       uaStub._setReconnectImpl(() => { uaStub._triggerConnect(); return Promise.resolve(); });

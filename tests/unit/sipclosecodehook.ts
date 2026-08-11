@@ -8,14 +8,14 @@ function createLogStub(): any {
   return { debug: sinon.stub(), error: sinon.stub(), info: sinon.stub(), warn: sinon.stub() };
 }
 
+// `ws` mirrors SIP.js's getter for the currently active socket.
 function createTransportStub(base?: any) {
-  return { onWebSocketClose: base || sinon.stub() };
+  return { ws: { id: 'active-socket' } as any, onWebSocketClose: base || sinon.stub() };
 }
 
 describe('installCloseCodeHook', () => {
-  // Canary for a sip.js upgrade. The close code is captured by wrapping a
-  // method that is private to sip.js, so if it is renamed or removed the
-  // adapter silently loses close codes. Fail loudly here instead.
+  // Canary for a sip.js upgrade: the hook wraps a private method, so a rename
+  // would silently cost us close codes. Fail loudly here instead.
   it('relies on a Web.Transport.prototype.onWebSocketClose that still exists', () => {
     assert.strictEqual(
       typeof (Web.Transport.prototype as any).onWebSocketClose,
@@ -36,7 +36,7 @@ describe('installCloseCodeHook', () => {
     const recorder = installCloseCodeHook(transport, createLogStub() as Log);
 
     const event = { code: 1006 };
-    const ws = {};
+    const ws = transport.ws;
     transport.onWebSocketClose(event, ws);
 
     assert.strictEqual(recorder.lastCloseCode, 1006);
@@ -47,13 +47,13 @@ describe('installCloseCodeHook', () => {
   });
 
   it('records the code BEFORE the base handler runs', () => {
-    // Ordering is the whole point: sip.js dispatches onDisconnect from inside
-    // the base handler, so the code must already be recorded by then.
+    // sip.js dispatches onDisconnect from inside the base handler, so the code
+    // must already be recorded by then.
     let codeSeenByBase: number | undefined;
     const transport = createTransportStub(() => { codeSeenByBase = recorder.lastCloseCode; });
     const recorder = installCloseCodeHook(transport, createLogStub() as Log);
 
-    transport.onWebSocketClose({ code: 1015 }, {});
+    transport.onWebSocketClose({ code: 1015 }, transport.ws);
 
     assert.strictEqual(codeSeenByBase, 1015);
   });
@@ -62,11 +62,24 @@ describe('installCloseCodeHook', () => {
     const transport = createTransportStub();
     const recorder = installCloseCodeHook(transport, createLogStub() as Log);
 
-    transport.onWebSocketClose({ code: 1006 }, {});
+    transport.onWebSocketClose({ code: 1006 }, transport.ws);
     assert.strictEqual(recorder.lastCloseCode, 1006);
 
-    transport.onWebSocketClose({ code: 1000 }, {});
+    transport.onWebSocketClose({ code: 1000 }, transport.ws);
     assert.strictEqual(recorder.lastCloseCode, 1000);
+  });
+
+  it('ignores a close from a socket sip.js has already replaced', () => {
+    // sip.js drops these itself, so a stale 1000 must not mask a real 1006.
+    const base = sinon.stub();
+    const transport = createTransportStub(base);
+    const recorder = installCloseCodeHook(transport, createLogStub() as Log);
+
+    transport.onWebSocketClose({ code: 1006 }, transport.ws);
+    transport.onWebSocketClose({ code: 1000 }, { id: 'replaced-socket' });
+
+    assert.strictEqual(recorder.lastCloseCode, 1006, 'the stale close must not overwrite');
+    assert.strictEqual(base.callCount, 2, 'the base handler still sees both, and drops the stale one itself');
   });
 
   it('degrades instead of throwing when the base handler is missing', () => {
