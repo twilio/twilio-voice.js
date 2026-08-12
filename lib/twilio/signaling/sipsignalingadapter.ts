@@ -162,6 +162,8 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     primary: null,
   };
   private _isReconnecting: boolean = false;
+  // Backstop for the attempt currently in flight, so destroy() can cancel it.
+  private _connectTimeout: NodeJS.Timeout | null = null;
   private _wasRegistered: boolean = false;
   // Timestamp of the most recent connect, or null while down. Feeds the
   // CONNECT_SUCCESS_TIMEOUT_MS check.
@@ -356,6 +358,10 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     this._log.info('Destroying SipSignalingAdapter');
 
     this._isReconnecting = false;
+    if (this._connectTimeout) {
+      clearTimeout(this._connectTimeout);
+      this._connectTimeout = null;
+    }
     if (this._backoff) {
       this._backoff.preferred.reset();
       this._backoff.preferred.removeAllListeners();
@@ -877,8 +883,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     // The server never received the orphaned re-INVITE's ICE/DTLS creds, so
     // Call has to re-trigger. _inFlightIceRestarts entries stay stale so their
     // eventual rejection is still suppressed.
-    const recovery: string[] = [];
-    this._pendingIceRestartRecovery.forEach((callSid: string) => recovery.push(callSid));
+    const recovery = Array.from(this._pendingIceRestartRecovery);
     this._pendingIceRestartRecovery.clear();
     this._log.info(`_onTransportConnect: ${recovery.length} stale ICE-restart(s) to re-trigger`);
     recovery.forEach((callSid: string) => {
@@ -888,8 +893,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   }
 
   /**
-   * Replay whatever queued while the transport was down. Drained before
-   * replaying, so a send that fails again re-queues rather than looping.
+   * Replay whatever queued while the transport was down.
    */
   private _flushMessageQueue(): void {
     if (!this._messageQueue.length) {
@@ -1069,40 +1073,66 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     }
     this._log.info(`Reconnect attempt #${attempt} (${tier})`);
 
-    // The next backoff is only scheduled from this promise's handlers, so a
-    // reconnect() that never settles would stall the tier forever.
-    let settled = false;
-    const timeout = setTimeout(() => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      this._log.warn(`Reconnect attempt timed out after ${CONNECT_TIMEOUT_MS}ms`);
-      this._backoff?.[tier].backoff();
-    }, CONNECT_TIMEOUT_MS);
-
-    this._userAgent.reconnect().then(
-      () => {
-        if (settled) {
-          // A retry is already scheduled, and if the socket did open the
-          // onConnect delegate has already run the post-connect work.
-          this._log.info('Ignoring reconnect success that landed after the attempt timed out');
-          return;
+    this._withConnectTimeout(tier, this._userAgent.reconnect()).then(
+      (connected: boolean) => {
+        if (connected) {
+          this._onReconnectSuccess();
         }
-        settled = true;
-        clearTimeout(timeout);
-        this._onReconnectSuccess();
       },
       (err: Error) => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        clearTimeout(timeout);
         this._log.warn('Reconnect attempt failed', err);
         this._backoff?.[tier].backoff();
       },
     );
+  }
+
+  /**
+   * Own the per-attempt backstop end to end: arm it, and if it wins the race,
+   * log it and schedule the tier's next delay. Exactly one of the two outcomes
+   * is acted on, so a late result is dropped.
+   *
+   * Resolves true if the attempt connected and false if it was abandoned;
+   * rejects only when the attempt itself failed.
+   */
+  private _withConnectTimeout(
+    tier: 'preferred' | 'primary',
+    attempt: Promise<void>,
+  ): Promise<boolean> {
+    return new Promise<boolean>((resolve, reject) => {
+      let settled = false;
+      const timeout = setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        this._log.warn(`Reconnect attempt timed out after ${CONNECT_TIMEOUT_MS}ms`);
+        this._backoff?.[tier].backoff();
+        resolve(false);
+      }, CONNECT_TIMEOUT_MS);
+      this._connectTimeout = timeout;
+
+      attempt.then(
+        () => {
+          if (settled) {
+            // A retry is already scheduled, and if the socket did open the
+            // onConnect delegate has already run the post-connect work.
+            this._log.info('Ignoring reconnect success that landed after the attempt timed out');
+            return;
+          }
+          settled = true;
+          clearTimeout(timeout);
+          resolve(true);
+        },
+        (err: Error) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timeout);
+          reject(err);
+        },
+      );
+    });
   }
 
   private _onReconnectSuccess(): void {

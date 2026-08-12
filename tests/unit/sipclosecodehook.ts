@@ -25,6 +25,31 @@ describe('installCloseCodeHook', () => {
     );
   });
 
+  // Second canary for the same upgrade risk. The hook decides whether a close
+  // belongs to the live socket by comparing against `transport.ws`, so a `ws`
+  // that was removed, or that computed a fresh value per access, would make
+  // every comparison fail and drop all close codes silently.
+  it('relies on a Web.Transport.ws that is a stable accessor', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(Web.Transport.prototype, 'ws');
+    assert.strictEqual(
+      typeof descriptor?.get,
+      'function',
+      'sip.js no longer defines Web.Transport.prototype.ws; the stale-socket ' +
+      'guard in sipclosecodehook.ts needs updating',
+    );
+
+    const log: any = {
+      debug: sinon.stub(), error: sinon.stub(), log: sinon.stub(), warn: sinon.stub(),
+    };
+    const transport = new Web.Transport(log, { server: 'wss://example.invalid' });
+    assert.strictEqual(
+      transport.ws,
+      transport.ws,
+      'Web.Transport.ws no longer returns a stable reference; the stale-socket ' +
+      'guard would silently drop every close code',
+    );
+  });
+
   it('starts with no close code', () => {
     const recorder = installCloseCodeHook(createTransportStub(), createLogStub() as Log);
     assert.strictEqual(recorder.lastCloseCode, undefined);

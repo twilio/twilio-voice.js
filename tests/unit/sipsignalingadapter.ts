@@ -1407,6 +1407,11 @@ describe('SipSignalingAdapter', () => {
         'our ceiling must not pre-empt sip.js',
       );
       warnSpy.restore();
+
+      // Logging the error is not enough: the rejection must also re-arm the
+      // tier, or the cycle would stall on the first connect timeout.
+      await clock.tickAsync(200);
+      assert.strictEqual(uaStub.reconnect.callCount, 2, 'a second attempt must be scheduled');
     });
 
     it('does not fire a backoff left pending by a reconnect cycle that already ended', async () => {
@@ -1446,6 +1451,26 @@ describe('SipSignalingAdapter', () => {
       adapter.destroy();
       await clock.tickAsync(5000);
       assert.strictEqual(uaStub.reconnect.callCount, 0);
+    });
+
+    it('destroy() cancels the backstop of an attempt already in flight', async () => {
+      const { adapter, uaStub } = createAdapter();
+      // Hangs, so the backstop is the only thing left armed for this attempt.
+      uaStub._setReconnectImpl(() => new Promise<void>(() => { /* never settles */ }));
+      uaStub._triggerConnect();
+      uaStub._triggerDisconnect();
+      await clock.tickAsync(100);
+      assert.strictEqual(uaStub.reconnect.callCount, 1, 'attempt started, backstop armed');
+
+      const warnSpy = sinon.spy((adapter as any)._log, 'warn');
+      adapter.destroy();
+      await clock.tickAsync(20000);
+
+      const timedOut = warnSpy.getCalls().filter((c: any) =>
+        String(c.args[0]).includes('timed out after'),
+      );
+      assert.strictEqual(timedOut.length, 0, 'the backstop must not fire after destroy');
+      warnSpy.restore();
     });
 
     it('queues an invite issued while the transport is down and flushes it on reconnect', async () => {
