@@ -122,4 +122,5 @@ require('./unit/cdn/viewerresponse/test');
 require('./unit/rtcpc');
 require('./unit/pstreamsignalingadapter');
 require('./unit/sipsignalingadapter');
+require('./unit/sipclosecodehook');
 require('./unit/sipsessiondescriptionhandler');
