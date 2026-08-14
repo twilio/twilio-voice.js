@@ -106,6 +106,7 @@ require('./pstream');
 require('./sound');
 require('./sdp');
 
+require('./unit/check-version-bump');
 require('./unit/audioplayer');
 require('./unit/audioprocessoreventobserver');
 require('./unit/asyncQueue');
