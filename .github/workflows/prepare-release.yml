@@ -142,10 +142,15 @@ jobs:
               ;;
           esac
 
-          # CHANGELOG headings read "2.18.3 (May 11, 2026)"; the in-progress entry
-          # reads "2.18.4 (Work in progress)". Either form matches this prefix.
-          if ! grep -q "^${RELEASE_VERSION} (" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md has no ${RELEASE_VERSION} entry — add one before releasing."
+          # A final release must have a DATED CHANGELOG heading like
+          # "2.18.4 (August 14, 2026)". Requiring a 4-digit year in the heading
+          # rejects the in-progress placeholder "2.18.4 (Work in progress)", which
+          # a bare "^${RELEASE_VERSION} (" prefix would wave through — shipping a
+          # tarball, tag, and docs whose top entry still says "Work in progress".
+          # The year, not the leading capital, is what separates the two ("Work"
+          # is also capitalized). Any reasonable date format satisfies it.
+          if ! grep -qE "^${RELEASE_VERSION} \(.*[0-9]{4}\)" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no dated ${RELEASE_VERSION} entry (still \"Work in progress\"?) — date it before releasing."
             exit 1
           fi
 
