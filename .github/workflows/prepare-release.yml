@@ -3,15 +3,13 @@ name: Prepare Release
 # Builds a release: bumps the version, builds the SDK, commits the built tree,
 # and pushes a version tag.
 #
-# Dispatch this FROM the branch you are releasing (normally `master`) — pick it
+# Dispatch this FROM the branch you are releasing (normally `master`); pick it
 # in the "Run workflow" dropdown. The commits and the tag are pushed back to
 # whatever ref the run was dispatched from, so the branch selected there is the
 # branch that gets the release.
 #
 # This workflow does not publish. To publish, dispatch release.yml from the tag
 # this pushed; it accepts only a final X.Y.Z tag, so a prerelease stops here.
-#
-# Replaces the CircleCI `release`/`development` plans in .release.json.
 
 on:
   workflow_dispatch:
@@ -26,7 +24,7 @@ on:
       # the event payload is always the string "true"/"false", whereas `inputs`
       # is a real boolean from the UI but a (truthy) string from the dispatch API.
       dry_run:
-        description: "Build and pack only — commit nothing, tag nothing, publish nothing."
+        description: "Build and pack only; commit nothing, tag nothing, publish nothing."
         required: false
         type: boolean
         default: false
@@ -44,7 +42,7 @@ jobs:
   build:
     name: Build release tree
     runs-on: ubuntu-latest-large
-    timeout-minutes: 60
+    timeout-minutes: 25
     permissions:
       contents: read
       id-token: write # for the Artifactory OIDC exchange below
@@ -54,7 +52,7 @@ jobs:
       # set a version different from the literal string used below as the commit
       # message and tag name.
       #
-      # Passed as env, referenced as "$VAR" — never interpolated into a run script.
+      # Passed as env, referenced as "$VAR", never interpolated into a run script.
       - name: Validate the version inputs
         env:
           RELEASE_VERSION: ${{ inputs.release_version }}
@@ -137,7 +135,7 @@ jobs:
           # a missing CHANGELOG entry for one is not a release-blocking error.
           case "$RELEASE_VERSION" in
             *-*)
-              echo "::notice::${RELEASE_VERSION} is a prerelease — leaving CHANGELOG.md alone."
+              echo "::notice::${RELEASE_VERSION} is a prerelease; leaving CHANGELOG.md alone."
               exit 0
               ;;
           esac
@@ -145,12 +143,13 @@ jobs:
           # A final release must have a DATED CHANGELOG heading like
           # "2.18.4 (August 14, 2026)". Requiring a 4-digit year in the heading
           # rejects the in-progress placeholder "2.18.4 (Work in progress)", which
-          # a bare "^${RELEASE_VERSION} (" prefix would wave through — shipping a
+          # a bare "^${RELEASE_VERSION} (" prefix would wave through, shipping a
           # tarball, tag, and docs whose top entry still says "Work in progress".
           # The year, not the leading capital, is what separates the two ("Work"
           # is also capitalized). Any reasonable date format satisfies it.
-          if ! grep -qE "^${RELEASE_VERSION} \(.*[0-9]{4}\)" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md has no dated ${RELEASE_VERSION} entry (still \"Work in progress\"?) — date it before releasing."
+          ESCAPED_VERSION=$(printf '%s' "$RELEASE_VERSION" | sed 's/[.]/\\./g')
+          if ! grep -qE "^${ESCAPED_VERSION} \(.*[0-9]{4}\)" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no dated ${RELEASE_VERSION} entry (still \"Work in progress\"?); date it before releasing."
             exit 1
           fi
 
@@ -198,7 +197,7 @@ jobs:
 
       # A publish cannot be undone: this proves the tree builds and shows exactly
       # what would ship, without writing anything anywhere.
-      - name: Dry run — pack and preview the publish
+      - name: Dry run, pack and preview the publish
         if: ${{ github.event.inputs.dry_run == 'true' }}
         run: |
           set -euo pipefail
@@ -235,7 +234,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
-    # Passed as env, referenced as "$VAR" — never interpolated into a run script.
+    # Passed as env, referenced as "$VAR", never interpolated into a run script.
     env:
       RELEASE_VERSION: ${{ inputs.release_version }}
     steps:
@@ -247,10 +246,30 @@ jobs:
         run: |
           set -euo pipefail
 
-          if git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_VERSION}" >/dev/null 2>&1; then
-            echo "::error::tag ${RELEASE_VERSION} already exists on origin."
-            exit 1
-          fi
+          # --exit-code distinguishes three outcomes we must not conflate:
+          #   0  the tag exists on origin  -> abort
+          #   2  no such tag               -> proceed
+          #   *  network/auth failure      -> abort loudly, never treat as absent
+          # The lookup can't sit in an `if` under `set -e`, so capture the status
+          # explicitly. stderr is left visible so a real failure is diagnosable.
+          set +e
+          git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_VERSION}" >/dev/null
+          RC=$?
+          set -e
+
+          case "$RC" in
+            0)
+              echo "::error::tag ${RELEASE_VERSION} already exists on origin."
+              exit 1
+              ;;
+            2)
+              echo "::notice::tag ${RELEASE_VERSION} does not exist on origin."
+              ;;
+            *)
+              echo "::error::could not query origin for tag ${RELEASE_VERSION} (git ls-remote exit ${RC})."
+              exit 1
+              ;;
+          esac
 
       # The download overwrites but never deletes, so stale files from a build
       # still tracked from a previous release (one cut without a development
@@ -295,7 +314,7 @@ jobs:
             }
           '
 
-      # Matches the identity the CircleCI release used (.release.json).
+      # The identity used on release commits.
       - name: Configure git identity
         run: |
           set -euo pipefail
@@ -364,7 +383,7 @@ jobs:
 
           git fetch --no-tags origin "${GITHUB_REF}"
           if ! git merge-base --is-ancestor "refs/tags/${RELEASE_VERSION}" FETCH_HEAD; then
-            echo "::error::tag ${RELEASE_VERSION} is not reachable from ${GITHUB_REF} on origin — it is orphaned."
+            echo "::error::tag ${RELEASE_VERSION} is not reachable from ${GITHUB_REF} on origin; it is orphaned."
             exit 1
           fi
           echo "::notice::tag ${RELEASE_VERSION} is reachable from ${GITHUB_REF} on origin."

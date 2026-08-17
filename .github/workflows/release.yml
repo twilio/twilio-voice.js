@@ -2,15 +2,12 @@ name: Release
 
 # Publishes a tagged release to npm and refreshes the gh-pages docs.
 #
-# Dispatch this FROM the release tag prepare-release.yml pushed — pick the tag in
+# Dispatch this FROM the release tag prepare-release.yml pushed; pick the tag in
 # the "Run workflow" dropdown. That commit already contains the built tree, so
-# this workflow only publishes — do not add an install or build step here.
+# this workflow only publishes; do not add an install or build step here.
 #
 # Dispatch is manual because GitHub suppresses events from a workflow pushing
 # with the default GITHUB_TOKEN, so a tag trigger would never fire.
-#
-# Replaces the CircleCI `publish` plan (and its gh-pages subtree push) in
-# .release.json.
 
 on:
   workflow_dispatch:
@@ -31,7 +28,7 @@ jobs:
     # Both at job level: `environment:` resolves before any step runs, so a
     # first-step guard would gate on approval first, and the OIDC token only
     # carries the environment claim when the job itself asks for the environment
-    # — which is what the npm trusted publisher matches on.
+    # which is what the npm trusted publisher matches on.
     if: github.repository_owner == 'twilio'
     environment:
       name: production
@@ -48,7 +45,7 @@ jobs:
           # A branch ref keeps its refs/heads/ prefix here and fails the same check.
           TAG="${GITHUB_REF#refs/tags/}"
           if ! printf '%s' "$TAG" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Dispatch this workflow from a final X.Y.Z release tag, not ${GITHUB_REF} — prereleases are not published."
+            echo "::error::Dispatch this workflow from a final X.Y.Z release tag, not ${GITHUB_REF}; prereleases are not published."
             exit 1
           fi
 
@@ -114,8 +111,8 @@ jobs:
           access: 'public'
           provenance: 'true'
 
-  # Mirrors the gh-pages subtree push the CircleCI release did. The tag already
-  # carries the built docs/ tree, so this only republishes it — no rebuild.
+  # The tag already carries the built docs/ tree, so this only republishes it to
+  # gh-pages; no rebuild.
   docs:
     name: Publish docs to gh-pages
     needs: deploy
@@ -141,16 +138,18 @@ jobs:
           set -euo pipefail
 
           if [ -z "$(ls -A ../release/docs 2>/dev/null)" ]; then
-            echo "::error::docs/ is missing or empty on ${GITHUB_REF_NAME} — nothing to publish."
+            echo "::error::docs/ is missing or empty on ${GITHUB_REF_NAME}; nothing to publish."
             exit 1
           fi
 
           git config user.name "twilio-vblocks-ci"
           git config user.email "svc.vblocks-ci@twilio.com"
 
-          # Replace the published tree wholesale so files deleted since the last
-          # release do not linger on gh-pages.
-          git rm -rqf . >/dev/null 2>&1 || true
+          # Clear the old tree so files dropped since the last release don't linger.
+          # Tracked files only; the guard tolerates an empty gh-pages.
+          if [ -n "$(git ls-files)" ]; then
+            git ls-files -z | xargs -0 git rm -q -f
+          fi
           cp -R ../release/docs/. .
           # Keep Jekyll off so TypeDoc's directories are served verbatim.
           touch .nojekyll

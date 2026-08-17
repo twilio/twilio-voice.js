@@ -21,15 +21,9 @@ parameters:
   tag:
     type: string
     default: "" # use something like: "2.0.0-beta.15" when invoking with parameters.
-  release_workflow:
-    type: boolean
-    default: false
   qe_workflow:
     type: boolean
     default: false
-  release_command:
-    type: string
-    default: "echo \"no release-command specified\""
 
 ###
 # Executors
@@ -226,23 +220,6 @@ jobs:
           datadog-test-service: <<parameters.datadog-test-service>>
           start_relay_server: <<parameters.start_relay_server>>
           integration_test_files: <<parameters.integration_test_files>>
-  run-release:
-    parameters:
-      dryRun:
-        type: boolean
-        default: true
-    executor:
-      name: docker-with-browser
-    steps:
-      - when:
-          condition: << parameters.dryRun >>
-          steps:
-            - run: echo "Will run \"<< pipeline.parameters.release_command >>\""
-      - unless:
-          condition: << parameters.dryRun >>
-          steps:
-            - build
-            - run: << pipeline.parameters.release_command >>
   run-chrome-extension-tests:
     parameters:
       bver:
@@ -367,70 +344,6 @@ workflows:
   #     #       parameters:
   #     #         browser: ["chrome", "firefox"]
   #     #         bver: ["stable"]
-  release-workflow:
-    when: <<pipeline.parameters.release_workflow>>
-    jobs:
-      - run-build-checks:
-          context:
-            - vblocks-js
-          name: Build Checks
-          datadog-test-service: "release-unit-tests"
-      - run-integration-tests:
-          name: Integration tests <<matrix.browser>> <<matrix.bver>>
-          context:
-            - dockerhub-pulls
-            - vblocks-js
-          start_relay_server: true
-          browser: <<matrix.browser>>
-          datadog-test-service: "release-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
-          matrix:
-            parameters:
-              browser: ["chrome", "firefox"]
-              bver: ["beta", "unstable", "stable"]
-              build_label: ["Release build"]
-      # NOTE(csantos): Will be addressed on a future epic
-      # - run-network-tests:
-      #     context:
-      #       - dockerhub-pulls
-      #       - vblocks-js
-      #     name: Network Tests <<matrix.browser>> <<matrix.bver>>
-      #     matrix:
-      #       parameters:
-      #         browser: ["chrome", "firefox"]
-      #         bver: ["stable"]
-      - run-release:
-          context:
-            - dockerhub-pulls
-            - vblocks-js
-          name: Create Release Dry Run
-          dryRun: true
-          requires:
-            - Build Checks
-            # NOTE(mhuynh): Temporarily allow release without these tests passing
-            # # Chrome integration tests
-            # - Integration tests chrome beta
-            # - Integration tests chrome unstable
-            # - Integration tests chrome stable
-            # # Firefox integration tests
-            # - Integration tests firefox beta
-            # - Integration tests firefox unstable
-            # - Integration tests firefox stable
-            # # Chrome network tests
-            # - Network Tests chrome stable
-            # # Firefox network tests
-            # - Network Tests firefox stable
-      - hold:
-          type: approval
-          requires:
-            - Create Release Dry Run
-      - run-release:
-          context:
-            - dockerhub-pulls
-            - vblocks-js
-          name: Create Release
-          dryRun: false
-          requires:
-            - hold
   release-candidate:
     jobs:
       - trigger-qe-tests:

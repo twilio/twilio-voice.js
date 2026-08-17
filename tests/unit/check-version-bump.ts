@@ -2,7 +2,6 @@ import * as assert from 'assert';
 
 // Plain CommonJS module (scripts/ is not part of the TS build); require avoids
 // the esModuleInterop dance for a default-less module.exports.
-// tslint:disable-next-line
 const { compare, isForward, parse } = require('../../scripts/check-version-bump');
 
 describe('check-version-bump', () => {
