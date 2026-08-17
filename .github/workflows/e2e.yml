@@ -1,0 +1,85 @@
+name: E2E
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  e2e:
+    name: e2e (${{ matrix.browser }}, ${{ matrix.bver }})
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest-large
+    container:
+      image: twilio/twilio-video-browsers:${{ matrix.browser }}-${{ matrix.bver }}
+    env:
+      DISPLAY: ':99'
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chrome, firefox]
+        bver: [stable, beta, unstable]
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Artifactory OIDC Auth
+        uses: ./.github/actions/artifactory-oidc
+        with:
+          artifactory_url: ${{ vars.ARTIFACTORY_URL }}
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install Cypress binary
+        run: ./node_modules/.bin/cypress install
+
+      # lib/twilio/constants.ts is gitignored and generated at build time.
+      - name: Build constants
+        run: npm run build:constants
+
+      # Container jobs skip the image's own ENTRYPOINT that normally starts these.
+      - name: Start Xvfb and dbus
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo dbus-daemon --system --fork
+          Xvfb $DISPLAY -screen 0 1280x1024x24 &
+          xvfb_pid=$!
+          socket="/tmp/.X11-unix/X${DISPLAY#:}"
+          for _ in $(seq 1 50); do
+            [ -e "$socket" ] && break
+            kill -0 "$xvfb_pid" 2>/dev/null || { echo "Xvfb exited during startup"; exit 1; }
+            sleep 0.2
+          done
+          [ -e "$socket" ] || { echo "Xvfb did not create display $DISPLAY within 10s"; exit 1; }
+
+      - name: Run e2e integration tests (chrome)
+        if: matrix.browser == 'chrome'
+        env:
+          VENDOR_URL: ${{ vars.VENDOR_URL }}
+          VENDOR_AUDIENCE: ${{ vars.VENDOR_URL }}
+        run: npm run test:integration:chrome
+
+      # Cypress can't auto-detect Firefox's beta/nightly builds by name.
+      - name: Run e2e integration tests (firefox)
+        if: matrix.browser == 'firefox'
+        env:
+          VENDOR_URL: ${{ vars.VENDOR_URL }}
+          VENDOR_AUDIENCE: ${{ vars.VENDOR_URL }}
+        run: npm run test:integration -- --browser /usr/local/bin/firefox

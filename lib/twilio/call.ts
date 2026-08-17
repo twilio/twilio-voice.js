@@ -48,6 +48,10 @@ const BACKOFF_CONFIG = {
 };
 
 const DTMF_INTER_TONE_GAP: number = 70;
+// Cadence of the feedback tones the caller hears. Intentionally independent of
+// the wire's tone timing: this is audible feedback, not a mirror of what the
+// recipient receives.
+const DTMF_LOCAL_TONE_GAP: number = 200;
 const DTMF_PAUSE_DURATION: number = 500;
 const DTMF_TONE_DURATION: number = 160;
 
@@ -995,9 +999,11 @@ class Call extends EventEmitter {
       sequence.push(dtmf);
     });
 
+    let tonesInRun = 0;
     const playNextDigit = () => {
       const digit = sequence.shift() as Device.SoundName | undefined;
       if (digit) {
+        tonesInRun++;
         if (this._options.dialtonePlayer && !customSounds[digit]) {
           this._options.dialtonePlayer.play(digit);
         } else {
@@ -1005,7 +1011,17 @@ class Call extends EventEmitter {
         }
       }
       if (sequence.length) {
-        setTimeout(() => playNextDigit(), 200);
+        let delay: number;
+        if (digit) {
+          delay = DTMF_LOCAL_TONE_GAP;
+        } else {
+          // A pause ('w') is an empty string here and plays no sound. The wire
+          // starts its pause timer at the start of a run, so the pause overlaps
+          // that run's tones. Subtract the tones already played to match it.
+          delay = Math.max(0, DTMF_PAUSE_DURATION - tonesInRun * DTMF_LOCAL_TONE_GAP);
+          tonesInRun = 0;
+        }
+        setTimeout(() => playNextDigit(), delay);
       }
     };
     playNextDigit();

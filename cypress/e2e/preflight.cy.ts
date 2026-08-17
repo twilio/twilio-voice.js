@@ -5,10 +5,15 @@ import { EventEmitter } from 'events';
 import { PreflightTest } from '../../lib/twilio/preflight/preflight';
 import Call from '../../lib/twilio/call';
 import { TwilioError } from '../../lib/twilio/errors';
+import { Edge, regionShortcodes, regionToEdge } from '../../lib/twilio/regions';
 
 const DURATION_PADDING = 3000;
 const EVENT_TIMEOUT = 30000;
 const MAX_TIMEOUT = 300000;
+
+// The public edges roaming can resolve to. regionShortcodes covers exactly the
+// regions geo-routing can place a client in, so Interconnect edges are excluded.
+const ROAMING_EDGES: Edge[] = Object.values(regionShortcodes).map(region => regionToEdge[region]);
 
 describe('Preflight Test', function() {
   this.timeout(MAX_TIMEOUT);
@@ -40,8 +45,8 @@ describe('Preflight Test', function() {
     receiverIdentity = 'id1-' + Date.now();
     callerIdentity = 'id2-' + Date.now();
 
-    const receiverToken = generateAccessToken(receiverIdentity);
-    callerToken = generateAccessToken(callerIdentity);
+    const receiverToken = await generateAccessToken(receiverIdentity);
+    callerToken = await generateAccessToken(callerIdentity);
     receiverDevice = new Device(receiverToken);
     receiverDevice.on('error', () => { });
     await receiverDevice.register();
@@ -171,10 +176,13 @@ describe('Preflight Test', function() {
 
   describe('when using non-default edge options', () => {
     [
-      ['roaming', 'ashburn'],
-      ['ashburn', 'ashburn'],
-      ['dublin', 'dublin'],
-    ].forEach(([selectedEdge, edge]) => {
+      // Roaming does not map to a fixed edge. It is resolved at connect time to
+      // the public edge nearest the client, so any of ROAMING_EDGES is correct
+      // and which one it is depends on where the test runs.
+      { selectedEdge: 'roaming', expectedEdges: ROAMING_EDGES },
+      { selectedEdge: 'ashburn', expectedEdges: [Edge.Ashburn] },
+      { selectedEdge: 'dublin', expectedEdges: [Edge.Dublin] },
+    ].forEach(({ selectedEdge, expectedEdges }) => {
       describe(selectedEdge, () => {
         let report: PreflightTest.Report | undefined;
 
@@ -207,7 +215,10 @@ describe('Preflight Test', function() {
 
         it('should use edge passed in', () => {
           assert.equal(report?.selectedEdge, selectedEdge);
-          assert.equal(report?.edge, edge);
+          assert(
+            expectedEdges.includes(report?.edge as Edge),
+            `expected one of ${expectedEdges.join(', ')}, got ${report?.edge}`,
+          );
         });
       });
     });

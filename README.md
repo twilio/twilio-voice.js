@@ -1,8 +1,3 @@
-## Migration from twilio-client.js 1.x
-This product, Twilio's JavaScript Voice SDK, is the next version of Twilio's Javascript Client SDK. It is
-now in GA and we recommend all customers migrate in order to continue receiving future feature additions.
-For help on migrating from 1.x, see our [migration guide](https://www.twilio.com/docs/voice/client/migrating-to-js-voice-sdk-20).
-
 @twilio/voice-sdk
 =================
 

@@ -1,7 +1,7 @@
 version: 2.1
 
 orbs:
-  test-visibility-circleci-orb: datadog/test-visibility-circleci-orb@1
+  test-visibility-circleci-orb: datadog/test-visibility-circleci-orb@1.1.0
 
 ###
 # Parameters
@@ -37,7 +37,7 @@ parameters:
 executors:
   machine-executor:
     machine:
-      image: ubuntu-2004:current
+      image: ubuntu-2004:2024.11.1
       docker_layer_caching: true
   docker-with-browser:
     parameters:
@@ -67,14 +67,14 @@ commands:
     steps:
       - get-code
       - restore_cache:
-          key: dependency-cache-{{ arch }}-{{ checksum "package.json" }}
+          key: dependency-cache-{{ arch }}-{{ checksum "package-lock.json" }}
       - run:
           name: Installing dependencies
-          command: node -v && npm install
+          command: npm ci
       - save_cache:
-          key: dependency-cache-{{ arch }}-{{ checksum "package.json" }}
+          key: dependency-cache-{{ arch }}-{{ checksum "package-lock.json" }}
           paths:
-            - ./node_modules
+            - ~/.npm
   build:
     steps:
       - get-code-and-dependencies
@@ -260,7 +260,7 @@ jobs:
 
   trigger-qe-tests:
     docker:
-      - image: circleci/node:latest
+      - image: cimg/node:24.15.0@sha256:0a67b6fa151ceac233d469a5915ca75a4a1c9e3854502ed7cc236f18c3a4f5c3
     steps:
       - run:
           name: Trigger QE tests
@@ -325,48 +325,48 @@ workflows:
               browser: ["chrome", "firefox"]
               bver: ["beta", "unstable", "stable"]
               build_label: ["Daily build"]
-  pull-request-workflow:
-    when:
-        and:
-          - equal: [true, <<pipeline.parameters.pr_workflow>>]
-          - equal: [false, <<pipeline.parameters.release_workflow>>]
-    jobs:
-      - run-build-checks:
-          context:
-            - vblocks-js
-          name: Build Checks
-          datadog-test-service: "pull-request-unit-tests"
-      - run-integration-tests:
-          name: Integration tests <<matrix.browser>> <<matrix.bver>>
-          context:
-            - dockerhub-pulls
-            - vblocks-js
-          start_relay_server: true
-          browser: <<matrix.browser>>
-          datadog-test-service: "pull-request-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
-          matrix:
-            parameters:
-              browser: ["chrome", "firefox"]
-              bver: ["beta", "unstable", "stable"]
-              build_label: ["Integration tests"]
-      - run-chrome-extension-tests:
-          name: Chrome extension tests <<matrix.browser>> <<matrix.bver>>
-          context: 
-            - vblocks-js
-          matrix:
-            parameters:
-              browser: ["chrome"]
-              bver: ["beta", "stable"]
-      # NOTE(csantos): Will be addressed on a future epic
-      # - run-network-tests:
-      #     name: Network Tests <<matrix.browser>> <<matrix.bver>>
-      #     context:
-      #       - dockerhub-pulls
-      #       - vblocks-js
-      #     matrix:
-      #       parameters:
-      #         browser: ["chrome", "firefox"]
-      #         bver: ["stable"]
+  # pull-request-workflow:
+  #   when:
+  #       and:
+  #         - equal: [true, <<pipeline.parameters.pr_workflow>>]
+  #         - equal: [false, <<pipeline.parameters.release_workflow>>]
+  #   jobs:
+  #     - run-build-checks:
+  #         context:
+  #           - vblocks-js
+  #         name: Build Checks
+  #         datadog-test-service: "pull-request-unit-tests"
+  #     - run-integration-tests:
+  #         name: Integration tests <<matrix.browser>> <<matrix.bver>>
+  #         context:
+  #           - dockerhub-pulls
+  #           - vblocks-js
+  #         start_relay_server: true
+  #         browser: <<matrix.browser>>
+  #         datadog-test-service: "pull-request-integration-tests-<<matrix.browser>>-<<matrix.bver>>"
+  #         matrix:
+  #           parameters:
+  #             browser: ["chrome", "firefox"]
+  #             bver: ["beta", "unstable", "stable"]
+  #             build_label: ["Integration tests"]
+  #     - run-chrome-extension-tests:
+  #         name: Chrome extension tests <<matrix.browser>> <<matrix.bver>>
+  #         context:
+  #           - vblocks-js
+  #         matrix:
+  #           parameters:
+  #             browser: ["chrome"]
+  #             bver: ["beta", "stable"]
+  #     # NOTE(csantos): Will be addressed on a future epic
+  #     # - run-network-tests:
+  #     #     name: Network Tests <<matrix.browser>> <<matrix.bver>>
+  #     #     context:
+  #     #       - dockerhub-pulls
+  #     #       - vblocks-js
+  #     #     matrix:
+  #     #       parameters:
+  #     #         browser: ["chrome", "firefox"]
+  #     #         bver: ["stable"]
   release-workflow:
     when: <<pipeline.parameters.release_workflow>>
     jobs:

@@ -27,11 +27,11 @@ describe('Device Options Extended', function() {
       const callerId1 = 'id-caller1-' + Date.now();
       const callerId2 = 'id-caller2-' + Date.now();
 
-      receiverDevice = new Device(generateAccessToken(receiverId), {
+      receiverDevice = new Device(await generateAccessToken(receiverId), {
         allowIncomingWhileBusy: false,
       });
-      callerDevice = new Device(generateAccessToken(callerId1));
-      callerDevice2 = new Device(generateAccessToken(callerId2));
+      callerDevice = new Device(await generateAccessToken(callerId1));
+      callerDevice2 = new Device(await generateAccessToken(callerId2));
 
       await Promise.all([
         receiverDevice.register(),
@@ -67,11 +67,11 @@ describe('Device Options Extended', function() {
       const callerId1 = 'id-caller1-' + Date.now();
       const callerId2 = 'id-caller2-' + Date.now();
 
-      receiverDevice = new Device(generateAccessToken(receiverId), {
+      receiverDevice = new Device(await generateAccessToken(receiverId), {
         allowIncomingWhileBusy: true,
       });
-      callerDevice = new Device(generateAccessToken(callerId1));
-      callerDevice2 = new Device(generateAccessToken(callerId2));
+      callerDevice = new Device(await generateAccessToken(callerId1));
+      callerDevice2 = new Device(await generateAccessToken(callerId2));
 
       await Promise.all([
         receiverDevice.register(),
@@ -100,9 +100,9 @@ describe('Device Options Extended', function() {
   });
 
   describe('closeProtection', () => {
-    it('should accept closeProtection as a boolean option', () => {
+    it('should accept closeProtection as a boolean option', async () => {
       const identity = 'id-' + Date.now();
-      const token = generateAccessToken(identity);
+      const token = await generateAccessToken(identity);
 
       assert.doesNotThrow(() => {
         const device = new Device(token, { closeProtection: true });
@@ -110,9 +110,9 @@ describe('Device Options Extended', function() {
       });
     });
 
-    it('should accept closeProtection as a string option', () => {
+    it('should accept closeProtection as a string option', async () => {
       const identity = 'id-' + Date.now();
-      const token = generateAccessToken(identity);
+      const token = await generateAccessToken(identity);
 
       assert.doesNotThrow(() => {
         const device = new Device(token, { closeProtection: 'Are you sure you want to leave?' });
@@ -122,9 +122,9 @@ describe('Device Options Extended', function() {
   });
 
   describe('maxCallSignalingTimeoutMs', () => {
-    it('should accept maxCallSignalingTimeoutMs option', () => {
+    it('should accept maxCallSignalingTimeoutMs option', async () => {
       const identity = 'id-' + Date.now();
-      const token = generateAccessToken(identity);
+      const token = await generateAccessToken(identity);
 
       assert.doesNotThrow(() => {
         const device = new Device(token, { maxCallSignalingTimeoutMs: 15000 });
@@ -132,9 +132,9 @@ describe('Device Options Extended', function() {
       });
     });
 
-    it('should accept maxCallSignalingTimeoutMs as 0 (no timeout)', () => {
+    it('should accept maxCallSignalingTimeoutMs as 0 (no timeout)', async () => {
       const identity = 'id-' + Date.now();
-      const token = generateAccessToken(identity);
+      const token = await generateAccessToken(identity);
 
       assert.doesNotThrow(() => {
         const device = new Device(token, { maxCallSignalingTimeoutMs: 0 });
@@ -162,8 +162,8 @@ describe('Device Options Extended', function() {
       const identity1 = 'id1-' + Date.now();
       const identity2 = 'id2-' + Date.now();
 
-      dscpDevice1 = new Device(generateAccessToken(identity1), { dscp: true });
-      dscpDevice2 = new Device(generateAccessToken(identity2), { dscp: true });
+      dscpDevice1 = new Device(await generateAccessToken(identity1), { dscp: true });
+      dscpDevice2 = new Device(await generateAccessToken(identity2), { dscp: true });
 
       await Promise.all([dscpDevice1.register(), dscpDevice2.register()]);
 
@@ -183,8 +183,8 @@ describe('Device Options Extended', function() {
       const identity1 = 'id1-' + Date.now();
       const identity2 = 'id2-' + Date.now();
 
-      dscpDevice1 = new Device(generateAccessToken(identity1), { dscp: false });
-      dscpDevice2 = new Device(generateAccessToken(identity2), { dscp: false });
+      dscpDevice1 = new Device(await generateAccessToken(identity1), { dscp: false });
+      dscpDevice2 = new Device(await generateAccessToken(identity2), { dscp: false });
 
       await Promise.all([dscpDevice1.register(), dscpDevice2.register()]);
 
@@ -201,9 +201,9 @@ describe('Device Options Extended', function() {
   });
 
   describe('enableImprovedSignalingErrorPrecision', () => {
-    it('should accept enableImprovedSignalingErrorPrecision option', () => {
+    it('should accept enableImprovedSignalingErrorPrecision option', async () => {
       const identity = 'id-' + Date.now();
-      const token = generateAccessToken(identity);
+      const token = await generateAccessToken(identity);
 
       assert.doesNotThrow(() => {
         const device = new Device(token, { enableImprovedSignalingErrorPrecision: true });
@@ -213,9 +213,9 @@ describe('Device Options Extended', function() {
   });
 
   describe('sounds', () => {
-    it('should accept custom sound URLs without throwing', () => {
+    it('should accept custom sound URLs without throwing', async () => {
       const identity = 'id-' + Date.now();
-      const token = generateAccessToken(identity);
+      const token = await generateAccessToken(identity);
 
       assert.doesNotThrow(() => {
         const device = new Device(token, {

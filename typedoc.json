@@ -1,4 +1,5 @@
 {
+  "tsconfig": "./tsconfig.docs.json",
   "entryPoints": ["lib/twilio.ts"],
   "excludePrivate": true,
   "excludeProtected": true,

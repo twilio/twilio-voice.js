@@ -10,7 +10,7 @@ describe('AudioHelper', function() {
 
   beforeEach(async () => {
     const identity = 'id-' + Date.now();
-    const token = generateAccessToken(identity);
+    const token = await generateAccessToken(identity);
     device = new Device(token);
     await device.register();
   });
