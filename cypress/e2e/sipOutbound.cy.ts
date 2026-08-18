@@ -13,7 +13,7 @@ describe('SIP Outbound Call', function() {
 
   beforeEach(async () => {
     identity = 'sip-id-' + Date.now();
-    const token = generateAccessToken(identity);
+    const token = await generateAccessToken(identity);
     device = new Device(token, {
       signalingOptions: {
         useSignalingMethod: 'sip',
