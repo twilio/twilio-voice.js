@@ -2,6 +2,10 @@ name: Release
 
 # Publishes a tagged release to npm and refreshes the gh-pages docs.
 #
+# Prerequisite: the release/X.Y.Z PR that prepare-release.yml opened must already
+# be merged into master with a merge commit. This workflow verifies the tag is
+# reachable from master and fails otherwise.
+#
 # Dispatch this FROM the release tag prepare-release.yml pushed; pick the tag in
 # the "Run workflow" dropdown. That commit already contains the built tree, so
 # this workflow only publishes; do not add an install or build step here.
@@ -27,7 +31,7 @@ jobs:
     timeout-minutes: 20
     # Both at job level: `environment:` resolves before any step runs, so a
     # first-step guard would gate on approval first, and the OIDC token only
-    # carries the environment claim when the job itself asks for the environment
+    # carries the environment claim when the job itself asks for the environment,
     # which is what the npm trusted publisher matches on.
     if: github.repository_owner == 'twilio'
     environment:

@@ -1,15 +1,18 @@
 name: Prepare Release
 
 # Builds a release: bumps the version, builds the SDK, commits the built tree,
-# and pushes a version tag.
+# and pushes a version tag onto a new release/X.Y.Z branch.
 #
-# Dispatch this FROM the branch you are releasing (normally `master`); pick it
-# in the "Run workflow" dropdown. The commits and the tag are pushed back to
-# whatever ref the run was dispatched from, so the branch selected there is the
-# branch that gets the release.
+# Dispatch this FROM master; pick it in the "Run workflow" dropdown. The release
+# commit, the tag, and the -dev bump are pushed to a new release/X.Y.Z branch,
+# never to master directly (a ruleset forbids that).
 #
-# This workflow does not publish. To publish, dispatch release.yml from the tag
-# this pushed; it accepts only a final X.Y.Z tag, so a prerelease stops here.
+# After this runs: open a PR from release/X.Y.Z into master and merge it with a
+# MERGE COMMIT. Squash or rebase would rewrite the tagged commit and orphan the
+# tag from master, breaking the reachability check in release.yml.
+#
+# This workflow does not publish. Once the PR is merged, dispatch release.yml
+# from the tag; it accepts only a final X.Y.Z tag, so a prerelease stops here.
 
 on:
   workflow_dispatch:
@@ -18,7 +21,7 @@ on:
         description: "Version to release (e.g. 2.19.0 or 2.19.0-rc1)"
         required: true
       development_version:
-        description: "Optional: next dev version to commit after the release (e.g. 2.19.1-dev). Leave blank to skip."
+        description: "Next dev version to commit after the release (e.g. 2.19.1-dev). Required for a final release; optional for a prerelease."
         required: false
       # Guards on this read `github.event.inputs.dry_run`, not `inputs.dry_run`:
       # the event payload is always the string "true"/"false", whereas `inputs`
@@ -84,8 +87,25 @@ jobs:
             fi
           done
 
-          # The push steps use GITHUB_REF as a refspec target, so a tag dispatch
-          # would try to push a commit onto a tag.
+          # A final X.Y.Z release must be merged into master, and that merge brings
+          # in whatever the release-branch tip holds. Without a -dev bump the tip is
+          # the built release commit, so the merge would commit the built tree
+          # (dist/, es5/, esm/, docs/, constants.ts) onto master. Require the dev
+          # bump for finals so the release PR stays a clean version-only diff.
+          # Prereleases never merge to master (they are not published), so they may
+          # omit it.
+          case "$RELEASE_VERSION" in
+            *-*) ;;
+            *)
+              if [ -z "${DEVELOPMENT_VERSION:-}" ]; then
+                echo "::error::development_version is required for a final release (${RELEASE_VERSION}); it keeps the release PR a clean version bump instead of merging the built tree into master."
+                exit 1
+              fi
+              ;;
+          esac
+
+          # We build from and base release/X.Y.Z on the dispatched ref, so it must
+          # be a branch (normally master), not a tag.
           case "$GITHUB_REF" in
             refs/heads/*) ;;
             *)
@@ -237,6 +257,7 @@ jobs:
     # Passed as env, referenced as "$VAR", never interpolated into a run script.
     env:
       RELEASE_VERSION: ${{ inputs.release_version }}
+      RELEASE_BRANCH: release/${{ inputs.release_version }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
@@ -271,10 +292,35 @@ jobs:
               ;;
           esac
 
-      # The download overwrites but never deletes, so stale files from a build
-      # still tracked from a previous release (one cut without a development
-      # bump, leaving the built tree committed on the branch) would be staged
-      # alongside this one.
+      # A leftover release/X.Y.Z from an aborted attempt would make the branch
+      # push below a non-fast-forward and fail confusingly; catch it up front.
+      - name: Verify the release branch does not already exist
+        run: |
+          set -euo pipefail
+
+          set +e
+          git ls-remote --exit-code --heads origin "refs/heads/${RELEASE_BRANCH}" >/dev/null
+          RC=$?
+          set -e
+
+          case "$RC" in
+            0)
+              echo "::error::branch ${RELEASE_BRANCH} already exists on origin. Delete it (and the prior release attempt) before re-running."
+              exit 1
+              ;;
+            2)
+              echo "::notice::branch ${RELEASE_BRANCH} does not exist on origin."
+              ;;
+            *)
+              echo "::error::could not query origin for branch ${RELEASE_BRANCH} (git ls-remote exit ${RC})."
+              exit 1
+              ;;
+          esac
+
+      # Defensive: clear any build output that might be tracked on the branch tip
+      # so the download below (which overwrites but never deletes) cannot leave a
+      # stale copy staged. Normally a no-op: finals leave master on a -dev commit
+      # with no build tree, and prereleases never merge to master.
       - name: Clear any previously committed build output
         run: |
           set -euo pipefail
@@ -342,16 +388,16 @@ jobs:
       - name: Tag the release
         run: git tag "$RELEASE_VERSION"
 
-      # Explicit refspecs: the checkout may be a detached HEAD rather than on a
-      # named branch, so push back to the ref this run was dispatched from
-      # instead of relying on `HEAD` inferring one.
+      # Push to a NEW release/X.Y.Z branch, never to master: a ruleset requires a
+      # PR there, so the release lands on master via a human-merged PR (see the
+      # header). The release branch has no ruleset, so this push is allowed.
       #
       # --atomic: a rejected tag must not leave the release commit pushed alone.
       - name: Push the release commit and tag
         run: |
           set -euo pipefail
 
-          git push --atomic origin "HEAD:${GITHUB_REF}" "refs/tags/${RELEASE_VERSION}"
+          git push --atomic origin "HEAD:refs/heads/${RELEASE_BRANCH}" "refs/tags/${RELEASE_VERSION}"
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         if: ${{ inputs.development_version != '' }}
@@ -359,8 +405,9 @@ jobs:
           node-version: 22
 
       # The inverse of the release commit: bump to the next -dev version and drop
-      # the built tree again, returning the branch to a clean working state.
-      # Pushed after the tag, so the tag keeps pointing at the built commit.
+      # the built tree again, so merging the release branch leaves master on a
+      # clean -dev state. Pushed onto the release branch after the tag, so the tag
+      # keeps pointing at the built commit.
       - name: Commit the development version
         if: ${{ inputs.development_version != '' }}
         env:
@@ -372,18 +419,22 @@ jobs:
           git rm -r --quiet --ignore-unmatch dist es5 esm docs lib/twilio/constants.ts
           git add package.json package-lock.json
           git commit --no-verify -m "$DEVELOPMENT_VERSION"
-          git push origin "HEAD:${GITHUB_REF}"
+          git push origin "HEAD:refs/heads/${RELEASE_BRANCH}"
           echo "::notice::Development commit: $(git rev-parse HEAD)"
 
       # Against origin, not local refs: comparing the tag this job just created to
       # its own HEAD would be true by construction.
-      - name: Verify the tag is reachable from the branch on origin
+      - name: Verify the tag is reachable from the release branch on origin
         run: |
           set -euo pipefail
 
-          git fetch --no-tags origin "${GITHUB_REF}"
+          git fetch --no-tags origin "refs/heads/${RELEASE_BRANCH}"
           if ! git merge-base --is-ancestor "refs/tags/${RELEASE_VERSION}" FETCH_HEAD; then
-            echo "::error::tag ${RELEASE_VERSION} is not reachable from ${GITHUB_REF} on origin; it is orphaned."
+            echo "::error::tag ${RELEASE_VERSION} is not reachable from ${RELEASE_BRANCH} on origin; it is orphaned."
             exit 1
           fi
-          echo "::notice::tag ${RELEASE_VERSION} is reachable from ${GITHUB_REF} on origin."
+          echo "::notice::tag ${RELEASE_VERSION} is reachable from ${RELEASE_BRANCH} on origin."
+
+      - name: Summarize next steps
+        run: |
+          echo "::notice::Prepared ${RELEASE_VERSION} on ${RELEASE_BRANCH}. Next: open a PR from ${RELEASE_BRANCH} into master and merge it with a MERGE COMMIT, then dispatch release.yml from tag ${RELEASE_VERSION} to publish. Open the PR: ${{ github.server_url }}/${{ github.repository }}/compare/master...${RELEASE_BRANCH}?expand=1"
