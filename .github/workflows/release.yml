@@ -89,7 +89,7 @@ jobs:
             fi
           done
 
-          if [ ! -s "$(node -p "require('./package.json').main")" ]; then
+          if [ ! -s "$(jq -r .main package.json)" ]; then
             echo "::error::package.json main does not resolve to a file at ${GITHUB_REF_NAME}."
             exit 1
           fi

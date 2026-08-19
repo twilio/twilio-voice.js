@@ -125,7 +125,7 @@ jobs:
           set -euo pipefail
 
           node ./scripts/check-version-bump.js \
-            "$(node -p "require('./package.json').version")" \
+            "$(jq -r .version package.json)" \
             "$RELEASE_VERSION"
 
       - name: Artifactory OIDC Auth
@@ -222,7 +222,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "::notice::Version: $(node -p "require('./package.json').version")"
+          echo "::notice::Version: $(jq -r .version package.json)"
           npm pack --dry-run
           npm publish --dry-run --registry https://registry.npmjs.org --ignore-scripts --access public
 
@@ -338,13 +338,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          PACKAGE_NAME="$(node -p "require('./package.json').name")"
+          PACKAGE_NAME="$(jq -r .name package.json)"
           if [ "$PACKAGE_NAME" != "@twilio/voice-sdk" ]; then
             echo "::error::downloaded package.json is for ${PACKAGE_NAME}, not @twilio/voice-sdk."
             exit 1
           fi
 
-          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          PACKAGE_VERSION="$(jq -r .version package.json)"
           if [ "$PACKAGE_VERSION" != "$RELEASE_VERSION" ]; then
             echo "::error::downloaded package.json is ${PACKAGE_VERSION}, not ${RELEASE_VERSION}."
             exit 1
