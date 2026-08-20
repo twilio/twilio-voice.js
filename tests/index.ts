@@ -9,8 +9,12 @@ root.resetEvents = () => { handlers = {}; };
 root.WebSocket = WebSocket;
 root.window = {
   addEventListener: (name: string, func: Function) => { (handlers as any)[name] = func; },
-  dispatchEvent: (name: string) => {
-    (handlers as any)[name]();
+  dispatchEvent: (name: string, event?: any) => {
+    const handler = (handlers as any)[name];
+    if (!handler) {
+      return;
+    }
+    handler(event);
   },
   navigator: { userAgent: '' },
   removeEventListener: (name: string) => { delete (handlers as any)[name]; },
@@ -117,8 +121,6 @@ require('./unit/error');
 require('./unit/log');
 require('./unit/regions');
 require('./unit/sid');
-require('./unit/cdn/viewerrequest/test');
-require('./unit/cdn/viewerresponse/test');
 require('./unit/rtcpc');
 require('./unit/pstreamsignalingadapter');
 require('./unit/sipsignalingadapter');

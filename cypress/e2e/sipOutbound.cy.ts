@@ -1,26 +1,35 @@
 import * as assert from 'assert';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
-import * as env from '../../tests/env';
-import { generateAccessToken } from '../../tests/lib/token';
 import { expectEvent } from '../../tests/lib/util';
 
-describe('SIP Outbound Call', function() {
+// SIP credentials are only available locally today, so this spec skips itself
+// in CI rather than failing the run. Remove the guard once CI can vend them.
+const hasSipEnv = Boolean(Cypress.env('SIP_SERVER') && Cypress.env('SIP_URI'));
+
+(hasSipEnv ? describe : describe.skip)('SIP Outbound Call', function() {
   this.timeout(30000);
 
   let device: Device;
-  let identity: string;
 
   beforeEach(async () => {
-    identity = 'sip-id-' + Date.now();
-    const token = generateAccessToken(identity);
+    const token = Cypress.env('LOCAL_ACCESS_TOKEN');
+    if (!token) {
+      throw new Error(
+        'LOCAL_ACCESS_TOKEN is not set. Run `source .env` so ACCOUNT_SID, ' +
+        'API_KEY_SID and API_KEY_SECRET are exported before this spec.',
+      );
+    }
     device = new Device(token, {
       signalingOptions: {
         useSignalingMethod: 'sip',
-        sipServer: (env as any).sipServer,
-        sipUri: (env as any).sipUri,
-        sipCredentials: { username: (env as any).sipUsername, password: (env as any).sipPassword },
-        region: (env as any).sipRegion,
+        sipServer: Cypress.env('SIP_SERVER'),
+        sipUri: Cypress.env('SIP_URI'),
+        sipCredentials: {
+          username: Cypress.env('SIP_USERNAME'),
+          password: Cypress.env('SIP_PASSWORD'),
+        },
+        region: Cypress.env('SIP_REGION'),
       },
     });
     await device.register();

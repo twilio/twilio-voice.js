@@ -29,11 +29,11 @@ describe('userDefinedMessage', function() {
     const tokenTtl = 60 * 3; // 3 minute TTL
 
     const aliceId = `client-id-call-message-tests-alice-${Date.now()}`;
-    const aliceToken = generateAccessToken(aliceId, tokenTtl);
+    const aliceToken = await generateAccessToken(aliceId, tokenTtl);
     const aliceDevice = new Device(aliceToken);
 
     const bobId = `client-id-call-message-tests-bob-${Date.now()}`;
-    const bobToken = generateAccessToken(bobId, tokenTtl);
+    const bobToken = await generateAccessToken(bobId, tokenTtl);
     const bobDevice = new Device(bobToken);
 
     await bobDevice.register();

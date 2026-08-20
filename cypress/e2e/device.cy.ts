@@ -13,11 +13,11 @@ describe('Device', function() {
   let token1: string;
   let token2: string;
 
-  before(() => {
+  before(async () => {
     identity1 = 'id1-' + Date.now();
     identity2 = 'id2-' + Date.now();
-    token1 = generateAccessToken(identity1);
-    token2 = generateAccessToken(identity2);
+    token1 = await generateAccessToken(identity1);
+    token2 = await generateAccessToken(identity2);
     device1 = new Device(token1);
     device2 = new Device(token2);
 
@@ -40,23 +40,25 @@ describe('Device', function() {
   });
 
   describe('tokenWillExpire event', () => {
-    const setupDevice = (tokenTtl: number, tokenRefreshMs: number) => {
-      const accessToken = generateAccessToken(`device-tokenWillExpire-${Date.now()}`, tokenTtl);
+    const setupDevice = async (tokenTtl: number, tokenRefreshMs: number) => {
+      const accessToken = await generateAccessToken(`device-tokenWillExpire-${Date.now()}`, tokenTtl);
       const device = new Device(accessToken, { tokenRefreshMs });
       device.on(Device.EventName.Error, () => { /* no-op */ });
       return device;
     };
 
-    it('should emit a "tokenWillExpire" event', (done) => {
-      const device = setupDevice(5, 1000);
-      device.on(Device.EventName.TokenWillExpire, () => {
-        done();
+    it('should emit a "tokenWillExpire" event', async () => {
+      const device = await setupDevice(5, 1000);
+      await new Promise<void>((resolve) => {
+        device.on(Device.EventName.TokenWillExpire, () => {
+          resolve();
+        });
+        device.register();
       });
-      device.register();
     });
 
     it('should not emit a "tokenWillExpire" event early', async () => {
-      const device = setupDevice(10, 1000);
+      const device = await setupDevice(10, 1000);
       await new Promise<void>(async (resolve, reject) => {
         let successTimeout: any = null;
         device.on(Device.EventName.TokenWillExpire, () => {
@@ -76,7 +78,7 @@ describe('Device', function() {
     });
 
     it('should emit a "tokenWillExpire" event as soon as possible if the option is smaller than the ttl', async () => {
-      const device = setupDevice(5, 10000);
+      const device = await setupDevice(5, 10000);
 
       const eventPromises = Promise.all([
         Device.EventName.TokenWillExpire,

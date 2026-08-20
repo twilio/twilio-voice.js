@@ -26,13 +26,13 @@ describe('connectToken', function() {
   let reconnectDeviceB: Device;
   let identity: string;
 
-  const setupDevices = () => {
+  const setupDevices = async () => {
     identity = 'id2-' + Date.now();
-    const callerTokenA = generateAccessToken();
-    const callerTokenB = generateAccessToken();
-    const receiverDeviceToken = generateAccessToken(identity);
-    const reconnectDeviceTokenA = generateAccessToken(identity);
-    const reconnectDeviceTokenB = generateAccessToken(identity);
+    const callerTokenA = await generateAccessToken();
+    const callerTokenB = await generateAccessToken();
+    const receiverDeviceToken = await generateAccessToken(identity);
+    const reconnectDeviceTokenA = await generateAccessToken(identity);
+    const reconnectDeviceTokenB = await generateAccessToken(identity);
 
     callerDeviceA = new Device(callerTokenA);
     callerDeviceB = new Device(callerTokenB);

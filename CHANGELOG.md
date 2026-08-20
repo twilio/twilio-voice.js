@@ -1,12 +1,33 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
-2.18.2 (In Progress)
+2.18.4 (Work in progress)
+===================
+
+Bug Fixes
+---------
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/272) where a pause character (`w`) in `call.sendDigits()` paused the DTMF tones played back to the caller for a different length of time than the tones sent to the recipient, so the two drifted apart, and the gap grew with each `w`. This is common in PIN and IVR entry such as `sendDigits('1w1234')`. Local playback now stays in step with the recipient for up to two digits before a `w`. Longer runs still lag, because those tones take longer to play locally than the 500ms pause allows. Thanks @a-lindsay for reporting this.
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/446) where the `Device` was permanently destroyed when Chrome restored a page from the back/forward cache (BFCache) in Chrome 149+. When a page is cached (and no calls are active), the `Device` now closes its signaling connection instead of destroying itself, and reconnects and re-registers when the page is restored. Normal page unloads still destroy the `Device`, and a `Device` you destroy yourself is never revived. Thanks @anene for reporting this.
+
+  Note: during a BFCache round-trip, the `Device` emits `unregistered` when the page is cached and `registered` again when it is restored. If your app shows registration status in the UI, expect it to briefly flip to unregistered and back.
+
+2.18.3 (May 11, 2026)
+=====================
+
+Bug Fixes
+---------
+
+- Fixed an issue where preflight report samples contained `NaN` or `undefined` values for `bytesSent`, `packetsSent`, `bytesReceived`, `packetsReceived`, `packetsLost`, and `jitter` when running on Chrome 141+. Starting in Chrome 141, the `outbound-rtp` stats entry is omitted from `RTCPeerConnection.getStats()` while ICE has not yet connected; counter fields are now initialized to `0` so the sample shape matches pre-141 behavior.
+
+2.18.2 (April 21, 2026)
 =======================
 
 Bug Fixes
 ---------
 
 - Fixed an issue where multiple PeerConnections are created when `device.connect()` is called multiple times.
+- Fixed an issue where the `docs:ts` build fails when the repository is inside a monorepo or workspace due to TypeDoc picking up conflicting `@types` from parent `node_modules`. Thanks @taf2 for your [contribution](https://github.com/twilio/twilio-voice.js/pull/416).
 
 2.18.1 (March 17, 2026)
 =======================
