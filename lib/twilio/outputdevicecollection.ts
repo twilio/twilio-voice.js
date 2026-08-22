@@ -34,6 +34,13 @@ export default class OutputDeviceCollection {
    */
   delete(device: MediaDeviceInfo): boolean {
     this._log.debug('.delete', device);
+
+    // Sink selection is impossible on this browser: set() always rejects and
+    // _beforeChange would reject with NotSupportedError. Just drop the device.
+    if (!this._isSupported) {
+      return !!(this._activeDevices.delete(device));
+    }
+
     const wasDeleted: boolean = !!(this._activeDevices.delete(device));
 
     const defaultDevice: MediaDeviceInfo = this._availableDevices.get('default')

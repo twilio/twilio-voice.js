@@ -33,6 +33,21 @@ describe('OutputDeviceCollection', () => {
         throw new Error('Promise was unexpectedly fulfilled');
       }, () => { }));
     });
+
+    describe('.delete', () => {
+      it('should remove the device without calling _beforeChange', () => {
+        const onChange = sinon.spy(() => Promise.reject(new Error('should not be called')));
+        collection = new OutputDeviceCollection('foo', new Map(), onChange, false);
+        const fakeDevice = { deviceId: 'lost' };
+        collection._activeDevices.add(fakeDevice);
+
+        const wasDeleted = collection.delete(fakeDevice);
+
+        assert.equal(wasDeleted, true);
+        assert.equal(collection.get().size, 0);
+        assert.equal(onChange.callCount, 0);
+      });
+    });
   });
 
   context('when supported', () => {
