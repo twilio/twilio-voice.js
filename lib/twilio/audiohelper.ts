@@ -860,7 +860,9 @@ class AudioHelper extends EventEmitter {
       || Array.from(this.availableInputDevices.values())[0];
 
     if (defaultDevice) {
-      this.setInputDevice(defaultDevice.deviceId);
+      this.setInputDevice(defaultDevice.deviceId).catch((e) => {
+        this._log.warn('Unable to set input device after losing the active input device', e);
+      });
     }
 
     return true;
@@ -1046,7 +1048,9 @@ class AudioHelper extends EventEmitter {
         // but it won't actually update the stream. We need to update the stream in a different
         // execution context (setTimeout) to properly update the stream.
         setTimeout(() => {
-          this._setInputDevice(defaultId, true);
+          Promise.resolve(this._setInputDevice(defaultId, true)).catch((e) => {
+            this._log.warn('Unable to refresh the default input device after a device change', e);
+          });
         }, 0);
       }
       this._log.debug('#deviceChange', lostActiveDevices);
