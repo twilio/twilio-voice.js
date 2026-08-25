@@ -839,6 +839,48 @@ PeerConnection.prototype.processAnswer = function(sdp, onMediaStarted) {
     } });
   });
 };
+/**
+ * Answers a remote offer on an open connection (SIP re-INVITE). Skips
+ * _initializeMediaStream, which no-ops on an open PC and would replace it.
+ * @private
+ */
+PeerConnection.prototype.processOffer = function(sdp, onAnswerReady, onMediaStarted) {
+  if (this.status === 'closed') {
+    return;
+  }
+
+  const processedSdp = this._maybeSetIceAggressiveNomination(sdp);
+  this._answerSdp = processedSdp;
+
+  const self = this;
+  function onAnswerSuccess() {
+    // close() may have landed while createAnswer was in flight, which nulls
+    // version.pc, so getSDP() would throw. Mirrors answerIncomingCall.
+    if (self.status === 'closed') {
+      return;
+    }
+
+    onAnswerReady(self.version.getSDP());
+    if (self.options) {
+      self._setEncodingParameters(self.options.dscp);
+    }
+    onMediaStarted(self.version.pc);
+  }
+
+  function onAnswerError(err) {
+    const errMsg = err.message || err;
+    self.onerror({ info: {
+      code: 31000,
+      message: `Error processing offer: ${errMsg}`,
+      twilioError: new MediaErrors.ClientRemoteDescFailed(),
+    } });
+  }
+
+  // NOTE(VBLOCKS-7005): no a=setup:actpass -> passive rewrite here. The DTLS
+  // role was fixed by the initial exchange; a renegotiation must not restate
+  // it. _setupRTCDtlsTransportListener is likewise already installed.
+  this.version.processSDP(this.options.maxAverageBitrate, this.codecPreferences, processedSdp, { audio: true }, onAnswerSuccess, onAnswerError);
+};
 PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfiguration, onAnswerReady, onMediaStarted) {
   if (!this._initializeMediaStream(rtcConfiguration)) {
     return;

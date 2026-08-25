@@ -55,12 +55,21 @@ export interface IPeerConnection {
     onMediaStarted: (pc: RTCPeerConnection) => void,
   ): void;
 
+  // answerIncomingCall cannot be reused here: it re-initializes the media
+  // stream, which no-ops without calling back once the PC is open.
+  processOffer(
+    sdp: string,
+    onAnswerReady: (answerSdp: string) => void,
+    onMediaStarted: (pc: RTCPeerConnection) => void,
+  ): void;
+
   iceRestart(onOfferReady: (offerSdp: string) => void): void;
 
   close(): void;
 }
 
 const APPLICATION_SDP = 'application/sdp';
+const CLOSED_ERROR_MESSAGE = 'SipSessionDescriptionHandler closed';
 
 /**
  * Bridges SIP.js's SessionDescriptionHandler interface to the SDK's
@@ -78,6 +87,9 @@ const APPLICATION_SDP = 'application/sdp';
  *   ICE restart: getDescription({offerOptions:{iceRestart:true}}) -> pc.iceRestart
  *                produces a fresh-ICE offer; subsequent setDescription
  *                consumes the remote answer via processAnswer.
+ *   Remote re-INVITE: once the initial exchange has completed, SIP.js drives
+ *                setDescription(remote offer) -> pc.processOffer, then
+ *                getDescription() -> the answer processOffer cached.
  *
  * Error handling: PeerConnection reports failures via `onerror` (generic,
  * rejects whatever is pending) and `onfailed` (ICE-state failures plus
@@ -89,6 +101,12 @@ const APPLICATION_SDP = 'application/sdp';
  */
 export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   private _cachedAnswer: string | null = null;
+  // SIP.js can still call in after close(), which already unwrapped
+  // pc.onerror, so a new operation would never settle. Reject up front.
+  private _closed: boolean = false;
+  // True once the initial offer/answer exchange has completed. A remote offer
+  // arriving after this point is a server-initiated re-INVITE.
+  private _hasNegotiated: boolean = false;
   private _hasSentOffer: boolean = false;
   // True while an ICE-restart getDescription() is in flight. Scopes the
   // onfailed wrap: pc.onfailed fires both for createOffer rejection (what
@@ -107,20 +125,18 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   // media), so a single-slot field would let earlier Promises hang.
   private _pendingRejects: Set<(error: Error) => void> = new Set();
 
-  /**
-   * Invariant: at most one SipSessionDescriptionHandler exists per
-   * PeerConnection lifetime. The constructor wraps pc.onerror and
-   * pc.onfailed and stores the previous handlers in closures. Creating
-   * a second SDH over the same PC would stack wraps indefinitely and
-   * keep old Promise rejects reachable via closure. Today Call owns one
-   * PC per call and SIP.js memoizes one SDH per Session, so this holds.
-   */
+  // Call's pc.onerror / pc.onfailed, captured before the constructor wraps
+  // them. close() puts them back, so Call keeps receiving errors after the
+  // Session is disposed and a recreated Session re-wraps instead of stacking.
+  private _previousOnError: (error: PeerConnectionError) => void;
+  private _previousOnFailed: (message: string) => void;
+
   constructor(
     private _pc: IPeerConnection,
     private _callSid: string,
     private _rtcConfiguration: RTCConfiguration = {},
   ) {
-    const previousOnError = this._pc.onerror;
+    const previousOnError = this._previousOnError = this._pc.onerror;
     this._pc.onerror = (error: PeerConnectionError) => {
       // Clear _iceRestartPending so a later runtime onfailed doesn't re-enter
       // _failPending. Harmless today (pending set is already drained) but keeps
@@ -129,7 +145,7 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
       this._failPending(error?.info?.twilioError || new Error(error?.info?.message || 'PeerConnection error'));
       previousOnError(error);
     };
-    const previousOnFailed = this._pc.onfailed;
+    const previousOnFailed = this._previousOnFailed = this._pc.onfailed;
     this._pc.onfailed = (message: string) => {
       // Only reject pending Promises if an ICE restart is in flight —
       // that's the one case where pc.onfailed carries a createOffer
@@ -151,6 +167,9 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   }
 
   getDescription(options?: SessionDescriptionHandlerOptions): Promise<BodyAndContentType> {
+    if (this._closed) {
+      return Promise.reject(new Error(CLOSED_ERROR_MESSAGE));
+    }
     if (this._cachedAnswer !== null) {
       const body = this._cachedAnswer;
       this._cachedAnswer = null;
@@ -174,6 +193,12 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
         });
       });
     }
+    if (this._hasNegotiated) {
+      // Offerless re-INVITE. Falling through would hang: makeOutgoingCall
+      // no-ops on an open PC. Rejecting makes SIP.js respond 488 and keep
+      // the call up. Supporting it also means answering from the ACK.
+      return Promise.reject(new Error('Offerless re-INVITE is not supported'));
+    }
     return this._awaitOperation<BodyAndContentType>((resolve) => {
       this._pc.makeOutgoingCall(this._callSid, this._rtcConfiguration, (offerSdp) => {
         this._hasSentOffer = true;
@@ -187,16 +212,31 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   }
 
   setDescription(sdp: string): Promise<void> {
+    if (this._closed) {
+      return Promise.reject(new Error(CLOSED_ERROR_MESSAGE));
+    }
     if (this._hasSentOffer) {
       return this._awaitOperation<void>((resolve) => {
         this._pc.processAnswer(sdp, () => {
           // Outbound offer/answer exchange complete. Clear the flag so a
           // subsequent re-INVITE on the same session (SIP.js memoizes the
-          // SDH per Session) can route correctly — inbound re-INVITE must
-          // go down answerIncomingCall, outbound must set the flag again.
+          // SDH per Session) can route correctly. A remote re-INVITE must
+          // go down processOffer, outbound must set the flag again.
           this._hasSentOffer = false;
+          this._hasNegotiated = true;
           resolve();
         });
+      });
+    }
+    if (this._hasNegotiated) {
+      // Server-initiated re-INVITE carrying an offer. SIP.js follows this
+      // with a getDescription() that collects the cached answer.
+      return this._awaitOperation<void>((resolve) => {
+        this._pc.processOffer(
+          sdp,
+          (answerSdp) => { this._cachedAnswer = answerSdp; },
+          () => resolve(),
+        );
       });
     }
     return this._awaitOperation<void>((resolve) => {
@@ -205,7 +245,10 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
         sdp,
         this._rtcConfiguration,
         (answerSdp) => { this._cachedAnswer = answerSdp; },
-        () => resolve(),
+        () => {
+          this._hasNegotiated = true;
+          resolve();
+        },
       );
     });
   }
@@ -215,8 +258,15 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
     // teardown paths. SIP.js invokes close() on the SDH at session end —
     // we must NOT close the PC here, or it would be closed twice (risking
     // duplicate close events or log warnings on torn-down handlers).
+    this._closed = true;
     this._iceRestartPending = false;
-    this._failPending(new Error('SipSessionDescriptionHandler closed'));
+    // Also drops the PC's last reference to this SDH.
+    this._pc.onerror = this._previousOnError;
+    this._pc.onfailed = this._previousOnFailed;
+    // Drop any answer produced but never collected, e.g. onAnswerReady fired
+    // and the operation was cancelled before SIP.js called getDescription().
+    this._cachedAnswer = null;
+    this._failPending(new Error(CLOSED_ERROR_MESSAGE));
   }
 
   sendDtmf(_tones: string): boolean {

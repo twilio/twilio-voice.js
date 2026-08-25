@@ -703,6 +703,112 @@ describe('PeerConnection', () => {
     });
   });
 
+  context('PeerConnection.prototype.processOffer', () => {
+    const METHOD = PeerConnection.prototype.processOffer;
+    const EXPECTED_PROCESSING_ERROR = {info: {code: 31000, message: 'Error processing offer: error message'}};
+    const ERROR_MESSAGE = 'error message';
+    const ERROR = new Error(ERROR_MESSAGE);
+    const SDP = 'sdp payload';
+    const ANSWER_SDP = 'answer sdp payload';
+
+    let context = null;
+    let version = null;
+    let onAnswerReady = null;
+    let onMediaStarted = null;
+    let toTest = null;
+
+    beforeEach(() => {
+      onAnswerReady = sinon.stub();
+      onMediaStarted = sinon.stub();
+      version = {
+        pc: 'peer connection',
+        getSDP: sinon.stub().returns(ANSWER_SDP),
+        processSDP: sinon.stub()
+      };
+      context = {
+        _initializeMediaStream: sinon.stub().returns(true),
+        _maybeSetIceAggressiveNomination: (sdp) => sdp,
+        _setEncodingParameters: sinon.stub(),
+        _setupRTCDtlsTransportListener: sinon.stub(),
+        _answerSdp: null,
+        version,
+        status: 'open',
+        onerror: sinon.stub(),
+        options: { dscp: true, maxAverageBitrate: undefined },
+        codecPreferences: undefined,
+      };
+      toTest = METHOD.bind(context, SDP, onAnswerReady, onMediaStarted);
+    });
+
+    it('Should not re-initialize the media stream', () => {
+      toTest();
+      sinon.assert.notCalled(context._initializeMediaStream);
+    });
+
+    it('Should not call processSDP when status is closed', () => {
+      context.status = 'closed';
+      toTest = METHOD.bind(context, SDP, onAnswerReady, onMediaStarted);
+      toTest();
+      assert.equal(version.processSDP.called, false);
+      assert.equal(context._answerSdp, null);
+    });
+
+    it('Should call _maybeSetIceAggressiveNomination with the sdp and set _answerSdp', () => {
+      context._maybeSetIceAggressiveNomination = sinon.stub().returns(SDP);
+      toTest = METHOD.bind(context, SDP, onAnswerReady, onMediaStarted);
+      toTest();
+      sinon.assert.calledWithExactly(context._maybeSetIceAggressiveNomination, SDP);
+      assert.equal(context._answerSdp, SDP);
+    });
+
+    it('Should call version.processSDP with the processed sdp', () => {
+      toTest();
+      assert(version.processSDP.calledWithExactly(undefined, undefined, SDP, {audio: true}, sinon.match.func, sinon.match.func));
+      assert(version.processSDP.calledOn(version));
+    });
+
+    it('Should call onAnswerReady and onMediaStarted when processSDP succeeds', () => {
+      version.processSDP.callsArgWith(4);
+      toTest();
+      assert.equal(context.onerror.called, false);
+      assert(onAnswerReady.calledWithExactly(ANSWER_SDP));
+      assert(onMediaStarted.calledWithExactly(version.pc));
+    });
+
+    it('Should call _setEncodingParameters when processSDP succeeds and options exist', () => {
+      version.processSDP.callsArgWith(4);
+      toTest();
+      sinon.assert.calledOnce(context._setEncodingParameters);
+      sinon.assert.calledWithExactly(context._setEncodingParameters, true);
+    });
+
+    it('Should not call back when the connection closes while createAnswer is in flight', () => {
+      toTest();
+      // close() lands after processSDP was called but before it succeeds.
+      context.status = 'closed';
+      const onSuccess = version.processSDP.firstCall.args[4];
+      onSuccess();
+      sinon.assert.notCalled(version.getSDP);
+      sinon.assert.notCalled(onAnswerReady);
+      sinon.assert.notCalled(onMediaStarted);
+    });
+
+    it('Should call onerror when processSDP calls error callback with Error object', () => {
+      version.processSDP.callsArgWith(5, ERROR);
+      toTest();
+      assert(context.onerror.calledWithMatch(EXPECTED_PROCESSING_ERROR));
+      sinon.assert.notCalled(onAnswerReady);
+      sinon.assert.notCalled(onMediaStarted);
+    });
+
+    it('Should call onerror when processSDP calls error callback with string', () => {
+      version.processSDP.callsArgWith(5, ERROR_MESSAGE);
+      toTest();
+      assert(context.onerror.calledWithMatch(EXPECTED_PROCESSING_ERROR));
+      sinon.assert.notCalled(context._setEncodingParameters);
+    });
+  });
+
   context('PeerConnection.prototype.processAnswer', () => {
     const METHOD = PeerConnection.prototype.processAnswer;
     const EXPECTED_PROCESSING_ERROR = {info: {code: 31000, message: 'Error processing answer: error message'}};

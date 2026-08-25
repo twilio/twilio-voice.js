@@ -13,6 +13,7 @@ function createPeerConnectionStub(): IPeerConnection {
     makeOutgoingCall: sinon.stub(),
     answerIncomingCall: sinon.stub(),
     processAnswer: sinon.stub(),
+    processOffer: sinon.stub(),
     iceRestart: sinon.stub(),
     close: sinon.stub(),
   };
