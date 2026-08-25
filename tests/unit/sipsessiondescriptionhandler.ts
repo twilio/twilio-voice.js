@@ -130,22 +130,21 @@ describe('SipSessionDescriptionHandler', () => {
 
   describe('getDescription with ICE restart', () => {
     const ICE_RESTART_OFFER_SDP = 'v=0\r\no=ice-restart\r\n';
-    const ICE_RESTART_OPTS = { offerOptions: { iceRestart: true } };
-
-    it('routes through pc.iceRestart when options.offerOptions.iceRestart is true', async () => {
+    it('routes through pc.iceRestart after requestIceRestart()', async () => {
       const pc = createPeerConnectionStub({
         iceRestart: sinon.stub().callsFake(
           (cb: (sdp: string) => void) => cb(ICE_RESTART_OFFER_SDP),
         ) as sinon.SinonStub,
       });
       const { handler } = createHandler(pc);
-      const description = await (handler.getDescription as any)(ICE_RESTART_OPTS);
+      handler.requestIceRestart();
+      const description = await handler.getDescription();
       assert.deepStrictEqual(description, { body: ICE_RESTART_OFFER_SDP, contentType: APPLICATION_SDP });
       sinon.assert.calledOnce(pc.iceRestart);
       sinon.assert.notCalled(pc.makeOutgoingCall);
     });
 
-    it('falls back to makeOutgoingCall when options does NOT include iceRestart', async () => {
+    it('falls back to makeOutgoingCall when no restart was requested', async () => {
       const pc = createPeerConnectionStub({
         makeOutgoingCall: sinon.stub().callsFake(
           (_sid: string, _cfg: RTCConfiguration, cb: (sdp: string) => void) => cb(OFFER_SDP),
@@ -157,7 +156,7 @@ describe('SipSessionDescriptionHandler', () => {
       sinon.assert.notCalled(pc.iceRestart);
     });
 
-    it('does NOT leak iceRestart routing across calls (each getDescription reads options independently)', async () => {
+    it('does NOT leak iceRestart routing across calls (the request is one shot)', async () => {
       const pc = createPeerConnectionStub({
         makeOutgoingCall: sinon.stub().callsFake(
           (_sid: string, _cfg: RTCConfiguration, cb: (sdp: string) => void) => cb(OFFER_SDP),
@@ -174,7 +173,8 @@ describe('SipSessionDescriptionHandler', () => {
       await handler.getDescription();
       await handler.setDescription(ANSWER_SDP);
       // Options present: must route to iceRestart, not makeOutgoingCall again.
-      await (handler.getDescription as any)(ICE_RESTART_OPTS);
+      handler.requestIceRestart();
+      await handler.getDescription();
       sinon.assert.calledOnce(pc.makeOutgoingCall);
       sinon.assert.calledOnce(pc.iceRestart);
 
@@ -197,7 +197,8 @@ describe('SipSessionDescriptionHandler', () => {
         ) as sinon.SinonStub,
       });
       const { handler } = createHandler(pc);
-      await (handler.getDescription as any)(ICE_RESTART_OPTS);
+      handler.requestIceRestart();
+      await handler.getDescription();
       await handler.setDescription(ANSWER_SDP);
       sinon.assert.calledOnce(pc.processAnswer);
       sinon.assert.notCalled(pc.answerIncomingCall);
@@ -206,7 +207,8 @@ describe('SipSessionDescriptionHandler', () => {
     it('rejects the pending getDescription if pc.onerror fires during ICE restart', async () => {
       const pc = createPeerConnectionStub(); // iceRestart stub never calls back
       const { handler } = createHandler(pc);
-      const pending = (handler.getDescription as any)(ICE_RESTART_OPTS);
+      handler.requestIceRestart();
+      const pending = handler.getDescription();
       pc.onerror({ info: { code: 31000, message: 'ice restart failure' } });
       await assert.rejects(pending, /ice restart failure/);
     });
@@ -214,7 +216,8 @@ describe('SipSessionDescriptionHandler', () => {
     it('rejects the pending getDescription if pc.onfailed fires during ICE restart (createOffer rejection path)', async () => {
       const pc = createPeerConnectionStub(); // iceRestart stub never calls back
       const { handler } = createHandler(pc);
-      const pending = (handler.getDescription as any)(ICE_RESTART_OPTS);
+      handler.requestIceRestart();
+      const pending = handler.getDescription();
       pc.onfailed('createOffer rejected');
       await assert.rejects(pending, /createOffer rejected/);
     });
@@ -234,7 +237,8 @@ describe('SipSessionDescriptionHandler', () => {
       const previousOnFailed = sinon.spy();
       const pc = createPeerConnectionStub({ onfailed: previousOnFailed }); // iceRestart stub never calls back
       const { handler } = createHandler(pc);
-      const pending = (handler.getDescription as any)(ICE_RESTART_OPTS);
+      handler.requestIceRestart();
+      const pending = handler.getDescription();
       pc.onfailed('createOffer rejected');
       await assert.rejects(pending, /createOffer rejected/);
       sinon.assert.notCalled(previousOnFailed);
@@ -401,6 +405,30 @@ describe('SipSessionDescriptionHandler', () => {
       await assert.rejects(pending, /Error processing offer: boom/);
     });
 
+    it('rejects an offerless re-INVITE that follows an ICE restart', async () => {
+      // SIP.js persists session.invite()'s sessionDescriptionHandlerOptions into
+      // sessionDescriptionHandlerOptionsReInvite and replays it on every later
+      // in-dialog request, so the restart intent must not be read back from it.
+      const pc = createPeerConnectionStub({
+        makeOutgoingCall: stubMakeOutgoingCall(),
+        processAnswer: stubProcessAnswer(),
+        iceRestart: sinon.stub().callsFake(
+          (cb: (sdp: string) => void) => cb(REOFFER_SDP),
+        ) as sinon.SinonStub,
+      });
+      const { handler } = createHandler(pc);
+      await handler.getDescription();
+      await handler.setDescription(ANSWER_SDP);
+
+      handler.requestIceRestart();
+      await handler.getDescription();
+      await handler.setDescription(ANSWER_SDP);
+
+      await assert.rejects(handler.getDescription(), /Offerless re-INVITE is not supported/);
+      sinon.assert.calledOnce(pc.iceRestart);
+      sinon.assert.calledOnce(pc.makeOutgoingCall);
+    });
+
     it('rejects an offerless re-INVITE instead of hanging on makeOutgoingCall', async () => {
       // Stable dialog + no SDP body: SIP.js asks for a fresh local offer.
       // makeOutgoingCall would no-op on the open PC and never call back.
@@ -428,7 +456,8 @@ describe('SipSessionDescriptionHandler', () => {
       await handler.getDescription();
       await handler.setDescription(ANSWER_SDP);
 
-      const description = await handler.getDescription({ offerOptions: { iceRestart: true } });
+      handler.requestIceRestart();
+      const description = await handler.getDescription();
 
       sinon.assert.calledOnce(pc.iceRestart);
       assert.deepStrictEqual(description, { body: REOFFER_SDP, contentType: APPLICATION_SDP });

@@ -29,7 +29,6 @@ import {
 } from './signalingadapter';
 import {
   IPeerConnection,
-  SessionDescriptionHandlerOptions,
   SipSessionDescriptionHandler,
 } from './sipsessiondescriptionhandler';
 import { CloseCodeRecorder, installCloseCodeHook } from './sipclosecodehook';
@@ -57,14 +56,6 @@ const CONNECT_SUCCESS_TIMEOUT_MS = 10000;
 // Close codes meaning the server was unreachable rather than shut down
 // cleanly. 1006: abnormal close. 1015: TLS handshake failure.
 const ABNORMAL_CLOSE_CODES = [1006, 1015];
-
-// SIP.js's SessionInviteOptions.sessionDescriptionHandlerOptions is typed
-// as the base SessionDescriptionHandlerOptions, which does not expose
-// offerOptions. Override that field with our SDH's extended type so the
-// iceRestart flag is typechecked at the call site.
-type IceRestartInviteOptions = Omit<SessionInviteOptions, 'sessionDescriptionHandlerOptions'> & {
-  sessionDescriptionHandlerOptions?: SessionDescriptionHandlerOptions;
-};
 
 type SipSendMessageConfig = Pick<SendMessageConfig, 'content' | 'contentType' | 'voiceEventSid'>;
 
@@ -493,11 +484,9 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   }
 
   /**
-   * Re-INVITE with offerOptions.iceRestart:true. SIP.js asks the SDH for the
-   * fresh-ICE offer, so config.mediaHandler is unused here (kept for the
-   * shared interface). Every failure path emits 'hangup' so Call can drop its
-   * inline listeners, except while reconnecting, which defers to
-   * 'iceRestartNeeded'.
+   * Re-INVITE for a fresh-ICE offer, which the armed SDH produces (so
+   * _config is unused). Failures emit 'hangup' so Call can drop its inline
+   * listeners, except while reconnecting, which defers to 'iceRestartNeeded'.
    */
   iceRestart(callSid: string, _config: IceRestartConfig): void {
     const session = this._getSession(callSid);
@@ -513,9 +502,20 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       this._pendingIceRestartRecovery.add(callSid);
       return;
     }
+    // Arm the SDH directly. Invite options stick to the dialog and replay
+    // onto later server-initiated re-INVITEs.
+    const sdh = session.sessionDescriptionHandler as
+      Partial<SipSessionDescriptionHandler> | undefined;
+    if (typeof sdh?.requestIceRestart !== 'function') {
+      this._log.warn('iceRestart: no usable description handler for callSid', callSid);
+      this.emit('hangup', { callsid: callSid });
+      return;
+    }
+    sdh.requestIceRestart();
+
     const inflight: InflightIceRestart = { callSid, stale: false };
     this._inFlightIceRestarts.add(inflight);
-    const inviteOptions: IceRestartInviteOptions = {
+    const inviteOptions: SessionInviteOptions = {
       requestDelegate: {
         onAccept: () => {
           this._inFlightIceRestarts.delete(inflight);
@@ -540,9 +540,6 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
             error: { code: code ?? 31000, message: `ICE-restart re-INVITE rejected (${code ?? 'unknown'})` },
           });
         },
-      },
-      sessionDescriptionHandlerOptions: {
-        offerOptions: { iceRestart: true },
       },
     };
     session.invite(inviteOptions).catch((error: Error) => {

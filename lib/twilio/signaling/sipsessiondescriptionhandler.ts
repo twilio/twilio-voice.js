@@ -1,19 +1,7 @@
 import {
   BodyAndContentType,
   SessionDescriptionHandler,
-  SessionDescriptionHandlerOptions as BaseSessionDescriptionHandlerOptions,
 } from 'sip.js';
-
-/**
- * Local extension of SIP.js's public SessionDescriptionHandlerOptions
- * type. SIP.js's web-platform SDH ships a richer type in a private
- * subpath (sip.js/lib/platform/web/...), but importing from that path
- * is fragile across versions. We only need offerOptions for ICE-restart
- * plumbing, so we widen the public type here.
- */
-export interface SessionDescriptionHandlerOptions extends BaseSessionDescriptionHandlerOptions {
-  offerOptions?: RTCOfferOptions;
-}
 
 /**
  * Shape of error payloads emitted by PeerConnection.onerror.
@@ -84,7 +72,7 @@ const CLOSED_ERROR_MESSAGE = 'SipSessionDescriptionHandler closed';
  *   Inbound:  setDescription() -> answerIncomingCall consumes offer and
  *                                 produces an answer (cached)
  *             getDescription() -> returns the cached answer
- *   ICE restart: getDescription({offerOptions:{iceRestart:true}}) -> pc.iceRestart
+ *   ICE restart: requestIceRestart() then getDescription() -> pc.iceRestart
  *                produces a fresh-ICE offer; subsequent setDescription
  *                consumes the remote answer via processAnswer.
  *   Remote re-INVITE: once the initial exchange has completed, SIP.js drives
@@ -95,9 +83,9 @@ const CLOSED_ERROR_MESSAGE = 'SipSessionDescriptionHandler closed';
  * rejects whatever is pending) and `onfailed` (ICE-state failures plus
  * ICE-restart createOffer rejections). We wrap both and call the previous
  * handlers (Call owns them) so Call still emits its error events. The
- * onfailed wrap is scoped: it only rejects pending Promises when the SDH
- * itself initiated an ICE restart, so that runtime ICE failures do not
- * reject unrelated in-flight get/setDescription Promises.
+ * onfailed wrap is scoped: it only rejects pending Promises while an ICE
+ * restart is in flight, so that runtime ICE failures do not reject
+ * unrelated in-flight get/setDescription Promises.
  */
 export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   private _cachedAnswer: string | null = null;
@@ -108,21 +96,16 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   // arriving after this point is a server-initiated re-INVITE.
   private _hasNegotiated: boolean = false;
   private _hasSentOffer: boolean = false;
-  // True while an ICE-restart getDescription() is in flight. Scopes the
-  // onfailed wrap: pc.onfailed fires both for createOffer rejection (what
-  // we want to reject the pending getDescription Promise for) and for ICE
-  // state = failed at runtime (what we do NOT want to reject unrelated
-  // in-flight get/setDescription Promises for).
-  //
-  // Invariant: at most one ICE-restart getDescription in flight per SDH.
-  // Enforced by the caller — Call._mediaReconnectBackoff fires serially,
-  // so overlapping ICE restarts cannot reach this SDH.
+  // One shot, set by requestIceRestart(). SIP.js persists invite options across
+  // the dialog, so the intent cannot be read back from them.
+  private _iceRestartRequested: boolean = false;
+  // pc.onfailed reports both a createOffer rejection during our restart and a
+  // runtime ICE failure. Only the first should reject the pending Promise.
+  // Call._mediaReconnectBackoff fires serially, so at most one is in flight.
   private _iceRestartPending: boolean = false;
-  // PeerConnection reports failures via onerror, not the success callbacks
-  // we pass in. Every in-flight operation adds its reject handler here;
-  // the onerror hook in the constructor rejects all of them. SIP.js can
-  // issue overlapping setDescription calls (e.g. PRACK/UPDATE during early
-  // media), so a single-slot field would let earlier Promises hang.
+  // PeerConnection reports failures through onerror, not the callbacks we pass
+  // it, so every in-flight operation parks its reject here. A Set because SIP.js
+  // can overlap setDescription calls (PRACK/UPDATE during early media).
   private _pendingRejects: Set<(error: Error) => void> = new Set();
 
   // Call's pc.onerror / pc.onfailed, captured before the constructor wraps
@@ -166,7 +149,11 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
     };
   }
 
-  getDescription(options?: SessionDescriptionHandlerOptions): Promise<BodyAndContentType> {
+  requestIceRestart(): void {
+    this._iceRestartRequested = true;
+  }
+
+  getDescription(): Promise<BodyAndContentType> {
     if (this._closed) {
       return Promise.reject(new Error(CLOSED_ERROR_MESSAGE));
     }
@@ -175,12 +162,8 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
       this._cachedAnswer = null;
       return Promise.resolve({ body, contentType: APPLICATION_SDP });
     }
-    // SIP.js forwards sessionDescriptionHandlerOptions from session.invite()
-    // into this options argument. SipSignalingAdapter.iceRestart() sets
-    // offerOptions.iceRestart when Call's media backoff requests a restart;
-    // that routes through pc.iceRestart() (fresh ICE candidates) instead
-    // of pc.makeOutgoingCall().
-    if (options?.offerOptions?.iceRestart) {
+    if (this._iceRestartRequested) {
+      this._iceRestartRequested = false;
       this._iceRestartPending = true;
       return this._awaitOperation<BodyAndContentType>((resolve) => {
         this._pc.iceRestart((offerSdp) => {
