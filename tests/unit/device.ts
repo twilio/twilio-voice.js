@@ -815,6 +815,35 @@ describe('Device', function() {
           sinon.assert.calledOnce(spy);
         });
 
+        it('should not attempt a re-register while the device is already registered', async () => {
+          await registerDevice();
+
+          // The stream drops. `_shouldReRegister` latches, and the device is
+          // moved to `unregistered`.
+          pstream.emit('offline');
+          await clock.tickAsync(0);
+          assert.equal(device['_shouldReRegister'], true);
+
+          // The stream comes back and the server restores presence on its own,
+          // so the device is `registered` again without `register()` running
+          // (which is what would have cleared `_shouldReRegister`).
+          pstream.emit('ready');
+          await clock.tickAsync(0);
+          assert.equal(device.state, Device.State.Registered);
+          assert.equal(device['_shouldReRegister'], true);
+
+          const spy = device.register = sinon.spy(device.register);
+
+          pstream.emit('connected', { region: 'EU_IRELAND' });
+          await clock.tickAsync(0);
+
+          // `register()` rejects with an `InvalidStateError` unless the device
+          // is `unregistered`, and nothing here awaits it, so calling it would
+          // surface as an unhandled rejection the application cannot intercept.
+          sinon.assert.notCalled(spy);
+          assert.equal(device.state, Device.State.Registered);
+        });
+
         it('should update the preferred uri', () => {
           pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
           assert.equal(device['_preferredURI'], ['wss://voice-js.dublin.twilio.com/signal']);
