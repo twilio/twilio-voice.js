@@ -47,6 +47,35 @@ describe('OutputDeviceCollection', () => {
         assert.equal(collection.get().size, 0);
         assert.equal(onChange.callCount, 0);
       });
+
+      it('should restore the default device without calling _beforeChange', () => {
+        const onChange = sinon.spy(() => Promise.reject(new Error('should not be called')));
+        const deviceDefault = { deviceId: 'default', kind: 'audiooutput' };
+        const fakeDevice = { deviceId: 'lost' };
+        collection = new OutputDeviceCollection('foo', new Map([['default', deviceDefault]]), onChange, false);
+        collection._activeDevices.add(fakeDevice);
+
+        const wasDeleted = collection.delete(fakeDevice);
+
+        assert.equal(wasDeleted, true);
+        assert.equal(collection.get().size, 1);
+        assert.equal(Array.from(collection.get())[0], deviceDefault);
+        assert.equal(onChange.callCount, 0);
+      });
+
+      it('should restore the first available device when default is missing', () => {
+        const onChange = sinon.spy(() => Promise.reject(new Error('should not be called')));
+        const deviceFoo = { deviceId: 'foo', kind: 'audiooutput' };
+        const fakeDevice = { deviceId: 'lost' };
+        collection = new OutputDeviceCollection('foo', new Map([['foo', deviceFoo]]), onChange, false);
+        collection._activeDevices.add(fakeDevice);
+
+        collection.delete(fakeDevice);
+
+        assert.equal(collection.get().size, 1);
+        assert.equal(Array.from(collection.get())[0], deviceFoo);
+        assert.equal(onChange.callCount, 0);
+      });
     });
   });
 
