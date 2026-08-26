@@ -1123,6 +1123,26 @@ describe('AudioHelper', () => {
       });
     });
 
+    context('when output selection is not supported', () => {
+      beforeEach(async () => {
+        onActiveOutputsChanged = sinon.spy(() => Promise.resolve());
+        audio = new AudioHelper(onActiveOutputsChanged, null, {
+          getUserMedia,
+          mediaDevices,
+          setSinkId: undefined,
+        });
+        await new Promise(resolve => setTimeout(resolve));
+      });
+
+      it('should not trigger onActiveOutputsChanged when an output device is lost', async () => {
+        assert.equal(audio.isOutputSelectionSupported, false);
+        availableDevices.splice(1, 1);
+        handlers.get('devicechange')();
+        await new Promise(resolve => setTimeout(resolve));
+        assert.equal(onActiveOutputsChanged.callCount, 0);
+      });
+    });
+
     describe('_destroyRemoteProcessedStream', () => {
       it('should destroy and stop remote processed tracks', async () => {
         remoteProcessedStreamStopStub = sinon.stub();

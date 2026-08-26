@@ -33,6 +33,30 @@ describe('OutputDeviceCollection', () => {
         throw new Error('Promise was unexpectedly fulfilled');
       }, () => { }));
     });
+
+    describe('#delete', () => {
+      it('should remove the device from the active set', () => {
+        const fakeDevice = { deviceId: 'foo' };
+        collection._activeDevices.add(fakeDevice);
+        assert.equal(collection.delete(fakeDevice), true);
+        assert.equal(collection.get().size, 0);
+      });
+
+      it('should not add the default device', () => {
+        const deviceDefault = { deviceId: 'default', kind: 'audiooutput' };
+        collection = new OutputDeviceCollection('foo',
+          new Map([['default', deviceDefault]]), () => { }, false);
+        collection.delete({ deviceId: 'foo' });
+        assert.equal(collection.get().size, 0);
+      });
+
+      it('should not trigger _beforeChange', () => {
+        const onChange = sinon.spy();
+        collection = new OutputDeviceCollection('foo', new Map(), onChange, false);
+        collection.delete({ deviceId: 'foo' });
+        assert.equal(onChange.callCount, 0);
+      });
+    });
   });
 
   context('when supported', () => {
@@ -175,6 +199,27 @@ describe('OutputDeviceCollection', () => {
           collection.delete(fakeDevice1);
           assert.equal(collection.get().size, 1);
           assert(collection.get().has(fakeDevice2));
+        });
+      });
+
+      context('when _beforeChange fails', () => {
+        beforeEach(() => {
+          collection._log = { debug: sinon.stub(), warn: sinon.stub() };
+        });
+
+        it('should log a warning when it rejects', async () => {
+          collection._beforeChange = () => Promise.reject(new Error('expected'));
+          collection._activeDevices.add(deviceFoo);
+          collection.delete(deviceFoo);
+          await new Promise(resolve => setTimeout(resolve));
+          assert.equal(collection._log.warn.callCount, 1);
+          assert(/expected/.test(collection._log.warn.args[0][0]));
+        });
+
+        it('should not throw when it throws synchronously', () => {
+          collection._beforeChange = () => { throw new Error('expected'); };
+          collection._activeDevices.add(deviceFoo);
+          assert.doesNotThrow(() => collection.delete(deviceFoo));
         });
       });
     });
