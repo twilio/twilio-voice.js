@@ -13,6 +13,7 @@ function createPeerConnectionStub(): IPeerConnection {
     makeOutgoingCall: sinon.stub(),
     answerIncomingCall: sinon.stub(),
     processAnswer: sinon.stub(),
+    processOffer: sinon.stub(),
     iceRestart: sinon.stub(),
     close: sinon.stub(),
   };
@@ -51,6 +52,10 @@ function createSessionStub(initialState: string = 'Initial') {
     bye: sinon.stub().resolves(),
     cancel: sinon.stub().resolves(),
     invite: sinon.stub().resolves(),
+    sessionDescriptionHandler: {
+      requestIceRestart: sinon.stub(),
+      cancelIceRestart: sinon.stub(),
+    },
     info: sinon.stub().resolves(),
     message: sinon.stub().resolves(),
     _simulateState(state: string) {
@@ -701,13 +706,68 @@ describe('SipSignalingAdapter', () => {
   describe('iceRestart()', () => {
     const mediaHandlerStub = () => ({ iceRestart: sinon.stub() });
 
-    it('passes offerOptions.iceRestart:true to session.invite', () => {
+    it('arms the session description handler for an ICE restart', () => {
       const { adapter, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
       inviterStub.state = 'Established';
       adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+      sinon.assert.calledOnce(inviterStub.sessionDescriptionHandler.requestIceRestart);
+      // Passing it as an invite option would stick on the SIP.js Session and
+      // replay onto later server-initiated re-INVITEs.
       const reinviteOpts = inviterStub.invite.lastCall.args[0];
-      assert.strictEqual(reinviteOpts?.sessionDescriptionHandlerOptions?.offerOptions?.iceRestart, true);
+      assert.strictEqual(reinviteOpts?.sessionDescriptionHandlerOptions, undefined);
+    });
+
+    it('disarms the SDH when the invite is skipped as RequestPending', async () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      inviterStub.invite = sinon.stub().rejects(new RequestPendingError('pending'));
+
+      adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      sinon.assert.calledOnce(inviterStub.sessionDescriptionHandler.requestIceRestart);
+      sinon.assert.calledOnce(inviterStub.sessionDescriptionHandler.cancelIceRestart);
+    });
+
+    it('hangs up when the session fell back to the unbound SDH', () => {
+      // createUnboundSdh() is returned when a session has no PeerConnection
+      // binding. It has no requestIceRestart, so the restart cannot proceed.
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      (inviterStub as any).sessionDescriptionHandler = {
+        getDescription: () => Promise.reject(new Error('unbound')),
+        hasDescription: () => false,
+        setDescription: () => Promise.reject(new Error('unbound')),
+        sendDtmf: () => false,
+        close: () => { /* no-op */ },
+      };
+      const hangupSpy = sinon.spy();
+      adapter.on('hangup', hangupSpy);
+
+      adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+
+      sinon.assert.calledOnceWithExactly(hangupSpy, { callsid: 'call-1' });
+      // Only the initial INVITE; no re-INVITE was sent.
+      sinon.assert.calledOnce(inviterStub.invite);
+    });
+
+    it('hangs up when the session has no usable description handler', () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      (inviterStub as any).sessionDescriptionHandler = undefined;
+      const hangupSpy = sinon.spy();
+      adapter.on('hangup', hangupSpy);
+
+      adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+
+      sinon.assert.calledOnceWithExactly(hangupSpy, { callsid: 'call-1' });
+      // Only the initial INVITE; no re-INVITE was sent.
+      sinon.assert.calledOnce(inviterStub.invite);
     });
 
     it('does NOT consult the mediaHandler (SIP SDH generates the offer itself)', () => {

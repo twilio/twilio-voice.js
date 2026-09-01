@@ -29,8 +29,7 @@ export interface HangupConfig {
 
 export interface IceRestartConfig {
   // Used by the PStream adapter to generate the fresh-ICE offer; the
-  // SIP adapter ignores it because SIP.js asks the SDH to produce the
-  // offer via session.invite() + offerOptions.iceRestart.
+  // SIP adapter ignores it because its SDH produces the offer itself.
   mediaHandler: IMediaHandler;
 }
 
@@ -74,8 +73,8 @@ export interface SignalingAdapter extends EventEmitter {
    * its own offer-generation strategy:
    *  - PStream: asks config.mediaHandler to generate the offer, then
    *    ships it via the existing reinvite wire.
-   *  - SIP: calls session.invite() with offerOptions.iceRestart so SIP.js
-   *    asks the SDH to produce the offer itself.
+   *  - SIP: arms the SDH via requestIceRestart(), then sends a re-INVITE;
+   *    the SDH produces the offer when SIP.js asks it for one.
    * On failure, emits 'hangup' for the callSid so Call can clean up its
    * reinvite listeners.
    */
