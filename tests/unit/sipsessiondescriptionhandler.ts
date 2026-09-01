@@ -405,6 +405,25 @@ describe('SipSessionDescriptionHandler', () => {
       await assert.rejects(pending, /Error processing offer: boom/);
     });
 
+    it('cancelIceRestart() disarms the request', async () => {
+      const pc = createPeerConnectionStub({
+        makeOutgoingCall: stubMakeOutgoingCall(),
+        processAnswer: stubProcessAnswer(),
+        iceRestart: sinon.stub().callsFake(
+          (cb: (sdp: string) => void) => cb(REOFFER_SDP),
+        ) as sinon.SinonStub,
+      });
+      const { handler } = createHandler(pc);
+      await handler.getDescription();
+      await handler.setDescription(ANSWER_SDP);
+
+      handler.requestIceRestart();
+      handler.cancelIceRestart();
+
+      await assert.rejects(handler.getDescription(), /Offerless re-INVITE is not supported/);
+      sinon.assert.notCalled(pc.iceRestart);
+    });
+
     it('rejects an offerless re-INVITE that follows an ICE restart', async () => {
       // SIP.js persists session.invite()'s sessionDescriptionHandlerOptions into
       // sessionDescriptionHandlerOptionsReInvite and replays it on every later

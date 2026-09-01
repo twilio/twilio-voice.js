@@ -505,7 +505,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     // Arm the SDH directly. Invite options stick to the dialog and replay
     // onto later server-initiated re-INVITEs.
     const sdh = session.sessionDescriptionHandler as
-      Partial<SipSessionDescriptionHandler> | undefined;
+      SipSessionDescriptionHandler | undefined;
     if (typeof sdh?.requestIceRestart !== 'function') {
       this._log.warn('iceRestart: no usable description handler for callSid', callSid);
       this.emit('hangup', { callsid: callSid });
@@ -549,6 +549,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       // the in-flight re-INVITE has a chance to succeed or surface the real
       // failure (timeout, reject, etc.).
       if (error instanceof RequestPendingError) {
+        sdh.cancelIceRestart();
         this._log.info('iceRestart skipped: previous re-INVITE still pending');
         return;
       }

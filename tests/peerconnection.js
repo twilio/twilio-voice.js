@@ -745,12 +745,16 @@ describe('PeerConnection', () => {
       sinon.assert.notCalled(context._initializeMediaStream);
     });
 
-    it('Should not call processSDP when status is closed', () => {
+    it('Should call onerror and not processSDP when status is closed', () => {
       context.status = 'closed';
       toTest = METHOD.bind(context, SDP, onAnswerReady, onMediaStarted);
       toTest();
       assert.equal(version.processSDP.called, false);
       assert.equal(context._answerSdp, null);
+      assert(context.onerror.calledWithMatch({info: {
+        code: 31000,
+        message: 'Error processing offer: Connection is closed',
+      }}));
     });
 
     it('Should call _maybeSetIceAggressiveNomination with the sdp and set _answerSdp', () => {
@@ -782,7 +786,7 @@ describe('PeerConnection', () => {
       sinon.assert.calledWithExactly(context._setEncodingParameters, true);
     });
 
-    it('Should not call back when the connection closes while createAnswer is in flight', () => {
+    it('Should call onerror when the connection closes while createAnswer is in flight', () => {
       toTest();
       // close() lands after processSDP was called but before it succeeds.
       context.status = 'closed';
@@ -791,6 +795,10 @@ describe('PeerConnection', () => {
       sinon.assert.notCalled(version.getSDP);
       sinon.assert.notCalled(onAnswerReady);
       sinon.assert.notCalled(onMediaStarted);
+      assert(context.onerror.calledWithMatch({info: {
+        code: 31000,
+        message: 'Error processing offer: Connection closed while creating the answer',
+      }}));
     });
 
     it('Should call onerror when processSDP calls error callback with Error object', () => {

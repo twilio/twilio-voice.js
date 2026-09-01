@@ -153,6 +153,10 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
     this._iceRestartRequested = true;
   }
 
+  cancelIceRestart(): void {
+    this._iceRestartRequested = false;
+  }
+
   getDescription(): Promise<BodyAndContentType> {
     if (this._closed) {
       return Promise.reject(new Error(CLOSED_ERROR_MESSAGE));

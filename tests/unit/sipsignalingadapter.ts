@@ -52,7 +52,10 @@ function createSessionStub(initialState: string = 'Initial') {
     bye: sinon.stub().resolves(),
     cancel: sinon.stub().resolves(),
     invite: sinon.stub().resolves(),
-    sessionDescriptionHandler: { requestIceRestart: sinon.stub() },
+    sessionDescriptionHandler: {
+      requestIceRestart: sinon.stub(),
+      cancelIceRestart: sinon.stub(),
+    },
     info: sinon.stub().resolves(),
     message: sinon.stub().resolves(),
     _simulateState(state: string) {
@@ -713,6 +716,20 @@ describe('SipSignalingAdapter', () => {
       // replay onto later server-initiated re-INVITEs.
       const reinviteOpts = inviterStub.invite.lastCall.args[0];
       assert.strictEqual(reinviteOpts?.sessionDescriptionHandlerOptions, undefined);
+    });
+
+    it('disarms the SDH when the invite is skipped as RequestPending', async () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      inviterStub.invite = sinon.stub().rejects(new RequestPendingError('pending'));
+
+      adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      sinon.assert.calledOnce(inviterStub.sessionDescriptionHandler.requestIceRestart);
+      sinon.assert.calledOnce(inviterStub.sessionDescriptionHandler.cancelIceRestart);
     });
 
     it('hangs up when the session fell back to the unbound SDH', () => {
