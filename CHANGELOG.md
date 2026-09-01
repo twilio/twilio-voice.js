@@ -1,5 +1,15 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.18.5 (Work in progress)
+=========================
+
+Bug Fixes
+---------
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/458) where losing an audio output device during a call caused an unhandled promise rejection. On browsers without audio output selection, such as Chrome on Android, `OutputDeviceCollection.delete()` attempted a sink change that can never apply there, raising `NotSupportedError` without affecting call audio; it no longer attempts one. On browsers that do support selection, a failed switch to the fallback device is now logged as a warning. Thanks @ifabijanovic for reporting this.
+
+  Note: on browsers without audio output selection, `device.audio.speakerDevices.get()` and `ringtoneDevices.get()` now stay empty after a device is lost instead of reporting `default`.
+
 2.18.4 (August 31, 2026)
 ========================
 

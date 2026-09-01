@@ -28,13 +28,19 @@ export default class OutputDeviceCollection {
   /**
    * Delete a device from the collection. If no devices remain, the 'default'
    * device will be added as the sole device. If no `default` device exists,
-   * the first available device will be used.
+   * the first available device will be used. On browsers without output
+   * selection, the collection is left empty.
    * @param device - The device to delete from the collection
    * @returns whether the device was present before it was deleted
    */
   delete(device: MediaDeviceInfo): boolean {
     this._log.debug('.delete', device);
     const wasDeleted: boolean = !!(this._activeDevices.delete(device));
+
+    // Without sink support _beforeChange rejects, and nothing can catch it.
+    if (!this._isSupported) {
+      return wasDeleted;
+    }
 
     const defaultDevice: MediaDeviceInfo = this._availableDevices.get('default')
       || Array.from(this._availableDevices.values())[0];
@@ -47,8 +53,15 @@ export default class OutputDeviceCollection {
     // removed or lost.
     const deviceIds = Array.from(this._activeDevices.values()).map(deviceInfo => deviceInfo.deviceId);
 
-    this._beforeChange(this._name, deviceIds);
-    return !!wasDeleted;
+    // Nothing can await a synchronous method. The wrapper also tolerates a
+    // _beforeChange that returns a non-promise or throws.
+    new Promise(resolve => {
+      resolve(this._beforeChange(this._name, deviceIds));
+    }).catch(reason => {
+      this._log.warn(`Unable to update audio output devices. ${reason}`);
+    });
+
+    return wasDeleted;
   }
 
   /**
