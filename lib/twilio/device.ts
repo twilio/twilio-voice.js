@@ -1260,9 +1260,14 @@ class Device extends EventEmitter {
     }
 
     // The signaling stream emits a `connected` event after reconnection, if the
-    // device was registered before this, then register again.
-    if (this._shouldReRegister) {
-      this.register();
+    // device was registered before this, then register again. `register()`
+    // rejects unless the device is `unregistered`, and nothing awaits the
+    // promise here, so guard the state and log a failure rather than letting it
+    // surface as an unhandled rejection the application cannot intercept.
+    if (this._shouldReRegister && this.state === Device.State.Unregistered) {
+      this.register().catch((error: any) => {
+        this._log.warn('Failed to re-register after the stream reconnected', error);
+      });
     }
   }
 
