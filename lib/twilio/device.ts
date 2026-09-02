@@ -1262,7 +1262,9 @@ class Device extends EventEmitter {
     // The signaling stream emits a `connected` event after reconnection, if the
     // device was registered before this, then register again.
     if (this._shouldReRegister) {
-      this.register();
+      this.register().catch((error: any) => {
+        this._log.warn('Failed to re-register after signaling reconnect', error);
+      });
     }
   }
 
