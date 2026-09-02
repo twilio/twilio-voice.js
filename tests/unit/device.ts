@@ -819,7 +819,7 @@ describe('Device', function() {
           // Never send `ready`, so the device is still registering when the
           // stream drops.
           const registerPromise = device.register();
-          const didReject = registerPromise.then(() => false, () => true);
+          const didReject = registerPromise.then(() => false).catch(() => true);
           await clock.tickAsync(0);
           assert.equal(device.state, Device.State.Registering);
 
