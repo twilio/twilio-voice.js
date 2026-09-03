@@ -379,6 +379,25 @@ describe('PStream', () => {
         assert.equal(pstream._messageQueue.length, 0);
       });
     });
+
+    context('when a register fails to send', () => {
+      beforeEach(() => {
+        pstream.transport.send = sinon.spy(() => false);
+      });
+
+      it('should not queue the register', () => {
+        pstream.register({ audio: true });
+        assert.equal(pstream._messageQueue.length, 0);
+      });
+
+      it('should only send a listen when the transport reopens', () => {
+        pstream.register({ audio: true });
+        pstream.transport.send = sinon.spy(() => true);
+        pstream.transport.emit('open');
+        assert.equal(pstream.transport.send.callCount, 1);
+        assert.equal(JSON.parse(pstream.transport.send.args[0][0]).type, 'listen');
+      });
+    });
   });
 
   [
@@ -455,7 +474,7 @@ describe('PStream', () => {
     ]],
   ].forEach(([method, type, scenarios]) => {
     describe(method, () => {
-      const shouldRetry = method !== 'reinvite';
+      const shouldRetry = !['register', 'reinvite'].includes(method);
       scenarios.forEach(({ args, payload, scenario }) => {
         context(scenario, () => {
           it('should return undefined', () => {

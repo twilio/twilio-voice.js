@@ -214,7 +214,9 @@ PStream.prototype.sendMessage = function(
 
 PStream.prototype.register = function(mediaCapabilities) {
   const regPayload = { media: mediaCapabilities };
-  this._publish('register', regPayload, true);
+  // A queued register is replayed alongside `listen`, before the server
+  // validates the token, and earns a 31204. Re-register on `connected` covers it.
+  this._publish('register', regPayload, false);
 };
 
 PStream.prototype.invite = function(sdp, callsid, params) {

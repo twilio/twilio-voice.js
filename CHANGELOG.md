@@ -10,6 +10,8 @@ Bug Fixes
 
   Note: on browsers without audio output selection, `device.audio.speakerDevices.get()` and `ringtoneDevices.get()` now stay empty after a device is lost instead of reporting `default`.
 
+- Fixed an issue where the SDK emitted a false `AccessTokenInvalid (20101)` error on a still valid access token after the signaling WebSocket dropped. Registration messages that failed to send while the connection was down were queued and replayed immediately after reconnecting, before the server had validated the token, and the server rejected them with error `31204`. Registration messages are no longer queued, and a re-registration that fails because the connection dropped again is now logged as a warning instead of surfacing as an unhandled promise rejection. The `Device` already re-registers once the signaling connection is re-established, so registration recovery is unchanged.
+
 2.18.4 (August 31, 2026)
 ========================
 

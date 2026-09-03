@@ -815,6 +815,43 @@ describe('Device', function() {
           sinon.assert.calledOnce(spy);
         });
 
+        it('should attempt a re-register if the stream dropped while registering', async () => {
+          // Never send `ready`, so the device is still registering when the
+          // stream drops.
+          const registerPromise = device.register();
+          const didReject = registerPromise.then(() => false).catch(() => true);
+          await clock.tickAsync(0);
+          assert.equal(device.state, Device.State.Registering);
+
+          pstream.register.resetHistory();
+          pstream.emit('offline');
+          await clock.tickAsync(0);
+          assert.equal(await didReject, true);
+          assert.equal(device.state, Device.State.Unregistered);
+
+          pstream.emit('connected', { region: 'EU_IRELAND' });
+          await clock.tickAsync(0);
+
+          sinon.assert.calledOnce(pstream.register);
+        });
+
+        it('should not reject when the stream goes offline before the re-register completes', async () => {
+          await registerDevice();
+
+          const warnStub = device['_log'].warn = sinon.stub();
+          pstream.emit('offline');
+          await clock.tickAsync(0);
+          pstream.emit('connected', { region: 'EU_IRELAND' });
+          await clock.tickAsync(0);
+
+          // A second drop before the server `ready` rejects the re-register.
+          pstream.emit('offline');
+          await clock.tickAsync(0);
+
+          sinon.assert.calledOnce(warnStub);
+          assert.equal(device.state, Device.State.Unregistered);
+        });
+
         it('should update the preferred uri', () => {
           pstream.emit('connected', { region: 'EU_IRELAND', edge: Edge.Dublin });
           assert.equal(device['_preferredURI'], ['wss://voice-js.dublin.twilio.com/signal']);
