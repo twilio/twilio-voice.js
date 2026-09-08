@@ -1385,6 +1385,9 @@ class Device extends EventEmitter {
     this._edge = null;
     this._region = null;
 
+    // A tick landing before the server validates the token earns a 31204.
+    this._stopRegistrationTimer();
+
     this._shouldReRegister = this.state !== Device.State.Unregistered;
 
     this._setState(Device.State.Unregistered);
