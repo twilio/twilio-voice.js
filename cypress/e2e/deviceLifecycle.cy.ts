@@ -163,6 +163,42 @@ describe('Device Lifecycle', function() {
       assert.strictEqual(device.state, Device.State.Registered);
     });
 
+    it('should not register while the signaling stream is offline', async function() {
+      // One registration interval plus reconnect time.
+      this.timeout(120000);
+
+      const identity = 'id-' + Date.now();
+      const token = await generateAccessToken(identity);
+      device = new Device(token);
+
+      const errorCodes: number[] = [];
+      device.on(Device.EventName.Error, (error: any) => errorCodes.push(error.code));
+      await device.register();
+
+      const transport = (device as any)._stream.transport;
+      const connect = transport._connect;
+
+      // Drop the socket and block reconnects so the outage outlasts the 30s
+      // registration interval.
+      const unregisteredPromise = expectEvent(Device.EventName.Unregistered, device);
+      transport._connect = () => { /* no-op */ };
+      transport._socket.close();
+      await unregisteredPromise;
+
+      // Presence is the only thing publishing on an idle device, so a 31009
+      // here means a registration went out over the closed transport.
+      errorCodes.length = 0;
+      await new Promise(resolve => setTimeout(resolve, 35000));
+      assert.ok(!errorCodes.includes(31009), `registered while offline: ${errorCodes}`);
+
+      const registeredPromise = expectEvent(Device.EventName.Registered, device);
+      transport._connect = connect;
+      transport.open();
+      await registeredPromise;
+
+      assert.ok(!errorCodes.includes(20101), `false AccessTokenInvalid: ${errorCodes}`);
+    });
+
     it('should throw when passing a non-string token', async () => {
       const identity = 'id-' + Date.now();
       const token = await generateAccessToken(identity);
