@@ -835,6 +835,39 @@ describe('Device', function() {
           sinon.assert.calledOnce(pstream.register);
         });
 
+        it('should stop the registration timer when the stream goes offline', async () => {
+          await registerDevice();
+
+          pstream.register.resetHistory();
+          pstream.emit('offline');
+          await clock.tickAsync(0);
+
+          // The timer would otherwise fire mid-outage, or in the window after
+          // the socket reopens but before the server validates the token.
+          await clock.tickAsync(90000);
+          sinon.assert.notCalled(pstream.register);
+
+          pstream.emit('connected', { region: 'ie1' });
+          await clock.tickAsync(0);
+
+          sinon.assert.calledOnce(pstream.register);
+        });
+
+        it('should resume the registration cadence after reconnecting', async () => {
+          await registerDevice();
+
+          pstream.emit('offline');
+          await clock.tickAsync(0);
+          pstream.emit('connected', { region: 'ie1' });
+          await clock.tickAsync(0);
+          pstream.emit('ready');
+          await clock.tickAsync(0);
+
+          pstream.register.resetHistory();
+          await clock.tickAsync(30000 + 1);
+          sinon.assert.calledOnce(pstream.register);
+        });
+
         it('should not reject when the stream goes offline before the re-register completes', async () => {
           await registerDevice();
 
