@@ -122,6 +122,7 @@
     "tslib": "2.8.1"
   },
   "overrides": {
+    "proxy-addr": "2.0.8",
     "tough-cookie": "4.1.4"
   }
 }
