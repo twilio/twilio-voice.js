@@ -2,6 +2,10 @@
 
 'use strict';
 
+// Started as its own process, so it loads .env itself rather than inheriting
+// what cypress.config.ts loaded.
+require('dotenv').config();
+
 const ngrok = require('@ngrok/ngrok');
 const axios = require('axios').default;
 const express = require('express');
