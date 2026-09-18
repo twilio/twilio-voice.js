@@ -1,8 +1,6 @@
 'use strict';
-const env = require('../../env.js');
 const fetchRequest = require('./fetchRequest');
 const isDocker = require('is-docker')();
-const Twilio = require('twilio');
 
 const DEFAULT_SERVER_PORT = 3032;
 const version = 1.00;
@@ -63,8 +61,6 @@ class DockerProxyServer {
       { endpoint: '/connectToDefaultNetwork', handleRequest: '_connectToDefaultNetwork' },
       { endpoint: '/getAllNetworks', handleRequest: '_getAllNetworks' },
       { endpoint: '/getCurrentNetworks', handleRequest: '_getCurrentNetworks' },
-      { endpoint: '/getCapabilityToken', handleRequest: '_getCapabilityToken' },
-      { endpoint: '/getInvalidCapabilityToken', handleRequest: '_getInvalidCapabilityToken' },
     ].forEach((route) => {
       app.get(route.endpoint, async (req, res, next) => {
         try {
@@ -125,14 +121,33 @@ class DockerProxyServer {
 
   async _getCurrentContainerId() {
     if (!this._containerId) {
-      const cmd = 'cat /proc/self/cgroup | grep "pids:/" | sed \'s/\\([0-9]*\\):pids:\\/docker\\///g\'';
-      const output = await this._runCommand(cmd);
-      const containerId = output.replace('\n', '');
-      this._containerId = containerId;
-      return { containerId };
-    }
-    return Promise.resolve({ containerId: this._containerId });
+      // Under cgroup v2 /proc/self/cgroup is just "0::/", so read the id from
+      // the mounts docker sets up instead, and fall back to cgroup v1. Match
+      // the /containers/ path rather than any 64 hex run, which also matches
+      // the overlay2 layer hashes that share the file.
+      const { readFileSync } = require('fs');
+      const os = require('os');
+      const match = (file, pattern) => {
+        try {
+          const found = readFileSync(file, 'utf8').match(pattern);
+          return found && found[1];
+        } catch (err) {
+          return null;
+        }
+      };
+      // docker names the container after its own short id unless told otherwise.
+      const hostname = os.hostname();
+      const containerId = match('/proc/self/mountinfo', /\/containers\/([0-9a-f]{64})/) ||
+        match('/proc/self/cgroup', /\b([0-9a-f]{64})\b/) ||
+        (/^[0-9a-f]{12}$/.test(hostname) ? hostname : null);
 
+      if (!containerId) {
+        throw new Error('Unable to determine the current container id. Is this running inside docker?');
+      }
+
+      this._containerId = containerId;
+    }
+    return { containerId: this._containerId };
   }
 
   async _getActiveInterface() {
@@ -180,6 +195,12 @@ class DockerProxyServer {
   // returns Promise<[{ Name, Id }]>
   async _getCurrentNetworks() {
     const currentContainer = await this._inspectCurrentContainer();
+
+    if (!currentContainer || !currentContainer.NetworkSettings) {
+      const { containerId } = await this._getCurrentContainerId();
+      throw new Error(`Docker could not inspect container ${containerId}.`);
+    }
+
     const networkNames = Object.keys(currentContainer.NetworkSettings.Networks);
     return networkNames.map((networkName) => {
       return {
@@ -187,31 +208,6 @@ class DockerProxyServer {
         Id: currentContainer.NetworkSettings.Networks[networkName].NetworkID
       };
     });
-  }
-
-  async _generateCapabilityToken(shouldInvalidate) {
-    const outgoingScope = new Twilio.jwt.ClientCapability.OutgoingClientScope({
-      applicationSid: env.appSid
-    });
-
-    // For generating a token with an invalid account sid for testing
-    const accountSid = shouldInvalidate ? 'foo' : env.accountSid;
-
-    const token = new Twilio.jwt.ClientCapability({
-      accountSid,
-      authToken: env.authToken,
-    });
-
-    token.addScope(outgoingScope);
-    return { token: token.toJwt() };
-  }
-
-  async _getCapabilityToken() {
-    return this._generateCapabilityToken();
-  }
-
-  async _getInvalidCapabilityToken() {
-    return this._generateCapabilityToken(true);
   }
 
   async _disconnectFromAllNetworks() {

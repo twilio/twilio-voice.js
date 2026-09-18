@@ -134,6 +134,12 @@ npm run test:integration:chrome
 npm run test:integration:firefox
 ```
 
+6. The reconnection suite in `cypress/network/` exercises signaling and media recovery under real network loss, so it runs in a docker container that the test itself disconnects from the network. It needs a running docker daemon and is not part of `test:integration`:
+
+```
+BROWSER=chrome BVER=stable docker compose -f tests/docker/docker-compose.yml run --rm networkTests
+```
+
 Content Security Policy (CSP)
 ----------------------------
 

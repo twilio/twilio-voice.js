@@ -1,8 +1,8 @@
+import * as assert from 'assert';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
-import { generateAccessToken } from '../lib/token';
-import { expectEvent, isFirefox, runDockerCommand, waitFor } from '../lib/util';
-import * as assert from 'assert';
+import { generateAccessToken } from '../../tests/lib/token';
+import { expectEvent, isFirefox, runDockerCommand, waitFor } from '../../tests/lib/util';
 
 type CB = any;
 
@@ -47,8 +47,8 @@ describe('Reconnection', function() {
   ) => {
     identity1 = 'id1-' + Date.now();
     identity2 = 'id2-' + Date.now();
-    token1 = generateAccessToken(identity1);
-    token2 = generateAccessToken(identity2);
+    token1 = await generateAccessToken(identity1);
+    token2 = await generateAccessToken(identity2);
     device1 = new Device(token1, device1Options);
     device2 = new Device(token2, device2Options);
 
