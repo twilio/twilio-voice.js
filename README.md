@@ -108,7 +108,7 @@ Integration tests require some set up:
 </Response>
 ```
 
-2. Create a second TwiML App with the friendly name `STIR/SHAKEN`, using the TwiML code below. Be sure to use your Twilio number for the `Dial` verb. 
+2. Optionally create a second TwiML App with the friendly name `STIR/SHAKEN`, using the TwiML code below. Be sure to use your Twilio number for the `Dial` verb. Only `cypress/e2e/stirshaken.cy.ts` needs this app; set both `APPLICATION_SID_STIR` and `CALLER_ID` for it. Without them, that one spec fails and the rest still run.
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -117,9 +117,11 @@ Integration tests require some set up:
 </Response>
 ```
 
-3. Make a copy of the `example.env` file with the name `.env` and populate the file with your credentials.
+3. Make a copy of the `example.env` file with the name `.env` and populate the file with your credentials. At minimum, set `ACCOUNT_SID`, `API_KEY_SID`, `API_KEY_SECRET` and `APPLICATION_SID`. Access tokens are then minted inside the Cypress Node process, so your credentials never reach the browser.
 
-4. Start the relay server
+   Twilio-internal runs and CI instead set `VENDOR_URL` to a credential vending Function, plus `VENDOR_TOKEN` when running outside of GitHub Actions. If `VENDOR_URL` is set, it takes precedence over the credentials in `.env`.
+
+4. Optionally start the relay server, which only `cypress/e2e/callMessage/userDefinedMessage.cy.ts` uses. That spec skips itself when the server is unreachable. The relay server reads the same `.env` file, and additionally needs `NGROK_AUTHTOKEN` to open its tunnel.
 
 ```
 npm run test:relay-server

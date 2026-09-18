@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const http = require('http');
+const Twilio = require('twilio');
 
 // GitHub Actions OIDC tokens are valid for ~5 minutes; a 4-min ceiling leaves a
 // 1-min margin so a long-running spec file never signs with a stale token.
@@ -15,6 +16,9 @@ const TOKEN_MAX_AGE_MS = 4 * 60 * 1000;
  * Tests POST to /vend with the vending request body and the per-run secret in
  * the X-Vendor-Proxy-Secret header. The status code and body of the vending
  * response are returned as-is.
+ *
+ * With VENDOR_URL unset, the token is minted here from the credentials in .env
+ * instead, so contributors without access to the Function can run the suite.
 */
 class VendorProxy {
   constructor() {
@@ -82,7 +86,7 @@ class VendorProxy {
 
     try {
       const body = await readBody(req);
-      const { status, text } = await this._forward(body);
+      const { status, text } = await this._vend(body);
       res.writeHead(status, { 'Content-Type': 'application/json' });
       res.end(text);
     } catch (error) {
@@ -92,6 +96,14 @@ class VendorProxy {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'internal error' }));
     }
+  }
+
+  // VENDOR_URL set -> vend remotely (CI and internal runs). Otherwise mint
+  // locally from .env so contributors without vendor access can run the suite.
+  _vend(body) {
+    return process.env.VENDOR_URL
+      ? this._forward(body)
+      : Promise.resolve(vendLocally(body));
   }
 
   async _forward(body) {
@@ -133,6 +145,75 @@ class VendorProxy {
     });
     return this._cachedTokenPromise;
   }
+}
+
+/**
+ * Mint the voice access token the vending Function would have returned, using
+ * the credentials in .env. Runs in the Cypress Node process, so a contributor's
+ * keys never reach the browser.
+ *
+ * Configuration problems are returned as a status and body rather than thrown,
+ * so the message survives _handleRequest's generic 500 and reaches the spec.
+ * @param {string} body the raw /vend request body
+ * @returns {{ status: number, text: string }}
+ */
+function vendLocally(body) {
+  let request;
+  try {
+    request = JSON.parse(body);
+  } catch (e) {
+    return errorResponse(400, 'vendorProxy: request body is not JSON');
+  }
+
+  if (request.action !== 'mint-voice-token') {
+    return errorResponse(400, `vendorProxy: action "${request.action}" is not ` +
+      'supported by local minting; set VENDOR_URL to use the credential vending Function');
+  }
+
+  if (request.variant !== undefined && request.variant !== 'stir') {
+    return errorResponse(400, `vendorProxy: unknown variant "${request.variant}"`);
+  }
+
+  // APPLICATION_SID_STIR is only checked when asked for, so a contributor
+  // without the STIR/SHAKEN TwiML app can still run every other spec.
+  const required = ['ACCOUNT_SID', 'API_KEY_SID', 'API_KEY_SECRET', 'APPLICATION_SID'];
+  if (request.variant === 'stir') {
+    required.push('APPLICATION_SID_STIR', 'CALLER_ID');
+  }
+
+  const missing = required.filter(name => !process.env[name]);
+  if (missing.length) {
+    return errorResponse(500, 'vendorProxy: cannot mint a voice token locally; set ' +
+      `${missing.join(', ')} in .env, or set VENDOR_URL to vend credentials remotely`);
+  }
+
+  const { identity, ttl, outgoingApplicationSid, variant } = request;
+  const applicationSid = outgoingApplicationSid ||
+    (variant === 'stir' ? process.env.APPLICATION_SID_STIR : process.env.APPLICATION_SID);
+
+  const token = new Twilio.jwt.AccessToken(
+    process.env.ACCOUNT_SID,
+    process.env.API_KEY_SID,
+    process.env.API_KEY_SECRET,
+    { identity, ttl: ttl || 300 },
+  );
+
+  // Specs place calls between two devices, so both ends need incoming allowed.
+  // The STIR/SHAKEN app's TwiML reads {{CallerId}}, and the spec connects
+  // without params, so the number has to ride along on the grant.
+  token.addGrant(new Twilio.jwt.AccessToken.VoiceGrant({
+    outgoingApplicationSid: applicationSid,
+    outgoingApplicationParams: variant === 'stir'
+      ? { CallerId: process.env.CALLER_ID }
+      : undefined,
+    incomingAllow: !!identity,
+  }));
+
+  return { status: 200, text: JSON.stringify({ token: token.toJwt() }) };
+}
+
+function errorResponse(status, message) {
+  return { status, text: JSON.stringify({ error: message }) };
 }
 
 /**

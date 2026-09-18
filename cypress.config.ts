@@ -1,10 +1,11 @@
+// Loads the credentials README.md tells contributors to put in .env. Existing
+// process.env values win, so CI is unaffected.
+require('dotenv').config();
+
 const { defineConfig } = require('cypress');
 const VendorProxy = require('./tests/lib/vendorProxy');
 
 module.exports = defineConfig({
-  env: {
-    AUTH_TOKEN: process.env.AUTH_TOKEN,
-  },
   e2e: {
     defaultCommandTimeout: 10000,
     // Retry failing tests in CI only; fail fast when debugging locally.

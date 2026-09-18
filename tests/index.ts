@@ -107,6 +107,7 @@ require('./sound');
 require('./sdp');
 
 require('./unit/check-version-bump');
+require('./unit/vendorProxy');
 require('./unit/audioplayer');
 require('./unit/audioprocessoreventobserver');
 require('./unit/asyncQueue');
