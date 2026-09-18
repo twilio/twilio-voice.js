@@ -122,17 +122,24 @@ class DockerProxyServer {
   async _getCurrentContainerId() {
     if (!this._containerId) {
       // Under cgroup v2 /proc/self/cgroup is just "0::/", so read the id from
-      // the bind mounts docker sets up instead, and fall back to cgroup v1.
+      // the mounts docker sets up instead, and fall back to cgroup v1. Match
+      // the /containers/ path rather than any 64 hex run, which also matches
+      // the overlay2 layer hashes that share the file.
       const { readFileSync } = require('fs');
-      const readId = (file) => {
+      const os = require('os');
+      const match = (file, pattern) => {
         try {
-          const match = readFileSync(file, 'utf8').match(/[0-9a-f]{64}/);
-          return match && match[0];
+          const found = readFileSync(file, 'utf8').match(pattern);
+          return found && found[1];
         } catch (err) {
           return null;
         }
       };
-      const containerId = readId('/proc/self/mountinfo') || readId('/proc/self/cgroup');
+      // docker names the container after its own short id unless told otherwise.
+      const hostname = os.hostname();
+      const containerId = match('/proc/self/mountinfo', /\/containers\/([0-9a-f]{64})/) ||
+        match('/proc/self/cgroup', /\b([0-9a-f]{64})\b/) ||
+        (/^[0-9a-f]{12}$/.test(hostname) ? hostname : null);
 
       if (!containerId) {
         throw new Error('Unable to determine the current container id. Is this running inside docker?');
@@ -188,6 +195,12 @@ class DockerProxyServer {
   // returns Promise<[{ Name, Id }]>
   async _getCurrentNetworks() {
     const currentContainer = await this._inspectCurrentContainer();
+
+    if (!currentContainer || !currentContainer.NetworkSettings) {
+      const { containerId } = await this._getCurrentContainerId();
+      throw new Error(`Docker could not inspect container ${containerId}.`);
+    }
+
     const networkNames = Object.keys(currentContainer.NetworkSettings.Networks);
     return networkNames.map((networkName) => {
       return {
