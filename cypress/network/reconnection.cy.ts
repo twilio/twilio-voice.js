@@ -133,7 +133,7 @@ describe('Reconnection', function() {
       assert.equal(device2.edge, 'ashburn');
     });
 
-    it.skip('should reconnect to a fallback edge after 8 seconds', async () => {
+    it('should reconnect to a fallback edge after 8 seconds', async () => {
       await setupDevices({
         edge: ['ashburn', 'sydney', 'sydney', 'sydney', 'sydney', 'sydney'],
         // default; maxCallSignalingTimeoutMs: 0,
