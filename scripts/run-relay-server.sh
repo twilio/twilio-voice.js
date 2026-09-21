@@ -1,3 +1,0 @@
-#!/bin/bash
-
-npm run test:relay-server && echo "Relay server shut down gracefully"
