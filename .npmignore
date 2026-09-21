@@ -13,6 +13,7 @@ config.yaml
 coverage
 cypress
 cypress.config.ts
+cypress.network.config.ts
 docs
 example.env
 extension
