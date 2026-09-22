@@ -1,5 +1,13 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+Unreleased
+==========
+
+Bug Fixes
+---------
+
+- Fixed an input device change during call acceptance throwing a TypeError before the peer connection is initialized. The replacement input stream is now retained for connection setup. Addresses the startup race described in [#459](https://github.com/twilio/twilio-voice.js/issues/459).
+
 2.18.5 (September 10, 2026)
 ===========================
 
