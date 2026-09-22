@@ -142,7 +142,7 @@ function createChunderEdgeURI(edge: string): string {
  * String template for a region insights URI
  * @param region - The region.
  */
-export function createEventGatewayURI(region: string): string {
+export function createEventGatewayURI(region?: string): string {
   return region
     ? `eventgw.${region}.twilio.com`
     : defaultEventGatewayURI;

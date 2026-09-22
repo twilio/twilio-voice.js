@@ -697,6 +697,48 @@ describe('SipSignalingAdapter', () => {
       assert(inv.reject.calledOnce);
     });
 
+    it('should call session.bye() on an answered inbound session', () => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      uaStub._triggerInvite(inv);
+      adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer', peerConnection: createPeerConnectionStub() });
+      inv.state = 'Established';
+      adapter.hangup('CA-test-call-sid', {});
+      assert(inv.bye.calledOnce);
+    });
+
+    it('should call invitation.reject() on an answered inbound session still establishing', () => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      uaStub._triggerInvite(inv);
+      adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer', peerConnection: createPeerConnectionStub() });
+      inv.reject.resetHistory();
+      inv.state = 'Establishing';
+      adapter.hangup('CA-test-call-sid', {});
+      assert(inv.reject.calledOnce);
+    });
+
+    it('should do nothing when an outbound session is already terminating', () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Terminating';
+      adapter.hangup('call-1', {});
+      sinon.assert.notCalled(inviterStub.bye);
+      sinon.assert.notCalled(inviterStub.cancel);
+    });
+
+    it('should do nothing when an inbound session is already terminated', () => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      uaStub._triggerInvite(inv);
+      adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer', peerConnection: createPeerConnectionStub() });
+      inv.reject.resetHistory();
+      inv.state = 'Terminated';
+      adapter.hangup('CA-test-call-sid', {});
+      sinon.assert.notCalled(inv.bye);
+      sinon.assert.notCalled(inv.reject);
+    });
+
     it('should not throw for unknown callSid', () => {
       const { adapter } = createAdapter();
       assert.doesNotThrow(() => adapter.hangup('unknown', {}));
@@ -851,13 +893,48 @@ describe('SipSignalingAdapter', () => {
   });
 
   describe('dtmf()', () => {
+    let clock: sinon.SinonFakeTimers;
+
+    beforeEach(() => {
+      clock = sinon.useFakeTimers();
+    });
+
+    afterEach(() => {
+      clock.restore();
+    });
+
     it('should call session.info() for each digit', async () => {
       const { adapter, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
       inviterStub.state = 'Established';
       adapter.dtmf('call-1', { digits: '12' });
-      // Allow async sends to complete
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await clock.tickAsync(100);
+      assert.strictEqual(inviterStub.info.callCount, 2);
+    });
+
+    it('should wait between digits', async () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      adapter.dtmf('call-1', { digits: '12' });
+
+      await clock.tickAsync(0);
+      assert.strictEqual(inviterStub.info.callCount, 1);
+
+      await clock.tickAsync(39);
+      assert.strictEqual(inviterStub.info.callCount, 1);
+
+      await clock.tickAsync(1);
+      assert.strictEqual(inviterStub.info.callCount, 2);
+    });
+
+    it('should keep sending after a failed digit', async () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      inviterStub.info.onFirstCall().rejects(new Error('info failed'));
+      adapter.dtmf('call-1', { digits: '12' });
+      await clock.tickAsync(100);
       assert.strictEqual(inviterStub.info.callCount, 2);
     });
 

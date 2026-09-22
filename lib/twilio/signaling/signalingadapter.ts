@@ -80,11 +80,20 @@ export interface SignalingAdapter extends EventEmitter {
    */
   iceRestart(callSid: string, config: IceRestartConfig): void;
 
+  /**
+   * Send DTMF digits. Fire and forget on both adapters: neither emits an 'ack'
+   * for DTMF, and Call acts only on an 'ack' whose acktype is 'message'.
+   * Failures surface as logs, so callers get no delivery signal.
+   */
   dtmf(callSid: string, config: DtmfConfig): void;
   sendMessage(callSid: string, config: SendMessageConfig): void;
   register(mediaCapabilities: Record<string, any>): void;
 }
 
+/**
+ * 'presence' and 'roster' are VSP-only. PStream forwards them; the SIP adapter
+ * does not produce them, and nothing in the SDK listens for either today.
+ */
 export type SignalingAdapterEvent =
   | 'invite' | 'answer' | 'ringing' | 'hangup' | 'cancel'
   | 'error' | 'offline' | 'ready' | 'connected' | 'transportClose'
