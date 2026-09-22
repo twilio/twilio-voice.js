@@ -484,6 +484,8 @@ PeerConnection.prototype._disableOutput = function disableOutput(pc, id) {
  */
 PeerConnection.prototype._reassignMasterOutput = function reassignMasterOutput(pc, masterId) {
   const masterOutput = pc.outputs.get(masterId);
+  // Another output update may already be reassigning this master.
+  if (!masterOutput) { return Promise.resolve(); }
   pc.outputs.delete(masterId);
 
   const self = this;
