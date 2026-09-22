@@ -56,8 +56,10 @@ describe('Reconnection', function() {
     identity2 = 'id2-' + Date.now();
     token1 = await generateAccessToken(identity1);
     token2 = await generateAccessToken(identity2);
-    device1 = new Device(token1, device1Options);
-    device2 = new Device(token2, device2Options);
+    // Debug level so the console capture has an SDK timeline to show when a
+    // reconnect stalls; the SDK defaults to ERROR.
+    device1 = new Device(token1, { logLevel: 'debug', ...device1Options });
+    device2 = new Device(token2, { logLevel: 'debug', ...device2Options });
 
     device1.on('error', () => { });
     device2.on('error', () => { });
