@@ -13,6 +13,7 @@ import {
   URI,
   UserAgent,
 } from 'sip.js';
+import { AsyncQueue } from '../asyncQueue';
 import Backoff from '../backoff';
 import { GeneralErrors, SignalingErrors } from '../errors';
 import Log from '../log';
@@ -56,6 +57,10 @@ const CONNECT_SUCCESS_TIMEOUT_MS = 10000;
 // Close codes meaning the server was unreachable rather than shut down
 // cleanly. 1006: abnormal close. 1015: TLS handshake failure.
 const ABNORMAL_CLOSE_CODES = [1006, 1015];
+// Gap between DTMF INFO sends. Awaiting each transaction only spaces digits
+// by network RTT, which on a fast link can be short enough for the far end to
+// merge or drop them.
+const DTMF_INTER_DIGIT_DELAY_MS = 40;
 
 type SipSendMessageConfig = Pick<SendMessageConfig, 'content' | 'contentType' | 'voiceEventSid'>;
 
@@ -116,7 +121,7 @@ interface QueuedMessage {
  * Promise-based accept/invite paths fail cleanly instead of crashing
  * synchronously inside setupSessionDescriptionHandler.
  */
-function createUnboundSdh(): SessionDescriptionHandler {
+function createUnboundSdh() {
   const reject = () => Promise.reject(
     new Error('SipSignalingAdapter: no PeerConnection binding registered for SIP session'),
   );
@@ -126,7 +131,7 @@ function createUnboundSdh(): SessionDescriptionHandler {
     setDescription: reject,
     sendDtmf: () => false,
     close: () => { /* no-op */ },
-  };
+  } satisfies SessionDescriptionHandler;
 }
 
 /**
@@ -141,12 +146,16 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   private _outboundSessions: Map<string, Inviter> = new Map();
   private _pendingInvitations: Map<string, Invitation> = new Map();
   private _sessionBindings: WeakMap<Session, SdhBinding> = new WeakMap();
-  private _registerer: any | null = null;
+  // One DTMF queue per session so digits stay spaced across separate dtmf()
+  // calls, not just within one digit string. Keyed by session rather than
+  // callSid, which can be rekeyed by a 200 OK.
+  private _dtmfQueues: WeakMap<Session, AsyncQueue> = new WeakMap();
+  private _registerer: Registerer | null = null;
   private _region: string | undefined;
   private _status: SignalingAdapterStatus = 'disconnected';
   private _token: string = '';
   private _uri: string;
-  private _userAgent: any | null = null;
+  private _userAgent: UserAgent | null = null;
   private _backoff: { preferred: Backoff, primary: Backoff } | null = null;
   private _backoffStartTime: { preferred: number | null, primary: number | null } = {
     preferred: null,
@@ -575,8 +584,14 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       this._log.warn('dtmf: no established session for callSid', callSid);
       return;
     }
-    const sendDigits = async () => {
-      for (const digit of digits) {
+    let queue = this._dtmfQueues.get(session);
+    if (!queue) {
+      queue = new AsyncQueue();
+      this._dtmfQueues.set(session, queue);
+    }
+
+    for (const digit of digits) {
+      queue.enqueue(async () => {
         try {
           await session.info({
             requestOptions: {
@@ -590,9 +605,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
         } catch (error: any) {
           this._log.warn('Failed to send DTMF digit', digit, error?.message);
         }
-      }
-    };
-    sendDigits();
+        // Trailing, so the gap also applies between the last digit of one
+        // dtmf() call and the first of the next.
+        await new Promise(resolve => setTimeout(resolve, DTMF_INTER_DIGIT_DELAY_MS));
+      });
+    }
   }
 
   sendMessage(callSid: string, { content, contentType, voiceEventSid }: SipSendMessageConfig): void {
@@ -635,56 +652,55 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
   private _hangupOutboundSession(session: Inviter, callSid: string): void {
     this._outboundSessions.delete(callSid);
-
-    switch (session.state) {
-      case SessionState.Established:
-        session.bye().catch((error: Error) => {
-          this._log.error('Failed to send BYE', error);
-          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-        });
-        return;
-      case SessionState.Initial:
-      case SessionState.Establishing:
-        session.cancel().catch((error: Error) => {
-          this._log.error('Failed to cancel outgoing call', error);
-          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-        });
-        return;
-      case SessionState.Terminating:
-      case SessionState.Terminated:
-        this._log.debug('_hangupOutboundSession: session already ending', session.state);
-        return;
-      default: {
-        const _exhaustive: never = session.state;
-        this._log.warn('_hangupOutboundSession: unexpected session state', _exhaustive);
-      }
-    }
+    this._hangupSession(
+      session,
+      callSid,
+      () => session.cancel(),
+      'Failed to cancel outgoing call',
+    );
   }
 
   private _hangupInboundSession(session: Invitation, callSid: string): void {
     this._inboundSessions.delete(callSid);
+    this._hangupSession(
+      session,
+      callSid,
+      () => session.reject(),
+      'Failed to reject invitation during hangup',
+    );
+  }
+
+  /**
+   * Shared hangup state machine. Outbound and inbound differ only in how an
+   * unestablished session is aborted: CANCEL for an Inviter we sent, reject
+   * for an Invitation we received.
+   */
+  private _hangupSession(
+    session: Session,
+    callSid: string,
+    abortUnestablished: () => Promise<unknown>,
+    abortErrorMessage: string,
+  ): void {
+    const onFailure = (message: string) => (error: Error) => {
+      this._log.error(message, error);
+      this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+    };
 
     switch (session.state) {
       case SessionState.Established:
-        session.bye().catch((error: Error) => {
-          this._log.error('Failed to send BYE', error);
-          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-        });
+        session.bye().catch(onFailure('Failed to send BYE'));
         return;
       case SessionState.Initial:
       case SessionState.Establishing:
-        session.reject().catch((error: Error) => {
-          this._log.error('Failed to reject invitation during hangup', error);
-          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-        });
+        abortUnestablished().catch(onFailure(abortErrorMessage));
         return;
       case SessionState.Terminating:
       case SessionState.Terminated:
-        this._log.debug('_hangupInboundSession: session already ending', session.state);
+        this._log.debug('_hangupSession: session already ending', session.state);
         return;
       default: {
         const _exhaustive: never = session.state;
-        this._log.warn('_hangupInboundSession: unexpected session state', _exhaustive);
+        this._log.warn('_hangupSession: unexpected session state', _exhaustive);
       }
     }
   }

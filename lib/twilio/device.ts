@@ -1286,8 +1286,14 @@ class Device extends EventEmitter {
     const region = getRegionShortcode(payload.region);
     this._edge = payload.edge || regionToEdge[region as Region] || payload.region;
     this._region = region || payload.region;
-    this._home = payload.home;
-    this._publisher?.setHost(createEventGatewayURI(payload.home));
+    this._home = payload.home ?? null;
+
+    // The SIP path's connected payload carries no `home` yet (VBLOCKS-7012),
+    // so without this guard every connect would overwrite a consumer-supplied
+    // `eventgw` with the default gateway.
+    if (payload.home || !this._options.eventgw) {
+      this._publisher?.setHost(createEventGatewayURI(payload.home));
+    }
 
     if (payload.token) {
       this._identity = payload.token.identity;
