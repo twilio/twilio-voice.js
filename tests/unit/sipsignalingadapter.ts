@@ -928,6 +928,23 @@ describe('SipSignalingAdapter', () => {
       assert.strictEqual(inviterStub.info.callCount, 2);
     });
 
+    it('should wait between digits from separate dtmf() calls', async () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      adapter.dtmf('call-1', { digits: '1' });
+      adapter.dtmf('call-1', { digits: '2' });
+
+      await clock.tickAsync(0);
+      assert.strictEqual(inviterStub.info.callCount, 1);
+
+      await clock.tickAsync(39);
+      assert.strictEqual(inviterStub.info.callCount, 1);
+
+      await clock.tickAsync(1);
+      assert.strictEqual(inviterStub.info.callCount, 2);
+    });
+
     it('should keep sending after a failed digit', async () => {
       const { adapter, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });

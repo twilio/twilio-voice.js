@@ -13,6 +13,7 @@ import {
   URI,
   UserAgent,
 } from 'sip.js';
+import { AsyncQueue } from '../asyncQueue';
 import Backoff from '../backoff';
 import { GeneralErrors, SignalingErrors } from '../errors';
 import Log from '../log';
@@ -145,6 +146,10 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   private _outboundSessions: Map<string, Inviter> = new Map();
   private _pendingInvitations: Map<string, Invitation> = new Map();
   private _sessionBindings: WeakMap<Session, SdhBinding> = new WeakMap();
+  // One DTMF queue per session so digits stay spaced across separate dtmf()
+  // calls, not just within one digit string. Keyed by session rather than
+  // callSid, which can be rekeyed by a 200 OK.
+  private _dtmfQueues: WeakMap<Session, AsyncQueue> = new WeakMap();
   private _registerer: Registerer | null = null;
   private _region: string | undefined;
   private _status: SignalingAdapterStatus = 'disconnected';
@@ -579,12 +584,14 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       this._log.warn('dtmf: no established session for callSid', callSid);
       return;
     }
-    const sendDigits = async () => {
-      for (let i = 0; i < digits.length; i++) {
-        const digit = digits[i];
-        if (i > 0) {
-          await new Promise(resolve => setTimeout(resolve, DTMF_INTER_DIGIT_DELAY_MS));
-        }
+    let queue = this._dtmfQueues.get(session);
+    if (!queue) {
+      queue = new AsyncQueue();
+      this._dtmfQueues.set(session, queue);
+    }
+
+    for (const digit of digits) {
+      queue.enqueue(async () => {
         try {
           await session.info({
             requestOptions: {
@@ -598,9 +605,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
         } catch (error: any) {
           this._log.warn('Failed to send DTMF digit', digit, error?.message);
         }
-      }
-    };
-    sendDigits();
+        // Trailing, so the gap also applies between the last digit of one
+        // dtmf() call and the first of the next.
+        await new Promise(resolve => setTimeout(resolve, DTMF_INTER_DIGIT_DELAY_MS));
+      });
+    }
   }
 
   sendMessage(callSid: string, { content, contentType, voiceEventSid }: SipSendMessageConfig): void {
