@@ -1,13 +1,16 @@
+import * as assert from 'assert';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
-import { generateAccessToken } from '../lib/token';
-import { expectEvent, isFirefox, runDockerCommand, waitFor } from '../lib/util';
-import * as assert from 'assert';
+import { generateAccessToken } from '../../tests/lib/token';
+import { expectEvent, isFirefox, runDockerCommand, waitFor } from '../../tests/lib/util';
 
 type CB = any;
 
 const EVENT_TIMEOUT = 20000;
-const RTP_TIMEOUT = 60000;
+// The SDK stops retrying ICE after BACKOFF_CONFIG.max (30s in call.ts), but
+// only checks at the end of an ICE cycle, and Chrome needs ~30s more to
+// declare one failed. 60s left no margin.
+const RTP_TIMEOUT = 120000;
 const SUITE_TIMEOUT = 300000;
 const USE_CASE_TIMEOUT = 180000;
 
@@ -45,12 +48,18 @@ describe('Reconnection', function() {
     device1Options: Device.Options = { },
     device2Options: Device.Options = { },
   ) => {
+    // Tokens are minted over the network, so make sure a previous scenario did
+    // not leave the container detached.
+    await runDockerCommand('resetNetwork');
+
     identity1 = 'id1-' + Date.now();
     identity2 = 'id2-' + Date.now();
-    token1 = generateAccessToken(identity1);
-    token2 = generateAccessToken(identity2);
-    device1 = new Device(token1, device1Options);
-    device2 = new Device(token2, device2Options);
+    token1 = await generateAccessToken(identity1);
+    token2 = await generateAccessToken(identity2);
+    // Debug level so the console capture has an SDK timeline to show when a
+    // reconnect stalls; the SDK defaults to ERROR.
+    device1 = new Device(token1, { logLevel: 'debug', ...device1Options });
+    device2 = new Device(token2, { logLevel: 'debug', ...device2Options });
 
     device1.on('error', () => { });
     device2.on('error', () => { });
@@ -233,9 +242,5 @@ describe('Reconnection', function() {
       await runDockerCommand('resetNetwork');
       await waitFor(bindTestPerDevice((device: Device) => expectEvent(Device.EventName.Registered, device)), EVENT_TIMEOUT);
     });
-  });
-
-  (isFirefox() ? it : it.skip)('Dummy test for Firefox', () => {
-    // no-op
   });
 });

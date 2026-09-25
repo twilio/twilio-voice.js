@@ -1,0 +1,48 @@
+# Runs the network reconnection suite (cypress/network) in a browser container
+# that the host can disconnect from the docker network. The suite cannot run in
+# the same container as the GitHub Actions runner, because cutting that
+# container's network also cuts the runner's connection to GitHub.
+#
+#   BROWSER=chrome BVER=stable docker compose -f tests/docker/docker-compose.yml run networkTests
+#
+# Use the `bash` service for an interactive shell in the same container.
+services:
+  defaults: &defaults
+    user: root
+    image: twilio/twilio-video-browsers:${BROWSER:-chrome}-${BVER:-stable}
+    working_dir: /opt/app
+    # The proxy blocks media ports with iptables and moves the container
+    # between docker networks.
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+  runtimeDefaults: &runtimeDefaults
+    <<: *defaults
+    environment:
+      - VENDOR_URL
+      - VENDOR_AUDIENCE
+      - VENDOR_TOKEN
+      # The vendor proxy signs with a GitHub OIDC token, and GitHub injects
+      # these into the step, not into a container the step starts.
+      - ACTIONS_ID_TOKEN_REQUEST_TOKEN
+      - ACTIONS_ID_TOKEN_REQUEST_URL
+      - ACCOUNT_SID
+      - AUTH_TOKEN
+      - API_KEY_SID
+      - API_KEY_SECRET
+      - APPLICATION_SID
+      - CALLER_ID
+    volumes:
+      - "../../:/opt/app"
+      # The proxy drives the host's docker daemon to detach this container.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Keep the container's install separate from the host's.
+      - /opt/app/node_modules
+      # /dev/null reads as an empty file, so this is a no-op when unset.
+      - "${NPMRC_FILE:-/dev/null}:/root/.npmrc:ro"
+  networkTests:
+    <<: *runtimeDefaults
+    command: bash -c "npm ci && npm run build:constants && ./node_modules/.bin/cypress install && npm run test:network"
+  bash:
+    <<: *runtimeDefaults
+    command: bash
