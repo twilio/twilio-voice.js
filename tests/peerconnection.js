@@ -1892,6 +1892,39 @@ describe('PeerConnection', () => {
       toTest = METHOD.bind(context, pc, MASTER_ID);
     });
 
+    it('Should ignore a master output that has already been removed', async () => {
+      pc.outputs.delete(MASTER_ID);
+      await toTest();
+      assert(output.audio.setSinkId.notCalled);
+      assert(context._disableOutput.notCalled);
+      assert.deepStrictEqual(Array.from(pc.outputs.entries()), OUTPUTS);
+      assert.equal(pc._masterAudioDeviceId, 'before');
+    });
+
+    [false, true].forEach(reject => {
+      it(`Should tolerate overlapping master removals when setSinkId ${reject ? 'rejects' : 'resolves'}`, async () => {
+        let finish;
+        output.audio.setSinkId.returns(new Promise((resolve, fail) => {
+          finish = () => reject ? fail(ERROR) : resolve();
+        }));
+        const first = toTest();
+        assert.equal(pc.outputs.has(MASTER_ID), false);
+        await toTest();
+        assert(output.audio.setSinkId.calledOnce);
+        finish();
+        await first;
+        if (reject) {
+          assert.strictEqual(pc.outputs.get(MASTER_ID), output);
+          assert.equal(pc._masterAudioDeviceId, 'before');
+          assert(context._disableOutput.notCalled);
+        } else {
+          assert.strictEqual(pc.outputs.get('a'), output);
+          assert.equal(pc._masterAudioDeviceId, 'a');
+          assert(context._disableOutput.calledOnce);
+        }
+      });
+    });
+
     it('Should call setSinkId with default when audio outputs are empty', done => {
       output.audio.setSinkId.returns(Promise.resolve());
       pc.outputs.delete('a');

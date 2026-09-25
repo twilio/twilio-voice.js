@@ -6,6 +6,7 @@
 Bug Fixes
 ---------
 
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/464) where overlapping audio output updates could throw when a previous update had already removed the master output during reassignment.
 - Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/376) where setting the `maxAverageBitrate` option produced a malformed Opus `a=fmtp` line in the SDP, with `;maxaveragebitrate` added after the line's carriage return. Chrome re-serializes the SDP and hid the problem, but WebRTC redirection layers that pass the SDP through as-is, such as Citrix HDX, sent it unchanged and calls failed with error `31000`. The parameter is now added before the line ending.
 
 2.18.5 (September 10, 2026)
