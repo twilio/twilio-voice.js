@@ -6,6 +6,7 @@
 Bug Fixes
 ---------
 
+- Fixed an input device change during call acceptance throwing a TypeError before the peer connection is initialized. The replacement input stream is now retained for connection setup. Addresses the startup race described in [#459](https://github.com/twilio/twilio-voice.js/issues/459).
 - Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/376) where setting the `maxAverageBitrate` option produced a malformed Opus `a=fmtp` line in the SDP, with `;maxaveragebitrate` added after the line's carriage return. Chrome re-serializes the SDP and hid the problem, but WebRTC redirection layers that pass the SDP through as-is, such as Citrix HDX, sent it unchanged and calls failed with error `31000`. The parameter is now added before the line ending.
 
 2.18.5 (September 10, 2026)
