@@ -211,13 +211,19 @@ function product(xs, ys, combine) {
 function runDockerCommand(cmd) {
   return new Promise((resolve, reject) => {
     const xmlhttp = new XMLHttpRequest();
+    // A failed connection leaves responseText empty, which mocha reports as
+    // "Promise rejected with no or falsy reason". Always reject with an Error.
+    const fail = (reason) => reject(new Error(
+      `docker proxy ${cmd} failed: ${reason}. Is ${DOCKER_PROXY_SERVER_URL} running?`
+    ));
     xmlhttp.onreadystatechange = function() {
       if (this.readyState == 4 && this.status == 200) {
         resolve(this.responseText);
       } else if (this.readyState == 4 && this.status != 200) {
-        reject(this.responseText);
+        fail(`${this.status} ${this.responseText}`.trim());
       }
     };
+    xmlhttp.onerror = () => fail('could not connect');
     xmlhttp.open('GET', `${DOCKER_PROXY_SERVER_URL}/${cmd}`, true);
     xmlhttp.send();
   });
