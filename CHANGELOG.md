@@ -22,6 +22,8 @@ Bug Fixes
 
 - Fixed an issue where error `31402` (`AcquisitionFailedError`) did not include the underlying error. It is now set as `originalError`, for example the error from a local `AudioProcessor` that failed to create its processed stream.
 
+- Fixed an issue where `Device.updateOptions()` threw `Cannot change Edge while on an active Call` but still applied the new options. After the call ended, calling `updateOptions()` again with the same edge did not detect a change, so the signaling stream stayed on the previous edge. A rejected `updateOptions()` call now leaves the `Device` options unchanged.
+
 2.18.5 (September 10, 2026)
 ===========================
 
