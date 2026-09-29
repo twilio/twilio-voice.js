@@ -8,6 +8,8 @@ Bug Fixes
 
 - Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/376) where setting the `maxAverageBitrate` option produced a malformed Opus `a=fmtp` line in the SDP, with `;maxaveragebitrate` added after the line's carriage return. Chrome re-serializes the SDP and hid the problem, but WebRTC redirection layers that pass the SDP through as-is, such as Citrix HDX, sent it unchanged and calls failed with error `31000`. The parameter is now added before the line ending.
 
+- Fixed an issue where `Device.updateOptions()` threw `Cannot change Edge while on an active Call` but still applied the new options. After the call ended, calling `updateOptions()` again with the same edge did not detect a change, so the signaling stream stayed on the previous edge. A rejected `updateOptions()` call now leaves the `Device` options unchanged.
+
 2.18.5 (September 10, 2026)
 ===========================
 

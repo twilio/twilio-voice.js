@@ -764,9 +764,11 @@ class Device extends EventEmitter {
       );
     }
 
+    const originalOptions = this._options;
+    const originalChunderURIsList = this._chunderURIs;
     this._options = { ...this._defaultOptions, ...this._options, ...options };
 
-    const originalChunderURIs: Set<string> = new Set(this._chunderURIs);
+    const originalChunderURIs: Set<string> = new Set(originalChunderURIsList);
 
     const newChunderURIs = this._chunderURIs = (
       this._getChunderws() || getChunderURIs(this._options.edge)
@@ -784,6 +786,10 @@ class Device extends EventEmitter {
     }
 
     if (this.isBusy && hasChunderURIsChanged) {
+      // Leave the Device unchanged so a later call to `updateOptions` still
+      // detects the edge change and reconnects the signaling stream.
+      this._options = originalOptions;
+      this._chunderURIs = originalChunderURIsList;
       throw new InvalidStateError('Cannot change Edge while on an active Call');
     }
 

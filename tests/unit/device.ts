@@ -704,6 +704,34 @@ describe('Device', function() {
           sinon.assert.calledOnce(setupStreamSpy);
         });
 
+        describe('when changing the edge during an active Call', () => {
+          beforeEach(async () => {
+            await registerDevice();
+            await device.connect();
+          });
+
+          it('should throw', () => {
+            assert.throws(() => device.updateOptions({ edge: 'sydney' }), /Cannot change Edge/);
+          });
+
+          it('should not change the options or signaling URIs', () => {
+            const options = device['_options'];
+            const chunderURIs = device['_chunderURIs'];
+            assert.throws(() => device.updateOptions({ edge: 'sydney' }));
+            assert.strictEqual(device['_options'], options);
+            assert.strictEqual(device['_options'].edge, undefined);
+            assert.deepStrictEqual(device['_chunderURIs'], chunderURIs);
+          });
+
+          it('should reconstruct the stream when the same edge is applied after the Call ends', () => {
+            assert.throws(() => device.updateOptions({ edge: 'sydney' }));
+            device['_activeCall'] = null;
+            const setupStreamSpy = device['_setupStream'] = sinon.spy(device['_setupStream']);
+            device.updateOptions({ edge: 'sydney' });
+            sinon.assert.calledOnce(setupStreamSpy);
+          });
+        });
+
         it('should not throw during re-registration', async () => {
           await registerDevice();
 
