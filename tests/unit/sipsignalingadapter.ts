@@ -955,6 +955,21 @@ describe('SipSignalingAdapter', () => {
       assert.strictEqual(inviterStub.info.callCount, 2);
     });
 
+    it('should stop sending queued digits once the session ends', async () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      inviterStub.info.onFirstCall().callsFake(() => {
+        inviterStub.state = 'Terminated';
+        return Promise.resolve();
+      });
+
+      adapter.dtmf('call-1', { digits: '123' });
+      await clock.tickAsync(500);
+
+      assert.strictEqual(inviterStub.info.callCount, 1);
+    });
+
     it('should not throw for non-established session', () => {
       const { adapter } = createAdapter();
       assert.doesNotThrow(() => adapter.dtmf('unknown', { digits: '1' }));

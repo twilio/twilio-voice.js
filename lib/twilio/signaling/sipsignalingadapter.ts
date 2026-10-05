@@ -592,6 +592,12 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
     for (const digit of digits) {
       queue.enqueue(async () => {
+        // Re-checked here, not just at enqueue time: a hangup between the two
+        // would otherwise send an INFO per leftover digit, each rejected by
+        // SIP.js for invalid session state.
+        if (session.state !== SessionState.Established) {
+          return;
+        }
         try {
           await session.info({
             requestOptions: {
