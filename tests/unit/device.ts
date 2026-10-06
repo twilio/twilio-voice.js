@@ -333,6 +333,36 @@ describe('Device', function() {
           assert.equal(await device.connect(), device['_activeCall']);
         });
 
+        it('should allow another outgoing call after transport loss without a reconnect token', async () => {
+          device['_options'].Call = function(config: CallType.Config, options: CallType.Options) {
+            const mediaHandler = createEmitterStub(require('../../lib/twilio/rtc/peerconnection').default);
+            const call = new CallType(config, {
+              ...options,
+              MediaHandler: function() { return mediaHandler; },
+              StatsMonitor: function() {
+                return createEmitterStub(require('../../lib/twilio/statsMonitor').default);
+              } as any,
+            });
+            mediaHandler.close.callsFake(() => mediaHandler.onclose());
+            sinon.stub(call, 'accept').callsFake(() => { call['_status'] = CallType.State.Connecting; });
+            return call;
+          } as any;
+          pstream.status = 'connected';
+          const call = await device.connect();
+          const disconnect = sinon.spy();
+          call.on('disconnect', disconnect);
+
+          pstream.emit('transportClose');
+
+          assert.equal(call.status(), CallType.State.Closed);
+          sinon.assert.calledOnce(disconnect);
+          sinon.assert.notCalled(pstream.hangup);
+          assert.equal(device['_activeCall'], null);
+          const nextCall = await device.connect();
+          assert.notEqual(nextCall, call);
+          assert.equal(device['_activeCall'], nextCall);
+        });
+
         it('should set ._makeCallPromise', () => {
           device.connect();
           assert(device['_makeCallPromise']);
