@@ -893,11 +893,19 @@ describe('SipSignalingAdapter', () => {
   });
 
   describe('dtmf()', () => {
-    it('should not send SIP INFO', () => {
+    it('should emit an error instead of sending SIP INFO', () => {
       const { adapter, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
       inviterStub.state = 'Established';
+      const errorSpy = sinon.spy();
+      adapter.on('error', errorSpy);
+
       adapter.dtmf('call-1', { digits: '12' });
+
+      sinon.assert.calledOnceWithExactly(errorSpy, {
+        error: { code: 31000, message: 'DTMF is not supported over SIP signaling' },
+        callsid: 'call-1',
+      });
       sinon.assert.notCalled(inviterStub.info);
     });
   });

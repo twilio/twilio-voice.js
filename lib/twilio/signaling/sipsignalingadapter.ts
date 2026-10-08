@@ -571,8 +571,12 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
   dtmf(callSid: string, _config: DtmfConfig): void {
     // The edge only handles RFC2833 DTMF, which Call sends via RTCDTMFSender.
-    // It ignores SIP INFO, so there is no signaling fallback to send.
-    this._log.warn('dtmf: not supported over SIP signaling, digits dropped for callSid', callSid);
+    // It ignores SIP INFO, so there is no signaling fallback; emit an error so
+    // the app knows the digits weren't sent.
+    this.emit('error', {
+      error: { code: 31000, message: 'DTMF is not supported over SIP signaling' },
+      callsid: callSid,
+    });
   }
 
   sendMessage(callSid: string, { content, contentType, voiceEventSid }: SipSendMessageConfig): void {

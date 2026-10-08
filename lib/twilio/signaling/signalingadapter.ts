@@ -82,8 +82,8 @@ export interface SignalingAdapter extends EventEmitter {
 
   /**
    * Send DTMF digits when RTCDTMFSender is unavailable. Fire and forget: no
-   * 'ack' is emitted and failures surface only as logs. The SIP adapter drops
-   * the digits, since the edge only handles RFC2833 DTMF.
+   * 'ack' is emitted. The SIP adapter emits an 'error' instead of sending,
+   * since the edge only handles RFC2833 DTMF.
    */
   dtmf(callSid: string, config: DtmfConfig): void;
   sendMessage(callSid: string, config: SendMessageConfig): void;
