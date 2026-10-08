@@ -207,9 +207,16 @@ describe('Device', function() {
               publisher.setHost = sinon.stub();
             });
 
-            it('should not overwrite it when home is absent', () => {
+            it('should use it when home is absent', () => {
               pstream.emit('connected', {});
-              sinon.assert.notCalled(publisher.setHost);
+              sinon.assert.calledOnceWithExactly(publisher.setHost, 'eventgw.example.com');
+            });
+
+            it('should restore it when a later connect has no home', () => {
+              pstream.emit('connected', { home: 'us1' });
+              pstream.emit('connected', {});
+              sinon.assert.calledTwice(publisher.setHost);
+              sinon.assert.calledWithExactly(publisher.setHost.secondCall, 'eventgw.example.com');
             });
 
             it('should still set the host when home is present', () => {

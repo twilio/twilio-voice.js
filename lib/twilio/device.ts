@@ -1288,12 +1288,11 @@ class Device extends EventEmitter {
     this._region = region || payload.region;
     this._home = payload.home ?? null;
 
-    // The SIP path's connected payload carries no `home` yet (VBLOCKS-7012),
-    // so without this guard every connect would overwrite a consumer-supplied
-    // `eventgw` with the default gateway.
-    if (payload.home || !this._options.eventgw) {
-      this._publisher?.setHost(createEventGatewayURI(payload.home));
-    }
+    // Same precedence as publisher setup: home, then eventgw, then default.
+    // The SIP path's connected payload carries no `home` yet (VBLOCKS-7012).
+    this._publisher?.setHost(payload.home
+      ? createEventGatewayURI(payload.home)
+      : this._options.eventgw || createEventGatewayURI());
 
     if (payload.token) {
       this._identity = payload.token.identity;
