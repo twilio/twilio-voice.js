@@ -2,12 +2,13 @@ import * as assert from 'assert';
 
 // Plain CommonJS module (tests/lib is not part of the TS build); require avoids
 // the esModuleInterop dance for a default-less module.exports.
-const VendorProxy = require('../lib/vendorProxy');
+const Vendor = require('../lib/vend');
 
 const ACCOUNT_SID = 'AC' + '0'.repeat(32);
 const API_KEY_SID = 'SK' + '1'.repeat(32);
 const APPLICATION_SID = 'AP' + '2'.repeat(32);
 const APPLICATION_SID_STIR = 'AP' + '3'.repeat(32);
+const APPLICATION_SID_EXTENSION = 'AP' + '4'.repeat(32);
 const CALLER_ID = '+15005550006';
 
 const CREDENTIAL_KEYS = [
@@ -16,6 +17,7 @@ const CREDENTIAL_KEYS = [
   'API_KEY_SECRET',
   'APPLICATION_SID',
   'APPLICATION_SID_STIR',
+  'APPLICATION_SID_EXTENSION',
   'CALLER_ID',
   'VENDOR_URL',
 ];
@@ -24,8 +26,8 @@ function decodePayload(jwt: string) {
   return JSON.parse(Buffer.from(jwt.split('.')[1], 'base64').toString());
 }
 
-describe('vendorProxy', () => {
-  let proxy: any;
+describe('vend', () => {
+  let vendor: any;
   let saved: Record<string, string | undefined>;
 
   beforeEach(() => {
@@ -34,7 +36,7 @@ describe('vendorProxy', () => {
       saved[key] = process.env[key];
       delete process.env[key];
     });
-    proxy = new VendorProxy();
+    vendor = new Vendor();
   });
 
   afterEach(() => {
@@ -59,8 +61,12 @@ describe('vendorProxy', () => {
     process.env.CALLER_ID = CALLER_ID;
   }
 
+  function setExtensionCredentials() {
+    process.env.APPLICATION_SID_EXTENSION = APPLICATION_SID_EXTENSION;
+  }
+
   function vend(request: any) {
-    return proxy._vend(JSON.stringify(request));
+    return vendor.vend(JSON.stringify(request));
   }
 
   function mintVoiceToken(params: any = {}) {
@@ -71,7 +77,7 @@ describe('vendorProxy', () => {
     it('forwards the raw body to the vendor', async () => {
       process.env.VENDOR_URL = 'https://vendor.example/vend';
       const forwarded: string[] = [];
-      proxy._forward = (body: string) => {
+      vendor._forward = (body: string) => {
         forwarded.push(body);
         return Promise.resolve({ status: 200, text: '{"token":"from-vendor"}' });
       };
@@ -88,8 +94,8 @@ describe('vendorProxy', () => {
     it('leaves the vendor auth token cache untouched', async () => {
       setCredentials();
       await mintVoiceToken();
-      assert.strictEqual(proxy._cachedToken, null);
-      assert.strictEqual(proxy._cachedTokenPromise, null);
+      assert.strictEqual(vendor._cachedToken, null);
+      assert.strictEqual(vendor._cachedTokenPromise, null);
     });
 
     it('mints a voice token from the local credentials', async () => {
@@ -155,7 +161,7 @@ describe('vendorProxy', () => {
       assert.strictEqual(response.status, 500);
       assert.strictEqual(
         JSON.parse(response.text).error,
-        'vendorProxy: cannot mint a voice token locally; set ACCOUNT_SID, API_KEY_SID, ' +
+        'vend: cannot mint a voice token locally; set ACCOUNT_SID, API_KEY_SID, ' +
         'API_KEY_SECRET, APPLICATION_SID in .env, or set VENDOR_URL to vend credentials remotely',
       );
     });
@@ -170,6 +176,36 @@ describe('vendorProxy', () => {
       assert.match(
         JSON.parse(response.text).error,
         /set APPLICATION_SID_STIR, CALLER_ID in \.env/,
+      );
+    });
+
+    it('uses the extension application for the extension variant', async () => {
+      setCredentials();
+      setExtensionCredentials();
+      const response = await mintVoiceToken({ variant: 'extension' });
+      const payload = decodePayload(JSON.parse(response.text).token);
+      assert.strictEqual(payload.grants.voice.outgoing.application_sid, APPLICATION_SID_EXTENSION);
+    });
+
+    it('sends no application params for the extension variant', async () => {
+      setCredentials();
+      setExtensionCredentials();
+      process.env.CALLER_ID = CALLER_ID;
+      const response = await mintVoiceToken({ variant: 'extension' });
+      const payload = decodePayload(JSON.parse(response.text).token);
+      assert.strictEqual(payload.grants.voice.outgoing.params, undefined);
+    });
+
+    it('requires the extension application only for the extension variant', async () => {
+      setCredentials();
+
+      assert.strictEqual((await mintVoiceToken()).status, 200);
+
+      const response = await mintVoiceToken({ variant: 'extension' });
+      assert.strictEqual(response.status, 500);
+      assert.match(
+        JSON.parse(response.text).error,
+        /set APPLICATION_SID_EXTENSION in \.env/,
       );
     });
 
@@ -189,7 +225,7 @@ describe('vendorProxy', () => {
 
     it('rejects a non-JSON body', async () => {
       setCredentials();
-      const response = await proxy._vend('not json');
+      const response = await vendor.vend('not json');
       assert.strictEqual(response.status, 400);
       assert.match(JSON.parse(response.text).error, /not JSON/);
     });
