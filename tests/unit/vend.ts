@@ -209,6 +209,16 @@ describe('vend', () => {
       );
     });
 
+    it('does not require the base application for a variant', async () => {
+      setCredentials();
+      setStirCredentials();
+      setExtensionCredentials();
+      delete process.env.APPLICATION_SID;
+
+      assert.strictEqual((await mintVoiceToken({ variant: 'stir' })).status, 200);
+      assert.strictEqual((await mintVoiceToken({ variant: 'extension' })).status, 200);
+    });
+
     it('rejects an unsupported action', async () => {
       setCredentials();
       const response = await vend({ action: 'revoke-voice-token' });

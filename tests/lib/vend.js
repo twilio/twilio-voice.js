@@ -98,13 +98,15 @@ function vendLocally(body) {
     return errorResponse(400, `vend: unknown variant "${request.variant}"`);
   }
 
-  // Variant credentials are only checked when asked for, so a contributor
-  // without the STIR/SHAKEN or extension TwiML app can still run the rest.
-  const required = ['ACCOUNT_SID', 'API_KEY_SID', 'API_KEY_SECRET', 'APPLICATION_SID'];
+  // Only the TwiML app the request uses is checked, so a contributor without
+  // the STIR/SHAKEN or extension app can still run the rest, and vice versa.
+  const required = ['ACCOUNT_SID', 'API_KEY_SID', 'API_KEY_SECRET'];
   if (request.variant === 'stir') {
     required.push('APPLICATION_SID_STIR', 'CALLER_ID');
   } else if (request.variant === 'extension') {
     required.push('APPLICATION_SID_EXTENSION');
+  } else {
+    required.push('APPLICATION_SID');
   }
 
   const missing = required.filter(name => !process.env[name]);
