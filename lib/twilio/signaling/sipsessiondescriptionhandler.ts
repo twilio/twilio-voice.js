@@ -257,8 +257,8 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   }
 
   sendDtmf(_tones: string): boolean {
-    // DTMF is routed through SipSignalingAdapter.dtmf() as SIP INFO, not
-    // the SDH path. Returning false tells SIP.js "I don't implement DTMF."
+    // DTMF goes out as RFC2833 via Call's RTCDTMFSender, not through SIP.js.
+    // Returning false tells SIP.js "I don't implement DTMF."
     return false;
   }
 

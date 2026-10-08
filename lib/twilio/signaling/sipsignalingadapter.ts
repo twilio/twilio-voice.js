@@ -13,7 +13,6 @@ import {
   URI,
   UserAgent,
 } from 'sip.js';
-import { AsyncQueue } from '../asyncQueue';
 import Backoff from '../backoff';
 import { GeneralErrors, SignalingErrors } from '../errors';
 import Log from '../log';
@@ -57,10 +56,6 @@ const CONNECT_SUCCESS_TIMEOUT_MS = 10000;
 // Close codes meaning the server was unreachable rather than shut down
 // cleanly. 1006: abnormal close. 1015: TLS handshake failure.
 const ABNORMAL_CLOSE_CODES = [1006, 1015];
-// Gap between DTMF INFO sends. Awaiting each transaction only spaces digits
-// by network RTT, which on a fast link can be short enough for the far end to
-// merge or drop them.
-const DTMF_INTER_DIGIT_DELAY_MS = 40;
 
 type SipSendMessageConfig = Pick<SendMessageConfig, 'content' | 'contentType' | 'voiceEventSid'>;
 
@@ -137,7 +132,7 @@ function createUnboundSdh() {
 /**
  * SignalingAdapter implementation backed by SIP.js. Handles WebSocket
  * connection, SIP registration lifecycle, and call-level signaling
- * (INVITE, BYE, re-INVITE, INFO, MESSAGE).
+ * (INVITE, BYE, re-INVITE, MESSAGE).
  */
 export class SipSignalingAdapter extends EventEmitter implements SignalingAdapter {
   private _log: Log = new Log('SipSignalingAdapter');
@@ -146,10 +141,6 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   private _outboundSessions: Map<string, Inviter> = new Map();
   private _pendingInvitations: Map<string, Invitation> = new Map();
   private _sessionBindings: WeakMap<Session, SdhBinding> = new WeakMap();
-  // One DTMF queue per session so digits stay spaced across separate dtmf()
-  // calls, not just within one digit string. Keyed by session rather than
-  // callSid, which can be rekeyed by a 200 OK.
-  private _dtmfQueues: WeakMap<Session, AsyncQueue> = new WeakMap();
   private _registerer: Registerer | null = null;
   private _region: string | undefined;
   private _status: SignalingAdapterStatus = 'disconnected';
@@ -578,44 +569,10 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     }, config.reconnectToken);
   }
 
-  dtmf(callSid: string, { digits }: DtmfConfig): void {
-    const session = this._getSession(callSid);
-    if (!session || session.state !== SessionState.Established) {
-      this._log.warn('dtmf: no established session for callSid', callSid);
-      return;
-    }
-    let queue = this._dtmfQueues.get(session);
-    if (!queue) {
-      queue = new AsyncQueue();
-      this._dtmfQueues.set(session, queue);
-    }
-
-    for (const digit of digits) {
-      queue.enqueue(async () => {
-        // Re-checked here, not just at enqueue time: a hangup between the two
-        // would otherwise send an INFO per leftover digit, each rejected by
-        // SIP.js for invalid session state.
-        if (session.state !== SessionState.Established) {
-          return;
-        }
-        try {
-          await session.info({
-            requestOptions: {
-              body: {
-                contentDisposition: 'render',
-                contentType: 'application/dtmf-relay',
-                content: `Signal=${digit}\r\nDuration=100\r\n`,
-              },
-            },
-          });
-        } catch (error: any) {
-          this._log.warn('Failed to send DTMF digit', digit, error?.message);
-        }
-        // Trailing, so the gap also applies between the last digit of one
-        // dtmf() call and the first of the next.
-        await new Promise(resolve => setTimeout(resolve, DTMF_INTER_DIGIT_DELAY_MS));
-      });
-    }
+  dtmf(callSid: string, _config: DtmfConfig): void {
+    // The edge only handles RFC2833 DTMF, which Call sends via RTCDTMFSender.
+    // It ignores SIP INFO, so there is no signaling fallback to send.
+    this._log.warn('dtmf: not supported over SIP signaling, digits dropped for callSid', callSid);
   }
 
   sendMessage(callSid: string, { content, contentType, voiceEventSid }: SipSendMessageConfig): void {

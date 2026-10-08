@@ -893,86 +893,12 @@ describe('SipSignalingAdapter', () => {
   });
 
   describe('dtmf()', () => {
-    let clock: sinon.SinonFakeTimers;
-
-    beforeEach(() => {
-      clock = sinon.useFakeTimers();
-    });
-
-    afterEach(() => {
-      clock.restore();
-    });
-
-    it('should call session.info() for each digit', async () => {
+    it('should not send SIP INFO', () => {
       const { adapter, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
       inviterStub.state = 'Established';
       adapter.dtmf('call-1', { digits: '12' });
-      await clock.tickAsync(100);
-      assert.strictEqual(inviterStub.info.callCount, 2);
-    });
-
-    it('should wait between digits', async () => {
-      const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
-      inviterStub.state = 'Established';
-      adapter.dtmf('call-1', { digits: '12' });
-
-      await clock.tickAsync(0);
-      assert.strictEqual(inviterStub.info.callCount, 1);
-
-      await clock.tickAsync(39);
-      assert.strictEqual(inviterStub.info.callCount, 1);
-
-      await clock.tickAsync(1);
-      assert.strictEqual(inviterStub.info.callCount, 2);
-    });
-
-    it('should wait between digits from separate dtmf() calls', async () => {
-      const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
-      inviterStub.state = 'Established';
-      adapter.dtmf('call-1', { digits: '1' });
-      adapter.dtmf('call-1', { digits: '2' });
-
-      await clock.tickAsync(0);
-      assert.strictEqual(inviterStub.info.callCount, 1);
-
-      await clock.tickAsync(39);
-      assert.strictEqual(inviterStub.info.callCount, 1);
-
-      await clock.tickAsync(1);
-      assert.strictEqual(inviterStub.info.callCount, 2);
-    });
-
-    it('should keep sending after a failed digit', async () => {
-      const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
-      inviterStub.state = 'Established';
-      inviterStub.info.onFirstCall().rejects(new Error('info failed'));
-      adapter.dtmf('call-1', { digits: '12' });
-      await clock.tickAsync(100);
-      assert.strictEqual(inviterStub.info.callCount, 2);
-    });
-
-    it('should stop sending queued digits once the session ends', async () => {
-      const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
-      inviterStub.state = 'Established';
-      inviterStub.info.onFirstCall().callsFake(() => {
-        inviterStub.state = 'Terminated';
-        return Promise.resolve();
-      });
-
-      adapter.dtmf('call-1', { digits: '123' });
-      await clock.tickAsync(500);
-
-      assert.strictEqual(inviterStub.info.callCount, 1);
-    });
-
-    it('should not throw for non-established session', () => {
-      const { adapter } = createAdapter();
-      assert.doesNotThrow(() => adapter.dtmf('unknown', { digits: '1' }));
+      sinon.assert.notCalled(inviterStub.info);
     });
   });
 
