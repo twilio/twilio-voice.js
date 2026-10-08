@@ -739,6 +739,44 @@ describe('SipSignalingAdapter', () => {
       sinon.assert.notCalled(inv.reject);
     });
 
+    it('should emit "error" if bye() fails', (done) => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      inviterStub.bye.rejects(new Error('bye failed'));
+      adapter.on('error', (payload: any) => {
+        assert.deepStrictEqual(payload, { error: { code: 31000, message: 'bye failed' }, callsid: 'call-1' });
+        done();
+      });
+      adapter.hangup('call-1', {});
+    });
+
+    it('should emit "error" if cancel() fails', (done) => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Establishing';
+      inviterStub.cancel.rejects(new Error('cancel failed'));
+      adapter.on('error', (payload: any) => {
+        assert.deepStrictEqual(payload, { error: { code: 31000, message: 'cancel failed' }, callsid: 'call-1' });
+        done();
+      });
+      adapter.hangup('call-1', {});
+    });
+
+    it('should emit "error" if reject() fails on an answered inbound session', (done) => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      uaStub._triggerInvite(inv);
+      adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer', peerConnection: createPeerConnectionStub() });
+      inv.state = 'Establishing';
+      inv.reject = sinon.stub().rejects(new Error('reject failed'));
+      adapter.on('error', (payload: any) => {
+        assert.deepStrictEqual(payload, { error: { code: 31000, message: 'reject failed' }, callsid: 'CA-test-call-sid' });
+        done();
+      });
+      adapter.hangup('CA-test-call-sid', {});
+    });
+
     it('should not throw for unknown callSid', () => {
       const { adapter } = createAdapter();
       assert.doesNotThrow(() => adapter.hangup('unknown', {}));
