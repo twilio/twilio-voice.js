@@ -129,3 +129,53 @@ jobs:
             cypress/screenshots
             cypress/videos
           if-no-files-found: ignore
+
+  # Puppeteer brings its own Chrome, so this needs no browser container. It
+  # lives in this workflow because the credential vending Function trusts this
+  # file's OIDC identity.
+  extension-e2e:
+    name: extension-e2e
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-x64
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Artifactory OIDC Auth
+        uses: ./.github/actions/artifactory-oidc
+        with:
+          artifactory_url: ${{ vars.ARTIFACTORY_URL }}
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      # --ignore-scripts skips the postinstall that downloads puppeteer's Chrome.
+      - name: Install puppeteer Chrome
+        run: npx puppeteer browsers install chrome
+
+      # The extension loads tests/extension/app/twilio.js, a symlink to dist/twilio.js.
+      - name: Build
+        run: npm run build
+
+      - name: Run extension tests
+        env:
+          VENDOR_URL: ${{ vars.VENDOR_URL }}
+          VENDOR_AUDIENCE: ${{ vars.VENDOR_URL }}
+        run: |
+          set -euo pipefail
+          npm run start:extension:server &
+          server_pid=$!
+          for _ in $(seq 1 50); do
+            curl -s -o /dev/null http://127.0.0.1:3030/ && break
+            kill -0 "$server_pid" 2>/dev/null || { echo "Token server exited during startup"; exit 1; }
+            sleep 0.2
+          done
+          curl -s -o /dev/null http://127.0.0.1:3030/ || { echo "Token server did not listen on 3030 within 10s"; exit 1; }
+          npm run test:extension
