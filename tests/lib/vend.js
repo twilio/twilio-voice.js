@@ -101,12 +101,15 @@ function vendLocally(body) {
   // Only the TwiML app the request uses is checked, so a contributor without
   // the STIR/SHAKEN or extension app can still run the rest, and vice versa.
   const required = ['ACCOUNT_SID', 'API_KEY_SID', 'API_KEY_SECRET'];
+  let applicationSidVar = 'APPLICATION_SID';
   if (request.variant === 'stir') {
-    required.push('APPLICATION_SID_STIR', 'CALLER_ID');
+    applicationSidVar = 'APPLICATION_SID_STIR';
+    required.push(applicationSidVar, 'CALLER_ID');
   } else if (request.variant === 'extension') {
-    required.push('APPLICATION_SID_EXTENSION');
+    applicationSidVar = 'APPLICATION_SID_EXTENSION';
+    required.push(applicationSidVar);
   } else {
-    required.push('APPLICATION_SID');
+    required.push(applicationSidVar);
   }
 
   const missing = required.filter(name => !process.env[name]);
@@ -116,10 +119,7 @@ function vendLocally(body) {
   }
 
   const { identity, ttl, outgoingApplicationSid, variant } = request;
-  const applicationSid = outgoingApplicationSid || {
-    extension: process.env.APPLICATION_SID_EXTENSION,
-    stir: process.env.APPLICATION_SID_STIR,
-  }[variant] || process.env.APPLICATION_SID;
+  const applicationSid = outgoingApplicationSid || process.env[applicationSidVar];
 
   const token = new Twilio.jwt.AccessToken(
     process.env.ACCOUNT_SID,
