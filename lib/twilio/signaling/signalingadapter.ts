@@ -80,11 +80,20 @@ export interface SignalingAdapter extends EventEmitter {
    */
   iceRestart(callSid: string, config: IceRestartConfig): void;
 
+  /**
+   * Send DTMF digits when RTCDTMFSender is unavailable. Fire and forget: no
+   * 'ack' is emitted. The SIP adapter emits an 'error' instead of sending,
+   * since the edge only handles RFC2833 DTMF.
+   */
   dtmf(callSid: string, config: DtmfConfig): void;
   sendMessage(callSid: string, config: SendMessageConfig): void;
   register(mediaCapabilities: Record<string, any>): void;
 }
 
+/**
+ * 'presence' and 'roster' are VSP-only. PStream forwards them; the SIP adapter
+ * does not produce them, and nothing in the SDK listens for either today.
+ */
 export type SignalingAdapterEvent =
   | 'invite' | 'answer' | 'ringing' | 'hangup' | 'cancel'
   | 'error' | 'offline' | 'ready' | 'connected' | 'transportClose'

@@ -116,7 +116,7 @@ interface QueuedMessage {
  * Promise-based accept/invite paths fail cleanly instead of crashing
  * synchronously inside setupSessionDescriptionHandler.
  */
-function createUnboundSdh(): SessionDescriptionHandler {
+function createUnboundSdh() {
   const reject = () => Promise.reject(
     new Error('SipSignalingAdapter: no PeerConnection binding registered for SIP session'),
   );
@@ -126,13 +126,13 @@ function createUnboundSdh(): SessionDescriptionHandler {
     setDescription: reject,
     sendDtmf: () => false,
     close: () => { /* no-op */ },
-  };
+  } satisfies SessionDescriptionHandler;
 }
 
 /**
  * SignalingAdapter implementation backed by SIP.js. Handles WebSocket
  * connection, SIP registration lifecycle, and call-level signaling
- * (INVITE, BYE, re-INVITE, INFO, MESSAGE).
+ * (INVITE, BYE, re-INVITE, MESSAGE).
  */
 export class SipSignalingAdapter extends EventEmitter implements SignalingAdapter {
   private _log: Log = new Log('SipSignalingAdapter');
@@ -141,12 +141,12 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   private _outboundSessions: Map<string, Inviter> = new Map();
   private _pendingInvitations: Map<string, Invitation> = new Map();
   private _sessionBindings: WeakMap<Session, SdhBinding> = new WeakMap();
-  private _registerer: any | null = null;
+  private _registerer: Registerer | null = null;
   private _region: string | undefined;
   private _status: SignalingAdapterStatus = 'disconnected';
   private _token: string = '';
   private _uri: string;
-  private _userAgent: any | null = null;
+  private _userAgent: UserAgent | null = null;
   private _backoff: { preferred: Backoff, primary: Backoff } | null = null;
   private _backoffStartTime: { preferred: number | null, primary: number | null } = {
     preferred: null,
@@ -569,30 +569,14 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     }, config.reconnectToken);
   }
 
-  dtmf(callSid: string, { digits }: DtmfConfig): void {
-    const session = this._getSession(callSid);
-    if (!session || session.state !== SessionState.Established) {
-      this._log.warn('dtmf: no established session for callSid', callSid);
-      return;
-    }
-    const sendDigits = async () => {
-      for (const digit of digits) {
-        try {
-          await session.info({
-            requestOptions: {
-              body: {
-                contentDisposition: 'render',
-                contentType: 'application/dtmf-relay',
-                content: `Signal=${digit}\r\nDuration=100\r\n`,
-              },
-            },
-          });
-        } catch (error: any) {
-          this._log.warn('Failed to send DTMF digit', digit, error?.message);
-        }
-      }
-    };
-    sendDigits();
+  dtmf(callSid: string, _config: DtmfConfig): void {
+    // The edge only handles RFC2833 DTMF, which Call sends via RTCDTMFSender.
+    // It ignores SIP INFO, so there is no signaling fallback; emit an error so
+    // the app knows the digits weren't sent.
+    this.emit('error', {
+      error: { code: 31000, message: 'DTMF is not supported over SIP signaling' },
+      callsid: callSid,
+    });
   }
 
   sendMessage(callSid: string, { content, contentType, voiceEventSid }: SipSendMessageConfig): void {
@@ -635,56 +619,55 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
   private _hangupOutboundSession(session: Inviter, callSid: string): void {
     this._outboundSessions.delete(callSid);
-
-    switch (session.state) {
-      case SessionState.Established:
-        session.bye().catch((error: Error) => {
-          this._log.error('Failed to send BYE', error);
-          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-        });
-        return;
-      case SessionState.Initial:
-      case SessionState.Establishing:
-        session.cancel().catch((error: Error) => {
-          this._log.error('Failed to cancel outgoing call', error);
-          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-        });
-        return;
-      case SessionState.Terminating:
-      case SessionState.Terminated:
-        this._log.debug('_hangupOutboundSession: session already ending', session.state);
-        return;
-      default: {
-        const _exhaustive: never = session.state;
-        this._log.warn('_hangupOutboundSession: unexpected session state', _exhaustive);
-      }
-    }
+    this._hangupSession(
+      session,
+      callSid,
+      () => session.cancel(),
+      'Failed to cancel outgoing call',
+    );
   }
 
   private _hangupInboundSession(session: Invitation, callSid: string): void {
     this._inboundSessions.delete(callSid);
+    this._hangupSession(
+      session,
+      callSid,
+      () => session.reject(),
+      'Failed to reject invitation during hangup',
+    );
+  }
+
+  /**
+   * Shared hangup state machine. Outbound and inbound differ only in how an
+   * unestablished session is aborted: CANCEL for an Inviter we sent, reject
+   * for an Invitation we received.
+   */
+  private _hangupSession(
+    session: Session,
+    callSid: string,
+    abortUnestablished: () => Promise<unknown>,
+    abortErrorMessage: string,
+  ): void {
+    const onFailure = (message: string) => (error: Error) => {
+      this._log.error(message, error);
+      this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+    };
 
     switch (session.state) {
       case SessionState.Established:
-        session.bye().catch((error: Error) => {
-          this._log.error('Failed to send BYE', error);
-          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-        });
+        session.bye().catch(onFailure('Failed to send BYE'));
         return;
       case SessionState.Initial:
       case SessionState.Establishing:
-        session.reject().catch((error: Error) => {
-          this._log.error('Failed to reject invitation during hangup', error);
-          this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
-        });
+        abortUnestablished().catch(onFailure(abortErrorMessage));
         return;
       case SessionState.Terminating:
       case SessionState.Terminated:
-        this._log.debug('_hangupInboundSession: session already ending', session.state);
+        this._log.debug('_hangupSession: session already ending', session.state);
         return;
       default: {
         const _exhaustive: never = session.state;
-        this._log.warn('_hangupInboundSession: unexpected session state', _exhaustive);
+        this._log.warn('_hangupSession: unexpected session state', _exhaustive);
       }
     }
   }

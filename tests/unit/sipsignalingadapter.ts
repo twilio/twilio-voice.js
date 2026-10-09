@@ -697,6 +697,86 @@ describe('SipSignalingAdapter', () => {
       assert(inv.reject.calledOnce);
     });
 
+    it('should call session.bye() on an answered inbound session', () => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      uaStub._triggerInvite(inv);
+      adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer', peerConnection: createPeerConnectionStub() });
+      inv.state = 'Established';
+      adapter.hangup('CA-test-call-sid', {});
+      assert(inv.bye.calledOnce);
+    });
+
+    it('should call invitation.reject() on an answered inbound session still establishing', () => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      uaStub._triggerInvite(inv);
+      adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer', peerConnection: createPeerConnectionStub() });
+      inv.reject.resetHistory();
+      inv.state = 'Establishing';
+      adapter.hangup('CA-test-call-sid', {});
+      assert(inv.reject.calledOnce);
+    });
+
+    it('should do nothing when an outbound session is already terminating', () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Terminating';
+      adapter.hangup('call-1', {});
+      sinon.assert.notCalled(inviterStub.bye);
+      sinon.assert.notCalled(inviterStub.cancel);
+    });
+
+    it('should do nothing when an inbound session is already terminated', () => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      uaStub._triggerInvite(inv);
+      adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer', peerConnection: createPeerConnectionStub() });
+      inv.reject.resetHistory();
+      inv.state = 'Terminated';
+      adapter.hangup('CA-test-call-sid', {});
+      sinon.assert.notCalled(inv.bye);
+      sinon.assert.notCalled(inv.reject);
+    });
+
+    it('should emit "error" if bye() fails', (done) => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      inviterStub.bye.rejects(new Error('bye failed'));
+      adapter.on('error', (payload: any) => {
+        assert.deepStrictEqual(payload, { error: { code: 31000, message: 'bye failed' }, callsid: 'call-1' });
+        done();
+      });
+      adapter.hangup('call-1', {});
+    });
+
+    it('should emit "error" if cancel() fails', (done) => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Establishing';
+      inviterStub.cancel.rejects(new Error('cancel failed'));
+      adapter.on('error', (payload: any) => {
+        assert.deepStrictEqual(payload, { error: { code: 31000, message: 'cancel failed' }, callsid: 'call-1' });
+        done();
+      });
+      adapter.hangup('call-1', {});
+    });
+
+    it('should emit "error" if reject() fails on an answered inbound session', (done) => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      uaStub._triggerInvite(inv);
+      adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer', peerConnection: createPeerConnectionStub() });
+      inv.state = 'Establishing';
+      inv.reject = sinon.stub().rejects(new Error('reject failed'));
+      adapter.on('error', (payload: any) => {
+        assert.deepStrictEqual(payload, { error: { code: 31000, message: 'reject failed' }, callsid: 'CA-test-call-sid' });
+        done();
+      });
+      adapter.hangup('CA-test-call-sid', {});
+    });
+
     it('should not throw for unknown callSid', () => {
       const { adapter } = createAdapter();
       assert.doesNotThrow(() => adapter.hangup('unknown', {}));
@@ -851,19 +931,20 @@ describe('SipSignalingAdapter', () => {
   });
 
   describe('dtmf()', () => {
-    it('should call session.info() for each digit', async () => {
+    it('should emit an error instead of sending SIP INFO', () => {
       const { adapter, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
       inviterStub.state = 'Established';
-      adapter.dtmf('call-1', { digits: '12' });
-      // Allow async sends to complete
-      await new Promise(resolve => setTimeout(resolve, 10));
-      assert.strictEqual(inviterStub.info.callCount, 2);
-    });
+      const errorSpy = sinon.spy();
+      adapter.on('error', errorSpy);
 
-    it('should not throw for non-established session', () => {
-      const { adapter } = createAdapter();
-      assert.doesNotThrow(() => adapter.dtmf('unknown', { digits: '1' }));
+      adapter.dtmf('call-1', { digits: '12' });
+
+      sinon.assert.calledOnceWithExactly(errorSpy, {
+        error: { code: 31000, message: 'DTMF is not supported over SIP signaling' },
+        callsid: 'call-1',
+      });
+      sinon.assert.notCalled(inviterStub.info);
     });
   });
 

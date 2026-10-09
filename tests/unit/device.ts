@@ -198,6 +198,32 @@ describe('Device', function() {
               sinon.assert.calledWithExactly(publisher.setHost, `eventgw.${region}.twilio.com`);
             });
           });
+
+          describe('when the eventgw option is set', () => {
+            beforeEach(async () => {
+              // The Publisher spy reassigns the outer `publisher` on construct.
+              device = new Device(token, { ...setupOptions, eventgw: 'eventgw.example.com' });
+              await setup();
+              publisher.setHost = sinon.stub();
+            });
+
+            it('should use it when home is absent', () => {
+              pstream.emit('connected', {});
+              sinon.assert.calledOnceWithExactly(publisher.setHost, 'eventgw.example.com');
+            });
+
+            it('should restore it when a later connect has no home', () => {
+              pstream.emit('connected', { home: 'us1' });
+              pstream.emit('connected', {});
+              sinon.assert.calledTwice(publisher.setHost);
+              sinon.assert.calledWithExactly(publisher.setHost.secondCall, 'eventgw.example.com');
+            });
+
+            it('should still set the host when home is present', () => {
+              pstream.emit('connected', { home: 'us1' });
+              sinon.assert.calledOnceWithExactly(publisher.setHost, 'eventgw.us1.twilio.com');
+            });
+          });
         });
 
         describe('defaultPayload', () => {
