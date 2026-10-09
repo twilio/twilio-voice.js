@@ -6,6 +6,8 @@
 Bug Fixes
 ---------
 
+- Fixed an issue where losing the signaling transport before a call received a signaling-reconnect token left its media open and the Device busy with a closed call. The SDK now closes the media and emits `disconnect`, releasing the active-call slot so a later `device.connect()` is not rejected with `InvalidStateError`. Calls with a reconnect token retain their existing recovery behavior.
+
 - Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/376) where setting the `maxAverageBitrate` option produced a malformed Opus `a=fmtp` line in the SDP, with `;maxaveragebitrate` added after the line's carriage return. Chrome re-serializes the SDP and hid the problem, but WebRTC redirection layers that pass the SDP through as-is, such as Citrix HDX, sent it unchanged and calls failed with error `31000`. The parameter is now added before the line ending.
 
 2.18.5 (September 10, 2026)

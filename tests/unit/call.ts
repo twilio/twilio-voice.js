@@ -1733,6 +1733,30 @@ describe('Call', function() {
     });
 
     describe('pstream.transportClose event', () => {
+      [
+        Call.State.Connecting,
+        Call.State.Ringing,
+        Call.State.Open,
+        Call.State.Reconnecting,
+      ].forEach(state => {
+        it(`should disconnect a ${state} call without a reconnect token`, () => {
+          conn['_status'] = state;
+          // PStream emits transportClose before updating its own status.
+          pstream.status = 'connected';
+          mediaHandler.close.callsFake(() => mediaHandler.onclose());
+          const disconnect = sinon.spy();
+          conn.on('disconnect', disconnect);
+
+          pstream.emit('transportClose');
+
+          assert.equal(conn.status(), Call.State.Closed);
+          sinon.assert.calledOnce(mediaHandler.close);
+          sinon.assert.calledOnceWithExactly(disconnect, conn);
+          sinon.assert.notCalled(pstream.hangup);
+          assert.equal(pstream.listenerCount('transportClose'), 0);
+        });
+      });
+
       it('should re-emit transportClose event', () => {
         const callback = sinon.stub();
         conn = new Call(config, Object.assign({
@@ -1755,6 +1779,9 @@ describe('Call', function() {
         pstream.emit('transportClose');
 
         sinon.assert.calledWith(publisher.info, 'connection', 'reconnecting');
+        assert.equal(conn.status(), Call.State.Reconnecting);
+        sinon.assert.notCalled(mediaHandler.close);
+        sinon.assert.notCalled(pstream.hangup);
       });
     });
 
