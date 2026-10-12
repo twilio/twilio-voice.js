@@ -1031,12 +1031,13 @@ class Device extends EventEmitter {
       MediaStream: this._options.MediaStream,
       RTCPeerConnection: this._options.RTCPeerConnection,
       beforeAccept: (currentCall: Call) => {
-        if (!this._activeCall || this._activeCall === currentCall) {
-          return;
+        if (this._activeCall && this._activeCall !== currentCall) {
+          this._activeCall.disconnect();
+          this._removeCall(this._activeCall);
         }
 
-        this._activeCall.disconnect();
-        this._removeCall(this._activeCall);
+        // Claim the slot now; 'accept' only fires once media is open.
+        this._activeCall = currentCall;
       },
       codecPreferences: this._options.codecPreferences,
       customSounds: this._options.sounds,

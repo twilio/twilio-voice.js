@@ -1197,6 +1197,49 @@ describe('Device', function() {
           await incomingPromise;
         });
 
+        describe('on call.beforeAccept', () => {
+          let callA: any;
+          let callB: any;
+
+          beforeEach(async () => {
+            callA = device.calls[0];
+            connectOptions!.beforeAccept(callA);
+
+            pstream.emit('invite', { callsid: 'CA5678', sdp: 'foobar' });
+            await clock.tickAsync(0);
+          });
+
+          it('should set the active call before media opens', () => {
+            assert.equal(device['_activeCall'], callA);
+            assert.equal(device.isBusy, true);
+          });
+
+          it('should ignore a second invite while connecting', () => {
+            assert.equal(device.calls.length, 1);
+          });
+
+          it('should clear the active call if the call fails while connecting', () => {
+            callA.emit('disconnect');
+            assert.equal(device['_activeCall'], null);
+          });
+
+          context('when allowIncomingWhileBusy is true', () => {
+            beforeEach(async () => {
+              device['_options'].allowIncomingWhileBusy = true;
+              pstream.emit('invite', { callsid: 'CA9012', sdp: 'foobar' });
+              await clock.tickAsync(0);
+              callB = device.calls[device.calls.length - 1];
+              connectOptions!.beforeAccept(callB);
+            });
+
+            it('should disconnect the connecting call when another is accepted', () => {
+              sinon.assert.calledOnce(callA.disconnect);
+              assert.equal(device.calls.indexOf(callA), -1);
+              assert.equal(device['_activeCall'], callB);
+            });
+          });
+        });
+
         describe('on call.accept', () => {
           it('should set the active call', () => {
             const call = device.calls[0];
