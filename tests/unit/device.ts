@@ -1238,6 +1238,29 @@ describe('Device', function() {
               assert.equal(device['_activeCall'], callB);
             });
           });
+
+          context('when a disconnect handler accepts another call', () => {
+            let callC: any;
+
+            beforeEach(async () => {
+              device['_options'].allowIncomingWhileBusy = true;
+              pstream.emit('invite', { callsid: 'CA9012', sdp: 'foobar' });
+              await clock.tickAsync(0);
+              callB = device.calls[device.calls.length - 1];
+              pstream.emit('invite', { callsid: 'CA3456', sdp: 'foobar' });
+              await clock.tickAsync(0);
+              callC = device.calls[device.calls.length - 1];
+
+              callA.disconnect = sinon.spy(() => callA.emit('disconnect'));
+              callA.once('disconnect', () => connectOptions!.beforeAccept(callC));
+              connectOptions!.beforeAccept(callB);
+            });
+
+            it('should track only the last accepted call', () => {
+              sinon.assert.calledOnce(callB.disconnect);
+              assert.equal(device['_activeCall'], callC);
+            });
+          });
         });
 
         describe('on call.accept', () => {
