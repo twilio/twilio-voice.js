@@ -904,7 +904,7 @@ PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfigur
   }
   function onAnswerError(err) {
     const errMsg = err.message || err;
-    self.onerror({ info: {
+    self.onerror({ disconnect: true, info: {
       code: 31000,
       message: `Error creating the answer: ${errMsg}`,
       twilioError: new MediaErrors.ClientRemoteDescFailed(),

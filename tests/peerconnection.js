@@ -421,7 +421,7 @@ describe('PeerConnection', () => {
 
   context('PeerConnection.prototype.answerIncomingCall', () => {
     const METHOD = PeerConnection.prototype.answerIncomingCall;
-    const EXPECTED_ERROR = {info: {code: 31000, message: 'Error creating the answer: error message'}};
+    const EXPECTED_ERROR = {disconnect: true, info: {code: 31000, message: 'Error creating the answer: error message'}};
     const eCallSid = 'callSid';
     const eSDP = 'sdp';
     const eIceServers = 'iceServers';
@@ -512,7 +512,7 @@ describe('PeerConnection', () => {
 
     it('Should call onerror event when processSDP error callback is called and returns error object', () => {
       const error = new Error('error message');
-      const expectedError = {info: {code: 31000, message: 'Error creating the answer: error message'}};
+      const expectedError = {disconnect: true, info: {code: 31000, message: 'Error creating the answer: error message'}};
       context._initializeMediaStream.returns(true);
       version.processSDP.callsArgWith(5, error);
       toTest();
