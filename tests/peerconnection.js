@@ -266,6 +266,16 @@ describe('PeerConnection', () => {
       assert.strictEqual(context.status, 'closed');
     });
 
+    it('Should release a late stream but not call onclose again when already closed', () => {
+      toTest();
+      const lateStream = { name: 'acquired after close' };
+      context.stream = lateStream;
+      toTest();
+      assert(context._stopStream.calledTwice);
+      assert.strictEqual(context.stream, null);
+      assert(context.onclose.calledOnce);
+    });
+
     it('Should stop everything what is available with minimum context', () => {
       context.version = false;
       context.stream = false;

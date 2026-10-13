@@ -949,6 +949,11 @@ PeerConnection.prototype.close = function() {
   if (this._outputAnalyser2) {
     this._outputAnalyser2.disconnect();
   }
+  // A repeat close only releases late resources, e.g. a stream from getUserMedia;
+  // don't emit onclose again.
+  if (this.status === 'closed') {
+    return;
+  }
   this.status = 'closed';
   this.onclose();
 };

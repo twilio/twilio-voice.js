@@ -39,6 +39,8 @@ describe('Concurrent accept', function() {
     await callerB.connect({ params: { To: calleeIdentity } });
     const callB = await incomingB;
 
+    let disconnectCountA = 0;
+    callA.on('disconnect', () => disconnectCountA++);
     const disconnectA = expectEvent('disconnect', callA);
     const acceptB = expectEvent('accept', callB);
 
@@ -47,7 +49,10 @@ describe('Concurrent accept', function() {
     callB.accept();
 
     await Promise.all([disconnectA, acceptB]);
+    // callA's getUserMedia settles after it was disconnected; that must not emit again.
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
+    assert.strictEqual(disconnectCountA, 1);
     assert.strictEqual(callA.status(), Call.State.Closed);
     assert.strictEqual(callB.status(), Call.State.Open);
     assert.strictEqual(callee.isBusy, true);
