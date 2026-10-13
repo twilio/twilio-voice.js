@@ -292,6 +292,16 @@ PeerConnection.prototype._setInputTracksFromStream = function(shouldClone, newSt
     // We can't use MediaStream.clone() here because it stopped copying over tracks
     //   as of Chrome 61. https://bugs.chromium.org/p/chromium/issues/detail?id=770908
     this.stream = shouldClone ? cloneStream(newStream, this.options.MediaStream) : newStream;
+  } else if (!this._sender && !(this.version && this.version.pc)) {
+    // No RTCPeerConnection yet, so there is no track to replace. A stream the app set
+    // wins over a late default-device stream from the call's own getUserMedia.
+    if (!shouldClone && !this._shouldManageStream) {
+      this._audioHelper._stopDefaultInputDeviceStream();
+      return getStreamPromise();
+    }
+
+    this._stopStream();
+    this.stream = shouldClone ? cloneStream(newStream, this.options.MediaStream) : newStream;
   } else {
     // If the call was started with gUM, and we are now replacing that track with an
     // external stream's tracks, we should stop the old managed track.

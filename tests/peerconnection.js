@@ -187,6 +187,38 @@ describe('PeerConnection', () => {
         assert(mediaStream.calledOnce);
       }).then(done).catch(done);
     });
+
+    describe('when there is no RTCPeerConnection yet', () => {
+      beforeEach(() => {
+        context = {
+          stream: STREAM,
+          mute: sinon.stub(),
+          version: null,
+          _audioHelper: { _stopDefaultInputDeviceStream: sinon.stub() },
+          _stopStream: sinon.stub(),
+          options: { MediaStream: sinon.stub().returns({ addTrack: sinon.stub(), id: 3 }) },
+        };
+        toTest = METHOD.bind(context);
+      });
+
+      it('Should keep the app stream and release a late default stream', () => {
+        context._shouldManageStream = false;
+        return toTest(false, newStream).then(result => {
+          sinon.assert.calledOnce(context._audioHelper._stopDefaultInputDeviceStream);
+          assert.strictEqual(result, STREAM);
+          assert.strictEqual(context.stream, STREAM);
+        });
+      });
+
+      it('Should swap a managed default stream for the app stream', () => {
+        context._shouldManageStream = true;
+        return toTest(true, newStream).then(result => {
+          sinon.assert.calledOnce(context._stopStream);
+          assert.strictEqual(result.id, 3);
+          assert.strictEqual(context.stream.id, 3);
+        });
+      });
+    });
   });
 
   context('PeerConnection.prototype.close', () => {
