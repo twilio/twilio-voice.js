@@ -673,6 +673,11 @@ class Call extends EventEmitter {
       this._options.beforeAccept(this);
     }
 
+    // beforeAccept can disconnect this call, e.g. from another call's disconnect handler.
+    if (this._status !== Call.State.Connecting) {
+      return;
+    }
+
     const inputStream = typeof this._options.getInputStream === 'function' && this._options.getInputStream();
 
     const promise = inputStream

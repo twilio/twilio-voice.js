@@ -426,6 +426,19 @@ describe('Call', function() {
       assert.equal(conn.status(), Call.State.Connecting);
     });
 
+    context('when beforeAccept disconnects the call', () => {
+      beforeEach(() => {
+        conn = new Call(config, Object.assign(options, { beforeAccept: (call: Call) => call.disconnect() }));
+        mediaHandler.close = sinon.spy(() => mediaHandler.onclose());
+      });
+
+      it('should not open a media stream', () => {
+        conn.accept();
+        assert.equal(conn.status(), Call.State.Closed);
+        sinon.assert.notCalled(mediaHandler.openDefaultDeviceWithConstraints);
+      });
+    });
+
     context('when getInputStream is not present', () => {
       it('should call mediaHandler.openDefaultDeviceWithConstraints with rtcConstraints if passed', () => {
         conn.accept({ rtcConstraints: { audio: { foo: 'bar' } as MediaTrackConstraints } });

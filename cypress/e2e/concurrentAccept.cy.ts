@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../../tests/lib/token';
-import { expectEvent } from '../../tests/lib/util';
+import { expectEvent, waitFor } from '../../tests/lib/util';
 
 describe('Concurrent accept', function() {
   this.timeout(30000);
@@ -10,19 +10,28 @@ describe('Concurrent accept', function() {
 
   let callerA: Device;
   let callerB: Device;
+  let callerC: Device;
   let callee: Device;
   let calleeIdentity: string;
+  let getUserMediaCount: number;
 
   beforeEach(async () => {
     calleeIdentity = 'callee-' + Date.now();
     callerA = new Device(await generateAccessToken('callerA-' + Date.now()));
     callerB = new Device(await generateAccessToken('callerB-' + Date.now()));
-    callee = new Device(await generateAccessToken(calleeIdentity));
+    callerC = new Device(await generateAccessToken('callerC-' + Date.now()));
+    getUserMediaCount = 0;
+    callee = new Device(await generateAccessToken(calleeIdentity), {
+      getUserMedia: (constraints: MediaStreamConstraints) => {
+        getUserMediaCount++;
+        return navigator.mediaDevices.getUserMedia(constraints);
+      },
+    } as any);
     await callee.register();
   });
 
   afterEach(() => {
-    [callerA, callerB, callee].forEach(device => {
+    [callerA, callerB, callerC, callee].forEach(device => {
       if (device) {
         device.disconnectAll();
         device.destroy();
@@ -56,6 +65,37 @@ describe('Concurrent accept', function() {
     assert.strictEqual(callA.status(), Call.State.Closed);
     assert.strictEqual(callB.status(), Call.State.Open);
     assert.strictEqual(callee.isBusy, true);
+    assert.strictEqual(callee.calls.length, 0);
+  });
+
+  it('should keep only the last call when a disconnect handler accepts another', async () => {
+    const calls: Call[] = [];
+    for (const caller of [callerA, callerB, callerC]) {
+      const incoming: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
+      await caller.connect({ params: { To: calleeIdentity } });
+      calls.push(await incoming);
+    }
+    const [callA, callB, callC] = calls;
+
+    let errorB: any = null;
+    callB.on('error', error => { errorB = error; });
+    callA.once('disconnect', () => callC.accept());
+    const disconnectB = expectEvent('disconnect', callB);
+    const acceptC = expectEvent('accept', callC);
+
+    callA.accept();
+    callB.accept();
+
+    await waitFor([disconnectB, acceptC], 15000);
+    // Let any late getUserMedia from callA or callB settle.
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // callB was disconnected inside its own accept(), so it never requests the mic.
+    assert.strictEqual(getUserMediaCount, 2);
+    assert.strictEqual(errorB, null);
+    assert.strictEqual(callB.status(), Call.State.Closed);
+    assert.strictEqual(callC.status(), Call.State.Open);
+    assert.strictEqual(callC.getLocalStream()!.getAudioTracks()[0].readyState, 'live');
     assert.strictEqual(callee.calls.length, 0);
   });
 });
