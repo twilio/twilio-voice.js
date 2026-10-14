@@ -426,6 +426,31 @@ describe('Call', function() {
       assert.equal(conn.status(), Call.State.Connecting);
     });
 
+    context('when beforeAccept is set', () => {
+      let beforeAccept: sinon.SinonSpy;
+      let statusInBeforeAccept: Call.State | undefined;
+
+      beforeEach(() => {
+        statusInBeforeAccept = undefined;
+        beforeAccept = sinon.spy((call: Call) => { statusInBeforeAccept = call.status(); });
+      });
+
+      it('should call it synchronously, while connecting, before opening the default device', () => {
+        conn = new Call(config, Object.assign(options, { beforeAccept }));
+        conn.accept();
+        sinon.assert.calledOnceWithExactly(beforeAccept, conn);
+        assert.equal(statusInBeforeAccept, Call.State.Connecting);
+        sinon.assert.callOrder(beforeAccept, mediaHandler.openDefaultDeviceWithConstraints);
+      });
+
+      it('should call it before setting tracks from an input stream', () => {
+        conn = new Call(config, Object.assign(options, { beforeAccept, getInputStream: () => 'foo' }));
+        conn.accept();
+        sinon.assert.calledOnceWithExactly(beforeAccept, conn);
+        sinon.assert.callOrder(beforeAccept, mediaHandler.setInputTracksFromStream);
+      });
+    });
+
     context('when beforeAccept disconnects the call', () => {
       beforeEach(() => {
         conn = new Call(config, Object.assign(options, { beforeAccept: (call: Call) => call.disconnect() }));
