@@ -10,6 +10,8 @@ Bug Fixes
 
 - Fixed an issue where a `Device` could end up with two open calls. An incoming call only counted as the `Device`'s active call once its media was connected, which can take several seconds while waiting on `getUserMedia`. Accepting a second incoming call in that window did not disconnect the first, and with `allowIncomingWhileBusy: false` a new incoming call was still surfaced. An accepted incoming call now becomes the active call as soon as `accept()` is called, as outgoing calls already did. While it connects, the `Device` now treats it as active: `device.isBusy` is `true`, `device.connect()` and an `edge`-changing `device.updateOptions()` throw `InvalidStateError`, another incoming call is surfaced without a ringtone (or ignored when `allowIncomingWhileBusy` is `false`), and `closeProtection` prompts before the page unloads.
 
+- Fixed an issue where an incoming call whose offer the browser rejected never emitted an `error` and stayed connecting after `accept()`. It now emits error `53402` (`ClientRemoteDescFailed`) and disconnects. An incoming call also now disconnects when creating its answer fails, where it previously emitted the same error but stayed connecting.
+
 2.18.5 (September 10, 2026)
 ===========================
 

@@ -4,11 +4,15 @@ import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../../tests/lib/token';
 import { expectEvent, waitFor } from '../../tests/lib/util';
 
-// Fails the local answer, which reaches PeerConnection's onAnswerError.
-function FailingAnswerRTCPeerConnection(configuration?: RTCConfiguration) {
+// The RTCPeerConnection method the callee's peer connection fails, set per test.
+let failingMethod: 'setRemoteDescription' | 'setLocalDescription';
+
+// Fails the offer (setRemoteDescription) or the answer (setLocalDescription),
+// which reaches PeerConnection's onAnswerError either way.
+function FailingRTCPeerConnection(configuration?: RTCConfiguration) {
   const pc: any = new RTCPeerConnection(configuration);
-  pc.setLocalDescription = (_desc: any, _onSuccess?: Function, onError?: Function) => {
-    const error = new Error('forced answer failure');
+  pc[failingMethod] = (_desc: any, _onSuccess?: Function, onError?: Function) => {
+    const error = new Error(`forced ${failingMethod} failure`);
     if (typeof onError === 'function') {
       onError(error);
       return;
@@ -30,7 +34,7 @@ describe('Answer failure', function() {
     calleeIdentity = 'callee-' + Date.now();
     caller = new Device(await generateAccessToken('caller-' + Date.now()));
     callee = new Device(await generateAccessToken(calleeIdentity), {
-      RTCPeerConnection: FailingAnswerRTCPeerConnection,
+      RTCPeerConnection: FailingRTCPeerConnection,
     } as any);
     callee.on('error', () => { /* expected */ });
     await callee.register();
@@ -45,20 +49,23 @@ describe('Answer failure', function() {
     });
   });
 
-  it('should disconnect the call and leave the Device idle', async () => {
-    const incoming: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
-    await caller.connect({ params: { To: calleeIdentity } });
-    const call = await incoming;
+  ['setRemoteDescription', 'setLocalDescription'].forEach(method => {
+    it(`should disconnect the call and leave the Device idle when ${method} fails`, async () => {
+      failingMethod = method as typeof failingMethod;
+      const incoming: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
+      await caller.connect({ params: { To: calleeIdentity } });
+      const call = await incoming;
 
-    const error = expectEvent('error', call);
-    const disconnect = expectEvent('disconnect', call);
-    call.accept();
-    assert.strictEqual(callee.isBusy, true);
+      const error = expectEvent('error', call);
+      const disconnect = expectEvent('disconnect', call);
+      call.accept();
+      assert.strictEqual(callee.isBusy, true);
 
-    await waitFor([error, disconnect], 15000);
+      await waitFor([error, disconnect], 15000);
 
-    assert.strictEqual(((await error) as any).code, 53402);
-    assert.strictEqual(call.status(), Call.State.Closed);
-    assert.strictEqual(callee.isBusy, false);
+      assert.strictEqual(((await error) as any).code, 53402);
+      assert.strictEqual(call.status(), Call.State.Closed);
+      assert.strictEqual(callee.isBusy, false);
+    });
   });
 });
