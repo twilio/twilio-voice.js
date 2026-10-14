@@ -1520,6 +1520,9 @@ class Call extends EventEmitter {
       this._log.debug('#reconnecting');
       this.emit('reconnecting', new SignalingErrors.ConnectionDisconnected());
     } else {
+      // The transport is closed; do not queue a hangup for replay.
+      this._shouldSendHangup = false;
+      this._disconnect(null, true);
       this._status = Call.State.Closed;
       this._signalingStatus = Call.State.Closed;
     }
