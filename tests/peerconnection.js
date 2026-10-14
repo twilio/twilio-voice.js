@@ -204,7 +204,7 @@ describe('PeerConnection', () => {
       it('Should keep the app stream and release a late default stream', () => {
         context._shouldManageStream = false;
         return toTest(false, newStream).then(result => {
-          sinon.assert.calledOnce(context._audioHelper._stopDefaultInputDeviceStream);
+          sinon.assert.calledOnceWithExactly(context._audioHelper._stopDefaultInputDeviceStream, newStream);
           assert.strictEqual(result, STREAM);
           assert.strictEqual(context.stream, STREAM);
         });
@@ -2183,6 +2183,13 @@ describe('PeerConnection', () => {
       context._shouldManageStream = true;
       toTest();
       sinon.assert.calledOnce(stub);
+    });
+
+    it('should release only its own stream', () => {
+      context._shouldManageStream = true;
+      context.stream = 'this is a stream';
+      toTest();
+      sinon.assert.calledWithExactly(stub, 'this is a stream');
     });
 
     it('should do nothing if _shouldManageStream is false', () => {

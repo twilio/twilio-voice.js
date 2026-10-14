@@ -569,6 +569,30 @@ describe('AudioHelper', () => {
         sinon.assert.notCalled(stopStub);
       });
 
+      it('should stop the default stream when passed the current default', async () => {
+        const stream = await audio._openDefaultDeviceWithConstraints();
+        audio._stopDefaultInputDeviceStream(stream);
+        sinon.assert.calledOnce(stopStub);
+        audio._stopDefaultInputDeviceStream();
+        sinon.assert.calledOnce(stopStub);
+      });
+
+      it('should only stop the passed stream once a later default stream replaced it', async () => {
+        const stopA = sinon.stub();
+        const stopB = sinon.stub();
+        getUserMedia.onFirstCall().returns(Promise.resolve({ getTracks: () => [{ stop: stopA }] }));
+        getUserMedia.onSecondCall().returns(Promise.resolve({ getTracks: () => [{ stop: stopB }] }));
+        const streamA = await audio._openDefaultDeviceWithConstraints();
+        await audio._openDefaultDeviceWithConstraints();
+
+        audio._stopDefaultInputDeviceStream(streamA);
+        sinon.assert.calledOnce(stopA);
+        sinon.assert.notCalled(stopB);
+
+        audio._stopDefaultInputDeviceStream();
+        sinon.assert.calledOnce(stopB);
+      });
+
       it('should destroy stop processed tracks', async () => {
         await audio.addProcessor(localProcessor);
         await audio._openDefaultDeviceWithConstraints();

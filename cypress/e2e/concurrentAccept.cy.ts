@@ -14,6 +14,8 @@ describe('Concurrent accept', function() {
   let callee: Device;
   let calleeIdentity: string;
   let getUserMediaCount: number;
+  // When set, holds getUserMedia results until two are ready, then releases them in request order.
+  let pairGate: Array<() => void> | null;
 
   beforeEach(async () => {
     calleeIdentity = 'callee-' + Date.now();
@@ -21,10 +23,22 @@ describe('Concurrent accept', function() {
     callerB = new Device(await generateAccessToken('callerB-' + Date.now()));
     callerC = new Device(await generateAccessToken('callerC-' + Date.now()));
     getUserMediaCount = 0;
+    pairGate = null;
     callee = new Device(await generateAccessToken(calleeIdentity), {
       getUserMedia: (constraints: MediaStreamConstraints) => {
-        getUserMediaCount++;
-        return navigator.mediaDevices.getUserMedia(constraints);
+        const index = getUserMediaCount++;
+        const stream = navigator.mediaDevices.getUserMedia(constraints);
+        const gate = pairGate;
+        if (!gate) {
+          return stream;
+        }
+        return stream.then(s => new Promise<MediaStream>(resolve => {
+          gate[index] = () => resolve(s);
+          if (gate[0] && gate[1]) {
+            gate[0]();
+            gate[1]();
+          }
+        }));
       },
     } as any);
     await callee.register();
@@ -97,5 +111,28 @@ describe('Concurrent accept', function() {
     assert.strictEqual(callC.status(), Call.State.Open);
     assert.strictEqual(callC.getLocalStream()!.getAudioTracks()[0].readyState, 'live');
     assert.strictEqual(callee.calls.length, 0);
+  });
+
+  it('should keep the second call mic live when both getUserMedia requests settle together', async () => {
+    const incomingA: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
+    await callerA.connect({ params: { To: calleeIdentity } });
+    const callA = await incomingA;
+
+    const incomingB: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
+    await callerB.connect({ params: { To: calleeIdentity } });
+    const callB = await incomingB;
+
+    const acceptB = expectEvent('accept', callB);
+    pairGate = [];
+    callA.accept();
+    callB.accept();
+
+    await waitFor(acceptB, 15000);
+    // Let callA's late close run.
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    assert.strictEqual(callA.status(), Call.State.Closed);
+    assert.strictEqual(callB.status(), Call.State.Open);
+    assert.strictEqual(callB.getLocalStream()!.getAudioTracks()[0].readyState, 'live');
   });
 });

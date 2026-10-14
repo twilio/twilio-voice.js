@@ -466,8 +466,15 @@ class AudioHelper extends EventEmitter {
   /**
    * Stop the default audio stream
    * @internal
+   * @param stream - The stream a call is releasing. If a later call has since replaced
+   *   the default stream, only this stream's tracks are stopped.
    */
-  _stopDefaultInputDeviceStream(): void {
+  _stopDefaultInputDeviceStream(stream?: MediaStream | null): void {
+    if (stream && stream !== this._defaultInputDeviceStream && stream !== this._localProcessedStream) {
+      stream.getTracks().forEach(track => track.stop());
+      return;
+    }
+
     if (this._defaultInputDeviceStream) {
       this._log.info('stopping default device stream');
       this._defaultInputDeviceStream.getTracks().forEach(track => track.stop());

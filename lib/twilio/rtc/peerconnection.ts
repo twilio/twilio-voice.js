@@ -218,7 +218,7 @@ PeerConnection.prototype._stopStream = function _stopStream() {
     return;
   }
 
-  this._audioHelper._stopDefaultInputDeviceStream();
+  this._audioHelper._stopDefaultInputDeviceStream(this.stream);
 };
 
 /**
@@ -296,7 +296,7 @@ PeerConnection.prototype._setInputTracksFromStream = function(shouldClone, newSt
     // No RTCPeerConnection yet, so there is no track to replace. A stream the app set
     // wins over a late default-device stream from the call's own getUserMedia.
     if (!shouldClone && !this._shouldManageStream) {
-      this._audioHelper._stopDefaultInputDeviceStream();
+      this._audioHelper._stopDefaultInputDeviceStream(newStream);
       return getStreamPromise();
     }
 
