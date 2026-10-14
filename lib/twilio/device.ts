@@ -681,7 +681,8 @@ class Device extends EventEmitter {
   }
 
   /**
-   * Whether the Device is currently on an active Call.
+   * Whether the Device is currently on an active Call. A Call counts as active from
+   * `device.connect()` or `call.accept()`, before its media has connected.
    */
   get isBusy(): boolean {
     return !!this._activeCall;
