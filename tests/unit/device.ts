@@ -1220,8 +1220,29 @@ describe('Device', function() {
           });
 
           it('should clear the active call if the call fails while connecting', () => {
+            assert.equal(device['_activeCall'], callA);
             callA.emit('disconnect');
             assert.equal(device['_activeCall'], null);
+          });
+
+          it('should clear the active call if the call is canceled while connecting', () => {
+            assert.equal(device['_activeCall'], callA);
+            callA.emit('cancel');
+            assert.equal(device['_activeCall'], null);
+          });
+
+          it('should clear the active call on an error that closed the call', () => {
+            assert.equal(device['_activeCall'], callA);
+            callA.status = () => 'closed';
+            callA.emit('error', new Error('closed'));
+            assert.equal(device['_activeCall'], null);
+          });
+
+          it('should keep the active call on an error that left the call connecting', () => {
+            callA.status = () => 'connecting';
+            callA.emit('error', new Error('warning'));
+            assert.equal(device['_activeCall'], callA);
+            assert.equal(device.isBusy, true);
           });
 
           context('when allowIncomingWhileBusy is true', () => {
