@@ -16,6 +16,8 @@ describe('Concurrent accept', function() {
   let getUserMediaCount: number;
   // When set, holds getUserMedia results until two are ready, then releases them in request order.
   let pairGate: Array<() => void> | null;
+  // When set, holds every getUserMedia result until it resolves.
+  let holdGate: Promise<void> | null;
 
   beforeEach(async () => {
     calleeIdentity = 'callee-' + Date.now();
@@ -24,10 +26,15 @@ describe('Concurrent accept', function() {
     callerC = new Device(await generateAccessToken('callerC-' + Date.now()));
     getUserMediaCount = 0;
     pairGate = null;
+    holdGate = null;
     callee = new Device(await generateAccessToken(calleeIdentity), {
       getUserMedia: (constraints: MediaStreamConstraints) => {
         const index = getUserMediaCount++;
         const stream = navigator.mediaDevices.getUserMedia(constraints);
+        const hold = holdGate;
+        if (hold) {
+          return stream.then(s => hold.then(() => s));
+        }
         const gate = pairGate;
         if (!gate) {
           return stream;
@@ -134,5 +141,32 @@ describe('Concurrent accept', function() {
     assert.strictEqual(callA.status(), Call.State.Closed);
     assert.strictEqual(callB.status(), Call.State.Open);
     assert.strictEqual(callB.getLocalStream()!.getAudioTracks()[0].readyState, 'live');
+  });
+
+  it('should ignore an invite that arrives while an accepted call is connecting', async () => {
+    const incomingA: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
+    await callerA.connect({ params: { To: calleeIdentity } });
+    const callA = await incomingA;
+
+    let releaseGetUserMedia!: () => void;
+    holdGate = new Promise<void>(resolve => { releaseGetUserMedia = resolve; });
+    callA.accept();
+    assert.strictEqual(callee.isBusy, true);
+
+    let incomingCount = 0;
+    callee.on(Device.EventName.Incoming, () => incomingCount++);
+    const inviteB = new Promise<void>(resolve => (callee as any)._stream.once('invite', () => resolve()));
+    await callerB.connect({ params: { To: calleeIdentity } });
+    await waitFor(inviteB, 15000);
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    assert.strictEqual(incomingCount, 0);
+    // callA stays in device.calls until its media opens; no call for callerB was added.
+    assert.deepStrictEqual(callee.calls, [callA]);
+
+    const acceptA = expectEvent('accept', callA);
+    releaseGetUserMedia();
+    await waitFor(acceptA, 15000);
+    assert.strictEqual(callA.status(), Call.State.Open);
   });
 });
