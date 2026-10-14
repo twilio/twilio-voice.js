@@ -19,6 +19,10 @@ describe('Selected input device', function() {
     callerB = new Device(await generateAccessToken('callerB-' + Date.now()));
     callee = new Device(await generateAccessToken(calleeIdentity));
     await callee.register();
+    // Firefox hides device IDs until microphone permission is granted.
+    const permission = await navigator.mediaDevices.getUserMedia({ audio: true });
+    permission.getTracks().forEach(track => track.stop());
+    await (callee.audio as any)._updateAvailableDevices();
     const deviceId = Array.from(callee.audio!.availableInputDevices.keys())[0];
     await callee.audio!.setInputDevice(deviceId);
   });
