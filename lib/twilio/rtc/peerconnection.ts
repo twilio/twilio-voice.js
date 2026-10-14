@@ -88,6 +88,7 @@ function PeerConnection(audioHelper, pstream, options) {
   this._onHangup = noop;
   this._remoteStream = null;
   this._shouldManageStream = true;
+  this._openedStream = null;
   this._iceState = INITIAL_ICE_CONNECTION_STATE;
 
   this.options = options = options || {};
@@ -119,8 +120,11 @@ PeerConnection.prototype.uri = function() {
  * @param {MediaStreamConstraints} constraints
  */
 PeerConnection.prototype.openDefaultDeviceWithConstraints = function(constraints) {
-  return this._audioHelper._openDefaultDeviceWithConstraints(constraints)
-    .then(this._setInputTracksFromStream.bind(this, false));
+  return this._audioHelper._openDefaultDeviceWithConstraints(constraints).then(stream => {
+    // Remember the stream this PeerConnection opened; _stopStream releases only that one.
+    this._openedStream = stream;
+    return this._setInputTracksFromStream(false, stream);
+  });
 };
 
 /**
@@ -214,11 +218,12 @@ PeerConnection.prototype._startPollingVolume = function() {
 PeerConnection.prototype._stopStream = function _stopStream() {
   // We shouldn't stop the tracks if they were not created inside
   //   this PeerConnection.
-  if (!this._shouldManageStream) {
+  if (!this._shouldManageStream || !this._openedStream) {
     return;
   }
 
-  this._audioHelper._stopDefaultInputDeviceStream(this.stream);
+  this._audioHelper._stopDefaultInputDeviceStream(this._openedStream);
+  this._openedStream = null;
 };
 
 /**
@@ -297,6 +302,7 @@ PeerConnection.prototype._setInputTracksFromStream = function(shouldClone, newSt
     // wins over a late default-device stream from the call's own getUserMedia.
     if (!shouldClone && !this._shouldManageStream) {
       this._audioHelper._stopDefaultInputDeviceStream(newStream);
+      this._openedStream = null;
       return getStreamPromise();
     }
 
