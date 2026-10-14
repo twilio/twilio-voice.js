@@ -76,9 +76,10 @@ describe('Concurrent accept', function() {
 
     // getUserMedia is async, so callB.accept() lands before callA's media opens.
     callA.accept();
+    assert.strictEqual(callee.isBusy, true);
     callB.accept();
 
-    await Promise.all([disconnectA, acceptB]);
+    await waitFor([disconnectA, acceptB], 15000);
     // callA's getUserMedia settles after it was disconnected; that must not emit again.
     await new Promise(resolve => setTimeout(resolve, 1000));
 
