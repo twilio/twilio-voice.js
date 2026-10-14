@@ -1215,6 +1215,7 @@ describe('Device', function() {
           });
 
           it('should ignore a second invite while connecting', () => {
+            sinon.assert.neverCalledWith(device.emit as any, Device.EventName.Incoming);
             assert.equal(device.calls.length, 1);
           });
 
