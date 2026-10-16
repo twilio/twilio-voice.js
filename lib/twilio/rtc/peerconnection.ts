@@ -121,15 +121,17 @@ PeerConnection.prototype.uri = function() {
  */
 PeerConnection.prototype.openDefaultDeviceWithConstraints = function(constraints) {
   return this._audioHelper._openDefaultDeviceWithConstraints(constraints).then(stream => {
-    // A late result: the call ended, or the app set its own stream meanwhile.
+    // A late result: the call ended, or the app set its own stream meanwhile. It was
+    // never adopted, so releasing it leaves the shared default stream alone.
     if (this.status === 'closed' || !this._shouldManageStream) {
       this._audioHelper._stopDefaultInputDeviceStream(stream);
       return this.stream;
     }
 
     const result = this._setInputTracksFromStream(false, stream);
-    // Own the stream only after the swap released the previous one, so a close()
+    // Adopt and own the stream only after the swap released the previous one, so a close()
     // during the swap still releases it. _stopStream releases only this stream.
+    this._audioHelper._adoptDefaultInputDeviceStream(stream);
     this._openedStream = stream;
     return result;
   });

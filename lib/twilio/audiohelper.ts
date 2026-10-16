@@ -124,7 +124,7 @@ class AudioHelper extends EventEmitter {
 
   /**
    * The raw default device stream behind each stream _openDefaultDeviceWithConstraints returned,
-   * so a release stops its own pair even after a later request took over the slots.
+   * so adopting or releasing that stream finds its raw stream.
    */
   private _defaultRawStreams: WeakMap<MediaStream, MediaStream> = new WeakMap();
 
@@ -450,7 +450,8 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Call getUserMedia with specified constraints
+   * Call getUserMedia with specified constraints. The result becomes the default device stream
+   * only once a call adopts it, so a result for a call that has since ended leaves it alone.
    * @internal
    */
   _openDefaultDeviceWithConstraints(constraints: MediaStreamConstraints): Promise<MediaStream> {
@@ -464,8 +465,8 @@ class AudioHelper extends EventEmitter {
         // Ignore error, we don't want to break the call flow
         this._log.warn('Unable to updateAvailableDevices after gUM call', error);
       });
-      this._defaultInputDeviceStream = stream;
-      return this._maybeCreateLocalProcessedStream(stream).then(returnedStream => {
+      return this._createLocalProcessedStream(stream).then(processedStream => {
+        const returnedStream = processedStream || stream;
         this._defaultRawStreams.set(returnedStream, stream);
         return returnedStream;
       });
@@ -473,11 +474,24 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
+   * Make a stream _openDefaultDeviceWithConstraints returned the default device stream
+   * @internal
+   * @param stream - The stream, adopted by the live call that opened it.
+   */
+  _adoptDefaultInputDeviceStream(stream: MediaStream): void {
+    const rawStream = this._defaultRawStreams.get(stream) || stream;
+    this._defaultInputDeviceStream = rawStream;
+    if (rawStream !== stream) {
+      this._localProcessedStream = stream;
+    }
+  }
+
+  /**
    * Stop the default audio stream
    * @internal
-   * @param stream - The stream a call is releasing. Only this stream and its raw or processed
-   *   pair are released, and a slot is cleared only if it still holds them. Without it, the
-   *   current slots are released.
+   * @param stream - A stream _openDefaultDeviceWithConstraints returned. It and its raw stream
+   *   are released; a slot is cleared only if it still holds them. Without it, the current
+   *   slots are released.
    */
   _stopDefaultInputDeviceStream(stream?: MediaStream | null): void {
     if (stream) {
@@ -840,18 +854,31 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Route local stream to the processor if it exists.
+   * Route local stream to the processor if it exists, without setting the local processed stream.
+   * @returns The processed stream, or null without a processor.
    */
-  private _maybeCreateLocalProcessedStream(stream: MediaStream): Promise<MediaStream> {
+  private _createLocalProcessedStream(stream: MediaStream): Promise<MediaStream | null> {
     if (this._localProcessor) {
       this._log.info('Creating local processed stream');
       return this._localProcessor.createProcessedStream(stream).then((processedStream: MediaStream) => {
-        this._localProcessedStream = processedStream;
         this._audioProcessorEventObserver.emit('create', false);
-        return this._localProcessedStream;
+        return processedStream;
       });
     }
-    return Promise.resolve(stream);
+    return Promise.resolve(null);
+  }
+
+  /**
+   * Route local stream to the processor if it exists.
+   */
+  private _maybeCreateLocalProcessedStream(stream: MediaStream): Promise<MediaStream> {
+    return this._createLocalProcessedStream(stream).then(processedStream => {
+      if (!processedStream) {
+        return stream;
+      }
+      this._localProcessedStream = processedStream;
+      return processedStream;
+    });
   }
 
   /**

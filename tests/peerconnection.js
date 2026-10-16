@@ -32,6 +32,7 @@ describe('PeerConnection', () => {
         _shouldManageStream: true,
         _setInputTracksFromStream: sinon.stub().returns(Promise.resolve(INPUT_TRACKS_FROM_STREAM)),
         _audioHelper: {
+          _adoptDefaultInputDeviceStream: sinon.stub(),
           _openDefaultDeviceWithConstraints: sinon.stub().returns(Promise.resolve(USER_MEDIA_RESULT)),
           _stopDefaultInputDeviceStream: sinon.stub(),
         },
@@ -47,14 +48,16 @@ describe('PeerConnection', () => {
         assert(context._audioHelper._openDefaultDeviceWithConstraints.calledBefore(context._setInputTracksFromStream));
         assert.deepStrictEqual(INPUT_TRACKS_FROM_STREAM, stream);
         assert.strictEqual(context._openedStream, USER_MEDIA_RESULT);
+        sinon.assert.calledOnceWithExactly(context._audioHelper._adoptDefaultInputDeviceStream, USER_MEDIA_RESULT);
       }).then(done).catch(done);
     });
 
-    it('Should own the stream only after _setInputTracksFromStream released the previous one', () => {
+    it('Should adopt and own the stream only after _setInputTracksFromStream released the previous one', () => {
       context._openedStream = 'previous stream';
       let ownedDuringSwap;
       context._setInputTracksFromStream = sinon.spy(() => {
         ownedDuringSwap = context._openedStream;
+        sinon.assert.notCalled(context._audioHelper._adoptDefaultInputDeviceStream);
         return Promise.resolve(INPUT_TRACKS_FROM_STREAM);
       });
       return toTest().then(() => {
@@ -71,6 +74,7 @@ describe('PeerConnection', () => {
         setup(context);
         return toTest().then(result => {
           sinon.assert.calledOnceWithExactly(context._audioHelper._stopDefaultInputDeviceStream, USER_MEDIA_RESULT);
+          sinon.assert.notCalled(context._audioHelper._adoptDefaultInputDeviceStream);
           sinon.assert.notCalled(context._setInputTracksFromStream);
           assert.strictEqual(context._openedStream, undefined);
           assert.strictEqual(result, 'app stream');

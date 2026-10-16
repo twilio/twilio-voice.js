@@ -65,4 +65,21 @@ describe('setInputDevice while a call is connecting', function() {
     assert.strictEqual(call.getLocalStream()!.getAudioTracks()[0], callee.audio!.inputStream!.getAudioTracks()[0]);
     assert.strictEqual(late.getAudioTracks()[0].readyState, 'ended');
   });
+
+  it('should reject unsetInputDevice while the call is connecting', async () => {
+    const incoming: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
+    await caller.connect({ params: { To: calleeIdentity } });
+    const call = await incoming;
+    const accept = expectEvent('accept', call);
+
+    const deviceId = Array.from(callee.audio!.availableInputDevices.keys())[0];
+    call.accept();
+    await callee.audio!.setInputDevice(deviceId);
+    const unsetError = await callee.audio!.unsetInputDevice().then(() => null, error => error);
+    releaseDefault();
+    await waitFor(accept, 15000);
+
+    assert.strictEqual(unsetError && unsetError.name, 'InvalidStateError');
+    assert.strictEqual(call.status(), Call.State.Open);
+  });
 });

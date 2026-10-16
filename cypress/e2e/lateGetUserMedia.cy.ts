@@ -150,7 +150,7 @@ describe('Late getUserMedia results', function() {
     callB.accept();
     await waitFor(acceptB, 15000);
 
-    // callA's late result takes over the default stream slots while callB is still open.
+    // callA's late result arrives while callB is still open.
     releaseA();
     const [rawA, rawB] = await waitFor(defaultRequests, 15000).then(() => Promise.all(defaultRequests));
     await settle();
@@ -162,5 +162,40 @@ describe('Late getUserMedia results', function() {
 
     assert.deepStrictEqual([rawA, rawB].map(raw => raw.getAudioTracks()[0].readyState), ['ended', 'ended']);
     assert.strictEqual(destroyCount, 2);
+  });
+
+  it('should keep the live call processed stream after a late result, through removeProcessor', async () => {
+    await grantMicPermission(callee);
+    let destroyCount = 0;
+    const processor = {
+      createProcessedStream: (stream: MediaStream) =>
+        Promise.resolve(new MediaStream(stream.getAudioTracks().map(track => track.clone()))),
+      destroyProcessedStream: () => { destroyCount++; return Promise.resolve(); },
+    };
+    await callee.audio!.addProcessor(processor);
+
+    callerB = new Device(await generateAccessToken('callerB-' + Date.now()));
+    const callA = await incomingCall();
+    const callB = await incomingCall(callerB);
+    let releaseA!: () => void;
+    holds.set(0, new Promise<void>(resolve => { releaseA = resolve; }));
+
+    const acceptB = expectEvent('accept', callB);
+    callA.accept();
+    callB.accept();
+    await waitFor(acceptB, 15000);
+    const processedB = callB.getLocalStream()!;
+
+    releaseA();
+    await waitFor(defaultRequests, 15000);
+    await settle();
+    assert.strictEqual(callee.audio!.localProcessedStream, processedB);
+
+    await callee.audio!.removeProcessor(processor);
+
+    assert.strictEqual(processedB.getAudioTracks()[0].readyState, 'ended');
+    assert.strictEqual(destroyCount, 2);
+    assert.strictEqual(callB.status(), Call.State.Open);
+    assert.strictEqual(callB.getLocalStream()!.getAudioTracks()[0].readyState, 'live');
   });
 });

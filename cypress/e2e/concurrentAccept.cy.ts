@@ -114,7 +114,7 @@ describe('Concurrent accept', function() {
     callB.accept();
 
     await waitFor([disconnectB, acceptC], 15000);
-    // Let any late getUserMedia from callA or callB settle.
+    // Let callA's late getUserMedia settle.
     await settleRequests();
 
     // callB was disconnected inside its own accept(), so it never requests the mic.
