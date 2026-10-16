@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../../tests/lib/token';
-import { expectEvent, waitFor } from '../../tests/lib/util';
+import { expectEvent, grantMicPermission, waitFor } from '../../tests/lib/util';
 
 describe('setInputDevice while a call is connecting', function() {
   this.timeout(30000);
@@ -31,6 +31,7 @@ describe('setInputDevice while a call is connecting', function() {
       },
     } as any);
     await callee.register();
+    await grantMicPermission(callee);
   });
 
   afterEach(() => {

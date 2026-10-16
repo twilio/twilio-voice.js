@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../../tests/lib/token';
-import { expectEvent, waitFor } from '../../tests/lib/util';
+import { expectEvent, grantMicPermission, waitFor } from '../../tests/lib/util';
 
 describe('Late getUserMedia results', function() {
   this.timeout(30000);
@@ -58,10 +58,7 @@ describe('Late getUserMedia results', function() {
   };
 
   it('should release a late default stream when the call ends after setInputDevice', async () => {
-    // Firefox hides device IDs until microphone permission is granted.
-    const permission = await navigator.mediaDevices.getUserMedia({ audio: true });
-    permission.getTracks().forEach(track => track.stop());
-    await (callee.audio as any)._updateAvailableDevices();
+    await grantMicPermission(callee);
     const deviceId = Array.from(callee.audio!.availableInputDevices.keys())[0];
 
     const call = await incomingCall();
