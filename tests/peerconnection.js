@@ -564,10 +564,18 @@ describe('PeerConnection', () => {
       assert.equal(context.onerror.called, false);
     });
 
+    it('Should not call onerror when processSDP fails after the call is closed', () => {
+      context._initializeMediaStream.returns(true);
+      version.processSDP.callsArgWith(5, new Error('error message'));
+      toTest();
+      sinon.assert.notCalled(context.onerror);
+    });
+
     it('Should call onerror event when processSDP error callback is called and returns error object', () => {
       const error = new Error('error message');
       const expectedError = {disconnect: true, info: {code: 31000, message: 'Error creating the answer: error message'}};
       context._initializeMediaStream.returns(true);
+      context.status = 'connecting';
       version.processSDP.callsArgWith(5, error);
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
@@ -586,6 +594,7 @@ describe('PeerConnection', () => {
 
     it('Should call onerror event when processSDP error callback is called and returns error message', () => {
       context._initializeMediaStream.returns(true);
+      context.status = 'connecting';
       version.processSDP.callsArgWith(5, 'error message');
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
@@ -618,6 +627,7 @@ describe('PeerConnection', () => {
 
     it('Should call onerror for each error callback processSDP calls', () => {
       context._initializeMediaStream.returns(true);
+      context.status = 'connecting';
       version.getSDP.returns('sdp');
       toTest();
       version.processSDP.callArg(5, new Error('error message'));

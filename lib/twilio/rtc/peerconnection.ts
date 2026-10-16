@@ -920,6 +920,9 @@ PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfigur
     }
   }
   function onAnswerError(err) {
+    if (self.status === 'closed') {
+      return;
+    }
     const errMsg = err.message || err;
     self.onerror({ disconnect: true, info: {
       code: 31000,
