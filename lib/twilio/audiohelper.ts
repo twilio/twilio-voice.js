@@ -123,6 +123,12 @@ class AudioHelper extends EventEmitter {
   private _defaultInputDeviceStream: MediaStream | null = null;
 
   /**
+   * The raw default device stream behind each stream _openDefaultDeviceWithConstraints returned,
+   * so a release stops its own pair even after a later request took over the slots.
+   */
+  private _defaultRawStreams: WeakMap<MediaStream, MediaStream> = new WeakMap();
+
+  /**
    * Whether each sound is enabled.
    */
   private _enabledSounds: Record<Device.ToggleableSound, boolean> = {
@@ -459,19 +465,30 @@ class AudioHelper extends EventEmitter {
         this._log.warn('Unable to updateAvailableDevices after gUM call', error);
       });
       this._defaultInputDeviceStream = stream;
-      return this._maybeCreateLocalProcessedStream(stream);
+      return this._maybeCreateLocalProcessedStream(stream).then(returnedStream => {
+        this._defaultRawStreams.set(returnedStream, stream);
+        return returnedStream;
+      });
     });
   }
 
   /**
    * Stop the default audio stream
    * @internal
-   * @param stream - The stream a call is releasing. If a later call has since replaced
-   *   the default stream, only this stream's tracks are stopped.
+   * @param stream - The stream a call is releasing. Only this stream and its raw or processed
+   *   pair are released, and a slot is cleared only if it still holds them. Without it, the
+   *   current slots are released.
    */
   _stopDefaultInputDeviceStream(stream?: MediaStream | null): void {
-    if (stream && stream !== this._defaultInputDeviceStream && stream !== this._localProcessedStream) {
-      stream.getTracks().forEach(track => track.stop());
+    if (stream) {
+      const rawStream = this._defaultRawStreams.get(stream) || stream;
+      rawStream.getTracks().forEach(track => track.stop());
+      if (rawStream === this._defaultInputDeviceStream) {
+        this._defaultInputDeviceStream = null;
+      }
+      if (rawStream !== stream) {
+        this._destroyLocalProcessedStream(stream);
+      }
       return;
     }
 
@@ -765,14 +782,16 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Destroys the local processed stream and updates references.
+   * Destroys a local processed stream, the current one by default, and updates references.
    */
-  private _destroyLocalProcessedStream() {
-    if (this._localProcessor && this._localProcessedStream) {
+  private _destroyLocalProcessedStream(localProcessedStream: MediaStream | null = this._localProcessedStream) {
+    if (this._localProcessor && localProcessedStream) {
       this._log.info('destroying local processed stream');
-      const localProcessedStream = this._localProcessedStream;
-      this._localProcessedStream.getTracks().forEach(track => track.stop());
-      this._localProcessedStream = null;
+      localProcessedStream.getTracks().forEach(track => track.stop());
+      this._defaultRawStreams.delete(localProcessedStream);
+      if (localProcessedStream === this._localProcessedStream) {
+        this._localProcessedStream = null;
+      }
       this._localProcessor.destroyProcessedStream(localProcessedStream);
       this._audioProcessorEventObserver.emit('destroy', false);
     }

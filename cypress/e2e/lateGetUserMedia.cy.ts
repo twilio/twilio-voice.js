@@ -133,4 +133,37 @@ describe('Late getUserMedia results', function() {
     assert.strictEqual(destroyCount, 0);
     assert.strictEqual(callee.audio!.remoteProcessedStream, processedB);
   });
+
+  it('should release each call raw stream with a local processor after a late result', async () => {
+    let destroyCount = 0;
+    await callee.audio!.addProcessor({
+      createProcessedStream: (stream: MediaStream) =>
+        Promise.resolve(new MediaStream(stream.getAudioTracks().map(track => track.clone()))),
+      destroyProcessedStream: () => { destroyCount++; return Promise.resolve(); },
+    });
+
+    callerB = new Device(await generateAccessToken('callerB-' + Date.now()));
+    const callA = await incomingCall();
+    const callB = await incomingCall(callerB);
+    let releaseA!: () => void;
+    holds.set(0, new Promise<void>(resolve => { releaseA = resolve; }));
+
+    const acceptB = expectEvent('accept', callB);
+    callA.accept();
+    callB.accept();
+    await waitFor(acceptB, 15000);
+
+    // callA's late result takes over the default stream slots while callB is still open.
+    releaseA();
+    const [rawA, rawB] = await waitFor(defaultRequests, 15000).then(() => Promise.all(defaultRequests));
+    await settle();
+
+    const disconnectB = expectEvent('disconnect', callB);
+    callB.disconnect();
+    await waitFor(disconnectB, 15000);
+    await settle();
+
+    assert.deepStrictEqual([rawA, rawB].map(raw => raw.getAudioTracks()[0].readyState), ['ended', 'ended']);
+    assert.strictEqual(destroyCount, 2);
+  });
 });

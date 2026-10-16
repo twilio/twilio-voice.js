@@ -577,6 +577,68 @@ describe('AudioHelper', () => {
         sinon.assert.calledOnce(stopStub);
       });
 
+      describe('with a local processor and two default streams', () => {
+        let stops;
+        let deferreds;
+
+        const fakeStream = id => {
+          stops[id] = sinon.stub();
+          return { id, getTracks: () => [{ stop: stops[id] }] };
+        };
+
+        beforeEach(async () => {
+          stops = {};
+          deferreds = {};
+          getUserMedia.onFirstCall().returns(Promise.resolve(fakeStream('rawA')));
+          getUserMedia.onSecondCall().returns(Promise.resolve(fakeStream('rawB')));
+          createProcessedStream.callsFake(raw => new Promise(resolve => {
+            deferreds[raw.id] = () => resolve(fakeStream(`processed-${raw.id}`));
+          }));
+          await audio.addProcessor(localProcessor);
+        });
+
+        // Opens A then B, and resolves their processed streams in the given order.
+        const openBoth = async order => {
+          const a = audio._openDefaultDeviceWithConstraints();
+          const b = audio._openDefaultDeviceWithConstraints();
+          await new Promise(resolve => setTimeout(resolve, 0));
+          order.forEach(id => deferreds[id]());
+          return Promise.all([a, b]);
+        };
+
+        it('should release a stale processed stream together with its raw stream', async () => {
+          const [processedA, processedB] = await openBoth(['rawA', 'rawB']);
+          audio._stopDefaultInputDeviceStream(processedA);
+          sinon.assert.calledOnce(stops.rawA);
+          sinon.assert.calledOnce(stops['processed-rawA']);
+          sinon.assert.calledWithExactly(destroyProcessedStream, processedA);
+          sinon.assert.notCalled(stops.rawB);
+          sinon.assert.notCalled(stops['processed-rawB']);
+          assert.strictEqual(audio.localProcessedStream, processedB);
+        });
+
+        it('should release the matching raw stream when processed streams resolve out of order', async () => {
+          const [processedA, processedB] = await openBoth(['rawB', 'rawA']);
+          audio._stopDefaultInputDeviceStream(processedA);
+          sinon.assert.calledOnce(stops.rawA);
+          sinon.assert.notCalled(stops.rawB);
+
+          audio._stopDefaultInputDeviceStream(processedB);
+          sinon.assert.calledOnce(stops.rawB);
+          sinon.assert.calledWithExactly(destroyProcessedStream, processedB);
+        });
+
+        it('should still release a pair whose slots a later open took over', async () => {
+          const [processedA, processedB] = await openBoth(['rawA', 'rawB']);
+          audio._stopDefaultInputDeviceStream(processedB);
+          audio._stopDefaultInputDeviceStream(processedA);
+          sinon.assert.calledOnce(stops.rawA);
+          sinon.assert.calledOnce(stops.rawB);
+          sinon.assert.calledWithExactly(destroyProcessedStream, processedA);
+          sinon.assert.calledWithExactly(destroyProcessedStream, processedB);
+        });
+      });
+
       it('should only stop the passed stream once a later default stream replaced it', async () => {
         const stopA = sinon.stub();
         const stopB = sinon.stub();
