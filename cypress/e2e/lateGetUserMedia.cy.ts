@@ -9,12 +9,13 @@ describe('Late getUserMedia results', function() {
   Cypress.config('defaultCommandTimeout', 30000);
 
   let caller: Device;
+  let callerB: Device | null;
   let callee: Device;
   let calleeIdentity: string;
   // Each default-device getUserMedia result (no deviceId constraint), in request order.
   let defaultRequests: Array<Promise<MediaStream>>;
-  // When set, holds default-device results until it resolves.
-  let holdDefault: Promise<void> | null;
+  // Holds the default-device result with this request index until the promise resolves.
+  let holds: Map<number, Promise<void>>;
 
   // Lets every pending promise callback chained on a settled request run.
   const settle = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -22,7 +23,8 @@ describe('Late getUserMedia results', function() {
   beforeEach(async () => {
     calleeIdentity = 'callee-' + Date.now();
     defaultRequests = [];
-    holdDefault = null;
+    holds = new Map();
+    callerB = null;
     caller = new Device(await generateAccessToken('caller-' + Date.now()));
     callee = new Device(await generateAccessToken(calleeIdentity), {
       getUserMedia: (constraints: MediaStreamConstraints) => {
@@ -31,7 +33,7 @@ describe('Late getUserMedia results', function() {
         if (audio && typeof audio === 'object' && audio.deviceId) {
           return stream;
         }
-        const hold = holdDefault;
+        const hold = holds.get(defaultRequests.length);
         const result = hold ? stream.then(s => hold.then(() => s)) : stream;
         defaultRequests.push(result);
         return result;
@@ -41,7 +43,7 @@ describe('Late getUserMedia results', function() {
   });
 
   afterEach(() => {
-    [caller, callee].forEach(device => {
+    [caller, callerB, callee].forEach(device => {
       if (device) {
         device.disconnectAll();
         device.destroy();
@@ -49,9 +51,9 @@ describe('Late getUserMedia results', function() {
     });
   });
 
-  const incomingCall = async (): Promise<Call> => {
+  const incomingCall = async (from: Device = caller): Promise<Call> => {
     const incoming: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
-    await caller.connect({ params: { To: calleeIdentity } });
+    await from.connect({ params: { To: calleeIdentity } });
     return incoming;
   };
 
@@ -64,7 +66,7 @@ describe('Late getUserMedia results', function() {
 
     const call = await incomingCall();
     let releaseDefault!: () => void;
-    holdDefault = new Promise<void>(resolve => { releaseDefault = resolve; });
+    holds.set(0, new Promise<void>(resolve => { releaseDefault = resolve; }));
     call.accept();
     await callee.audio!.setInputDevice(deviceId);
     call.disconnect();
@@ -96,5 +98,39 @@ describe('Late getUserMedia results', function() {
 
     assert.strictEqual(reopened.getAudioTracks()[0].readyState, 'live');
     assert.strictEqual(call.getLocalStream()!.getAudioTracks()[0].readyState, 'live');
+  });
+
+  it('should not destroy the next call remote processed stream on a repeat close', async () => {
+    let destroyCount = 0;
+    await callee.audio!.addProcessor({
+      createProcessedStream: (stream: MediaStream) => Promise.resolve(new MediaStream(stream.getAudioTracks())),
+      destroyProcessedStream: () => { destroyCount++; return Promise.resolve(); },
+    }, true);
+
+    callerB = new Device(await generateAccessToken('callerB-' + Date.now()));
+    const callA = await incomingCall();
+    const callB = await incomingCall(callerB);
+    let releaseA!: () => void;
+    holds.set(0, new Promise<void>(resolve => { releaseA = resolve; }));
+
+    const acceptB = expectEvent('accept', callB);
+    callA.accept();
+    callB.accept();
+    await waitFor(acceptB, 15000);
+    await waitFor(new Promise<void>(resolve => {
+      const poll = () => callee.audio!.remoteProcessedStream ? resolve() : setTimeout(poll, 50);
+      poll();
+    }), 15000);
+    const processedB = callee.audio!.remoteProcessedStream;
+
+    // callA was superseded while its getUserMedia was held; releasing it runs callA's late close.
+    releaseA();
+    await waitFor(defaultRequests[0], 15000);
+    await settle();
+
+    assert.strictEqual(callA.status(), Call.State.Closed);
+    assert.strictEqual(callB.status(), Call.State.Open);
+    assert.strictEqual(destroyCount, 0);
+    assert.strictEqual(callee.audio!.remoteProcessedStream, processedB);
   });
 });

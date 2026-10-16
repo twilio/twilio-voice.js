@@ -322,13 +322,11 @@ describe('PeerConnection', () => {
       assert.strictEqual(context.status, 'closed');
     });
 
-    it('Should release a late stream but not call onclose again when already closed', () => {
+    it('Should do nothing on a repeat close', () => {
       toTest();
-      const lateStream = { name: 'acquired after close' };
-      context.stream = lateStream;
       toTest();
-      assert(context._stopStream.calledTwice);
-      assert.strictEqual(context.stream, null);
+      assert(context._stopStream.calledOnce);
+      assert(context._audioHelper._destroyRemoteProcessedStream.calledOnce);
       assert(context.onclose.calledOnce);
     });
 

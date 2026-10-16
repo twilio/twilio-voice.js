@@ -930,6 +930,12 @@ PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfigur
   this.version.processSDP(this.options.maxAverageBitrate, this.codecPreferences, sdp, { audio: true }, onAnswerSuccess, onAnswerError);
 };
 PeerConnection.prototype.close = function() {
+  // A repeat close has nothing left to release, and shared AudioHelper state, such as the
+  // remote processed stream, may already belong to the next call.
+  if (this.status === 'closed') {
+    return;
+  }
+
   if (this.version && this.version.pc) {
     if (this.version.pc.signalingState !== 'closed') {
       this.version.pc.close();
@@ -965,11 +971,6 @@ PeerConnection.prototype.close = function() {
   }
   if (this._outputAnalyser2) {
     this._outputAnalyser2.disconnect();
-  }
-  // A repeat close only releases late resources, e.g. a stream from getUserMedia;
-  // don't emit onclose again.
-  if (this.status === 'closed') {
-    return;
   }
   this.status = 'closed';
   this.onclose();
