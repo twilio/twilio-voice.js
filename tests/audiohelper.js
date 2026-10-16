@@ -10,6 +10,12 @@ function getUserMedia() {
 
 describe('AudioHelper', () => {
   const wait = () => new Promise(res => res());
+  // Opens a default stream and adopts it, as a live call does.
+  const openDefaultDevice = async audio => {
+    const stream = await audio._openDefaultDeviceWithConstraints();
+    audio._adoptDefaultInputDeviceStream(stream);
+    return stream;
+  };
 
   context('when enumerateDevices is not supported', () => {
     const noop = () => {};
@@ -306,7 +312,7 @@ describe('AudioHelper', () => {
         });
 
         it('should restart default device if default stream exists', async () => {
-          await audio._openDefaultDeviceWithConstraints();
+          await openDefaultDevice(audio);
           sinon.assert.calledOnce(getUserMedia);
           await audio.addProcessor(localProcessor);
           sinon.assert.calledTwice(getUserMedia);
@@ -407,7 +413,7 @@ describe('AudioHelper', () => {
         });
 
         it('should restart default device if default stream exists', async () => {
-          await audio._openDefaultDeviceWithConstraints();
+          await openDefaultDevice(audio);
           sinon.assert.calledOnce(getUserMedia);
           await audio.removeProcessor(localProcessor);
           sinon.assert.calledTwice(getUserMedia);
@@ -425,7 +431,7 @@ describe('AudioHelper', () => {
         });
 
         it('should destroy and stop processed tracks', async () => {
-          await audio._openDefaultDeviceWithConstraints();
+          await openDefaultDevice(audio);
           await audio.removeProcessor(localProcessor);
           sinon.assert.calledOnce(localProcessedStreamStopStub);
           sinon.assert.calledOnce(destroyProcessedStream);
@@ -440,7 +446,7 @@ describe('AudioHelper', () => {
         it('should only remove local processor', async () => {
           remoteProcessedStreamStopStub = sinon.stub();
           audio._remoteProcessedStream = {id: 'remoteStream', getTracks: () => [{ stop: remoteProcessedStreamStopStub }]};
-          await audio._openDefaultDeviceWithConstraints();
+          await openDefaultDevice(audio);
           await audio.removeProcessor(localProcessor);
           sinon.assert.calledOnce(localProcessedStreamStopStub);
           sinon.assert.calledOnce(destroyProcessedStream);
@@ -558,7 +564,7 @@ describe('AudioHelper', () => {
       });
 
       it('should stop default tracks', async () => {
-        await audio._openDefaultDeviceWithConstraints();
+        await openDefaultDevice(audio);
         sinon.assert.notCalled(stopStub);
         audio._stopDefaultInputDeviceStream();
         sinon.assert.calledOnce(stopStub);
@@ -569,9 +575,112 @@ describe('AudioHelper', () => {
         sinon.assert.notCalled(stopStub);
       });
 
+      it('should stop the default stream when passed the current default', async () => {
+        const stream = await openDefaultDevice(audio);
+        audio._stopDefaultInputDeviceStream(stream);
+        sinon.assert.calledOnce(stopStub);
+        audio._stopDefaultInputDeviceStream();
+        sinon.assert.calledOnce(stopStub);
+      });
+
+      describe('with a local processor and two default streams', () => {
+        let stops;
+        let deferreds;
+
+        const fakeStream = id => {
+          stops[id] = sinon.stub();
+          return { id, getTracks: () => [{ stop: stops[id] }] };
+        };
+
+        beforeEach(async () => {
+          stops = {};
+          deferreds = {};
+          getUserMedia.onFirstCall().returns(Promise.resolve(fakeStream('rawA')));
+          getUserMedia.onSecondCall().returns(Promise.resolve(fakeStream('rawB')));
+          createProcessedStream.callsFake(raw => new Promise(resolve => {
+            deferreds[raw.id] = () => resolve(fakeStream(`processed-${raw.id}`));
+          }));
+          await audio.addProcessor(localProcessor);
+        });
+
+        const settle = () => new Promise(resolve => setTimeout(resolve, 0));
+
+        // Opens A then B and resolves their processed streams in the given order. With adoptB,
+        // B is adopted as soon as it resolves, as the live call does.
+        const openBoth = async (order, adoptB) => {
+          const a = audio._openDefaultDeviceWithConstraints();
+          const b = audio._openDefaultDeviceWithConstraints().then(stream => {
+            if (adoptB) {
+              audio._adoptDefaultInputDeviceStream(stream);
+            }
+            return stream;
+          });
+          await settle();
+          for (const id of order) {
+            deferreds[id]();
+            await settle();
+          }
+          return Promise.all([a, b]);
+        };
+
+        it('should not set the default or processed stream until a stream is adopted', async () => {
+          await openBoth(['rawA', 'rawB']);
+          assert.strictEqual(audio._defaultInputDeviceStream, null);
+          assert.strictEqual(audio.localProcessedStream, null);
+          audio._stopDefaultInputDeviceStream();
+          sinon.assert.notCalled(stops.rawA);
+          sinon.assert.notCalled(stops.rawB);
+        });
+
+        [['in order', ['rawA', 'rawB']], ['out of order', ['rawB', 'rawA']]].forEach(([when, order]) => {
+          it(`should release a late result without touching the adopted streams when processed ${when}`, async () => {
+            const [processedA, processedB] = await openBoth(order, true);
+            audio._stopDefaultInputDeviceStream(processedA);
+            sinon.assert.calledOnce(stops.rawA);
+            sinon.assert.calledOnce(stops['processed-rawA']);
+            sinon.assert.calledWithExactly(destroyProcessedStream, processedA);
+            sinon.assert.notCalled(stops.rawB);
+            sinon.assert.notCalled(stops['processed-rawB']);
+            assert.strictEqual(audio._defaultInputDeviceStream.id, 'rawB');
+            assert.strictEqual(audio.localProcessedStream, processedB);
+          });
+        });
+
+        it('should destroy the adopted processed stream on removeProcessor after a late result', async () => {
+          const [processedA, processedB] = await openBoth(['rawB', 'rawA'], true);
+          audio._stopDefaultInputDeviceStream(processedA);
+          let restartedFrom;
+          audio._restartInputStreams = sinon.spy(() => {
+            restartedFrom = audio._defaultInputDeviceStream;
+            return Promise.resolve();
+          });
+          await audio.removeProcessor(localProcessor);
+          sinon.assert.calledOnce(stops['processed-rawB']);
+          sinon.assert.calledWithExactly(destroyProcessedStream, processedB);
+          assert.strictEqual(audio.localProcessedStream, null);
+          assert.strictEqual(restartedFrom.id, 'rawB');
+        });
+      });
+
+      it('should only stop the passed stream once a later default stream replaced it', async () => {
+        const stopA = sinon.stub();
+        const stopB = sinon.stub();
+        getUserMedia.onFirstCall().returns(Promise.resolve({ getTracks: () => [{ stop: stopA }] }));
+        getUserMedia.onSecondCall().returns(Promise.resolve({ getTracks: () => [{ stop: stopB }] }));
+        const streamA = await openDefaultDevice(audio);
+        await openDefaultDevice(audio);
+
+        audio._stopDefaultInputDeviceStream(streamA);
+        sinon.assert.calledOnce(stopA);
+        sinon.assert.notCalled(stopB);
+
+        audio._stopDefaultInputDeviceStream();
+        sinon.assert.calledOnce(stopB);
+      });
+
       it('should destroy stop processed tracks', async () => {
         await audio.addProcessor(localProcessor);
-        await audio._openDefaultDeviceWithConstraints();
+        await openDefaultDevice(audio);
         audio._stopDefaultInputDeviceStream();
         sinon.assert.calledOnce(localProcessedStreamStopStub);
         sinon.assert.calledOnce(destroyProcessedStream);
@@ -581,7 +690,7 @@ describe('AudioHelper', () => {
         const stub = sinon.stub();
         eventObserver.on('event', stub);
         await audio.addProcessor(localProcessor);
-        await audio._openDefaultDeviceWithConstraints();
+        await openDefaultDevice(audio);
         audio._stopDefaultInputDeviceStream();
         sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'destroy-processed-stream', isRemote: false });
       });
@@ -770,14 +879,14 @@ describe('AudioHelper', () => {
           });
 
           it('should stop default tracks if it exists', async () => {
-            await audio._openDefaultDeviceWithConstraints();
+            await openDefaultDevice(audio);
             await audio.setInputDevice('input');
             sinon.assert.calledOnce(stopStub);
           });
 
           it('should destroy stop processed tracks if it exists', async () => {
             await audio.addProcessor(localProcessor);
-            await audio._openDefaultDeviceWithConstraints();
+            await openDefaultDevice(audio);
             await audio.setInputDevice('input');
             sinon.assert.calledOnce(localProcessedStreamStopStub);
             sinon.assert.calledOnce(destroyProcessedStream);
@@ -787,7 +896,7 @@ describe('AudioHelper', () => {
             const stub = sinon.stub();
             eventObserver.on('event', stub);
             await audio.addProcessor(localProcessor);
-            await audio._openDefaultDeviceWithConstraints();
+            await openDefaultDevice(audio);
             await audio.setInputDevice('input');
             sinon.assert.calledWithExactly(stub, { group: 'audio-processor', name: 'destroy-processed-stream', isRemote: false });
           });

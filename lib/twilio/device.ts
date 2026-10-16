@@ -681,7 +681,8 @@ class Device extends EventEmitter {
   }
 
   /**
-   * Whether the Device is currently on an active Call.
+   * Whether the Device is currently on an active Call. A Call counts as active once
+   * `device.connect()` has created it, or from `call.accept()`, before its media has connected.
    */
   get isBusy(): boolean {
     return !!this._activeCall;
@@ -1031,12 +1032,15 @@ class Device extends EventEmitter {
       MediaStream: this._options.MediaStream,
       RTCPeerConnection: this._options.RTCPeerConnection,
       beforeAccept: (currentCall: Call) => {
-        if (!this._activeCall || this._activeCall === currentCall) {
-          return;
-        }
+        // Claim the slot before disconnecting; 'accept' only fires once media is open,
+        // and disconnect handlers can synchronously accept another call.
+        const previousCall = this._activeCall;
+        this._activeCall = currentCall;
 
-        this._activeCall.disconnect();
-        this._removeCall(this._activeCall);
+        if (previousCall && previousCall !== currentCall) {
+          previousCall.disconnect();
+          this._removeCall(previousCall);
+        }
       },
       codecPreferences: this._options.codecPreferences,
       customSounds: this._options.sounds,

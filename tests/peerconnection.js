@@ -27,8 +27,15 @@ describe('PeerConnection', () => {
 
     beforeEach(() => {
       context = {
+        status: 'connecting',
+        stream: 'app stream',
+        _shouldManageStream: true,
         _setInputTracksFromStream: sinon.stub().returns(Promise.resolve(INPUT_TRACKS_FROM_STREAM)),
-        _audioHelper: { _openDefaultDeviceWithConstraints: sinon.stub().returns(Promise.resolve(USER_MEDIA_RESULT)) }
+        _audioHelper: {
+          _adoptDefaultInputDeviceStream: sinon.stub(),
+          _openDefaultDeviceWithConstraints: sinon.stub().returns(Promise.resolve(USER_MEDIA_RESULT)),
+          _stopDefaultInputDeviceStream: sinon.stub(),
+        },
       };
       toTest = METHOD.bind(context);
     });
@@ -40,7 +47,39 @@ describe('PeerConnection', () => {
         assert(context._audioHelper._openDefaultDeviceWithConstraints.calledWithExactly({not: 'is random'}));
         assert(context._audioHelper._openDefaultDeviceWithConstraints.calledBefore(context._setInputTracksFromStream));
         assert.deepStrictEqual(INPUT_TRACKS_FROM_STREAM, stream);
+        assert.strictEqual(context._openedStream, USER_MEDIA_RESULT);
+        sinon.assert.calledOnceWithExactly(context._audioHelper._adoptDefaultInputDeviceStream, USER_MEDIA_RESULT);
       }).then(done).catch(done);
+    });
+
+    it('Should adopt and own the stream only after _setInputTracksFromStream released the previous one', () => {
+      context._openedStream = 'previous stream';
+      let ownedDuringSwap;
+      context._setInputTracksFromStream = sinon.spy(() => {
+        ownedDuringSwap = context._openedStream;
+        sinon.assert.notCalled(context._audioHelper._adoptDefaultInputDeviceStream);
+        return Promise.resolve(INPUT_TRACKS_FROM_STREAM);
+      });
+      return toTest().then(() => {
+        assert.strictEqual(ownedDuringSwap, 'previous stream');
+        assert.strictEqual(context._openedStream, USER_MEDIA_RESULT);
+      });
+    });
+
+    [
+      ['the call is closed', ctx => { ctx.status = 'closed'; }],
+      ['the app owns the stream', ctx => { ctx._shouldManageStream = false; }],
+    ].forEach(([when, setup]) => {
+      it(`Should release a late result without installing it when ${when}`, () => {
+        setup(context);
+        return toTest().then(result => {
+          sinon.assert.calledOnceWithExactly(context._audioHelper._stopDefaultInputDeviceStream, USER_MEDIA_RESULT);
+          sinon.assert.notCalled(context._audioHelper._adoptDefaultInputDeviceStream);
+          sinon.assert.notCalled(context._setInputTracksFromStream);
+          assert.strictEqual(context._openedStream, undefined);
+          assert.strictEqual(result, 'app stream');
+        });
+      });
     });
 
     it('Should reject when openDefaultDeviceWithConstraints rejects', done => {
@@ -187,6 +226,27 @@ describe('PeerConnection', () => {
         assert(mediaStream.calledOnce);
       }).then(done).catch(done);
     });
+
+    describe('when there is no RTCPeerConnection yet', () => {
+      beforeEach(() => {
+        context = {
+          stream: STREAM,
+          mute: sinon.stub(),
+          version: null,
+          _stopStream: sinon.stub(),
+          options: { MediaStream: sinon.stub().returns({ addTrack: sinon.stub(), id: 3 }) },
+        };
+        toTest = METHOD.bind(context);
+      });
+
+      it('Should swap a managed default stream for the app stream', () => {
+        return toTest(true, newStream).then(result => {
+          sinon.assert.calledOnce(context._stopStream);
+          assert.strictEqual(result.id, 3);
+          assert.strictEqual(context.stream.id, 3);
+        });
+      });
+    });
   });
 
   context('PeerConnection.prototype.close', () => {
@@ -264,6 +324,14 @@ describe('PeerConnection', () => {
       assert.strictEqual(context.stream, null);
       assert.strictEqual(context.version.pc, null);
       assert.strictEqual(context.status, 'closed');
+    });
+
+    it('Should do nothing on a repeat close', () => {
+      toTest();
+      toTest();
+      assert(context._stopStream.calledOnce);
+      assert(context._audioHelper._destroyRemoteProcessedStream.calledOnce);
+      assert(context.onclose.calledOnce);
     });
 
     it('Should stop everything what is available with minimum context', () => {
@@ -411,7 +479,7 @@ describe('PeerConnection', () => {
 
   context('PeerConnection.prototype.answerIncomingCall', () => {
     const METHOD = PeerConnection.prototype.answerIncomingCall;
-    const EXPECTED_ERROR = {info: {code: 31000, message: 'Error creating the answer: error message'}};
+    const EXPECTED_ERROR = {disconnect: true, info: {code: 31000, message: 'Error creating the answer: error message'}};
     const eCallSid = 'callSid';
     const eSDP = 'sdp';
     const eIceServers = 'iceServers';
@@ -500,10 +568,18 @@ describe('PeerConnection', () => {
       assert.equal(context.onerror.called, false);
     });
 
+    it('Should not call onerror when processSDP fails after the call is closed', () => {
+      context._initializeMediaStream.returns(true);
+      version.processSDP.callsArgWith(5, new Error('error message'));
+      toTest();
+      sinon.assert.notCalled(context.onerror);
+    });
+
     it('Should call onerror event when processSDP error callback is called and returns error object', () => {
       const error = new Error('error message');
-      const expectedError = {info: {code: 31000, message: 'Error creating the answer: error message'}};
+      const expectedError = {disconnect: true, info: {code: 31000, message: 'Error creating the answer: error message'}};
       context._initializeMediaStream.returns(true);
+      context.status = 'connecting';
       version.processSDP.callsArgWith(5, error);
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
@@ -522,6 +598,7 @@ describe('PeerConnection', () => {
 
     it('Should call onerror event when processSDP error callback is called and returns error message', () => {
       context._initializeMediaStream.returns(true);
+      context.status = 'connecting';
       version.processSDP.callsArgWith(5, 'error message');
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
@@ -554,6 +631,7 @@ describe('PeerConnection', () => {
 
     it('Should call onerror for each error callback processSDP calls', () => {
       context._initializeMediaStream.returns(true);
+      context.status = 'connecting';
       version.getSDP.returns('sdp');
       toTest();
       version.processSDP.callArg(5, new Error('error message'));
@@ -2137,14 +2215,15 @@ describe('PeerConnection', () => {
       toTest = METHOD.bind(context);
     });
 
-    it('should stop default stream', () => {
-      context._shouldManageStream = true;
+    it('should stop the default stream it opened', () => {
+      context._openedStream = 'opened stream';
       toTest();
-      sinon.assert.calledOnce(stub);
+      sinon.assert.calledOnceWithExactly(stub, 'opened stream');
+      assert.strictEqual(context._openedStream, null);
     });
 
-    it('should do nothing if _shouldManageStream is false', () => {
-      context._shouldManageStream = false;
+    it('should not stop a stream it did not open', () => {
+      context.stream = 'cloned app stream';
       toTest();
       sinon.assert.notCalled(stub);
     });

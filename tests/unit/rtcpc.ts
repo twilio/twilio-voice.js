@@ -25,4 +25,35 @@ describe('rtcpc', function() {
     assert(typeof result === 'object');
     assert(typeof result.RTCPeerConnection === 'undefined');
   });
+
+  describe('processSDP', () => {
+    const root = global as any;
+    let originalRTCSessionDescription: any;
+
+    beforeEach(() => {
+      originalRTCSessionDescription = root.RTCSessionDescription;
+      root.RTCSessionDescription = function(init: any) { Object.assign(this, init); };
+    });
+
+    afterEach(() => {
+      root.RTCSessionDescription = originalRTCSessionDescription;
+    });
+
+    it('should call onError when setRemoteDescription fails', async () => {
+      const error = new Error('rejected offer');
+      const rtcpc = new (RTCPC as any)({});
+      rtcpc.pc = {
+        // Rejects both the promise form and promisify's callback-style retry.
+        setRemoteDescription: (_desc: any, _onSuccess?: Function, onFailure?: Function) =>
+          onFailure ? onFailure(error) : Promise.reject(error),
+      };
+      const onSuccess = sinon.stub();
+      const onError = sinon.stub();
+
+      await rtcpc.processSDP(undefined, undefined, 'v=0\r\n', { audio: true }, onSuccess, onError);
+
+      sinon.assert.calledOnceWithExactly(onError, error);
+      sinon.assert.notCalled(onSuccess);
+    });
+  });
 });

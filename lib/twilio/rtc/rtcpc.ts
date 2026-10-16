@@ -99,7 +99,7 @@ RTCPC.prototype.processSDP = function(maxAverageBitrate, codecPreferences, sdp, 
   const desc = new RTCSessionDescription({ sdp, type: 'offer' });
   return promisifySet(this.pc.setRemoteDescription, this.pc)(desc).then(() => {
     this.createAnswer(maxAverageBitrate, constraints, onSuccess, onError);
-  });
+  }, onError);
 };
 RTCPC.prototype.getSDP = function() {
   return this.pc.localDescription.sdp;
