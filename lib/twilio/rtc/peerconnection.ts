@@ -226,7 +226,7 @@ PeerConnection.prototype._startPollingVolume = function() {
 PeerConnection.prototype._stopStream = function _stopStream() {
   // We shouldn't stop the tracks if they were not created inside
   //   this PeerConnection.
-  if (!this._shouldManageStream || !this._openedStream) {
+  if (!this._openedStream) {
     return;
   }
 
@@ -306,14 +306,7 @@ PeerConnection.prototype._setInputTracksFromStream = function(shouldClone, newSt
     //   as of Chrome 61. https://bugs.chromium.org/p/chromium/issues/detail?id=770908
     this.stream = shouldClone ? cloneStream(newStream, this.options.MediaStream) : newStream;
   } else if (!this._sender && !(this.version && this.version.pc)) {
-    // No RTCPeerConnection yet, so there is no track to replace. A stream the app set
-    // wins over a late default-device stream from the call's own getUserMedia.
-    if (!shouldClone && !this._shouldManageStream) {
-      this._audioHelper._stopDefaultInputDeviceStream(newStream);
-      this._openedStream = null;
-      return getStreamPromise();
-    }
-
+    // No RTCPeerConnection yet, so there is no track to replace.
     this._stopStream();
     this.stream = shouldClone ? cloneStream(newStream, this.options.MediaStream) : newStream;
   } else {

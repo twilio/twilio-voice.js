@@ -229,26 +229,13 @@ describe('PeerConnection', () => {
           stream: STREAM,
           mute: sinon.stub(),
           version: null,
-          _audioHelper: { _stopDefaultInputDeviceStream: sinon.stub() },
           _stopStream: sinon.stub(),
           options: { MediaStream: sinon.stub().returns({ addTrack: sinon.stub(), id: 3 }) },
         };
         toTest = METHOD.bind(context);
       });
 
-      it('Should keep the app stream and release a late default stream', () => {
-        context._shouldManageStream = false;
-        context._openedStream = newStream;
-        return toTest(false, newStream).then(result => {
-          sinon.assert.calledOnceWithExactly(context._audioHelper._stopDefaultInputDeviceStream, newStream);
-          assert.strictEqual(context._openedStream, null);
-          assert.strictEqual(result, STREAM);
-          assert.strictEqual(context.stream, STREAM);
-        });
-      });
-
       it('Should swap a managed default stream for the app stream', () => {
-        context._shouldManageStream = true;
         return toTest(true, newStream).then(result => {
           sinon.assert.calledOnce(context._stopStream);
           assert.strictEqual(result.id, 3);
@@ -2217,7 +2204,6 @@ describe('PeerConnection', () => {
     });
 
     it('should stop the default stream it opened', () => {
-      context._shouldManageStream = true;
       context._openedStream = 'opened stream';
       toTest();
       sinon.assert.calledOnceWithExactly(stub, 'opened stream');
@@ -2225,14 +2211,7 @@ describe('PeerConnection', () => {
     });
 
     it('should not stop a stream it did not open', () => {
-      context._shouldManageStream = true;
       context.stream = 'cloned app stream';
-      toTest();
-      sinon.assert.notCalled(stub);
-    });
-
-    it('should do nothing if _shouldManageStream is false', () => {
-      context._shouldManageStream = false;
       toTest();
       sinon.assert.notCalled(stub);
     });
