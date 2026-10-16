@@ -121,9 +121,17 @@ PeerConnection.prototype.uri = function() {
  */
 PeerConnection.prototype.openDefaultDeviceWithConstraints = function(constraints) {
   return this._audioHelper._openDefaultDeviceWithConstraints(constraints).then(stream => {
-    // Remember the stream this PeerConnection opened; _stopStream releases only that one.
+    // A late result: the call ended, or the app set its own stream meanwhile.
+    if (this.status === 'closed' || !this._shouldManageStream) {
+      this._audioHelper._stopDefaultInputDeviceStream(stream);
+      return this.stream;
+    }
+
+    const result = this._setInputTracksFromStream(false, stream);
+    // Own the stream only after the swap released the previous one, so a close()
+    // during the swap still releases it. _stopStream releases only this stream.
     this._openedStream = stream;
-    return this._setInputTracksFromStream(false, stream);
+    return result;
   });
 };
 

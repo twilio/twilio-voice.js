@@ -27,8 +27,14 @@ describe('PeerConnection', () => {
 
     beforeEach(() => {
       context = {
+        status: 'connecting',
+        stream: 'app stream',
+        _shouldManageStream: true,
         _setInputTracksFromStream: sinon.stub().returns(Promise.resolve(INPUT_TRACKS_FROM_STREAM)),
-        _audioHelper: { _openDefaultDeviceWithConstraints: sinon.stub().returns(Promise.resolve(USER_MEDIA_RESULT)) }
+        _audioHelper: {
+          _openDefaultDeviceWithConstraints: sinon.stub().returns(Promise.resolve(USER_MEDIA_RESULT)),
+          _stopDefaultInputDeviceStream: sinon.stub(),
+        },
       };
       toTest = METHOD.bind(context);
     });
@@ -42,6 +48,34 @@ describe('PeerConnection', () => {
         assert.deepStrictEqual(INPUT_TRACKS_FROM_STREAM, stream);
         assert.strictEqual(context._openedStream, USER_MEDIA_RESULT);
       }).then(done).catch(done);
+    });
+
+    it('Should own the stream only after _setInputTracksFromStream released the previous one', () => {
+      context._openedStream = 'previous stream';
+      let ownedDuringSwap;
+      context._setInputTracksFromStream = sinon.spy(() => {
+        ownedDuringSwap = context._openedStream;
+        return Promise.resolve(INPUT_TRACKS_FROM_STREAM);
+      });
+      return toTest().then(() => {
+        assert.strictEqual(ownedDuringSwap, 'previous stream');
+        assert.strictEqual(context._openedStream, USER_MEDIA_RESULT);
+      });
+    });
+
+    [
+      ['the call is closed', ctx => { ctx.status = 'closed'; }],
+      ['the app owns the stream', ctx => { ctx._shouldManageStream = false; }],
+    ].forEach(([when, setup]) => {
+      it(`Should release a late result without installing it when ${when}`, () => {
+        setup(context);
+        return toTest().then(result => {
+          sinon.assert.calledOnceWithExactly(context._audioHelper._stopDefaultInputDeviceStream, USER_MEDIA_RESULT);
+          sinon.assert.notCalled(context._setInputTracksFromStream);
+          assert.strictEqual(context._openedStream, undefined);
+          assert.strictEqual(result, 'app stream');
+        });
+      });
     });
 
     it('Should reject when openDefaultDeviceWithConstraints rejects', done => {
