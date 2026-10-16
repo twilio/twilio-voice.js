@@ -13,7 +13,8 @@ describe('Concurrent accept', function() {
   let callerC: Device;
   let callee: Device;
   let calleeIdentity: string;
-  let getUserMediaCount: number;
+  // Each wrapped getUserMedia result, in request order.
+  let requests: Array<Promise<MediaStream>>;
   // When set, holds getUserMedia results until two are ready, then releases them in request order.
   let pairGate: Array<() => void> | null;
   // When set, holds every getUserMedia result until it resolves.
@@ -24,32 +25,36 @@ describe('Concurrent accept', function() {
     callerA = new Device(await generateAccessToken('callerA-' + Date.now()));
     callerB = new Device(await generateAccessToken('callerB-' + Date.now()));
     callerC = new Device(await generateAccessToken('callerC-' + Date.now()));
-    getUserMediaCount = 0;
+    requests = [];
     pairGate = null;
     holdGate = null;
     callee = new Device(await generateAccessToken(calleeIdentity), {
       getUserMedia: (constraints: MediaStreamConstraints) => {
-        const index = getUserMediaCount++;
+        const index = requests.length;
         const stream = navigator.mediaDevices.getUserMedia(constraints);
         const hold = holdGate;
-        if (hold) {
-          return stream.then(s => hold.then(() => s));
-        }
         const gate = pairGate;
-        if (!gate) {
-          return stream;
+        let result = stream;
+        if (hold) {
+          result = stream.then(s => hold.then(() => s));
+        } else if (gate) {
+          result = stream.then(s => new Promise<MediaStream>(resolve => {
+            gate[index] = () => resolve(s);
+            if (gate[0] && gate[1]) {
+              gate[0]();
+              gate[1]();
+            }
+          }));
         }
-        return stream.then(s => new Promise<MediaStream>(resolve => {
-          gate[index] = () => resolve(s);
-          if (gate[0] && gate[1]) {
-            gate[0]();
-            gate[1]();
-          }
-        }));
+        requests.push(result);
+        return result;
       },
     } as any);
     await callee.register();
   });
+
+  // Waits for every getUserMedia result, then lets the callbacks chained on them run.
+  const settleRequests = () => waitFor(requests, 15000).then(() => new Promise(resolve => setTimeout(resolve, 0)));
 
   afterEach(() => {
     [callerA, callerB, callerC, callee].forEach(device => {
@@ -81,7 +86,7 @@ describe('Concurrent accept', function() {
 
     await waitFor([disconnectA, acceptB], 15000);
     // callA's getUserMedia settles after it was disconnected; that must not emit again.
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await settleRequests();
 
     assert.strictEqual(disconnectCountA, 1);
     assert.strictEqual(callA.status(), Call.State.Closed);
@@ -110,10 +115,10 @@ describe('Concurrent accept', function() {
 
     await waitFor([disconnectB, acceptC], 15000);
     // Let any late getUserMedia from callA or callB settle.
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await settleRequests();
 
     // callB was disconnected inside its own accept(), so it never requests the mic.
-    assert.strictEqual(getUserMediaCount, 2);
+    assert.strictEqual(requests.length, 2);
     assert.strictEqual(errorB, null);
     assert.strictEqual(callB.status(), Call.State.Closed);
     assert.strictEqual(callC.status(), Call.State.Open);
@@ -137,7 +142,7 @@ describe('Concurrent accept', function() {
 
     await waitFor(acceptB, 15000);
     // Let callA's late close run.
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await settleRequests();
 
     assert.strictEqual(callA.status(), Call.State.Closed);
     assert.strictEqual(callB.status(), Call.State.Open);
