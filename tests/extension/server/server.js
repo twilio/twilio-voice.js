@@ -1,11 +1,16 @@
+// Loads the credentials for local minting from .env. Existing process.env
+// values win, so CI is unaffected.
+require('dotenv').config();
+
 const bodyParser = require('body-parser');
 const express = require('express');
 const http = require('http');
-const Twilio = require('twilio');
+const Vendor = require('../../lib/vend');
 
 const app = express();
 const server = http.createServer(app);
 const port = parseInt(process.env.PORT, 10) || 3030;
+const vendor = new Vendor();
 
 app.use(bodyParser.text());
 app.use(bodyParser.json());
@@ -18,32 +23,33 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/token', (req, res) => {
+app.get('/token', async (req, res) => {
   const identity = req.query.identity;
-  const twimlAppSid = process.env.APPLICATION_SID_EXTENSION;
-  const twilioAccountSid = process.env.ACCOUNT_SID;
-  const twilioApiKey = process.env.API_KEY_SID;
-  const twilioApiSecret = process.env.API_KEY_SECRET;
-  console.log("applicationsid", twimlAppSid)
-  const voiceGrant = new Twilio.jwt.AccessToken.VoiceGrant({
-    outgoingApplicationSid: twimlAppSid,
-    incomingAllow: !!identity,
-  });
 
-  const token = new Twilio.jwt.AccessToken(
-    twilioAccountSid,
-    twilioApiKey,
-    twilioApiSecret,
-    {
+  // Express 4 does not catch a rejected async handler, so the request would hang.
+  let response;
+  try {
+    response = await vendor.vend(JSON.stringify({
+      action: 'mint-voice-token',
+      variant: 'extension',
       identity,
       ttl: 3600,
-    });
+    }));
+  } catch (error) {
+    console.error('/token failed', error);
+    res.status(500).send({ error: 'internal error' });
+    return;
+  }
 
-  token.addGrant(voiceGrant);
+  if (response.status !== 200) {
+    console.error(`/token failed: ${response.status} ${response.text}`);
+    res.status(response.status).type('json').send(response.text);
+    return;
+  }
 
   res.send({
     identity,
-    token: token.toJwt()
+    token: JSON.parse(response.text).token,
   });
 });
 
