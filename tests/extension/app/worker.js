@@ -52,13 +52,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 async function init() {
-  setState({ status: 'idle' });
   const response = await fetch(
     'http://127.0.0.1:3030/token?identity=' + device1ClientIdentity
   );
   const data = await response.json();
   device = new Twilio.Device(data.token, { logLevel: 1 });
   await device.register();
+  // Idle only once registered, so tests can wait on it before calling or destroying.
+  setState({ status: 'idle' });
   /**
    * NOTE(kchoy): This is the first device created in this extension. device1ClientIdentity
    * is registered to receive an incoming call from device2ClientIdentity in offscreen.js
