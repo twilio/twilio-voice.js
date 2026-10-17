@@ -299,6 +299,13 @@ PeerConnection.prototype._setInputTracksFromStream = function(shouldClone, newSt
       this._stopStream();
     }
 
+    // Input can change while Call.accept is opening the mic, before connect
+    // creates the RTCPeerConnection. Setup will attach the latest stream.
+    if (!this.version) {
+      this.stream = shouldClone ? cloneStream(newStream, this.options.MediaStream) : newStream;
+      return getStreamPromise();
+    }
+
     if (!this._sender) {
       this._sender = this.version.pc.getSenders()[0];
     }
