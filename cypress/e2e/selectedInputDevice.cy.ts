@@ -69,4 +69,42 @@ describe('Selected input device', function() {
 
     assertLiveInput(callB);
   });
+
+  it('should show the Device idle to the replaced call disconnect handler', async () => {
+    callee.updateOptions({ allowIncomingWhileBusy: true });
+    const callA = await incomingFrom(callerA);
+    const acceptA = expectEvent('accept', callA);
+    callA.accept();
+    await waitFor(acceptA, 15000);
+
+    // The handler from the setInputDevice docs, run when callB replaces callA.
+    let unsetResult: Promise<string> | null = null;
+    callA.once('disconnect', () => {
+      unsetResult = callee.audio!.unsetInputDevice().then(() => 'resolved', error => error.name);
+    });
+    const callB = await incomingFrom(callerB);
+    const acceptB = expectEvent('accept', callB);
+    callB.accept();
+    await waitFor(acceptB, 15000);
+
+    assert.strictEqual(await unsetResult, 'resolved');
+    assert.strictEqual(callA.status(), Call.State.Closed);
+    assert.strictEqual(callB.status(), Call.State.Open);
+  });
+
+  it('should leave the Device idle when the replaced call disconnect handler ends the accepted call', async () => {
+    callee.updateOptions({ allowIncomingWhileBusy: true });
+    const callA = await incomingFrom(callerA);
+    const acceptA = expectEvent('accept', callA);
+    callA.accept();
+    await waitFor(acceptA, 15000);
+
+    const callB = await incomingFrom(callerB);
+    callA.once('disconnect', () => callee.disconnectAll());
+    callB.accept();
+
+    assert.strictEqual(callA.status(), Call.State.Closed);
+    assert.strictEqual(callB.status(), Call.State.Closed);
+    assert.strictEqual(callee.isBusy, false);
+  });
 });

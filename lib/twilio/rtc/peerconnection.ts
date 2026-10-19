@@ -1,5 +1,6 @@
 // @ts-nocheck
 import {
+  GeneralErrors,
   InvalidArgumentError,
   MediaErrors,
   NotSupportedError,
@@ -88,7 +89,7 @@ function PeerConnection(audioHelper, pstream, options) {
   this._onHangup = noop;
   this._remoteStream = null;
   this._shouldManageStream = true;
-  this._openedStream = null;
+  this._openedInput = null;
   this._iceState = INITIAL_ICE_CONNECTION_STATE;
 
   this.options = options = options || {};
@@ -120,19 +121,32 @@ PeerConnection.prototype.uri = function() {
  * @param {MediaStreamConstraints} constraints
  */
 PeerConnection.prototype.openDefaultDeviceWithConstraints = function(constraints) {
-  return this._audioHelper._openDefaultDeviceWithConstraints(constraints).then(stream => {
-    // A late result: the call ended, or the app set its own stream meanwhile. It was
-    // never adopted, so releasing it leaves the shared default stream alone.
+  return this._audioHelper._openDefaultDeviceWithConstraints(constraints).then(input => {
+    // A late result: the call ended, or setInputDevice() gave it the selected stream meanwhile.
+    // It was never adopted, so releasing it leaves the shared default stream alone.
     if (this.status === 'closed' || !this._shouldManageStream) {
-      this._audioHelper._stopDefaultInputDeviceStream(stream);
+      this._log.info('Releasing a default input stream that opened after the call closed or switched input');
+      this._audioHelper._stopDefaultInputDeviceStream(input);
       return this.stream;
     }
 
-    const result = this._setInputTracksFromStream(false, stream);
-    // Adopt and own the stream only after the swap released the previous one, so a close()
-    // during the swap still releases it. _stopStream releases only this stream.
-    this._audioHelper._adoptDefaultInputDeviceStream(stream);
-    this._openedStream = stream;
+    // The local processor was added, removed or replaced while this stream was opening.
+    if (input.processor !== this._audioHelper._localProcessor) {
+      this._log.info('The local processor changed while opening the default input; reopening it');
+      this._audioHelper._stopDefaultInputDeviceStream(input);
+      return this.openDefaultDeviceWithConstraints(constraints);
+    }
+
+    const result = this._setInputTracksFromStream(false, input.processed || input.raw);
+    // The swap rejected this stream up front, before releasing the call's current input, which stays in use.
+    if (this._openedInput) {
+      this._audioHelper._stopDefaultInputDeviceStream(input);
+      return result;
+    }
+    // Adopt once the swap's _stopStream has released the previous input, and before replaceTrack
+    // settles, so a close() in between still releases this one.
+    this._audioHelper._adoptDefaultInputDeviceStream(input);
+    this._openedInput = input;
     return result;
   });
 };
@@ -228,12 +242,12 @@ PeerConnection.prototype._startPollingVolume = function() {
 PeerConnection.prototype._stopStream = function _stopStream() {
   // We shouldn't stop the tracks if they were not created inside
   //   this PeerConnection.
-  if (!this._openedStream) {
+  if (!this._openedInput) {
     return;
   }
 
-  this._audioHelper._stopDefaultInputDeviceStream(this._openedStream);
-  this._openedStream = null;
+  this._audioHelper._stopDefaultInputDeviceStream(this._openedInput);
+  this._openedInput = null;
 };
 
 /**
@@ -608,14 +622,20 @@ PeerConnection.prototype._setupPeerConnection = function(rtcConfiguration) {
   const self = this;
   const version = new (this.options.rtcpcFactory || RTCPC)({ RTCPeerConnection: this.options.RTCPeerConnection });
   version.create(rtcConfiguration);
-  addStream(version.pc, this.stream);
+  try {
+    addStream(version.pc, this.stream);
 
-  const supportedCodecs = RTCRtpReceiver.getCapabilities('audio').codecs;
-  this._log.debug('sorting codecs', supportedCodecs, this.codecPreferences);
-  const sortedCodecs = util.sortByMimeTypes(supportedCodecs, this.codecPreferences);
-  const [transceiver] = version.pc.getTransceivers();
-  this._log.debug('setting sorted codecs', sortedCodecs);
-  transceiver.setCodecPreferences(sortedCodecs);
+    const supportedCodecs = RTCRtpReceiver.getCapabilities('audio').codecs;
+    this._log.debug('sorting codecs', supportedCodecs, this.codecPreferences);
+    const sortedCodecs = util.sortByMimeTypes(supportedCodecs, this.codecPreferences);
+    const [transceiver] = version.pc.getTransceivers();
+    this._log.debug('setting sorted codecs', sortedCodecs);
+    transceiver.setCodecPreferences(sortedCodecs);
+  } catch (error) {
+    // The caller never receives this version, so close its RTCPeerConnection here.
+    version.pc.close();
+    throw error;
+  }
 
   const eventName = 'ontrack' in version.pc
     ? 'ontrack' : 'onaddstream';
@@ -745,7 +765,17 @@ PeerConnection.prototype._initializeMediaStream = function(rtcConfiguration) {
     this.close();
     return false;
   }
-  this.version = this._setupPeerConnection(rtcConfiguration);
+  try {
+    this.version = this._setupPeerConnection(rtcConfiguration);
+  } catch (error) {
+    // E.g. the RTCPeerConnection constructor rejected rtcConfiguration.
+    this.onerror({ disconnect: true, info: {
+      code: 31000,
+      message: `Unable to set up the RTCPeerConnection: ${error.message}`,
+      twilioError: new GeneralErrors.UnknownError(error.message, error),
+    } });
+    return false;
+  }
   this._setupChannel();
   return true;
 };
@@ -923,6 +953,7 @@ PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfigur
   }
   function onAnswerError(err) {
     if (self.status === 'closed') {
+      self._log.info('Ignoring an answer error for a closed call', err);
       return;
     }
     const errMsg = err.message || err;
@@ -950,8 +981,9 @@ PeerConnection.prototype.close = function() {
   }
   if (this.stream) {
     this.mute(false);
-    this._stopStream();
   }
+  // Even without a stream: an opened input whose tracks were rejected was still adopted.
+  this._stopStream();
   this.stream = null;
   this._removeReconnectionListeners();
   this._stopIceGatheringTimeout();

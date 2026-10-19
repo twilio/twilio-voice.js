@@ -588,9 +588,14 @@ class Device extends EventEmitter {
     let activeCall;
     this._makeCallPromise = this._makeCall(twimlParams, callOptions, isReconnect);
     try {
-      activeCall = this._activeCall = await this._makeCallPromise;
+      activeCall = await this._makeCallPromise;
     } finally {
       this._makeCallPromise = null;
+    }
+
+    // An incoming call accepted meanwhile keeps the slot until accept() below replaces it.
+    if (!this._activeCall) {
+      this._activeCall = activeCall;
     }
 
     // Make sure any incoming calls are ignored
@@ -1032,15 +1037,26 @@ class Device extends EventEmitter {
       MediaStream: this._options.MediaStream,
       RTCPeerConnection: this._options.RTCPeerConnection,
       beforeAccept: (currentCall: Call) => {
-        // Claim the slot before disconnecting; 'accept' only fires once media is open,
-        // and disconnect handlers can synchronously accept another call.
         const previousCall = this._activeCall;
-        this._activeCall = currentCall;
-
         if (previousCall && previousCall !== currentCall) {
+          // Disconnect before claiming the slot; the Device's own disconnect listener frees it,
+          // so the previous call's handlers see the Device idle.
           previousCall.disconnect();
           this._removeCall(previousCall);
         }
+
+        // A disconnect handler above ended this call, or accepted another one, which wins.
+        if (currentCall.status() !== Call.State.Connecting) {
+          return;
+        }
+        if (this._activeCall && this._activeCall !== currentCall) {
+          this._log.info('Another call was accepted while replacing the active call; disconnecting this one');
+          currentCall.disconnect();
+          return;
+        }
+
+        // Claim the slot now; 'accept' only fires once media is open.
+        this._activeCall = currentCall;
       },
       codecPreferences: this._options.codecPreferences,
       customSounds: this._options.sounds,
@@ -1432,7 +1448,6 @@ class Device extends EventEmitter {
   private _removeCall(call: Call): void {
     if (this._activeCall === call) {
       this._activeCall = null;
-      this._makeCallPromise = null;
     }
 
     for (let i = this._calls.length - 1; i >= 0; i--) {

@@ -16,6 +16,8 @@ describe('Late getUserMedia results', function() {
   let defaultRequests: Array<Promise<MediaStream>>;
   // Holds the default-device result with this request index until the promise resolves.
   let holds: Map<number, Promise<void>>;
+  // When set, holds every selected-device result until this promise resolves.
+  let selectedHold: Promise<void> | null;
 
   // Lets every pending promise callback chained on a settled request run.
   const settle = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -24,6 +26,7 @@ describe('Late getUserMedia results', function() {
     calleeIdentity = 'callee-' + Date.now();
     defaultRequests = [];
     holds = new Map();
+    selectedHold = null;
     callerB = null;
     caller = new Device(await generateAccessToken('caller-' + Date.now()));
     callee = new Device(await generateAccessToken(calleeIdentity), {
@@ -31,7 +34,8 @@ describe('Late getUserMedia results', function() {
         const audio: any = constraints.audio;
         const stream = navigator.mediaDevices.getUserMedia(constraints);
         if (audio && typeof audio === 'object' && audio.deviceId) {
-          return stream;
+          const selected = selectedHold;
+          return selected ? stream.then(s => selected.then(() => s)) : stream;
         }
         const hold = holds.get(defaultRequests.length);
         const result = hold ? stream.then(s => hold.then(() => s)) : stream;
@@ -197,5 +201,205 @@ describe('Late getUserMedia results', function() {
     assert.strictEqual(destroyCount, 2);
     assert.strictEqual(callB.status(), Call.State.Open);
     assert.strictEqual(callB.getLocalStream()!.getAudioTracks()[0].readyState, 'live');
+  });
+
+  it('should stop the default raw track when it lands before setInputDevice, with a processor', async () => {
+    await grantMicPermission(callee);
+    await callee.audio!.addProcessor({
+      createProcessedStream: (stream: MediaStream) =>
+        Promise.resolve(new MediaStream(stream.getAudioTracks().map(track => track.clone()))),
+      destroyProcessedStream: () => Promise.resolve(),
+    });
+    const deviceId = Array.from(callee.audio!.availableInputDevices.keys())[0];
+
+    const call = await incomingCall();
+    let releaseSelected!: () => void;
+    selectedHold = new Promise<void>(resolve => { releaseSelected = resolve; });
+    const accept = expectEvent('accept', call);
+    call.accept();
+    const selected = callee.audio!.setInputDevice(deviceId);
+    // The default stream is adopted while setInputDevice still waits on its getUserMedia.
+    await waitFor(accept, 15000);
+    releaseSelected();
+    await waitFor(selected, 15000);
+    const rawDefault = await defaultRequests[0];
+
+    assert.strictEqual(rawDefault.getAudioTracks()[0].readyState, 'ended');
+    assert.strictEqual(call.status(), Call.State.Open);
+    assert.strictEqual(call.getLocalStream()!.getAudioTracks()[0].readyState, 'live');
+  });
+
+  it('should stop the raw track when the local processor returns a stream without audio', async () => {
+    await callee.audio!.addProcessor({
+      createProcessedStream: () => Promise.resolve(new MediaStream()),
+      destroyProcessedStream: () => Promise.resolve(),
+    });
+
+    const call = await incomingCall();
+    const error = expectEvent('error', call);
+    call.accept();
+    await waitFor(error, 15000);
+    const raw = await defaultRequests[0];
+    await settle();
+
+    assert.strictEqual(call.status(), Call.State.Closed);
+    assert.strictEqual(raw.getAudioTracks()[0].readyState, 'ended');
+    assert.strictEqual((callee.audio as any)._defaultInput, null);
+  });
+
+  it('should emit disconnect once for an outgoing call disconnected while acquiring its microphone', async () => {
+    let releaseDefault!: () => void;
+    holds.set(0, new Promise<void>(resolve => { releaseDefault = resolve; }));
+    const call = await callee.connect({ params: { To: 'nobody-' + Date.now() } });
+    let disconnectCount = 0;
+    call.on('disconnect', () => disconnectCount++);
+
+    call.disconnect();
+    releaseDefault();
+    const raw = await waitFor(defaultRequests[0], 15000).then(() => defaultRequests[0]);
+    await settle();
+
+    assert.strictEqual(disconnectCount, 1);
+    assert.strictEqual(raw.getAudioTracks()[0].readyState, 'ended');
+  });
+
+  it('should emit disconnect once for an incoming call disconnected while acquiring its microphone', async () => {
+    const call = await incomingCall();
+    let releaseDefault!: () => void;
+    holds.set(0, new Promise<void>(resolve => { releaseDefault = resolve; }));
+    let disconnectCount = 0;
+    call.on('disconnect', () => disconnectCount++);
+
+    call.accept();
+    call.disconnect();
+    releaseDefault();
+    const raw = await waitFor(defaultRequests[0], 15000).then(() => defaultRequests[0]);
+    await settle();
+
+    assert.strictEqual(disconnectCount, 1);
+    assert.strictEqual(raw.getAudioTracks()[0].readyState, 'ended');
+  });
+
+  it('should stop the raw track when the local processor throws', async () => {
+    await callee.audio!.addProcessor({
+      createProcessedStream: () => { throw new Error('forced processor throw'); },
+      destroyProcessedStream: () => Promise.resolve(),
+    });
+
+    const call = await incomingCall();
+    const error = expectEvent('error', call);
+    call.accept();
+    await waitFor(error, 15000);
+    assert.strictEqual(((await error) as any).code, 31402);
+    assert.strictEqual(((await error) as any).originalError.message, 'forced processor throw');
+    const raw = await defaultRequests[0];
+
+    assert.strictEqual(call.status(), Call.State.Closed);
+    assert.strictEqual(raw.getAudioTracks()[0].readyState, 'ended');
+  });
+
+  it('should stop the raw track when the local processor returns no stream', async () => {
+    await callee.audio!.addProcessor({
+      createProcessedStream: () => Promise.resolve(undefined as any),
+      destroyProcessedStream: () => Promise.resolve(),
+    });
+
+    const call = await incomingCall();
+    const error = expectEvent('error', call);
+    call.accept();
+    await waitFor(error, 15000);
+    assert.strictEqual(((await error) as any).code, 31402);
+    assert.strictEqual(((await error) as any).originalError.message,
+      'The local AudioProcessor did not return a MediaStream');
+    const raw = await defaultRequests[0];
+
+    assert.strictEqual(call.status(), Call.State.Closed);
+    assert.strictEqual(raw.getAudioTracks()[0].readyState, 'ended');
+    assert.strictEqual(callee.isBusy, false);
+  });
+
+  it('should stop the raw track when the local processor fails', async () => {
+    await callee.audio!.addProcessor({
+      createProcessedStream: () => Promise.reject(new Error('forced processor failure')),
+      destroyProcessedStream: () => Promise.resolve(),
+    });
+
+    const call = await incomingCall();
+    const error = expectEvent('error', call);
+    call.accept();
+    await waitFor(error, 15000);
+    assert.strictEqual(((await error) as any).code, 31402);
+    assert.strictEqual(((await error) as any).originalError.message, 'forced processor failure');
+    const raw = await defaultRequests[0];
+
+    assert.strictEqual(call.status(), Call.State.Closed);
+    assert.strictEqual(raw.getAudioTracks()[0].readyState, 'ended');
+    assert.strictEqual(callee.isBusy, false);
+  });
+
+  it('should reopen the microphone without a processor removed while it was being created', async () => {
+    let releaseProcessed!: () => void;
+    const held = new Promise<void>(resolve => { releaseProcessed = resolve; });
+    let createReached!: () => void;
+    const reached = new Promise<void>(resolve => { createReached = resolve; });
+    let processed: MediaStream | null = null;
+    const destroyed: MediaStream[] = [];
+    const processor = {
+      createProcessedStream: (stream: MediaStream) => {
+        createReached();
+        return held.then(() => processed = new MediaStream(stream.getAudioTracks().map(track => track.clone())));
+      },
+      destroyProcessedStream: (stream: MediaStream) => { destroyed.push(stream); return Promise.resolve(); },
+    };
+    await callee.audio!.addProcessor(processor);
+
+    const call = await incomingCall();
+    const accept = expectEvent('accept', call);
+    call.accept();
+    await waitFor(reached, 15000);
+    await callee.audio!.removeProcessor(processor);
+    releaseProcessed();
+    await waitFor(accept, 15000);
+
+    assert.strictEqual(defaultRequests.length, 2);
+    assert.strictEqual((await defaultRequests[0]).getAudioTracks()[0].readyState, 'ended');
+    assert.strictEqual(processed!.getAudioTracks()[0].readyState, 'ended');
+    assert.deepStrictEqual(destroyed, [processed]);
+    assert.strictEqual(callee.audio!.localProcessedStream, null);
+    assert.strictEqual(call.getLocalStream(), await defaultRequests[1]);
+  });
+
+  it('should keep the current input when a reacquired stream is rejected', async () => {
+    let createCount = 0;
+    const destroyed: MediaStream[] = [];
+    await callee.audio!.addProcessor({
+      createProcessedStream: (stream: MediaStream) => Promise.resolve(++createCount === 1
+        ? new MediaStream(stream.getAudioTracks().map(track => track.clone()))
+        : new MediaStream()),
+      destroyProcessedStream: (stream: MediaStream) => { destroyed.push(stream); return Promise.resolve(); },
+    });
+    // The device-lost path does not handle the swap's rejection.
+    const ignoreRejection = (error: Error) => !/no audio tracks/.test(error.message);
+    Cypress.on('uncaught:exception', ignoreRejection);
+
+    try {
+      const call = await incomingCall();
+      const accept = expectEvent('accept', call);
+      call.accept();
+      await waitFor(accept, 15000);
+
+      call.getLocalStream()!.getAudioTracks()[0].stop();
+      callee.audio!.emit('deviceChange', []);
+      const reacquired = await waitFor(defaultRequests[1], 15000).then(() => defaultRequests[1]);
+      await settle();
+      assert.strictEqual(reacquired.getAudioTracks()[0].readyState, 'ended');
+      assert.strictEqual(destroyed.length, 1);
+
+      call.disconnect();
+      assert.strictEqual((await defaultRequests[0]).getAudioTracks()[0].readyState, 'ended');
+      assert.strictEqual(destroyed.length, 2);
+    } finally {
+      Cypress.removeListener('uncaught:exception', ignoreRejection);
+    }
   });
 });

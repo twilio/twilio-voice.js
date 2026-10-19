@@ -494,6 +494,22 @@ describe('Call', function() {
           sinon.assert.calledWith(publisher.error, 'get-user-media', 'denied');
         });
       });
+
+      it('should publish but not emit a getUserMedia failure after the call was closed', async () => {
+        let rejectGetUserMedia: (error: any) => void = () => undefined;
+        mediaHandler.openDefaultDeviceWithConstraints = () => new Promise((_resolve, reject) => {
+          rejectGetUserMedia = reject;
+        });
+        const errorSpy = sinon.spy();
+        conn.on('error', errorSpy);
+        conn.accept();
+        conn['_status'] = Call.State.Closed;
+        rejectGetUserMedia({ code: 0, name: 'NotAllowedError', message: 'Permission denied' });
+        await clock.tickAsync(0);
+        sinon.assert.notCalled(errorSpy);
+        sinon.assert.calledWith(publisher.error, 'get-user-media', 'denied');
+        sinon.assert.notCalled(mediaHandler.close);
+      });
     });
 
     context('when getInputStream is present and succeeds', () => {
@@ -759,16 +775,18 @@ describe('Call', function() {
 
     context('when getInputStream is present and fails without 31208', () => {
       let getInputStream: () => any;
+      let rejection: any;
       let wait: Promise<any>;
 
       beforeEach(() => {
         getInputStream = sinon.spy(() => 'foo');
+        rejection = { };
 
         Object.assign(options, { getInputStream });
         conn = new Call(config, options);
 
         mediaHandler.setInputTracksFromStream = sinon.spy(() => {
-          const p = Promise.reject({ });
+          const p = Promise.reject(rejection);
           wait = p.catch(() => Promise.resolve());
           return p;
         });
@@ -778,6 +796,17 @@ describe('Call', function() {
         conn.accept({ rtcConstraints: { audio: { foo: 'bar' } as MediaTrackConstraints } });
         return wait.then(() => {
           sinon.assert.calledWith(publisher.error, 'get-user-media', 'failed');
+        });
+      });
+
+      it('should emit error 31402 with the cause as originalError', () => {
+        const errorSpy = sinon.spy();
+        conn.on('error', errorSpy);
+        conn.accept();
+        return wait.then(() => {
+          sinon.assert.calledOnce(errorSpy);
+          assert.equal(errorSpy.args[0][0].code, 31402);
+          assert.strictEqual(errorSpy.args[0][0].originalError, rejection);
         });
       });
     });

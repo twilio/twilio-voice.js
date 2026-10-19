@@ -18,9 +18,9 @@ describe('PeerConnection', () => {
 
   context('PeerConnection.prototype.openDefaultDeviceWithConstraints', () => {
     const METHOD = PeerConnection.prototype.openDefaultDeviceWithConstraints;
-    const USER_MEDIA_RESULT = 'foobar';
+    const USER_MEDIA_RESULT = { processed: null, processor: null, raw: 'foobar' };
     const INPUT_TRACKS_FROM_STREAM = '_setInputTracksFromStream';
-    const EXPECTED_ERROR = new Error(USER_MEDIA_RESULT);
+    const EXPECTED_ERROR = new Error('foobar');
 
     let context = null;
     let toTest = null;
@@ -29,10 +29,12 @@ describe('PeerConnection', () => {
       context = {
         status: 'connecting',
         stream: 'app stream',
+        _log: { info: sinon.stub() },
         _shouldManageStream: true,
         _setInputTracksFromStream: sinon.stub().returns(Promise.resolve(INPUT_TRACKS_FROM_STREAM)),
         _audioHelper: {
           _adoptDefaultInputDeviceStream: sinon.stub(),
+          _localProcessor: null,
           _openDefaultDeviceWithConstraints: sinon.stub().returns(Promise.resolve(USER_MEDIA_RESULT)),
           _stopDefaultInputDeviceStream: sinon.stub(),
         },
@@ -43,26 +45,28 @@ describe('PeerConnection', () => {
     it('Should resolve when _setInputTracksFromStream resolves', done => {
       toTest({not: 'is random'}).then(stream => {
         assert(context._setInputTracksFromStream.calledOn(context));
-        assert(context._setInputTracksFromStream.calledWithExactly(false, USER_MEDIA_RESULT));
+        assert(context._setInputTracksFromStream.calledWithExactly(false, USER_MEDIA_RESULT.raw));
         assert(context._audioHelper._openDefaultDeviceWithConstraints.calledWithExactly({not: 'is random'}));
         assert(context._audioHelper._openDefaultDeviceWithConstraints.calledBefore(context._setInputTracksFromStream));
         assert.deepStrictEqual(INPUT_TRACKS_FROM_STREAM, stream);
-        assert.strictEqual(context._openedStream, USER_MEDIA_RESULT);
+        assert.strictEqual(context._openedInput, USER_MEDIA_RESULT);
         sinon.assert.calledOnceWithExactly(context._audioHelper._adoptDefaultInputDeviceStream, USER_MEDIA_RESULT);
       }).then(done).catch(done);
     });
 
     it('Should adopt and own the stream only after _setInputTracksFromStream released the previous one', () => {
-      context._openedStream = 'previous stream';
+      context._openedInput = 'previous input';
       let ownedDuringSwap;
       context._setInputTracksFromStream = sinon.spy(() => {
-        ownedDuringSwap = context._openedStream;
+        ownedDuringSwap = context._openedInput;
         sinon.assert.notCalled(context._audioHelper._adoptDefaultInputDeviceStream);
+        // As _stopStream does.
+        context._openedInput = null;
         return Promise.resolve(INPUT_TRACKS_FROM_STREAM);
       });
       return toTest().then(() => {
-        assert.strictEqual(ownedDuringSwap, 'previous stream');
-        assert.strictEqual(context._openedStream, USER_MEDIA_RESULT);
+        assert.strictEqual(ownedDuringSwap, 'previous input');
+        assert.strictEqual(context._openedInput, USER_MEDIA_RESULT);
       });
     });
 
@@ -76,10 +80,37 @@ describe('PeerConnection', () => {
           sinon.assert.calledOnceWithExactly(context._audioHelper._stopDefaultInputDeviceStream, USER_MEDIA_RESULT);
           sinon.assert.notCalled(context._audioHelper._adoptDefaultInputDeviceStream);
           sinon.assert.notCalled(context._setInputTracksFromStream);
-          assert.strictEqual(context._openedStream, undefined);
+          assert.strictEqual(context._openedInput, undefined);
           assert.strictEqual(result, 'app stream');
         });
       });
+    });
+
+    it('Should send the processed stream when there is one', async () => {
+      const input = { processed: 'processed', processor: 'processor', raw: 'raw' };
+      context._audioHelper._localProcessor = 'processor';
+      context._audioHelper._openDefaultDeviceWithConstraints.returns(Promise.resolve(input));
+      await toTest();
+      sinon.assert.calledOnceWithExactly(context._setInputTracksFromStream, false, 'processed');
+    });
+
+    it('Should open again when the local processor changed while opening', async () => {
+      context._audioHelper._localProcessor = 'other processor';
+      context.openDefaultDeviceWithConstraints = sinon.stub().returns(Promise.resolve('reopened'));
+      const result = await toTest('constraints');
+      assert.strictEqual(result, 'reopened');
+      sinon.assert.calledOnceWithExactly(context.openDefaultDeviceWithConstraints, 'constraints');
+      sinon.assert.calledOnceWithExactly(context._audioHelper._stopDefaultInputDeviceStream, USER_MEDIA_RESULT);
+      sinon.assert.notCalled(context._setInputTracksFromStream);
+    });
+
+    it('Should keep the current input when the swap rejects the new stream', async () => {
+      context._openedInput = 'current input';
+      context._setInputTracksFromStream.returns(Promise.reject(EXPECTED_ERROR));
+      await assert.rejects(toTest(), EXPECTED_ERROR);
+      sinon.assert.calledOnceWithExactly(context._audioHelper._stopDefaultInputDeviceStream, USER_MEDIA_RESULT);
+      sinon.assert.notCalled(context._audioHelper._adoptDefaultInputDeviceStream);
+      assert.strictEqual(context._openedInput, 'current input');
     });
 
     it('Should reject when openDefaultDeviceWithConstraints rejects', done => {
@@ -96,7 +127,7 @@ describe('PeerConnection', () => {
       toTest(undefined).catch(aError => {
         assert.equal(aError.message, EXPECTED_ERROR.message);
         assert(context._setInputTracksFromStream.calledOn(context));
-        assert(context._setInputTracksFromStream.calledWithExactly(false, USER_MEDIA_RESULT));
+        assert(context._setInputTracksFromStream.calledWithExactly(false, USER_MEDIA_RESULT.raw));
         assert(context._audioHelper._openDefaultDeviceWithConstraints.calledWithExactly(undefined));
       }).then(done).catch(done);
     });
@@ -349,6 +380,13 @@ describe('PeerConnection', () => {
       assert.strictEqual(context.status, 'closed');
     });
 
+    it('Should release the opened input when there is no stream', () => {
+      context.stream = null;
+      context._openedInput = 'opened input';
+      toTest();
+      assert(context._stopStream.calledOnce);
+    });
+
     it('Should stop everything what is available with _outputAnalyser', () => {
       context.version = false;
       context.stream = false;
@@ -498,6 +536,7 @@ describe('PeerConnection', () => {
       };
       context = {
         _initializeMediaStream: sinon.stub(),
+        _log: { info: sinon.stub() },
         _maybeSetIceAggressiveNomination: (sdp) => sdp,
         _setEncodingParameters: sinon.stub(),
         _setupRTCDtlsTransportListener: sinon.stub(),
@@ -577,7 +616,10 @@ describe('PeerConnection', () => {
 
     it('Should call onerror event when processSDP error callback is called and returns error object', () => {
       const error = new Error('error message');
-      const expectedError = {disconnect: true, info: {code: 31000, message: 'Error creating the answer: error message'}};
+      const expectedError = {
+        disconnect: true,
+        info: {code: 31000, message: 'Error creating the answer: error message'},
+      };
       context._initializeMediaStream.returns(true);
       context.status = 'connecting';
       version.processSDP.callsArgWith(5, error);
@@ -646,6 +688,28 @@ describe('PeerConnection', () => {
       sinon.assert.notCalled(context._setupRTCDtlsTransportListener);
     });
 
+  });
+
+  context('PeerConnection.prototype._initializeMediaStream', () => {
+    const METHOD = PeerConnection.prototype._initializeMediaStream;
+
+    it('Should disconnect with an error when the RTCPeerConnection cannot be created', () => {
+      const error = new Error('invalid rtcConfiguration');
+      const context = {
+        onerror: sinon.stub(),
+        pstream: { status: 'connected' },
+        status: 'connecting',
+        _setupChannel: sinon.stub(),
+        _setupPeerConnection: sinon.stub().throws(error),
+      };
+      assert.strictEqual(METHOD.call(context, 'rtcConfiguration'), false);
+      sinon.assert.calledOnce(context.onerror);
+      const { disconnect, info } = context.onerror.args[0][0];
+      assert.strictEqual(disconnect, true);
+      assert.strictEqual(info.twilioError.code, 31000);
+      assert.strictEqual(info.twilioError.originalError, error);
+      sinon.assert.notCalled(context._setupChannel);
+    });
   });
 
   context('PeerConnection.prototype._removeReconnectionListeners', () => {
@@ -2216,10 +2280,10 @@ describe('PeerConnection', () => {
     });
 
     it('should stop the default stream it opened', () => {
-      context._openedStream = 'opened stream';
+      context._openedInput = 'opened input';
       toTest();
-      sinon.assert.calledOnceWithExactly(stub, 'opened stream');
-      assert.strictEqual(context._openedStream, null);
+      sinon.assert.calledOnceWithExactly(stub, 'opened input');
+      assert.strictEqual(context._openedInput, null);
     });
 
     it('should not stop a stream it did not open', () => {
@@ -2272,6 +2336,7 @@ describe('PeerConnection', () => {
       versionCreate = sinon.stub();
       versionPc = {
         addStream: sinon.stub(),
+        close: sinon.stub(),
         getSenders: () => [sender],
         getTransceivers: () => [transceiver],
       };
@@ -2315,6 +2380,7 @@ describe('PeerConnection', () => {
       assert(versionCreate.calledWithExactly(ICE_SERVERS));
       assert.equal(versionPc.addStream.called, false);
       assert.equal(typeof versionPc.onaddstream, 'undefined');
+      sinon.assert.notCalled(versionPc.close);
     });
 
     it('Should not create onaddstream callback function when pc addstream throws error', () => {
@@ -2323,6 +2389,7 @@ describe('PeerConnection', () => {
       assert(versionCreate.calledWithExactly(ICE_SERVERS));
       assert(versionPc.addStream.calledWithExactly(STREAM));
       assert.equal(typeof versionPc.onaddstream, 'undefined');
+      sinon.assert.calledOnce(versionPc.close);
     });
 
     it('Should call _onAddTrack when sink is supported', () => {

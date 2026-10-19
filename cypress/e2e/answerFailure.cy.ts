@@ -8,6 +8,8 @@ import { expectEvent, waitFor } from '../../tests/lib/util';
 let failingMethod: 'setRemoteDescription' | 'setLocalDescription';
 // When set, the failure waits until this resolves.
 let failureHold: Promise<void> | null;
+// When set, called each time the failing method is reached.
+let onFailingCall: (() => void) | null;
 
 // Fails the offer (setRemoteDescription) or the answer (setLocalDescription),
 // which reaches PeerConnection's onAnswerError either way.
@@ -15,6 +17,9 @@ function FailingRTCPeerConnection(configuration?: RTCConfiguration) {
   const pc: any = new RTCPeerConnection(configuration);
   pc[failingMethod] = (_desc: any, _onSuccess?: Function, onError?: Function) => {
     const error = new Error(`forced ${failingMethod} failure`);
+    if (onFailingCall) {
+      onFailingCall();
+    }
     const hold = failureHold || Promise.resolve();
     if (typeof onError === 'function') {
       hold.then(() => onError(error));
@@ -36,11 +41,11 @@ describe('Answer failure', function() {
   beforeEach(async () => {
     calleeIdentity = 'callee-' + Date.now();
     failureHold = null;
+    onFailingCall = null;
     caller = new Device(await generateAccessToken('caller-' + Date.now()));
     callee = new Device(await generateAccessToken(calleeIdentity), {
       RTCPeerConnection: FailingRTCPeerConnection,
     } as any);
-    callee.on('error', () => { /* expected */ });
     await callee.register();
   });
 
@@ -73,31 +78,61 @@ describe('Answer failure', function() {
     });
   });
 
-  it('should not emit an error when the answer fails after the call is closed', async () => {
-    failingMethod = 'setRemoteDescription';
-    let releaseFailure!: () => void;
-    failureHold = new Promise<void>(resolve => { releaseFailure = resolve; });
+  ['setRemoteDescription', 'setLocalDescription'].forEach(method => {
+    it(`should not emit an error when ${method} fails after the call is closed`, async () => {
+      failingMethod = method as typeof failingMethod;
+      let releaseFailure!: () => void;
+      failureHold = new Promise<void>(resolve => { releaseFailure = resolve; });
+      const reached = new Promise<void>(resolve => { onFailingCall = resolve; });
+      const incoming: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
+      await caller.connect({ params: { To: calleeIdentity } });
+      const call = await incoming;
+
+      let callError: any = null;
+      call.on('error', error => { callError = error; });
+      call.accept();
+      await waitFor(reached, 15000);
+
+      const disconnect = expectEvent('disconnect', call);
+      call.disconnect();
+      await waitFor(disconnect, 15000);
+      releaseFailure();
+      // The rejection reaches onAnswerError within the same task.
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      assert.strictEqual(call.status(), Call.State.Closed);
+      assert.strictEqual(callError, null);
+    });
+  });
+
+  it('should disconnect the call and leave the Device idle when its peer connection cannot be created', async () => {
     const incoming: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
     await caller.connect({ params: { To: calleeIdentity } });
     const call = await incoming;
 
-    let callError: any = null;
-    call.on('error', error => { callError = error; });
-    call.accept();
-    // The answer is in flight once the call has its peer connection.
-    await waitFor(new Promise<void>(resolve => {
-      const poll = () => (call as any)._mediaHandler.version ? resolve() : setTimeout(poll, 50);
-      poll();
-    }), 15000);
-
+    const error = expectEvent('error', call);
     const disconnect = expectEvent('disconnect', call);
-    call.disconnect();
-    await waitFor(disconnect, 15000);
-    releaseFailure();
-    // The rejection reaches onAnswerError within the same task.
-    await new Promise(resolve => setTimeout(resolve, 0));
+    // A TURN server without credentials makes the RTCPeerConnection constructor throw.
+    call.accept({ rtcConfiguration: { iceServers: [{ urls: 'turn:turn.example.com' }] } });
+    await waitFor([error, disconnect], 15000);
 
+    assert.strictEqual(((await error) as any).code, 31000);
     assert.strictEqual(call.status(), Call.State.Closed);
-    assert.strictEqual(callError, null);
+    assert.strictEqual(callee.isBusy, false);
+  });
+
+  it('should disconnect an outgoing call whose peer connection cannot be created', async () => {
+    const call = await callee.connect({
+      params: { To: calleeIdentity },
+      rtcConfiguration: { iceServers: [{ urls: 'turn:turn.example.com' }] },
+    });
+
+    const error = expectEvent('error', call);
+    const disconnect = expectEvent('disconnect', call);
+    await waitFor([error, disconnect], 15000);
+
+    assert.strictEqual(((await error) as any).code, 31000);
+    assert.strictEqual(call.status(), Call.State.Closed);
+    assert.strictEqual(callee.isBusy, false);
   });
 });

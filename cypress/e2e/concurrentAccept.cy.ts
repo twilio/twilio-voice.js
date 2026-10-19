@@ -17,7 +17,7 @@ describe('Concurrent accept', function() {
   let requests: Array<Promise<MediaStream>>;
   // When set, holds getUserMedia results until two are ready, then releases them in request order.
   let pairGate: Array<() => void> | null;
-  // When set, holds every getUserMedia result until it resolves.
+  // When set, holds every getUserMedia result until this promise resolves.
   let holdGate: Promise<void> | null;
 
   beforeEach(async () => {
@@ -90,6 +90,7 @@ describe('Concurrent accept', function() {
 
     assert.strictEqual(disconnectCountA, 1);
     assert.strictEqual(callA.status(), Call.State.Closed);
+    assert.strictEqual((await requests[0]).getAudioTracks()[0].readyState, 'ended');
     assert.strictEqual(callB.status(), Call.State.Open);
     assert.strictEqual(callee.isBusy, true);
     assert.strictEqual(callee.calls.length, 0);
@@ -149,6 +150,33 @@ describe('Concurrent accept', function() {
     assert.strictEqual(callB.getLocalStream()!.getAudioTracks()[0].readyState, 'live');
   });
 
+  it('should replace the accepted call when a disconnect handler connects another', async () => {
+    const incomingA: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
+    await callerA.connect({ params: { To: calleeIdentity } });
+    const callA = await incomingA;
+    // Ring callB first; the busy Device would drop its invite.
+    const incomingB: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
+    await callerB.connect({ params: { To: calleeIdentity } });
+    const callB = await incomingB;
+
+    const acceptA = expectEvent('accept', callA);
+    callA.accept();
+    await waitFor(acceptA, 15000);
+
+    // The Device is idle to this handler, so connect() starts while callB claims the slot.
+    let outgoing!: Promise<Call>;
+    callA.once('disconnect', () => {
+      outgoing = callee.connect({ params: { To: 'nobody-' + Date.now() } });
+    });
+    const disconnectB = expectEvent('disconnect', callB);
+    callB.accept();
+    const callC = await waitFor(outgoing, 15000).then(() => outgoing);
+    await waitFor(disconnectB, 15000);
+
+    assert.strictEqual(callB.status(), Call.State.Closed);
+    assert.strictEqual((callee as any)._activeCall, callC);
+  });
+
   it('should ignore an invite that arrives while an accepted call is connecting', async () => {
     const incomingA: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
     await callerA.connect({ params: { To: calleeIdentity } });
@@ -161,11 +189,13 @@ describe('Concurrent accept', function() {
 
     let incomingCount = 0;
     callee.on(Device.EventName.Incoming, () => incomingCount++);
-    const inviteB = new Promise<void>(resolve => (callee as any)._stream.once('invite', () => resolve()));
+    // The Device's own invite listener runs first, and drops the invite before any await.
+    const inviteB = new Promise<boolean>(resolve => (callee as any)._stream.once('invite', () =>
+      resolve((callee as any)._makeCallPromise === null)));
     await callerB.connect({ params: { To: calleeIdentity } });
     await waitFor(inviteB, 15000);
-    await new Promise(resolve => setTimeout(resolve, 500));
 
+    assert.strictEqual(await inviteB, true);
     assert.strictEqual(incomingCount, 0);
     // callA stays in device.calls until its media opens; no call for callerB was added.
     assert.deepStrictEqual(callee.calls, [callA]);

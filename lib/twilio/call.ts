@@ -673,8 +673,10 @@ class Call extends EventEmitter {
       this._options.beforeAccept(this);
     }
 
-    // beforeAccept can disconnect this call, e.g. from another call's disconnect handler.
+    // beforeAccept can disconnect this call, e.g. when another call's disconnect handler
+    // accepts a different call.
     if (this._status !== Call.State.Connecting) {
+      this._log.info('Accept stopped; the call was disconnected while accepting');
       return;
     }
 
@@ -703,7 +705,7 @@ class Call extends EventEmitter {
           },
         }, this);
       } else {
-        twilioError = new UserMediaErrors.AcquisitionFailedError();
+        twilioError = new UserMediaErrors.AcquisitionFailedError(error);
 
         this._publisher.error('get-user-media', 'failed', {
           data: {
@@ -711,6 +713,12 @@ class Call extends EventEmitter {
             error,
           },
         }, this);
+      }
+
+      // The call was disconnected while its microphone was being acquired.
+      if (this._status === Call.State.Closed) {
+        this._log.warn('Ignoring a getUserMedia failure for a closed call', error);
+        return;
       }
 
       this._disconnect();

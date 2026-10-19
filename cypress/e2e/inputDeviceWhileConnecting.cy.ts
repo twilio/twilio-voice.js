@@ -66,6 +66,27 @@ describe('setInputDevice while a call is connecting', function() {
     assert.strictEqual(late.getAudioTracks()[0].readyState, 'ended');
   });
 
+  it('should switch the selected device again before the call has a peer connection', async () => {
+    const incoming: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
+    await caller.connect({ params: { To: calleeIdentity } });
+    const call = await incoming;
+    const accept = expectEvent('accept', call);
+
+    const deviceId = Array.from(callee.audio!.availableInputDevices.keys())[0];
+    call.accept();
+    await callee.audio!.setInputDevice(deviceId);
+    // The call now has a stream but no peer connection, so this swap has no track to replace.
+    // A forced restart, as a device change does, since Firefox fakes only one input device.
+    await (callee.audio as any)._setInputDevice(deviceId, true);
+    releaseDefault();
+    await waitFor(accept, 15000);
+    const late = await defaultRequest;
+
+    assert.strictEqual(call.status(), Call.State.Open);
+    assert.strictEqual(call.getLocalStream()!.getAudioTracks()[0], callee.audio!.inputStream!.getAudioTracks()[0]);
+    assert.strictEqual(late.getAudioTracks()[0].readyState, 'ended');
+  });
+
   it('should reject unsetInputDevice while the call is connecting', async () => {
     const incoming: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
     await caller.connect({ params: { To: calleeIdentity } });
