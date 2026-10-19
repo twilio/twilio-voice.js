@@ -14,10 +14,13 @@ describe('setInputDevice while a call is connecting', function() {
   // Holds the call's default-device request until released, so setInputDevice() settles first.
   let releaseDefault: () => void;
   let defaultRequest: Promise<MediaStream>;
+  // When set, the held default-device request fails with this error once released.
+  let defaultFailure: Error | null;
 
   beforeEach(async () => {
     calleeIdentity = 'callee-' + Date.now();
     const defaultHold = new Promise<void>(resolve => { releaseDefault = resolve; });
+    defaultFailure = null;
     caller = new Device(await generateAccessToken('caller-' + Date.now()));
     callee = new Device(await generateAccessToken(calleeIdentity), {
       getUserMedia: (constraints: MediaStreamConstraints) => {
@@ -26,7 +29,13 @@ describe('setInputDevice while a call is connecting', function() {
         if (audio && typeof audio === 'object' && audio.deviceId) {
           return stream;
         }
-        defaultRequest = stream.then(s => defaultHold.then(() => s));
+        defaultRequest = stream.then(s => defaultHold.then(() => {
+          if (defaultFailure) {
+            s.getTracks().forEach(track => track.stop());
+            throw defaultFailure;
+          }
+          return s;
+        }));
         return defaultRequest;
       },
     } as any);
@@ -64,6 +73,27 @@ describe('setInputDevice while a call is connecting', function() {
     assert.strictEqual(call.status(), Call.State.Open);
     assert.strictEqual(call.getLocalStream()!.getAudioTracks()[0], callee.audio!.inputStream!.getAudioTracks()[0]);
     assert.strictEqual(late.getAudioTracks()[0].readyState, 'ended');
+  });
+
+  it('should keep the selected input device when the default request then fails', async () => {
+    const incoming: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
+    await caller.connect({ params: { To: calleeIdentity } });
+    const call = await incoming;
+
+    let callError: any = null;
+    call.on('error', error => { callError = error; });
+    const accept = expectEvent('accept', call);
+
+    const deviceId = Array.from(callee.audio!.availableInputDevices.keys())[0];
+    call.accept();
+    await callee.audio!.setInputDevice(deviceId);
+    defaultFailure = new DOMException('forced getUserMedia failure', 'NotReadableError');
+    releaseDefault();
+    await waitFor(accept, 15000);
+
+    assert.strictEqual(callError, null);
+    assert.strictEqual(call.status(), Call.State.Open);
+    assert.strictEqual(call.getLocalStream()!.getAudioTracks()[0], callee.audio!.inputStream!.getAudioTracks()[0]);
   });
 
   it('should switch the selected device again before the call has a peer connection', async () => {

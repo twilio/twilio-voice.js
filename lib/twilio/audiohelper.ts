@@ -796,9 +796,9 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Unset the input device, stopping the tracks. This should only be called when not in a connection. While a
-   *   call is active, including an accepted call that is still connecting, it rejects with InvalidStateError if an
-   *   input device is set.
+   * Unset the input device, stopping the tracks. This should only be called when not in a connection. While the
+   *   Device is busy (see `Device.isBusy`), including with an accepted call that is still connecting, it rejects
+   *   with InvalidStateError if an input device is set.
    */
   unsetInputDevice(): Promise<void> {
     this._log.debug('.unsetInputDevice', this.inputDevice);

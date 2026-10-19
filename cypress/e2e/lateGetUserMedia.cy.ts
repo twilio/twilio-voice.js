@@ -18,6 +18,8 @@ describe('Late getUserMedia results', function() {
   let holds: Map<number, Promise<void>>;
   // When set, holds every selected-device result until this promise resolves.
   let selectedHold: Promise<void> | null;
+  // When set, every default-device request fails with this error.
+  let defaultFailure: Error | null;
 
   // Lets every pending promise callback chained on a settled request run.
   const settle = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -27,6 +29,7 @@ describe('Late getUserMedia results', function() {
     defaultRequests = [];
     holds = new Map();
     selectedHold = null;
+    defaultFailure = null;
     callerB = null;
     caller = new Device(await generateAccessToken('caller-' + Date.now()));
     callee = new Device(await generateAccessToken(calleeIdentity), {
@@ -36,6 +39,15 @@ describe('Late getUserMedia results', function() {
         if (audio && typeof audio === 'object' && audio.deviceId) {
           const selected = selectedHold;
           return selected ? stream.then(s => selected.then(() => s)) : stream;
+        }
+        const failure = defaultFailure;
+        if (failure) {
+          const failed = stream.then(s => {
+            s.getTracks().forEach(track => track.stop());
+            throw failure;
+          });
+          defaultRequests.push(failed);
+          return failed;
         }
         const hold = holds.get(defaultRequests.length);
         const result = hold ? stream.then(s => hold.then(() => s)) : stream;
@@ -401,5 +413,100 @@ describe('Late getUserMedia results', function() {
     } finally {
       Cypress.removeListener('uncaught:exception', ignoreRejection);
     }
+  });
+
+  it('should keep rejecting connect() when a call accepted while it waits then fails', async () => {
+    await grantMicPermission(callee);
+    const deviceId = Array.from(callee.audio!.availableInputDevices.keys())[0];
+    const callB = await incomingCall();
+
+    let releaseSelected!: () => void;
+    selectedHold = new Promise<void>(resolve => { releaseSelected = resolve; });
+    const selected = callee.audio!.setInputDevice(deviceId);
+    // connect() waits for setInputDevice before it creates its call.
+    const outgoing = callee.connect({ params: { To: 'nobody-' + Date.now() } });
+
+    defaultFailure = new DOMException('forced getUserMedia failure', 'NotReadableError');
+    const errorB = expectEvent('error', callB);
+    callB.accept();
+    await waitFor(errorB, 15000);
+    assert.strictEqual(callB.status(), Call.State.Closed);
+
+    const second = callee.connect({ params: { To: 'nobody-' + Date.now() } }).then(() => null, error => error);
+    const secondError = await waitFor(second, 5000).then(() => second);
+    assert.strictEqual(secondError && secondError.name, 'InvalidStateError');
+
+    releaseSelected();
+    await waitFor(selected, 15000);
+    const call = await waitFor(outgoing, 15000).then(() => outgoing);
+    assert.strictEqual((callee as any)._activeCall, call);
+  });
+
+  it('should not reacquire the default microphone while setInputDevice swaps the track', async () => {
+    await grantMicPermission(callee);
+    const deviceId = Array.from(callee.audio!.availableInputDevices.keys())[0];
+    const call = await incomingCall();
+    const accept = expectEvent('accept', call);
+    call.accept();
+    await waitFor(accept, 15000);
+
+    // Hold the swap's replaceTrack, after it has stopped the default track.
+    const sender = (call as any)._mediaHandler.version.pc.getSenders()[0];
+    const replaceTrack = sender.replaceTrack.bind(sender);
+    let releaseSwap!: () => void;
+    const swapHold = new Promise<void>(resolve => { releaseSwap = resolve; });
+    let swapStarted!: () => void;
+    const started = new Promise<void>(resolve => { swapStarted = resolve; });
+    sender.replaceTrack = (track: MediaStreamTrack) => {
+      swapStarted();
+      return swapHold.then(() => replaceTrack(track));
+    };
+    const selected = callee.audio!.setInputDevice(deviceId);
+    await waitFor(started, 15000);
+
+    callee.audio!.emit('deviceChange', []);
+    assert.strictEqual(defaultRequests.length, 1);
+
+    releaseSwap();
+    await waitFor(selected, 15000);
+    assert.strictEqual(call.getLocalStream()!.getAudioTracks()[0].readyState, 'live');
+    assert.strictEqual((await defaultRequests[0]).getAudioTracks()[0].readyState, 'ended');
+  });
+
+  it('should keep the selected input after an earlier overlapping swap fails', async () => {
+    await grantMicPermission(callee);
+    const deviceId = Array.from(callee.audio!.availableInputDevices.keys())[0];
+    const call = await incomingCall();
+    const accept = expectEvent('accept', call);
+    call.accept();
+    await waitFor(accept, 15000);
+
+    // The first swap's replaceTrack is held, then fails after the second swap succeeded.
+    const sender = (call as any)._mediaHandler.version.pc.getSenders()[0];
+    const replaceTrack = sender.replaceTrack.bind(sender);
+    let failFirstSwap!: () => void;
+    let firstSwapStarted!: () => void;
+    const started = new Promise<void>(resolve => { firstSwapStarted = resolve; });
+    let swaps = 0;
+    sender.replaceTrack = (track: MediaStreamTrack) => {
+      if (swaps++ > 0) {
+        return replaceTrack(track);
+      }
+      firstSwapStarted();
+      return new Promise<void>((_, reject) => {
+        failFirstSwap = () => reject(new Error('forced replaceTrack failure'));
+      });
+    };
+    const first = callee.audio!.setInputDevice(deviceId).then(() => null, error => error);
+    await waitFor(started, 15000);
+    await waitFor(callee.audio!.setInputDevice(deviceId), 15000);
+    failFirstSwap();
+    const firstError = await waitFor(first, 15000).then(() => first);
+    assert.ok(firstError);
+
+    // The call now sends the selected stream, so losing it must not reacquire the default device.
+    call.getLocalStream()!.getAudioTracks()[0].stop();
+    callee.audio!.emit('deviceChange', []);
+    assert.strictEqual(defaultRequests.length, 1);
   });
 });

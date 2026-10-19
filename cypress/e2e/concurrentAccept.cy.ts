@@ -177,6 +177,33 @@ describe('Concurrent accept', function() {
     assert.strictEqual((callee as any)._activeCall, callC);
   });
 
+  it('should let the replaced call disconnect handler end the outgoing call', async () => {
+    const incomingA: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
+    await callerA.connect({ params: { To: calleeIdentity } });
+    const callA = await incomingA;
+    // Ring callB first; the busy Device would drop its invite.
+    const incomingB: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
+    await callerB.connect({ params: { To: calleeIdentity } });
+    const callB = await incomingB;
+
+    const acceptA = expectEvent('accept', callA);
+    callA.accept();
+    await waitFor(acceptA, 15000);
+
+    let outgoing!: Promise<Call>;
+    callA.once('disconnect', () => {
+      outgoing = callee.connect({ params: { To: 'nobody-' + Date.now() } });
+    });
+    // The outgoing call replaces callB, whose handler then hangs up everything.
+    callB.once('disconnect', () => callee.disconnectAll());
+    callB.accept();
+    const callC = await waitFor(outgoing, 15000).then(() => outgoing);
+
+    assert.strictEqual(callB.status(), Call.State.Closed);
+    assert.strictEqual(callC.status(), Call.State.Closed);
+    assert.strictEqual(callee.isBusy, false);
+  });
+
   it('should ignore an invite that arrives while an accepted call is connecting', async () => {
     const incomingA: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
     await callerA.connect({ params: { To: calleeIdentity } });

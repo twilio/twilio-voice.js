@@ -278,6 +278,12 @@ class Device extends EventEmitter {
   private _activeCall: Call | null = null;
 
   /**
+   * The outgoing {@link Call} that connect() is accepting. When an accepted incoming call holds the slot,
+   * it is neither the active call nor in _calls until beforeAccept claims it, so disconnectAll() reaches it here.
+   */
+  private _acceptingCall: Call | null = null;
+
+  /**
    * The AudioHelper instance associated with this {@link Device}.
    */
   private _audio: AudioHelper | null = null;
@@ -604,7 +610,12 @@ class Device extends EventEmitter {
     // Stop the incoming sound if it's playing
     this._soundcache.get(Device.SoundName.Incoming).stop();
 
-    activeCall.accept({ rtcConstraints: options.rtcConstraints });
+    this._acceptingCall = activeCall;
+    try {
+      activeCall.accept({ rtcConstraints: options.rtcConstraints });
+    } finally {
+      this._acceptingCall = null;
+    }
     this._publishNetworkChange();
     return activeCall;
   }
@@ -659,6 +670,9 @@ class Device extends EventEmitter {
     if (this._activeCall) {
       this._activeCall.disconnect();
     }
+    if (this._acceptingCall) {
+      this._acceptingCall.disconnect();
+    }
   }
 
   /**
@@ -686,8 +700,11 @@ class Device extends EventEmitter {
   }
 
   /**
-   * Whether the Device is currently on an active Call. A Call counts as active once
-   * `device.connect()` has created it, or from `call.accept()`, before its media has connected.
+   * Whether the Device is currently on an active Call. A Call counts as active from `call.accept()`,
+   * which `device.connect()` calls before it resolves, until it ends, even before its media has
+   * connected. When accepting a Call replaces the active one, the replaced Call's disconnect handlers
+   * see the Device idle, and a Call they accept or connect, or a `disconnectAll()` they call, ends
+   * the accepting Call instead.
    */
   get isBusy(): boolean {
     return !!this._activeCall;

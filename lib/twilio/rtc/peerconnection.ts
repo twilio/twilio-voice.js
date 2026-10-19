@@ -90,6 +90,7 @@ function PeerConnection(audioHelper, pstream, options) {
   this._remoteStream = null;
   this._shouldManageStream = true;
   this._openedInput = null;
+  this._inputSwap = 0;
   this._iceState = INITIAL_ICE_CONNECTION_STATE;
 
   this.options = options = options || {};
@@ -148,6 +149,13 @@ PeerConnection.prototype.openDefaultDeviceWithConstraints = function(constraints
     this._audioHelper._adoptDefaultInputDeviceStream(input);
     this._openedInput = input;
     return result;
+  }, error => {
+    // setInputDevice() gave the call the selected stream meanwhile, so it no longer needs this one.
+    if (this.status !== 'closed' && !this._shouldManageStream && this.stream) {
+      this._log.warn('Ignoring a default input failure after the call switched input', error);
+      return this.stream;
+    }
+    throw error;
   });
 };
 
@@ -158,9 +166,16 @@ PeerConnection.prototype.openDefaultDeviceWithConstraints = function(constraints
  * @param {MediaStream} stream
  */
 PeerConnection.prototype.setInputTracksFromStream = function(stream) {
-  const self = this;
-  return this._setInputTracksFromStream(true, stream).then(() => {
-    self._shouldManageStream = false;
+  // Stop managing the stream before the swap, so a default result that lands during it is released.
+  const wasManaged = this._shouldManageStream;
+  const swap = ++this._inputSwap;
+  this._shouldManageStream = false;
+  return this._setInputTracksFromStream(true, stream).then(() => undefined, error => {
+    // A swap that started after this one owns the flag now.
+    if (this._inputSwap === swap) {
+      this._shouldManageStream = wasManaged;
+    }
+    throw error;
   });
 };
 
@@ -326,11 +341,8 @@ PeerConnection.prototype._setInputTracksFromStream = function(shouldClone, newSt
     this._stopStream();
     this.stream = shouldClone ? cloneStream(newStream, this.options.MediaStream) : newStream;
   } else {
-    // If the call was started with gUM, and we are now replacing that track with an
-    // external stream's tracks, we should stop the old managed track.
-    if (this._shouldManageStream) {
-      this._stopStream();
-    }
+    // If the call was started with gUM, stop the managed track it opened; this no-ops otherwise.
+    this._stopStream();
 
     if (!this._sender) {
       this._sender = this.version.pc.getSenders()[0];

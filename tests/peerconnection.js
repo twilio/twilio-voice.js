@@ -113,6 +113,21 @@ describe('PeerConnection', () => {
       assert.strictEqual(context._openedInput, 'current input');
     });
 
+    it('Should keep the switched stream when the default request fails after setInputDevice', async () => {
+      context._shouldManageStream = false;
+      context._log.warn = sinon.stub();
+      context._audioHelper._openDefaultDeviceWithConstraints.returns(Promise.reject(EXPECTED_ERROR));
+      assert.strictEqual(await toTest('constraints'), 'app stream');
+      sinon.assert.notCalled(context._setInputTracksFromStream);
+    });
+
+    it('Should reject when openDefaultDeviceWithConstraints rejects for a closed call', async () => {
+      context.status = 'closed';
+      context._shouldManageStream = false;
+      context._audioHelper._openDefaultDeviceWithConstraints.returns(Promise.reject(EXPECTED_ERROR));
+      await assert.rejects(toTest('constraints'), EXPECTED_ERROR);
+    });
+
     it('Should reject when openDefaultDeviceWithConstraints rejects', done => {
       context._audioHelper._openDefaultDeviceWithConstraints.returns(Promise.reject(EXPECTED_ERROR));
       toTest('constraints').catch(aError => {
@@ -142,6 +157,7 @@ describe('PeerConnection', () => {
 
     beforeEach(() => {
       context = {
+        _inputSwap: 0,
         _setInputTracksFromStream: sinon.stub().returns(Promise.resolve(INPUT_TRACK_FROM_STATE)),
         _shouldManageStream: 'before'
       };
@@ -154,6 +170,27 @@ describe('PeerConnection', () => {
         assert(context._setInputTracksFromStream.calledWithExactly(true, {arg: 'val'}));
         assert.strictEqual(context._shouldManageStream, false);
       }).then(done).catch(done);
+    });
+
+    it('Should stop managing the stream before the swap settles', () => {
+      let managedDuringSwap;
+      context._setInputTracksFromStream = sinon.spy(() => {
+        managedDuringSwap = context._shouldManageStream;
+        return Promise.resolve();
+      });
+      return toTest({arg: 'val'}).then(() => {
+        assert.strictEqual(managedDuringSwap, false);
+      });
+    });
+
+    it('Should not restore _shouldManageStream when a later swap started before this one rejected', async () => {
+      let rejectFirst;
+      context._setInputTracksFromStream.onFirstCall().returns(new Promise((_, reject) => { rejectFirst = reject; }));
+      const first = toTest({arg: 'first'});
+      await toTest({arg: 'second'});
+      rejectFirst(new Error('first swap failed'));
+      await assert.rejects(first, /first swap failed/);
+      assert.strictEqual(context._shouldManageStream, false);
     });
 
     it('setInputTracksFromStream rejects', done => {
@@ -179,7 +216,8 @@ describe('PeerConnection', () => {
       context = {
         stream: STREAM,
         mute: sinon.stub(),
-        _sender: {}
+        _sender: {},
+        _stopStream: sinon.stub(),
       };
       toTest = METHOD.bind(context);
     });
@@ -222,6 +260,7 @@ describe('PeerConnection', () => {
         stream: STREAM,
         mute: sinon.stub(),
         _sender: {},
+        _stopStream: sinon.stub(),
         options: {
           MediaStream: mediaStream,
         },

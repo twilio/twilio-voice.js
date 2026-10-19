@@ -10,11 +10,21 @@ let failingMethod: 'setRemoteDescription' | 'setLocalDescription';
 let failureHold: Promise<void> | null;
 // When set, called each time the failing method is reached.
 let onFailingCall: (() => void) | null;
+// When set, addTrack throws while the peer connection is being set up.
+let failAddTrack: boolean;
+// Each peer connection the callee created, in order.
+let peerConnections: RTCPeerConnection[];
 
 // Fails the offer (setRemoteDescription) or the answer (setLocalDescription),
 // which reaches PeerConnection's onAnswerError either way.
 function FailingRTCPeerConnection(configuration?: RTCConfiguration) {
   const pc: any = new RTCPeerConnection(configuration);
+  peerConnections.push(pc);
+  if (failAddTrack) {
+    pc.addTrack = () => {
+      throw new Error('forced addTrack failure');
+    };
+  }
   pc[failingMethod] = (_desc: any, _onSuccess?: Function, onError?: Function) => {
     const error = new Error(`forced ${failingMethod} failure`);
     if (onFailingCall) {
@@ -42,6 +52,8 @@ describe('Answer failure', function() {
     calleeIdentity = 'callee-' + Date.now();
     failureHold = null;
     onFailingCall = null;
+    failAddTrack = false;
+    peerConnections = [];
     caller = new Device(await generateAccessToken('caller-' + Date.now()));
     callee = new Device(await generateAccessToken(calleeIdentity), {
       RTCPeerConnection: FailingRTCPeerConnection,
@@ -119,6 +131,24 @@ describe('Answer failure', function() {
     assert.strictEqual(((await error) as any).code, 31000);
     assert.strictEqual(call.status(), Call.State.Closed);
     assert.strictEqual(callee.isBusy, false);
+  });
+
+  it('should close the peer connection and disconnect the call when setting it up fails', async () => {
+    failAddTrack = true;
+    const incoming: Promise<Call> = expectEvent(Device.EventName.Incoming, callee);
+    await caller.connect({ params: { To: calleeIdentity } });
+    const call = await incoming;
+
+    const error = expectEvent('error', call);
+    const disconnect = expectEvent('disconnect', call);
+    call.accept();
+    await waitFor([error, disconnect], 15000);
+
+    assert.strictEqual(((await error) as any).code, 31000);
+    assert.strictEqual(call.status(), Call.State.Closed);
+    assert.strictEqual(callee.isBusy, false);
+    assert.strictEqual(peerConnections.length, 1);
+    assert.strictEqual(peerConnections[0].signalingState, 'closed');
   });
 
   it('should disconnect an outgoing call whose peer connection cannot be created', async () => {

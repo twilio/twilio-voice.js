@@ -295,6 +295,24 @@ describe('Device', function() {
           sinon.assert.calledOnce(call.accept as sinon.SinonStub);
         });
 
+        it('should let disconnectAll() reach the outgoing call while it replaces a claimed call', async () => {
+          let resolveInputDevice!: () => void;
+          device.audio!._getInputDevicePromise = () => new Promise<void>(res => { resolveInputDevice = res; });
+          const connectPromise = device.connect();
+          device['_activeCall'] = { disconnect: sinon.stub(), status: () => CallType.State.Connecting } as any;
+          const makeCall: any = device['_options'].Call;
+          device['_options'].Call = ((...args: any[]) => {
+            const call = makeCall(...args);
+            // As the replaced call's disconnect handler does from inside accept().
+            call.accept.callsFake(() => device.disconnectAll());
+            return call;
+          }) as any;
+          resolveInputDevice();
+          const call = await connectPromise;
+          sinon.assert.calledOnce(call.disconnect as sinon.SinonStub);
+          assert.strictEqual(device['_acceptingCall'], null);
+        });
+
         it('should keep rejecting connect() when a call claimed meanwhile ends', async () => {
           let resolveInputDevice!: () => void;
           device.audio!._getInputDevicePromise = () => new Promise<void>(res => { resolveInputDevice = res; });
