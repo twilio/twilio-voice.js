@@ -2013,6 +2013,45 @@ namespace Device {
 
   /**
    * Signaling options for SIP over WebSocket.
+   *
+   * **Choosing a signaling method per call.** Each {@link Device} supports one signaling
+   * method, fixed at construction. To use SIP for some calls and VSP for others, create one
+   * {@link Device} per method and choose which one to call {@link Device.connect} on in your
+   * application. Each {@link Device} registers and emits {@link Device.incomingEvent} on its own.
+   *
+   * **Concurrent calls.** Only one active call is enforced per {@link Device}, not across
+   * Devices. If your application allows one call at a time, check {@link Device.isBusy} on the
+   * other {@link Device} before connecting or accepting. Each {@link Device} also manages its
+   * own audio input, so set the input device on each one with
+   * {@link AudioHelper.setInputDevice}. Ending a call on one {@link Device} does not stop the
+   * input of a call on the other.
+   *
+   * **Possible future: one Device, both methods.** Not implemented, and subject to change.
+   * A single {@link Device} could hold both a SIP and a VSP connection, accept a per-call
+   * `useSignalingMethod` in {@link Device.connect}, receive incoming calls from both
+   * connections, and report one combined {@link Device.state}.
+   *
+   * @example
+   * ```ts
+   * const sipDevice = new Device(token, {
+   *   signalingOptions: {
+   *     useSignalingMethod: 'sip',
+   *     sipServer: 'wss://sip.example.com',
+   *     sipUri: 'sip:alice@registrar.example.com',
+   *     sipCredentials: { username: 'alice', password: 'secret' },
+   *   },
+   * });
+   * const vspDevice = new Device(token);
+   *
+   * function connect(to: string, useSip: boolean): Promise<Call> {
+   *   const device = useSip ? sipDevice : vspDevice;
+   *   const otherDevice = useSip ? vspDevice : sipDevice;
+   *   if (otherDevice.isBusy) {
+   *     throw new Error('A call is already active on the other Device');
+   *   }
+   *   return device.connect({ params: { To: to } });
+   * }
+   * ```
    */
   export interface SIPSignalingOptions {
     useSignalingMethod: 'sip';
@@ -2269,6 +2308,7 @@ namespace Device {
 
     /**
      * Signaling configuration. Defaults to VSP (Twilio's native protocol) if omitted.
+     * To choose a signaling method per call, see {@link Device.SIPSignalingOptions}.
      *
      * @example SIP over WebSocket
      * ```ts
@@ -2276,6 +2316,7 @@ namespace Device {
      *   signalingOptions: {
      *     useSignalingMethod: 'sip',
      *     sipServer: 'wss://sip.example.com',
+     *     sipUri: 'sip:foo@registrar.example.com',
      *     sipCredentials: { username: 'foo', password: 'bar' },
      *   },
      * });
