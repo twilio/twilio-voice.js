@@ -278,6 +278,12 @@ class Device extends EventEmitter {
   private _activeCall: Call | null = null;
 
   /**
+   * The outgoing {@link Call} that connect() is accepting. When an accepted incoming call holds the slot,
+   * it is neither the active call nor in _calls until beforeAccept claims it, so disconnectAll() reaches it here.
+   */
+  private _acceptingCall: Call | null = null;
+
+  /**
    * The AudioHelper instance associated with this {@link Device}.
    */
   private _audio: AudioHelper | null = null;
@@ -588,9 +594,14 @@ class Device extends EventEmitter {
     let activeCall;
     this._makeCallPromise = this._makeCall(twimlParams, callOptions, isReconnect);
     try {
-      activeCall = this._activeCall = await this._makeCallPromise;
+      activeCall = await this._makeCallPromise;
     } finally {
       this._makeCallPromise = null;
+    }
+
+    // An incoming call accepted meanwhile keeps the slot until accept() below replaces it.
+    if (!this._activeCall) {
+      this._activeCall = activeCall;
     }
 
     // Make sure any incoming calls are ignored
@@ -599,7 +610,12 @@ class Device extends EventEmitter {
     // Stop the incoming sound if it's playing
     this._soundcache.get(Device.SoundName.Incoming).stop();
 
-    activeCall.accept({ rtcConstraints: options.rtcConstraints });
+    this._acceptingCall = activeCall;
+    try {
+      activeCall.accept({ rtcConstraints: options.rtcConstraints });
+    } finally {
+      this._acceptingCall = null;
+    }
     this._publishNetworkChange();
     return activeCall;
   }
@@ -654,6 +670,9 @@ class Device extends EventEmitter {
     if (this._activeCall) {
       this._activeCall.disconnect();
     }
+    if (this._acceptingCall) {
+      this._acceptingCall.disconnect();
+    }
   }
 
   /**
@@ -681,7 +700,11 @@ class Device extends EventEmitter {
   }
 
   /**
-   * Whether the Device is currently on an active Call.
+   * Whether the Device is currently on an active Call. A Call counts as active from `call.accept()`,
+   * which `device.connect()` calls before it resolves, until it ends, even before its media has
+   * connected. When accepting a Call replaces the active one, the replaced Call's disconnect handlers
+   * see the Device idle, and a Call they accept or connect, or a `disconnectAll()` they call, ends
+   * the accepting Call instead.
    */
   get isBusy(): boolean {
     return !!this._activeCall;
@@ -1031,12 +1054,26 @@ class Device extends EventEmitter {
       MediaStream: this._options.MediaStream,
       RTCPeerConnection: this._options.RTCPeerConnection,
       beforeAccept: (currentCall: Call) => {
-        if (!this._activeCall || this._activeCall === currentCall) {
+        const previousCall = this._activeCall;
+        if (previousCall && previousCall !== currentCall) {
+          // Disconnect before claiming the slot; the Device's own disconnect listener frees it,
+          // so the previous call's handlers see the Device idle.
+          previousCall.disconnect();
+          this._removeCall(previousCall);
+        }
+
+        // A disconnect handler above ended this call, or accepted another one, which wins.
+        if (currentCall.status() !== Call.State.Connecting) {
+          return;
+        }
+        if (this._activeCall && this._activeCall !== currentCall) {
+          this._log.info('Another call was accepted while replacing the active call; disconnecting this one');
+          currentCall.disconnect();
           return;
         }
 
-        this._activeCall.disconnect();
-        this._removeCall(this._activeCall);
+        // Claim the slot now; 'accept' only fires once media is open.
+        this._activeCall = currentCall;
       },
       codecPreferences: this._options.codecPreferences,
       customSounds: this._options.sounds,
@@ -1428,7 +1465,6 @@ class Device extends EventEmitter {
   private _removeCall(call: Call): void {
     if (this._activeCall === call) {
       this._activeCall = null;
-      this._makeCallPromise = null;
     }
 
     for (let i = this._calls.length - 1; i >= 0; i--) {

@@ -283,6 +283,48 @@ describe('Device', function() {
           assert(!device['_makeCallPromise']);
         });
 
+        it('should leave an incoming call accepted meanwhile in the slot for accept() to replace', async () => {
+          let resolveInputDevice!: () => void;
+          device.audio!._getInputDevicePromise = () => new Promise<void>(res => { resolveInputDevice = res; });
+          const connectPromise = device.connect();
+          const incomingCall = { status: () => CallType.State.Connecting } as any;
+          device['_activeCall'] = incomingCall;
+          resolveInputDevice();
+          const call = await connectPromise;
+          assert.strictEqual(device['_activeCall'], incomingCall);
+          sinon.assert.calledOnce(call.accept as sinon.SinonStub);
+        });
+
+        it('should let disconnectAll() reach the outgoing call while it replaces a claimed call', async () => {
+          let resolveInputDevice!: () => void;
+          device.audio!._getInputDevicePromise = () => new Promise<void>(res => { resolveInputDevice = res; });
+          const connectPromise = device.connect();
+          device['_activeCall'] = { disconnect: sinon.stub(), status: () => CallType.State.Connecting } as any;
+          const makeCall: any = device['_options'].Call;
+          device['_options'].Call = ((...args: any[]) => {
+            const call = makeCall(...args);
+            // As the replaced call's disconnect handler does from inside accept().
+            call.accept.callsFake(() => device.disconnectAll());
+            return call;
+          }) as any;
+          resolveInputDevice();
+          const call = await connectPromise;
+          sinon.assert.calledOnce(call.disconnect as sinon.SinonStub);
+          assert.strictEqual(device['_acceptingCall'], null);
+        });
+
+        it('should keep rejecting connect() when a call claimed meanwhile ends', async () => {
+          let resolveInputDevice!: () => void;
+          device.audio!._getInputDevicePromise = () => new Promise<void>(res => { resolveInputDevice = res; });
+          const connectPromise = device.connect();
+          const incomingCall = { status: () => CallType.State.Connecting } as any;
+          device['_activeCall'] = incomingCall;
+          device['_removeCall'](incomingCall);
+          await assert.rejects(() => device.connect(), /A Call is already active/);
+          resolveInputDevice();
+          await connectPromise;
+        });
+
         it('should reject if there is already an active call', async () => {
           await device.connect();
           await assert.rejects(() => device.connect(), /A Call is already active/);
@@ -1225,6 +1267,143 @@ describe('Device', function() {
           });
 
           await incomingPromise;
+        });
+
+        describe('on call.beforeAccept', () => {
+          let callA: any;
+          let callB: any;
+
+          // accept() sets the call connecting before calling beforeAccept.
+          const beforeAccept = (call: any) => {
+            call.status = () => CallType.State.Connecting;
+            connectOptions!.beforeAccept(call);
+          };
+
+          beforeEach(async () => {
+            callA = device.calls[0];
+            beforeAccept(callA);
+
+            pstream.emit('invite', { callsid: 'CA5678', sdp: 'foobar' });
+            await clock.tickAsync(0);
+          });
+
+          it('should set the active call before media opens', () => {
+            assert.equal(device['_activeCall'], callA);
+            assert.equal(device.isBusy, true);
+          });
+
+          it('should ignore a second invite while connecting', () => {
+            sinon.assert.neverCalledWith(device.emit as any, Device.EventName.Incoming);
+            assert.equal(device.calls.length, 1);
+          });
+
+          it('should clear the active call if the call fails while connecting', () => {
+            assert.equal(device['_activeCall'], callA);
+            callA.emit('disconnect');
+            assert.equal(device['_activeCall'], null);
+          });
+
+          it('should clear the active call if the call is canceled while connecting', () => {
+            assert.equal(device['_activeCall'], callA);
+            callA.emit('cancel');
+            assert.equal(device['_activeCall'], null);
+          });
+
+          it('should clear the active call on an error that closed the call', () => {
+            assert.equal(device['_activeCall'], callA);
+            callA.status = () => 'closed';
+            callA.emit('error', new Error('closed'));
+            assert.equal(device['_activeCall'], null);
+          });
+
+          it('should keep the active call on an error that left the call connecting', () => {
+            callA.status = () => 'connecting';
+            callA.emit('error', new Error('warning'));
+            assert.equal(device['_activeCall'], callA);
+            assert.equal(device.isBusy, true);
+          });
+
+          context('when allowIncomingWhileBusy is true', () => {
+            beforeEach(async () => {
+              device['_options'].allowIncomingWhileBusy = true;
+              pstream.emit('invite', { callsid: 'CA9012', sdp: 'foobar' });
+              await clock.tickAsync(0);
+              callB = device.calls[device.calls.length - 1];
+              beforeAccept(callB);
+            });
+
+            it('should disconnect the connecting call when another is accepted', () => {
+              sinon.assert.calledOnce(callA.disconnect);
+              assert.equal(device.calls.indexOf(callA), -1);
+              assert.equal(device['_activeCall'], callB);
+            });
+
+            it('should not play the incoming sound for an invite while connecting', () => {
+              sinon.assert.calledOnce(spyIncomingSound.play);
+            });
+          });
+
+          context('when the replaced call has a disconnect handler', () => {
+            let busyInHandler: boolean | undefined;
+
+            beforeEach(async () => {
+              device['_options'].allowIncomingWhileBusy = true;
+              pstream.emit('invite', { callsid: 'CA9012', sdp: 'foobar' });
+              await clock.tickAsync(0);
+              callB = device.calls[device.calls.length - 1];
+
+              callA.disconnect = sinon.spy(() => callA.emit('disconnect'));
+              callA.once('disconnect', () => { busyInHandler = device.isBusy; });
+              beforeAccept(callB);
+            });
+
+            it('should show the Device idle to the handler, then claim the slot', () => {
+              assert.equal(busyInHandler, false);
+              assert.equal(device['_activeCall'], callB);
+            });
+          });
+
+          context('when the replaced call disconnect handler ends the accepted call', () => {
+            beforeEach(async () => {
+              device['_options'].allowIncomingWhileBusy = true;
+              pstream.emit('invite', { callsid: 'CA9012', sdp: 'foobar' });
+              await clock.tickAsync(0);
+              callB = device.calls[device.calls.length - 1];
+
+              callA.disconnect = sinon.spy(() => callA.emit('disconnect'));
+              callA.once('disconnect', () => { callB.status = () => CallType.State.Closed; });
+              callB.status = () => CallType.State.Connecting;
+              connectOptions!.beforeAccept(callB);
+            });
+
+            it('should not claim the slot for the ended call', () => {
+              assert.equal(device['_activeCall'], null);
+              assert.equal(device.isBusy, false);
+            });
+          });
+
+          context('when a disconnect handler accepts another call', () => {
+            let callC: any;
+
+            beforeEach(async () => {
+              device['_options'].allowIncomingWhileBusy = true;
+              pstream.emit('invite', { callsid: 'CA9012', sdp: 'foobar' });
+              await clock.tickAsync(0);
+              callB = device.calls[device.calls.length - 1];
+              pstream.emit('invite', { callsid: 'CA3456', sdp: 'foobar' });
+              await clock.tickAsync(0);
+              callC = device.calls[device.calls.length - 1];
+
+              callA.disconnect = sinon.spy(() => callA.emit('disconnect'));
+              callA.once('disconnect', () => beforeAccept(callC));
+              beforeAccept(callB);
+            });
+
+            it('should track only the last accepted call', () => {
+              sinon.assert.calledOnce(callB.disconnect);
+              assert.equal(device['_activeCall'], callC);
+            });
+          });
         });
 
         describe('on call.accept', () => {

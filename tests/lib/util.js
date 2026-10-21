@@ -164,6 +164,19 @@ function expectEvent(eventName, emitter) {
 };
 
 /**
+ * Grant microphone permission and refresh the Device's input devices,
+ * since Firefox hides device IDs until permission is granted.
+ * @param {Device} device
+ * @returns {Promise<void>}
+ */
+function grantMicPermission(device) {
+  return navigator.mediaDevices.getUserMedia({ audio: true }).then(permission => {
+    permission.getTracks().forEach(track => track.stop());
+    return device.audio._updateAvailableDevices();
+  });
+};
+
+/**
  * Check if current browser is firefox
  * @returns {boolean} isFirefox
  */
@@ -260,6 +273,7 @@ function isDocker() {
 exports.combinationContext = combinationContext;
 exports.combinations = combinations;
 exports.expectEvent = expectEvent;
+exports.grantMicPermission = grantMicPermission;
 exports.isDocker = isDocker;
 exports.isFirefox = isFirefox;
 exports.pairs = pairs;

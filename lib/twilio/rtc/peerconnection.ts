@@ -1,5 +1,6 @@
 // @ts-nocheck
 import {
+  GeneralErrors,
   InvalidArgumentError,
   MediaErrors,
   NotSupportedError,
@@ -88,6 +89,8 @@ function PeerConnection(audioHelper, pstream, options) {
   this._onHangup = noop;
   this._remoteStream = null;
   this._shouldManageStream = true;
+  this._openedInput = null;
+  this._inputSwap = 0;
   this._iceState = INITIAL_ICE_CONNECTION_STATE;
 
   this.options = options = options || {};
@@ -119,8 +122,41 @@ PeerConnection.prototype.uri = function() {
  * @param {MediaStreamConstraints} constraints
  */
 PeerConnection.prototype.openDefaultDeviceWithConstraints = function(constraints) {
-  return this._audioHelper._openDefaultDeviceWithConstraints(constraints)
-    .then(this._setInputTracksFromStream.bind(this, false));
+  return this._audioHelper._openDefaultDeviceWithConstraints(constraints).then(input => {
+    // A late result: the call ended, or setInputDevice() gave it the selected stream meanwhile.
+    // It was never adopted, so releasing it leaves the shared default stream alone.
+    if (this.status === 'closed' || !this._shouldManageStream) {
+      this._log.info('Releasing a default input stream that opened after the call closed or switched input');
+      this._audioHelper._stopDefaultInputDeviceStream(input);
+      return this.stream;
+    }
+
+    // The local processor was added, removed or replaced while this stream was opening.
+    if (input.processor !== this._audioHelper._localProcessor) {
+      this._log.info('The local processor changed while opening the default input; reopening it');
+      this._audioHelper._stopDefaultInputDeviceStream(input);
+      return this.openDefaultDeviceWithConstraints(constraints);
+    }
+
+    const result = this._setInputTracksFromStream(false, input.processed || input.raw);
+    // The swap rejected this stream up front, before releasing the call's current input, which stays in use.
+    if (this._openedInput) {
+      this._audioHelper._stopDefaultInputDeviceStream(input);
+      return result;
+    }
+    // Adopt once the swap's _stopStream has released the previous input, and before replaceTrack
+    // settles, so a close() in between still releases this one.
+    this._audioHelper._adoptDefaultInputDeviceStream(input);
+    this._openedInput = input;
+    return result;
+  }, error => {
+    // setInputDevice() gave the call the selected stream meanwhile, so it no longer needs this one.
+    if (this.status !== 'closed' && !this._shouldManageStream && this.stream) {
+      this._log.warn('Ignoring a default input failure after the call switched input', error);
+      return this.stream;
+    }
+    throw error;
+  });
 };
 
 /**
@@ -130,9 +166,16 @@ PeerConnection.prototype.openDefaultDeviceWithConstraints = function(constraints
  * @param {MediaStream} stream
  */
 PeerConnection.prototype.setInputTracksFromStream = function(stream) {
-  const self = this;
-  return this._setInputTracksFromStream(true, stream).then(() => {
-    self._shouldManageStream = false;
+  // Stop managing the stream before the swap, so a default result that lands during it is released.
+  const wasManaged = this._shouldManageStream;
+  const swap = ++this._inputSwap;
+  this._shouldManageStream = false;
+  return this._setInputTracksFromStream(true, stream).then(() => undefined, error => {
+    // A swap that started after this one owns the flag now.
+    if (this._inputSwap === swap) {
+      this._shouldManageStream = wasManaged;
+    }
+    throw error;
   });
 };
 
@@ -214,11 +257,12 @@ PeerConnection.prototype._startPollingVolume = function() {
 PeerConnection.prototype._stopStream = function _stopStream() {
   // We shouldn't stop the tracks if they were not created inside
   //   this PeerConnection.
-  if (!this._shouldManageStream) {
+  if (!this._openedInput) {
     return;
   }
 
-  this._audioHelper._stopDefaultInputDeviceStream();
+  this._audioHelper._stopDefaultInputDeviceStream(this._openedInput);
+  this._openedInput = null;
 };
 
 /**
@@ -292,12 +336,13 @@ PeerConnection.prototype._setInputTracksFromStream = function(shouldClone, newSt
     // We can't use MediaStream.clone() here because it stopped copying over tracks
     //   as of Chrome 61. https://bugs.chromium.org/p/chromium/issues/detail?id=770908
     this.stream = shouldClone ? cloneStream(newStream, this.options.MediaStream) : newStream;
+  } else if (!this._sender && !(this.version && this.version.pc)) {
+    // No RTCPeerConnection yet, so there is no track to replace.
+    this._stopStream();
+    this.stream = shouldClone ? cloneStream(newStream, this.options.MediaStream) : newStream;
   } else {
-    // If the call was started with gUM, and we are now replacing that track with an
-    // external stream's tracks, we should stop the old managed track.
-    if (this._shouldManageStream) {
-      this._stopStream();
-    }
+    // If the call was started with gUM, stop the managed track it opened; this no-ops otherwise.
+    this._stopStream();
 
     if (!this._sender) {
       this._sender = this.version.pc.getSenders()[0];
@@ -589,14 +634,20 @@ PeerConnection.prototype._setupPeerConnection = function(rtcConfiguration) {
   const self = this;
   const version = new (this.options.rtcpcFactory || RTCPC)({ RTCPeerConnection: this.options.RTCPeerConnection });
   version.create(rtcConfiguration);
-  addStream(version.pc, this.stream);
+  try {
+    addStream(version.pc, this.stream);
 
-  const supportedCodecs = RTCRtpReceiver.getCapabilities('audio').codecs;
-  this._log.debug('sorting codecs', supportedCodecs, this.codecPreferences);
-  const sortedCodecs = util.sortByMimeTypes(supportedCodecs, this.codecPreferences);
-  const [transceiver] = version.pc.getTransceivers();
-  this._log.debug('setting sorted codecs', sortedCodecs);
-  transceiver.setCodecPreferences(sortedCodecs);
+    const supportedCodecs = RTCRtpReceiver.getCapabilities('audio').codecs;
+    this._log.debug('sorting codecs', supportedCodecs, this.codecPreferences);
+    const sortedCodecs = util.sortByMimeTypes(supportedCodecs, this.codecPreferences);
+    const [transceiver] = version.pc.getTransceivers();
+    this._log.debug('setting sorted codecs', sortedCodecs);
+    transceiver.setCodecPreferences(sortedCodecs);
+  } catch (error) {
+    // The caller never receives this version, so close its RTCPeerConnection here.
+    version.pc.close();
+    throw error;
+  }
 
   const eventName = 'ontrack' in version.pc
     ? 'ontrack' : 'onaddstream';
@@ -726,7 +777,17 @@ PeerConnection.prototype._initializeMediaStream = function(rtcConfiguration) {
     this.close();
     return false;
   }
-  this.version = this._setupPeerConnection(rtcConfiguration);
+  try {
+    this.version = this._setupPeerConnection(rtcConfiguration);
+  } catch (error) {
+    // E.g. the RTCPeerConnection constructor rejected rtcConfiguration.
+    this.onerror({ disconnect: true, info: {
+      code: 31000,
+      message: `Unable to set up the RTCPeerConnection: ${error.message}`,
+      twilioError: new GeneralErrors.UnknownError(error.message, error),
+    } });
+    return false;
+  }
   this._setupChannel();
   return true;
 };
@@ -903,8 +964,12 @@ PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfigur
     }
   }
   function onAnswerError(err) {
+    if (self.status === 'closed') {
+      self._log.info('Ignoring an answer error for a closed call', err);
+      return;
+    }
     const errMsg = err.message || err;
-    self.onerror({ info: {
+    self.onerror({ disconnect: true, info: {
       code: 31000,
       message: `Error creating the answer: ${errMsg}`,
       twilioError: new MediaErrors.ClientRemoteDescFailed(),
@@ -913,6 +978,12 @@ PeerConnection.prototype.answerIncomingCall = function(callSid, sdp, rtcConfigur
   this.version.processSDP(this.options.maxAverageBitrate, this.codecPreferences, sdp, { audio: true }, onAnswerSuccess, onAnswerError);
 };
 PeerConnection.prototype.close = function() {
+  // A repeat close has nothing left to release, and shared AudioHelper state, such as the
+  // remote processed stream, may already belong to the next call.
+  if (this.status === 'closed') {
+    return;
+  }
+
   if (this.version && this.version.pc) {
     if (this.version.pc.signalingState !== 'closed') {
       this.version.pc.close();
@@ -922,8 +993,9 @@ PeerConnection.prototype.close = function() {
   }
   if (this.stream) {
     this.mute(false);
-    this._stopStream();
   }
+  // Even without a stream: an opened input whose tracks were rejected was still adopted.
+  this._stopStream();
   this.stream = null;
   this._removeReconnectionListeners();
   this._stopIceGatheringTimeout();
