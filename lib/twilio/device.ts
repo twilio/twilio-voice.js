@@ -2026,9 +2026,10 @@ namespace Device {
    * {@link Device} still emits {@link Device.incomingEvent} and plays the incoming sound while
    * a call is in progress, so call {@link Call.reject} in its handler.
    *
-   * Each {@link Device} also manages its own audio input, so set the input device on each one
-   * with {@link AudioHelper.setInputDevice}. Ending a call on one {@link Device} does not stop
-   * the input of a call on the other.
+   * Each {@link Device} also manages its own audio input. If you select an input device with
+   * {@link AudioHelper.setInputDevice}, select it on each {@link Device}; otherwise the browser
+   * default is used. Ending a call on one {@link Device} does not stop the input of a call on
+   * the other.
    *
    * **Possible future: one Device, both methods.** Not implemented, and subject to change.
    * A single {@link Device} could hold both a SIP and a VSP connection, accept a per-call
