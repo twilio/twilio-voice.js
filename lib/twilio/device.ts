@@ -2018,14 +2018,19 @@ namespace Device {
    * method, fixed at construction. Changing it later with {@link Device.updateOptions} is not
    * supported. To use SIP for some calls and VSP for others, create one
    * {@link Device} per method and choose which one to call {@link Device.connect} on in your
-   * application. Each {@link Device} keeps its own connection and registration.
+   * application. Each {@link Device} keeps its own connection, registration and token, so
+   * handle {@link Device.tokenWillExpireEvent} and call {@link Device.updateToken} on each one.
    *
    * **Concurrent calls.** Only one active call is enforced per {@link Device}, not across
-   * Devices. If your application allows one call at a time, track a call in progress yourself
-   * and check it before connecting or accepting on either {@link Device}. {@link Device.isBusy}
-   * is not enough, since it only becomes true once {@link Device.connect} resolves. The other
-   * {@link Device} still emits {@link Device.incomingEvent} and plays the incoming sound while
-   * a call is in progress, so call {@link Call.reject} in its handler.
+   * Devices. If your application allows one call at a time, track a call in progress yourself.
+   * Check it before connecting or accepting on either {@link Device}, and set it when you
+   * accept an incoming call too. {@link Device.isBusy} is not enough, since it only becomes
+   * true once {@link Device.connect} resolves or an accepted call connects.
+   *
+   * Starting a call ignores pending incoming calls on the same {@link Device} only. Ignore or
+   * reject the other Device's {@link Device.calls} yourself. The other {@link Device} also still
+   * emits {@link Device.incomingEvent} and plays the incoming sound while a call is in
+   * progress, so call {@link Call.reject} in its handler.
    *
    * Each {@link Device} also manages its own audio input. If you select an input device with
    * {@link AudioHelper.setInputDevice}, select it on each {@link Device}; otherwise the browser
@@ -2054,12 +2059,19 @@ namespace Device {
    *
    *   try {
    *     const device = useSip ? sipDevice : vspDevice;
+   *     const otherDevice = useSip ? vspDevice : sipDevice;
+   *     otherDevice.calls.forEach((pending) => pending.ignore());
+   *
    *     const call = await device.connect({ params: { To: to } });
    *     const onEnd = () => {
    *       callInProgress = false;
    *     };
    *     call.on('disconnect', onEnd);
-   *     call.on('cancel', onEnd);
+   *     call.on('error', () => {
+   *       if (call.status() === Call.State.Closed) {
+   *         onEnd();
+   *       }
+   *     });
    *     return call;
    *   } catch (error) {
    *     callInProgress = false;
