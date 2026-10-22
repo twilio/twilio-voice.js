@@ -2032,11 +2032,6 @@ namespace Device {
    * default is used. Ending a call on one {@link Device} does not stop the input of a call on
    * the other.
    *
-   * **Possible future: one Device, both methods.** Not implemented, and subject to change.
-   * A single {@link Device} could hold both a SIP and a VSP connection, accept a per-call
-   * `useSignalingMethod` in {@link Device.connect}, receive incoming calls from both
-   * connections, and report one combined {@link Device.state}.
-   *
    * @example
    * ```ts
    * const sipDevice = new Device(token, {
