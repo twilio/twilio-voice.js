@@ -2017,12 +2017,14 @@ namespace Device {
    * **Choosing a signaling method per call.** Each {@link Device} supports one signaling
    * method, fixed at construction. To use SIP for some calls and VSP for others, create one
    * {@link Device} per method and choose which one to call {@link Device.connect} on in your
-   * application. Each {@link Device} registers and emits {@link Device.incomingEvent} on its own.
+   * application. Each {@link Device} keeps its own connection and registration.
    *
    * **Concurrent calls.** Only one active call is enforced per {@link Device}, not across
    * Devices. If your application allows one call at a time, track a call in progress yourself
    * and check it before connecting or accepting on either {@link Device}. {@link Device.isBusy}
-   * is not enough, since it only becomes true once {@link Device.connect} resolves.
+   * is not enough, since it only becomes true once {@link Device.connect} resolves. The other
+   * {@link Device} still emits {@link Device.incomingEvent} and plays the incoming sound while
+   * a call is in progress, so call {@link Call.reject} in its handler.
    *
    * Each {@link Device} also manages its own audio input, so set the input device on each one
    * with {@link AudioHelper.setInputDevice}. Ending a call on one {@link Device} does not stop
