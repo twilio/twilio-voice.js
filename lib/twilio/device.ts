@@ -2020,11 +2020,13 @@ namespace Device {
    * application. Each {@link Device} registers and emits {@link Device.incomingEvent} on its own.
    *
    * **Concurrent calls.** Only one active call is enforced per {@link Device}, not across
-   * Devices. If your application allows one call at a time, check {@link Device.isBusy} on the
-   * other {@link Device} before connecting or accepting. Each {@link Device} also manages its
-   * own audio input, so set the input device on each one with
-   * {@link AudioHelper.setInputDevice}. Ending a call on one {@link Device} does not stop the
-   * input of a call on the other.
+   * Devices. If your application allows one call at a time, track a call in progress yourself
+   * and check it before connecting or accepting on either {@link Device}. {@link Device.isBusy}
+   * is not enough, since it only becomes true once {@link Device.connect} resolves.
+   *
+   * Each {@link Device} also manages its own audio input, so set the input device on each one
+   * with {@link AudioHelper.setInputDevice}. Ending a call on one {@link Device} does not stop
+   * the input of a call on the other.
    *
    * **Possible future: one Device, both methods.** Not implemented, and subject to change.
    * A single {@link Device} could hold both a SIP and a VSP connection, accept a per-call
@@ -2043,13 +2045,27 @@ namespace Device {
    * });
    * const vspDevice = new Device(token);
    *
-   * function connect(to: string, useSip: boolean): Promise<Call> {
-   *   const device = useSip ? sipDevice : vspDevice;
-   *   const otherDevice = useSip ? vspDevice : sipDevice;
-   *   if (otherDevice.isBusy) {
-   *     throw new Error('A call is already active on the other Device');
+   * let callInProgress = false;
+   *
+   * async function connect(to: string, useSip: boolean): Promise<Call> {
+   *   if (callInProgress) {
+   *     throw new Error('A call is already in progress');
    *   }
-   *   return device.connect({ params: { To: to } });
+   *   callInProgress = true;
+   *
+   *   try {
+   *     const device = useSip ? sipDevice : vspDevice;
+   *     const call = await device.connect({ params: { To: to } });
+   *     const onEnd = () => {
+   *       callInProgress = false;
+   *     };
+   *     call.on('disconnect', onEnd);
+   *     call.on('cancel', onEnd);
+   *     return call;
+   *   } catch (error) {
+   *     callInProgress = false;
+   *     throw error;
+   *   }
    * }
    * ```
    */
