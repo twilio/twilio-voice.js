@@ -2015,7 +2015,8 @@ namespace Device {
    * Signaling options for SIP over WebSocket.
    *
    * **Choosing a signaling method per call.** Each {@link Device} supports one signaling
-   * method, fixed at construction. To use SIP for some calls and VSP for others, create one
+   * method, fixed at construction. Changing it later with {@link Device.updateOptions} is not
+   * supported. To use SIP for some calls and VSP for others, create one
    * {@link Device} per method and choose which one to call {@link Device.connect} on in your
    * application. Each {@link Device} keeps its own connection and registration.
    *
