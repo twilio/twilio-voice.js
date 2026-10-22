@@ -2013,6 +2013,72 @@ namespace Device {
 
   /**
    * Signaling options for SIP over WebSocket.
+   *
+   * **Choosing a signaling method per call.** Each {@link Device} supports one signaling
+   * method, fixed at construction. Changing it later with {@link Device.updateOptions} is not
+   * supported. To use SIP for some calls and VSP for others, create one
+   * {@link Device} per method and choose which one to call {@link Device.connect} on in your
+   * application. Each {@link Device} keeps its own connection, registration and token, so
+   * handle {@link Device.tokenWillExpireEvent} and call {@link Device.updateToken} on each one.
+   *
+   * **Concurrent calls.** Only one active call is enforced per {@link Device}, not across
+   * Devices. If your application allows one call at a time, track a call in progress yourself.
+   * Check it before connecting or accepting on either {@link Device}, and set it when you
+   * accept an incoming call too. {@link Device.isBusy} is not enough, since it only becomes
+   * true once {@link Device.connect} resolves or an accepted call connects.
+   *
+   * Starting a call ignores pending incoming calls on the same {@link Device} only. Ignore or
+   * reject the other Device's {@link Device.calls} yourself. The other {@link Device} also still
+   * emits {@link Device.incomingEvent} and plays the incoming sound while a call is in
+   * progress, so call {@link Call.reject} in its handler.
+   *
+   * Each {@link Device} also manages its own audio input. If you select an input device with
+   * {@link AudioHelper.setInputDevice}, select it on each {@link Device}; otherwise the browser
+   * default is used. Ending a call on one {@link Device} does not stop the input of a call on
+   * the other.
+   *
+   * @example
+   * ```ts
+   * const sipDevice = new Device(token, {
+   *   signalingOptions: {
+   *     useSignalingMethod: 'sip',
+   *     sipServer: 'wss://sip.example.com',
+   *     sipUri: 'sip:alice@registrar.example.com',
+   *     sipCredentials: { username: 'alice', password: 'secret' },
+   *   },
+   * });
+   * const vspDevice = new Device(token);
+   *
+   * let callInProgress = false;
+   *
+   * async function connect(to: string, useSip: boolean): Promise<Call> {
+   *   if (callInProgress) {
+   *     throw new Error('A call is already in progress');
+   *   }
+   *   callInProgress = true;
+   *
+   *   try {
+   *     const device = useSip ? sipDevice : vspDevice;
+   *     const otherDevice = useSip ? vspDevice : sipDevice;
+   *     otherDevice.calls.forEach((pending) => pending.ignore());
+   *
+   *     const call = await device.connect({ params: { To: to } });
+   *     const onEnd = () => {
+   *       callInProgress = false;
+   *     };
+   *     call.on('disconnect', onEnd);
+   *     call.on('error', () => {
+   *       if (call.status() === Call.State.Closed) {
+   *         onEnd();
+   *       }
+   *     });
+   *     return call;
+   *   } catch (error) {
+   *     callInProgress = false;
+   *     throw error;
+   *   }
+   * }
+   * ```
    */
   export interface SIPSignalingOptions {
     useSignalingMethod: 'sip';
@@ -2269,6 +2335,7 @@ namespace Device {
 
     /**
      * Signaling configuration. Defaults to VSP (Twilio's native protocol) if omitted.
+     * To choose a signaling method per call, see {@link Device.SIPSignalingOptions}.
      *
      * @example SIP over WebSocket
      * ```ts
@@ -2276,6 +2343,7 @@ namespace Device {
      *   signalingOptions: {
      *     useSignalingMethod: 'sip',
      *     sipServer: 'wss://sip.example.com',
+     *     sipUri: 'sip:foo@registrar.example.com',
      *     sipCredentials: { username: 'foo', password: 'bar' },
      *   },
      * });
