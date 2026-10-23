@@ -844,7 +844,8 @@ describe('Device', function() {
           });
 
           it('should not throw with valid SIP signalingOptions', () => {
-            assert.doesNotThrow(() => device.updateOptions({
+            assert.doesNotThrow(() => new Device(token, {
+              ...setupOptions,
               signalingOptions: {
                 useSignalingMethod: 'sip',
                 sipServer: 'wss://sip.example.com',
@@ -871,6 +872,99 @@ describe('Device', function() {
               }),
               /Unknown.*useSignalingMethod.*foo/,
             );
+          });
+        });
+
+        describe('signalingOptions changes', () => {
+          const sipOptions: Device.SIPSignalingOptions = {
+            useSignalingMethod: 'sip',
+            sipServer: 'wss://sip.example.com',
+            sipUri: 'sip:u@registrar.example.com',
+            sipCredentials: { username: 'u', password: 'p' },
+            region: 'ashburn',
+          };
+
+          it('should throw when switching from VSP to SIP', () => {
+            assert.throws(
+              () => device.updateOptions({ appName: 'foo', signalingOptions: sipOptions }),
+              /signalingOptions.*cannot be changed/,
+            );
+            assert.equal(device['_options'].signalingOptions!.useSignalingMethod, 'vsp');
+            assert.notEqual(device['_options'].appName, 'foo');
+          });
+
+          it('should leave options unchanged when SIP validation throws', () => {
+            assert.throws(
+              () => device.updateOptions({ signalingOptions: { ...sipOptions, sipServer: '' } }),
+              /sipServer.*required/,
+            );
+            assert.equal(device['_options'].signalingOptions!.useSignalingMethod, 'vsp');
+          });
+
+          it('should keep working when changing VSP chunderw', async () => {
+            await registerDevice();
+            const setupStreamSpy = device['_setupStream'] = sinon.spy(device['_setupStream']);
+            device.updateOptions({ signalingOptions: { useSignalingMethod: 'vsp', chunderw: 'foo' } });
+            sinon.assert.calledOnce(setupStreamSpy);
+          });
+
+          describe('on a SIP Device', () => {
+            beforeEach(() => {
+              device = new Device(token, { ...setupOptions, signalingOptions: sipOptions });
+            });
+
+            it('should throw when switching to VSP', () => {
+              assert.throws(
+                () => device.updateOptions({ signalingOptions: { useSignalingMethod: 'vsp' } }),
+                /signalingOptions.*cannot be changed/,
+              );
+              assert.equal(device['_options'].signalingOptions!.useSignalingMethod, 'sip');
+            });
+
+            it('should throw when signalingOptions is explicitly undefined', () => {
+              assert.throws(
+                () => device.updateOptions({ signalingOptions: undefined }),
+                /signalingOptions.*cannot be changed/,
+              );
+            });
+
+            [
+              { sipServer: 'wss://other.example.com' },
+              { sipUri: 'sip:other@registrar.example.com' },
+              { sipCredentials: { username: 'other', password: 'p' } },
+              { sipCredentials: { username: 'u', password: 'other' } },
+              { region: 'dublin' },
+            ].forEach((change) => {
+              it(`should throw when changing ${JSON.stringify(change)}`, () => {
+                assert.throws(
+                  () => device.updateOptions({ signalingOptions: { ...sipOptions, ...change } }),
+                  /signalingOptions.*cannot be changed/,
+                );
+                assert.deepEqual(device['_options'].signalingOptions, sipOptions);
+              });
+            });
+
+            it('should not throw when passed the same SIP options', () => {
+              assert.doesNotThrow(() => device.updateOptions({
+                signalingOptions: { ...sipOptions, sipCredentials: { ...sipOptions.sipCredentials } },
+              }));
+            });
+
+            it('should not pick up edits to the object the app passed in', () => {
+              const appOptions = { ...sipOptions, sipCredentials: { ...sipOptions.sipCredentials } };
+              device = new Device(token, { ...setupOptions, signalingOptions: appOptions });
+              appOptions.sipServer = 'wss://other.example.com';
+              appOptions.sipCredentials.password = 'other';
+              assert.throws(
+                () => device.updateOptions({ signalingOptions: appOptions }),
+                /signalingOptions.*cannot be changed/,
+              );
+              assert.deepEqual(device['_options'].signalingOptions, sipOptions);
+            });
+
+            it('should not throw when signalingOptions is not passed', () => {
+              assert.doesNotThrow(() => device.updateOptions({ appName: 'foo' }));
+            });
           });
         });
       });

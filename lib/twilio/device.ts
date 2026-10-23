@@ -774,8 +774,10 @@ class Device extends EventEmitter {
       );
     }
 
-    this._options = { ...this._defaultOptions, ...this._options, ...options };
-    this._options = { ...this._options, signalingOptions: this._resolveSignalingOptions() };
+    const nextOptions = { ...this._defaultOptions, ...this._options, ...options };
+    const signalingOptions = this._resolveSignalingOptions(nextOptions.signalingOptions);
+    this._assertSignalingOptionsUnchanged(signalingOptions);
+    this._options = { ...nextOptions, signalingOptions };
 
     const originalChunderURIs: Set<string> = new Set(this._chunderURIs);
 
@@ -982,17 +984,44 @@ class Device extends EventEmitter {
   }
 
   /**
+   * Throws {@link InvalidArgumentError} if the signaling method or SIP options differ from the
+   * current ones. The adapter is rebuilt from them on reconnect, so a change would switch
+   * protocol or credentials partway through.
+   */
+  private _assertSignalingOptionsUnchanged(next: Device.SIPSignalingOptions | Device.VSPSignalingOptions): void {
+    const current = this._options.signalingOptions;
+    if (!current) {
+      return;
+    }
+
+    const isUnchanged = current.useSignalingMethod === 'vsp' || next.useSignalingMethod === 'vsp'
+      ? current.useSignalingMethod === next.useSignalingMethod
+      : current.sipServer === next.sipServer
+        && current.sipUri === next.sipUri
+        && current.sipCredentials.username === next.sipCredentials.username
+        && current.sipCredentials.password === next.sipCredentials.password
+        && current.region === next.region;
+
+    if (!isUnchanged) {
+      throw new InvalidArgumentError(
+        '`signalingOptions` cannot be changed after the Device is constructed. Create a new Device instead.',
+      );
+    }
+  }
+
+  /**
    * Resolves the active signaling options, defaulting to VSP if not specified.
    * Throws {@link InvalidArgumentError} if SIP is selected but required fields are missing.
    */
-  private _resolveSignalingOptions(): Device.SIPSignalingOptions | Device.VSPSignalingOptions {
-    const opts = this._options.signalingOptions;
+  private _resolveSignalingOptions(
+    opts?: Device.SIPSignalingOptions | Device.VSPSignalingOptions,
+  ): Device.SIPSignalingOptions | Device.VSPSignalingOptions {
     if (!opts) {
       return { useSignalingMethod: 'vsp' };
     }
 
     if (opts.useSignalingMethod === 'vsp') {
-      return opts;
+      return { ...opts };
     }
     if (opts.useSignalingMethod !== 'sip') {
       throw new InvalidArgumentError(
@@ -1011,7 +1040,8 @@ class Device extends EventEmitter {
         '`signalingOptions.sipCredentials` with `username` and `password` are required when `useSignalingMethod` is "sip"',
       );
     }
-    return opts;
+    // Copy so the app can't change the stored options by editing its own object.
+    return { ...opts, sipCredentials: { ...opts.sipCredentials } };
   }
 
   /**
@@ -2015,10 +2045,10 @@ namespace Device {
    * Signaling options for SIP over WebSocket.
    *
    * **Choosing a signaling method per call.** Each {@link Device} supports one signaling
-   * method, fixed at construction. Changing it later with {@link Device.updateOptions} is not
-   * supported. To use SIP for some calls and VSP for others, create one
-   * {@link Device} per method and choose which one to call {@link Device.connect} on in your
-   * application. Each {@link Device} keeps its own connection, registration and token, so
+   * method, fixed at construction. {@link Device.updateOptions} throws an `InvalidArgumentError`
+   * if the signaling method or SIP fields change. To use SIP for some calls and VSP for others,
+   * create one {@link Device} per method and choose which one to call {@link Device.connect} on in
+   * your application. Each {@link Device} keeps its own connection, registration and token, so
    * handle {@link Device.tokenWillExpireEvent} and call {@link Device.updateToken} on each one.
    *
    * **Concurrent calls.** Only one active call is enforced per {@link Device}, not across
@@ -2335,6 +2365,8 @@ namespace Device {
 
     /**
      * Signaling configuration. Defaults to VSP (Twilio's native protocol) if omitted.
+     * The signaling method and SIP fields are fixed at construction, and
+     * {@link Device.updateOptions} throws if they change. VSP `chunderw` may change.
      * To choose a signaling method per call, see {@link Device.SIPSignalingOptions}.
      *
      * @example SIP over WebSocket
