@@ -343,6 +343,7 @@ class Device extends EventEmitter {
     logLevel: loglevel.levels.ERROR,
     maxCallSignalingTimeoutMs: 0,
     preflight: false,
+    preloadSounds: true,
     sounds: { },
     tokenRefreshMs: 10000,
     voiceEventSidGenerator: generateVoiceEventSid,
@@ -818,10 +819,14 @@ class Device extends EventEmitter {
       const defaultUrl: string = `${C.SOUNDS_BASE_URL}/${soundDef.filename}.${Device.extension}`
         + `?cache=${C.RELEASE_VERSION}`;
 
-      const soundUrl: string = this._options.sounds && this._options.sounds[name as Device.SoundName] || defaultUrl;
+      const customSound = this._options.sounds && (this._options.sounds as any)[name];
+      const soundUrl: string = typeof customSound === 'string' ? customSound : defaultUrl;
+      const shouldPreload: boolean = this._shouldPreloadSound(name);
+
       const sound: any = new (this._options.Sound || Sound)(name, soundUrl, {
         audioContext: this._options.disableAudioContextSounds ? null : Device.audioContext,
         maxDuration: soundDef.maxDuration,
+        preload: shouldPreload,
         shouldLoop: soundDef.shouldLoop,
       });
 
@@ -1003,6 +1008,7 @@ class Device extends EventEmitter {
       'logLevel',
       'maxAverageBitrate',
       'maxCallSignalingTimeoutMs',
+      'preloadSounds',
       'sounds',
       'tokenRefreshMs',
     ];
@@ -1503,6 +1509,40 @@ class Device extends EventEmitter {
     const name = this._stateEventMapping[state];
     this._log.debug(`#${name}`);
     this.emit(name);
+  }
+
+  /**
+   * Determine whether a sound should be preloaded on initialization.
+   */
+  private _shouldPreloadSound(name: string): boolean {
+    const isDtmf = name.startsWith('dtmf');
+    const customSound = this._options.sounds && (this._options.sounds as any)[name];
+
+    if (customSound === false) {
+      return false;
+    }
+
+    const preloadSounds = this._options.preloadSounds;
+
+    if (typeof preloadSounds === 'boolean') {
+      return preloadSounds;
+    }
+
+    if (preloadSounds === 'call-events') {
+      return !isDtmf || typeof customSound === 'string';
+    }
+
+    if (typeof preloadSounds === 'object' && preloadSounds !== null) {
+      if (typeof (preloadSounds as any)[name] === 'boolean') {
+        return (preloadSounds as any)[name];
+      }
+      if (isDtmf && typeof (preloadSounds as any).dtmf === 'boolean') {
+        return (preloadSounds as any).dtmf;
+      }
+      return true;
+    }
+
+    return true;
   }
 
   /**
@@ -2174,9 +2214,23 @@ namespace Device {
     RTCPeerConnection?: any;
 
     /**
-     * A mapping of custom sound URLs by sound name.
+     * Whether to preload sounds by playing them muted upon initialization.
+     * This pre-warms audio elements against browser autoplay restrictions.
+     *
+     * - `true` (default): Preloads all default sounds (call-event sounds and DTMF sounds).
+     * - `false`: Disables preloading for all sounds. Sounds will be loaded on demand when played.
+     * - `'call-events'`: Only preloads call-event sounds (`incoming`, `outgoing`, `disconnect`)
+     *   and skips preloading the 12 default DTMF keypad sounds.
+     * - `Record<Device.SoundName | 'dtmf', boolean>`: Fine-grained per-sound control.
+     *   Can specify individual sounds to enable/disable (e.g. `{ [Device.SoundName.Incoming]: true, [Device.SoundName.Dtmf0]: false }`),
+     *   or use the `'dtmf'` key to toggle all 12 DTMF sounds (e.g. `{ dtmf: false }`).
      */
-    sounds?: Partial<Record<Device.SoundName, string>>;
+    preloadSounds?: boolean | 'call-events' | Partial<Record<Device.SoundName, boolean>> | { dtmf?: boolean; [key: string]: any };
+
+    /**
+     * A mapping of custom sound URLs by sound name, or `false` to disable a sound.
+     */
+    sounds?: Partial<Record<Device.SoundName, string | false>>;
 
     /**
      * Number of milliseconds fewer than the token's TTL to emit the tokenWillExpire event.

@@ -797,6 +797,119 @@ describe('Device', function() {
           await clock.tickAsync(0);
         });
 
+        describe('preloadSounds option', () => {
+          let soundCalls: Array<{ name: string; url: string; options: any }>;
+          let customSoundMock: any;
+
+          beforeEach(() => {
+            soundCalls = [];
+            customSoundMock = function(name: string, url: string, options: any) {
+              soundCalls.push({ name, url, options });
+              return sinon.createStubInstance(require('../../lib/twilio/sound').default);
+            };
+          });
+
+          it('should pass preload: true to all sounds by default', () => {
+            const dev = new Device('token', { ...setupOptions, Sound: customSoundMock });
+            assert.equal(soundCalls.length, 15);
+            soundCalls.forEach(call => {
+              assert.equal(call.options.preload, true, `Sound ${call.name} should have preload: true`);
+            });
+          });
+
+          it('should pass preload: false to all sounds when preloadSounds: false', () => {
+            const dev = new Device('token', { ...setupOptions, Sound: customSoundMock, preloadSounds: false });
+            assert.equal(soundCalls.length, 15);
+            soundCalls.forEach(call => {
+              assert.equal(call.options.preload, false, `Sound ${call.name} should have preload: false`);
+            });
+          });
+
+          it('should pass preload: false for dtmf and true for call events when preloadSounds: "call-events"', () => {
+            const dev = new Device('token', { ...setupOptions, Sound: customSoundMock, preloadSounds: 'call-events' });
+            assert.equal(soundCalls.length, 15);
+            soundCalls.forEach(call => {
+              if (call.name.startsWith('dtmf')) {
+                assert.equal(call.options.preload, false, `DTMF sound ${call.name} should have preload: false`);
+              } else {
+                assert.equal(call.options.preload, true, `Call event sound ${call.name} should have preload: true`);
+              }
+            });
+          });
+
+          it('should preload custom DTMF sound even when preloadSounds: "call-events"', () => {
+            const dev = new Device('token', {
+              ...setupOptions,
+              Sound: customSoundMock,
+              preloadSounds: 'call-events',
+              sounds: { [Device.SoundName.Dtmf0]: 'https://custom.com/dtmf0.mp3' },
+            });
+            const dtmf0 = soundCalls.find(c => c.name === Device.SoundName.Dtmf0);
+            assert(dtmf0);
+            assert.equal(dtmf0.options.preload, true);
+            assert.equal(dtmf0.url, 'https://custom.com/dtmf0.mp3');
+
+            const dtmf1 = soundCalls.find(c => c.name === Device.SoundName.Dtmf1);
+            assert(dtmf1);
+            assert.equal(dtmf1.options.preload, false);
+          });
+
+          it('should pass preload: false for dtmf sounds when preloadSounds: { dtmf: false }', () => {
+            const dev = new Device('token', { ...setupOptions, Sound: customSoundMock, preloadSounds: { dtmf: false } });
+            assert.equal(soundCalls.length, 15);
+            soundCalls.forEach(call => {
+              if (call.name.startsWith('dtmf')) {
+                assert.equal(call.options.preload, false, `DTMF sound ${call.name} should have preload: false`);
+              } else {
+                assert.equal(call.options.preload, true, `Call event sound ${call.name} should have preload: true`);
+              }
+            });
+          });
+
+          it('should allow per-sound override via preloadSounds object', () => {
+            const dev = new Device('token', {
+              ...setupOptions,
+              Sound: customSoundMock,
+              preloadSounds: {
+                [Device.SoundName.Incoming]: false,
+                [Device.SoundName.Dtmf1]: true,
+              },
+            });
+            const incoming = soundCalls.find(c => c.name === Device.SoundName.Incoming);
+            assert(incoming);
+            assert.equal(incoming.options.preload, false);
+
+            const dtmf1 = soundCalls.find(c => c.name === Device.SoundName.Dtmf1);
+            assert(dtmf1);
+            assert.equal(dtmf1.options.preload, true);
+
+            const dtmf2 = soundCalls.find(c => c.name === Device.SoundName.Dtmf2);
+            assert(dtmf2);
+            assert.equal(dtmf2.options.preload, true);
+          });
+
+          it('should pass preload: false when a sound is disabled via sounds: { [sound]: false }', () => {
+            const dev = new Device('token', {
+              ...setupOptions,
+              Sound: customSoundMock,
+              sounds: { [Device.SoundName.Dtmf0]: false },
+            });
+            const dtmf0 = soundCalls.find(c => c.name === Device.SoundName.Dtmf0);
+            assert(dtmf0);
+            assert.equal(dtmf0.options.preload, false);
+          });
+
+          it('should update sound preloads dynamically via updateOptions', () => {
+            const dev = new Device('token', { ...setupOptions, Sound: customSoundMock });
+            soundCalls = [];
+            dev.updateOptions({ preloadSounds: false });
+            assert.equal(soundCalls.length, 15);
+            soundCalls.forEach(call => {
+              assert.equal(call.options.preload, false);
+            });
+          });
+        });
+
         describe('log', () => {
           let setDefaultLevelStub: any;
 
