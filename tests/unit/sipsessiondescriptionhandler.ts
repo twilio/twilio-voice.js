@@ -483,6 +483,85 @@ describe('SipSessionDescriptionHandler', () => {
     });
   });
 
+  describe('onMediaStarted', () => {
+    const iceRestartStub = () => sinon.stub().callsFake(
+      (cb: (sdp: string) => void) => cb(REOFFER_SDP),
+    ) as sinon.SinonStub;
+
+    function createHandlerWithMediaStarted(pc: PcStub) {
+      const onMediaStarted = sinon.stub();
+      const handler = new SipSessionDescriptionHandler(pc, CALL_SID, {}, onMediaStarted);
+      return { handler, onMediaStarted };
+    }
+
+    it('fires once with the pc when the outbound answer is processed', async () => {
+      const mediaPc = {} as RTCPeerConnection;
+      const pc = createPeerConnectionStub({
+        makeOutgoingCall: stubMakeOutgoingCall(),
+        processAnswer: sinon.stub().callsFake(
+          (_sdp: string, cb: (pc: RTCPeerConnection) => void) => cb(mediaPc),
+        ) as sinon.SinonStub,
+      });
+      const { handler, onMediaStarted } = createHandlerWithMediaStarted(pc);
+      await handler.getDescription();
+      await handler.setDescription(ANSWER_SDP);
+
+      sinon.assert.calledOnce(onMediaStarted);
+      sinon.assert.calledWithExactly(onMediaStarted, mediaPc);
+    });
+
+    it('fires once when the inbound answer is created', async () => {
+      const pc = createPeerConnectionStub({ answerIncomingCall: stubAnswerIncomingCall() });
+      const { handler, onMediaStarted } = createHandlerWithMediaStarted(pc);
+      await handler.setDescription(OFFER_SDP);
+      await handler.getDescription();
+
+      sinon.assert.calledOnce(onMediaStarted);
+    });
+
+    it('does not re-fire on an ICE-restart answer', async () => {
+      const pc = createPeerConnectionStub({
+        makeOutgoingCall: stubMakeOutgoingCall(),
+        processAnswer: stubProcessAnswer(),
+        iceRestart: iceRestartStub(),
+      });
+      const { handler, onMediaStarted } = createHandlerWithMediaStarted(pc);
+      await handler.getDescription();
+      await handler.setDescription(ANSWER_SDP);
+
+      handler.requestIceRestart();
+      await handler.getDescription();
+      await handler.setDescription(REANSWER_SDP);
+
+      sinon.assert.calledTwice(pc.processAnswer);
+      sinon.assert.calledOnce(onMediaStarted);
+    });
+
+    it('does not re-fire on a remote re-INVITE', async () => {
+      const pc = createPeerConnectionStub({
+        answerIncomingCall: stubAnswerIncomingCall(),
+        processOffer: stubProcessOffer(),
+      });
+      const { handler, onMediaStarted } = createHandlerWithMediaStarted(pc);
+      await handler.setDescription(OFFER_SDP);
+      await handler.getDescription();
+
+      await handler.setDescription(REOFFER_SDP);
+
+      sinon.assert.calledOnce(pc.processOffer);
+      sinon.assert.calledOnce(onMediaStarted);
+    });
+
+    it('still resolves setDescription when onMediaStarted throws', async () => {
+      const pc = createPeerConnectionStub({ answerIncomingCall: stubAnswerIncomingCall() });
+      const handler = new SipSessionDescriptionHandler(pc, CALL_SID, {}, () => {
+        throw new Error('onAnswer failed');
+      });
+
+      await handler.setDescription(OFFER_SDP);
+    });
+  });
+
   describe('close', () => {
     it('does not close the PeerConnection (Call owns its lifecycle)', () => {
       const pc = createPeerConnectionStub();

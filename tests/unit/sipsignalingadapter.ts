@@ -1084,6 +1084,35 @@ describe('SipSignalingAdapter', () => {
       assert(answerIncomingCall.calledOnce);
       assert.strictEqual(answerIncomingCall.firstCall.args[0], 'CA-test-call-sid');
     });
+
+    it('should forward the bound onMediaStarted to the SDH', () => {
+      const { adapter, uaStub, getSdhFactory } = createAdapter();
+      const invitation = createInvitationStub();
+      uaStub._triggerInvite(invitation);
+      const peerConnection = createPeerConnectionStub();
+      const onMediaStarted = sinon.stub();
+      adapter.answer('CA-test-call-sid', { peerConnection, onMediaStarted });
+      const sdh = getSdhFactory()(invitation);
+      sdh.setDescription('v=0\r\no=remote\r\n');
+      const answerIncomingCall = peerConnection.answerIncomingCall as sinon.SinonStub;
+      const mediaPc = {} as RTCPeerConnection;
+      answerIncomingCall.firstCall.args[4](mediaPc);
+      sinon.assert.calledOnceWithExactly(onMediaStarted, mediaPc);
+    });
+
+    it('should forward onMediaStarted through reconnect()', () => {
+      const { adapter, inviterStub, getSdhFactory } = createAdapter();
+      const peerConnection = createPeerConnectionStub();
+      const onMediaStarted = sinon.stub();
+      adapter.reconnect('call-abc', { sdp: '', reconnectToken: 'token', peerConnection, onMediaStarted });
+      const sdh = getSdhFactory()(inviterStub);
+      sdh.getDescription();
+      (peerConnection.makeOutgoingCall as sinon.SinonStub).firstCall.args[2]('offer');
+      sdh.setDescription('answer');
+      const mediaPc = {} as RTCPeerConnection;
+      (peerConnection.processAnswer as sinon.SinonStub).firstCall.args[1](mediaPc);
+      sinon.assert.calledOnceWithExactly(onMediaStarted, mediaPc);
+    });
   });
 
   describe('reconnect lifecycle', () => {

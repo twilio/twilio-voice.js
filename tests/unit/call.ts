@@ -754,29 +754,21 @@ describe('Call', function() {
           });
         });
 
-        it('should install the onopen wrapper at most once across repeat accept() calls', () => {
+        it('should pass onAnswer to signalingAdapter.invite as onMediaStarted', () => {
           conn.accept();
           return wait.then(() => {
-            const afterFirst = mediaHandler.onopen;
-            // Force the Call back to Pending so a second accept() actually
-            // proceeds. This simulates any future bug where accept's guard is
-            // bypassed; the wrapper must NOT chain a second layer.
-            (conn as any)._status = Call.State.Pending;
-            conn.accept();
-            return wait.then(() => {
-              assert.strictEqual(mediaHandler.onopen, afterFirst,
-                'onopen should not have been re-wrapped on the second accept()');
-              // Also verify firing it once fires onAnswer exactly once (not
-              // twice from stacked wrappers).
-              const publisherInfo = publisher.info as sinon.SinonSpy;
-              publisherInfo.resetHistory();
-              mediaHandler.onopen();
-              const answeredCalls = publisherInfo.getCalls().filter(
-                (c: sinon.SinonSpyCall) => c.args[1] === 'accepted-by-remote' || c.args[1] === 'accepted-by-local',
-              );
-              assert.strictEqual(answeredCalls.length, 1,
-                'onAnswer should fire once, not once per stacked wrapper');
-            });
+            pstream.invite.args[0][1].onMediaStarted('foo');
+            sinon.assert.calledWith(publisher.info, 'connection', 'accepted-by-remote');
+            sinon.assert.calledWith(monitor.enable, 'foo');
+          });
+        });
+
+        it('should not fire onAnswer when the media handler opens', () => {
+          conn.accept();
+          return wait.then(() => {
+            mediaHandler.onopen();
+            sinon.assert.neverCalledWith(publisher.info, 'connection', 'accepted-by-remote');
+            sinon.assert.notCalled(monitor.enable);
           });
         });
 
@@ -788,6 +780,16 @@ describe('Call', function() {
             const reconnectConfig = pstream.reconnect.args[0][1];
             assert.strictEqual(reconnectConfig.peerConnection, mediaHandler);
             assert.strictEqual(reconnectConfig.reconnectToken, 'testReconnectToken');
+          });
+        });
+
+        it('should pass onAnswer to signalingAdapter.reconnect as onMediaStarted', () => {
+          setupSip({ reconnectToken: 'testReconnectToken' });
+          conn.accept();
+          return wait.then(() => {
+            pstream.reconnect.args[0][1].onMediaStarted('foo');
+            sinon.assert.calledWith(publisher.info, 'connection', 'accepted-by-remote');
+            sinon.assert.calledWith(monitor.enable, 'foo');
           });
         });
       });
@@ -811,6 +813,15 @@ describe('Call', function() {
           conn.accept();
           return wait.then(() => {
             sinon.assert.notCalled(mediaHandler.answerIncomingCall);
+          });
+        });
+
+        it('should pass onAnswer to signalingAdapter.answer as onMediaStarted', () => {
+          conn.accept();
+          return wait.then(() => {
+            pstream.answer.args[0][1].onMediaStarted('foo');
+            sinon.assert.calledWith(publisher.info, 'connection', 'accepted-by-local');
+            sinon.assert.calledWith(monitor.enable, 'foo');
           });
         });
       });

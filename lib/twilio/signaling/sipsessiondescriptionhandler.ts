@@ -118,6 +118,10 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
     private _pc: IPeerConnection,
     private _callSid: string,
     private _rtcConfiguration: RTCConfiguration = {},
+    // Call's onAnswer. Fired once, after the initial offer/answer settles, so
+    // a throw can't strand SIP.js's Promise. ICE-restart answers and remote
+    // re-INVITEs don't re-fire it.
+    private _onMediaStarted?: (pc: RTCPeerConnection) => void,
   ) {
     const previousOnError = this._previousOnError = this._pc.onerror;
     this._pc.onerror = (error: PeerConnectionError) => {
@@ -204,7 +208,8 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
     }
     if (this._hasSentOffer) {
       return this._awaitOperation<void>((resolve) => {
-        this._pc.processAnswer(sdp, () => {
+        this._pc.processAnswer(sdp, (pc: RTCPeerConnection) => {
+          const isInitialAnswer = !this._hasNegotiated;
           // Outbound offer/answer exchange complete. Clear the flag so a
           // subsequent re-INVITE on the same session (SIP.js memoizes the
           // SDH per Session) can route correctly. A remote re-INVITE must
@@ -212,6 +217,9 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
           this._hasSentOffer = false;
           this._hasNegotiated = true;
           resolve();
+          if (isInitialAnswer) {
+            this._onMediaStarted?.(pc);
+          }
         });
       });
     }
@@ -232,9 +240,10 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
         sdp,
         this._rtcConfiguration,
         (answerSdp) => { this._cachedAnswer = answerSdp; },
-        () => {
+        (pc: RTCPeerConnection) => {
           this._hasNegotiated = true;
           resolve();
+          this._onMediaStarted?.(pc);
         },
       );
     });

@@ -90,6 +90,7 @@ interface SdhBinding {
   callSid: string;
   peerConnection: IPeerConnection;
   rtcConfiguration?: RTCConfiguration;
+  onMediaStarted?: (pc: RTCPeerConnection) => void;
 }
 
 /**
@@ -216,6 +217,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
           binding.peerConnection,
           binding.callSid,
           binding.rtcConfiguration,
+          binding.onMediaStarted,
         );
       },
       delegate: {
@@ -566,6 +568,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       sdp: config.sdp,
       peerConnection: config.peerConnection,
       rtcConfiguration: config.rtcConfiguration,
+      onMediaStarted: config.onMediaStarted,
     }, config.reconnectToken);
   }
 
@@ -679,7 +682,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   private _bindSession(
     session: Session,
     callSid: string,
-    config: { peerConnection?: IPeerConnection; rtcConfiguration?: RTCConfiguration },
+    config: Pick<InviteConfig, 'peerConnection' | 'rtcConfiguration' | 'onMediaStarted'>,
   ): void {
     if (!config.peerConnection) {
       throw new Error('SipSignalingAdapter: peerConnection is required on the SIP path');
@@ -688,6 +691,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       callSid,
       peerConnection: config.peerConnection,
       rtcConfiguration: config.rtcConfiguration,
+      onMediaStarted: config.onMediaStarted,
     });
   }
 

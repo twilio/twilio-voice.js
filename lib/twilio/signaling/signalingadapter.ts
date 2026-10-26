@@ -12,6 +12,9 @@ export interface InviteConfig {
   params?: string;
   peerConnection?: IPeerConnection;
   rtcConfiguration?: RTCConfiguration;
+  // SIP only: the SDH calls this once the initial offer/answer completes,
+  // the same point PStream callers pass to processAnswer/answerIncomingCall.
+  onMediaStarted?: (pc: RTCPeerConnection) => void;
 }
 
 export interface AnswerConfig {
@@ -21,6 +24,8 @@ export interface AnswerConfig {
   sdp?: string;
   peerConnection?: IPeerConnection;
   rtcConfiguration?: RTCConfiguration;
+  // SIP only. See InviteConfig.onMediaStarted.
+  onMediaStarted?: (pc: RTCPeerConnection) => void;
 }
 
 export interface HangupConfig {
@@ -38,6 +43,8 @@ export interface ReconnectConfig {
   reconnectToken: string;
   peerConnection?: IPeerConnection;
   rtcConfiguration?: RTCConfiguration;
+  // SIP only. See InviteConfig.onMediaStarted.
+  onMediaStarted?: (pc: RTCPeerConnection) => void;
 }
 
 export interface DtmfConfig {

@@ -192,14 +192,6 @@ class Call extends EventEmitter {
   private _isAnswered: boolean = false;
 
   /**
-   * Whether the SIP-path onopen wrapper has already been installed. Guards
-   * against repeated `accept()` invocations chaining wrappers onto the
-   * previous one (each layer would retain its own onAnswerFired closure
-   * and fire independently against stale state).
-   */
-  private _sipOnOpenWrapped: boolean = false;
-
-  /**
    * Whether the call has been cancelled.
    */
   private _isCancelled: boolean = false;
@@ -716,22 +708,6 @@ class Call extends EventEmitter {
 
       const callSid = this.parameters.CallSid;
 
-      if (this._options.useSip && !this._sipOnOpenWrapped) {
-        // PeerConnection.onopen fires from multiple stable-state observers,
-        // so we gate onAnswer to a single call. _sipOnOpenWrapped prevents a
-        // repeat accept() from chaining another wrapper over this one.
-        this._sipOnOpenWrapped = true;
-        const previousOnOpen = this._mediaHandler.onopen;
-        let onAnswerFired = false;
-        this._mediaHandler.onopen = () => {
-          previousOnOpen();
-          if (!onAnswerFired && this._mediaHandler.version?.pc) {
-            onAnswerFired = true;
-            onAnswer(this._mediaHandler.version.pc);
-          }
-        };
-      }
-
       const params = Array.from(this.customParameters.entries()).map(pair =>
         `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
       const outgoingCallSid = this._options.reconnectCallSid || this.outboundConnectionId!;
@@ -741,6 +717,7 @@ class Call extends EventEmitter {
         // SDP intentionally omitted: the SIP adapter derives the answer
         // from the invitation body via its SDH, not from the caller.
         this._signalingAdapter.answer(callSid, {
+          onMediaStarted: onAnswer,
           peerConnection: this._mediaHandler,
           rtcConfiguration,
         });
@@ -764,6 +741,7 @@ class Call extends EventEmitter {
           const reconnectConfig: ReconnectConfig = {
             sdp: '',
             reconnectToken: this._signalingReconnectToken,
+            onMediaStarted: onAnswer,
             peerConnection: this._mediaHandler,
             rtcConfiguration,
           };
@@ -774,6 +752,7 @@ class Call extends EventEmitter {
           // that's added, pass them as extraHeaders through InviteConfig.
           const inviteConfig: InviteConfig = {
             sdp: '',
+            onMediaStarted: onAnswer,
             peerConnection: this._mediaHandler,
             rtcConfiguration,
           };
