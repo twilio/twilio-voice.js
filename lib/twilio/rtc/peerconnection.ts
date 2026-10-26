@@ -336,13 +336,19 @@ PeerConnection.prototype._setInputTracksFromStream = function(shouldClone, newSt
     // We can't use MediaStream.clone() here because it stopped copying over tracks
     //   as of Chrome 61. https://bugs.chromium.org/p/chromium/issues/detail?id=770908
     this.stream = shouldClone ? cloneStream(newStream, this.options.MediaStream) : newStream;
-  } else if (!this._sender && !(this.version && this.version.pc)) {
+  } else if (this.status !== 'closed' && !this._sender && !(this.version && this.version.pc)) {
     // No RTCPeerConnection yet, so there is no track to replace.
     this._stopStream();
     this.stream = shouldClone ? cloneStream(newStream, this.options.MediaStream) : newStream;
   } else {
     // If the call was started with gUM, stop the managed track it opened; this no-ops otherwise.
     this._stopStream();
+
+    // The native RTCPeerConnection can be closed before teardown nulls out
+    // version.pc. The call is already gone, so there is no track to swap.
+    if (this.status === 'closed' || !this.version || !this.version.pc || this.version.pc.signalingState === 'closed') {
+      return getStreamPromise();
+    }
 
     if (!this._sender) {
       this._sender = this.version.pc.getSenders()[0];

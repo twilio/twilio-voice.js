@@ -218,6 +218,11 @@ describe('PeerConnection', () => {
         mute: sinon.stub(),
         _sender: {},
         _stopStream: sinon.stub(),
+        version: {
+          pc: {
+            signalingState: 'stable',
+          },
+        },
       };
       toTest = METHOD.bind(context);
     });
@@ -261,6 +266,11 @@ describe('PeerConnection', () => {
         mute: sinon.stub(),
         _sender: {},
         _stopStream: sinon.stub(),
+        version: {
+          pc: {
+            signalingState: 'stable',
+          },
+        },
         options: {
           MediaStream: mediaStream,
         },
@@ -315,6 +325,46 @@ describe('PeerConnection', () => {
           assert.strictEqual(result.id, 3);
           assert.strictEqual(context.stream.id, 3);
         });
+      });
+    });
+
+    describe('when the RTCPeerConnection is closed', () => {
+      [
+        ['signalingState is closed', { version: { pc: { signalingState: 'closed' } } }],
+        ['version.pc is null', { version: { pc: null } }],
+        ['version is null', { version: null }],
+        ['status is closed', { status: 'closed' }],
+      ].forEach(([description, overrides]) => {
+        it(`Should resolve quietly when ${description}`, async () => {
+          context = {
+            stream: STREAM,
+            mute: sinon.stub(),
+            _sender: { replaceTrack: sinon.stub() },
+            _stopStream: sinon.stub(),
+            ...overrides,
+          };
+          toTest = METHOD.bind(context);
+
+          const result = await toTest(false, newStream);
+          sinon.assert.calledOnce(context._stopStream);
+          sinon.assert.notCalled(context._sender.replaceTrack);
+          assert.strictEqual(result, STREAM);
+        });
+      });
+
+      it('Should resolve quietly when status is closed and _sender is not cached', async () => {
+        context = {
+          stream: STREAM,
+          mute: sinon.stub(),
+          _stopStream: sinon.stub(),
+          status: 'closed',
+          version: { pc: null },
+        };
+        toTest = METHOD.bind(context);
+
+        const result = await toTest(false, newStream);
+        sinon.assert.calledOnce(context._stopStream);
+        assert.strictEqual(result, STREAM);
       });
     });
   });
