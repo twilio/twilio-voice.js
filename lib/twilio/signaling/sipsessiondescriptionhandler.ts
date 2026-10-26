@@ -249,6 +249,16 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
     });
   }
 
+  /**
+   * SIP.js calls this when our re-INVITE gets a non-2xx. The offer was never
+   * answered, so a later remote re-INVITE must route to processOffer. Must
+   * not reject: SIP.js sends BYE if it does.
+   */
+  rollbackDescription(): Promise<void> {
+    this._hasSentOffer = false;
+    return Promise.resolve();
+  }
+
   close(): void {
     // Call owns the PeerConnection lifecycle and closes it in its own
     // teardown paths. SIP.js invokes close() on the SDH at session end —

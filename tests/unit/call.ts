@@ -2891,6 +2891,36 @@ describe('Call', function() {
       assert.deepStrictEqual(pstream.iceRestart.firstCall.args[1], { mediaHandler: conn['_mediaHandler'] });
     });
 
+    it('should replace, not stack, the previous attempt\'s listeners when the backoff fires again', () => {
+      conn = new Call(config, Object.assign(options));
+      conn.parameters = { CallSid: 'CAtest' };
+      pstream.iceRestart = sinon.stub();
+      const answerCount = pstream.listenerCount('answer');
+      const hangupCount = pstream.listenerCount('hangup');
+
+      // A rejected re-INVITE emits neither answer nor hangup before the retry.
+      conn['_mediaReconnectBackoff'].emit('ready');
+      conn['_mediaReconnectBackoff'].emit('ready');
+      conn['_mediaReconnectBackoff'].emit('ready');
+
+      assert.strictEqual(pstream.listenerCount('answer'), answerCount + 1);
+      assert.strictEqual(pstream.listenerCount('hangup'), hangupCount + 1);
+    });
+
+    it('should remove the in-flight attempt\'s listeners on teardown', () => {
+      conn = new Call(config, Object.assign(options));
+      conn.parameters = { CallSid: 'CAtest' };
+      pstream.iceRestart = sinon.stub();
+      const before = pstream.listeners('answer');
+      conn['_mediaReconnectBackoff'].emit('ready');
+      const added = pstream.listeners('answer').filter((l: any) => !before.includes(l));
+      assert.strictEqual(added.length, 1);
+
+      conn['_cleanupEventListeners']();
+
+      assert(!pstream.listeners('answer').includes(added[0]));
+    });
+
     context('skips retry while signaling is disconnected', () => {
       beforeEach(() => {
         // Drive the call into media-Reconnecting so the next failure hits the

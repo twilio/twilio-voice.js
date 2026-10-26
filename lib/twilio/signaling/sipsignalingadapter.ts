@@ -56,6 +56,8 @@ const CONNECT_SUCCESS_TIMEOUT_MS = 10000;
 // Close codes meaning the server was unreachable rather than shut down
 // cleanly. 1006: abnormal close. 1015: TLS handshake failure.
 const ABNORMAL_CLOSE_CODES = [1006, 1015];
+// Non-2xx responses to a re-INVITE that terminate the dialog.
+const DIALOG_ENDING_REINVITE_CODES = [408, 481];
 
 type SipSendMessageConfig = Pick<SendMessageConfig, 'content' | 'contentType' | 'voiceEventSid'>;
 
@@ -487,8 +489,9 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
   /**
    * Re-INVITE for a fresh-ICE offer, which the armed SDH produces (so
-   * _config is unused). Failures emit 'hangup' so Call can drop its inline
-   * listeners, except while reconnecting, which defers to 'iceRestartNeeded'.
+   * _config is unused). Fatal failures emit 'hangup'; a rejection that keeps
+   * the dialog emits nothing, and one orphaned by a disconnect defers to
+   * 'iceRestartNeeded'.
    */
   iceRestart(callSid: string, _config: IceRestartConfig): void {
     const session = this._getSession(callSid);
@@ -536,10 +539,16 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
             return;
           }
           const code = response?.message?.statusCode;
-          this._log.warn('ICE-restart re-INVITE rejected', code);
+          const message = `ICE-restart re-INVITE rejected (${code ?? 'unknown'})`;
+          this._log.warn(message);
+          // Only 408 and 481 end the dialog (RFC 3261 14.1). Otherwise keep
+          // the call up; as on VSP, the next ICE failure drives the retry.
+          if (!DIALOG_ENDING_REINVITE_CODES.includes(code)) {
+            return;
+          }
           this.emit('hangup', {
             callsid: callSid,
-            error: { code: code ?? 31000, message: `ICE-restart re-INVITE rejected (${code ?? 'unknown'})` },
+            error: { code, message },
           });
         },
       },

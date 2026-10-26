@@ -885,18 +885,34 @@ describe('SipSignalingAdapter', () => {
       adapter.iceRestart('nope', { mediaHandler: mediaHandlerStub() });
     });
 
-    it('emits hangup (with status code) on requestDelegate.onReject', (done) => {
-      const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
-      inviterStub.state = 'Established';
-      adapter.on('hangup', (payload: any) => {
-        assert.strictEqual(payload.callsid, 'call-1');
-        assert.strictEqual(payload.error.code, 488);
-        done();
+    [408, 481].forEach((statusCode) => {
+      it(`emits hangup with the status code when the re-INVITE gets a dialog-ending ${statusCode}`, () => {
+        const { adapter, inviterStub } = createAdapter();
+        adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+        inviterStub.state = 'Established';
+        const onHangup = sinon.stub();
+        adapter.on('hangup', onHangup);
+        adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+        const rd = inviterStub.invite.lastCall.args[0]?.requestDelegate;
+        rd.onReject({ message: { statusCode } });
+        sinon.assert.calledOnce(onHangup);
+        assert.strictEqual(onHangup.firstCall.args[0].callsid, 'call-1');
+        assert.strictEqual(onHangup.firstCall.args[0].error.code, statusCode);
       });
-      adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
-      const rd = inviterStub.invite.lastCall.args[0]?.requestDelegate;
-      rd.onReject({ message: { statusCode: 488 } });
+    });
+
+    [488, 491, 500].forEach((statusCode) => {
+      it(`keeps the call up on a ${statusCode} re-INVITE rejection`, () => {
+        const { adapter, inviterStub } = createAdapter();
+        adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+        inviterStub.state = 'Established';
+        const onHangup = sinon.stub();
+        adapter.on('hangup', onHangup);
+        adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+        const rd = inviterStub.invite.lastCall.args[0]?.requestDelegate;
+        rd.onReject({ message: { statusCode } });
+        sinon.assert.notCalled(onHangup);
+      });
     });
 
     it('emits hangup when session.invite rejects asynchronously (via .catch)', (done) => {

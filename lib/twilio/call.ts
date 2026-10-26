@@ -228,6 +228,12 @@ class Call extends EventEmitter {
   private _mediaReconnectBackoff: any;
 
   /**
+   * Removes the in-flight ICE restart's answer/hangup listeners. A rejected
+   * re-INVITE ends in neither, so the next attempt and teardown call this.
+   */
+  private _removeIceRestartListeners: () => void = () => { /* none in flight */ };
+
+  /**
    * Timestamp for the initial media reconnection
    */
   private _mediaReconnectStartTime: number;
@@ -371,13 +377,14 @@ class Call extends EventEmitter {
         return;
       }
 
+      this._removeIceRestartListeners();
+
       const onAnswerOrRinging = (payload: any) => {
         // The adapter is shared across concurrent calls; ignore events for
         // other calls so their answer/hangup doesn't abort this call's
         // in-flight ICE restart by removing the listeners below.
         if (payload?.callsid !== callSid) { return; }
-        this._signalingAdapter.removeListener('answer', onAnswerOrRinging);
-        this._signalingAdapter.removeListener('hangup', onHangup);
+        this._removeIceRestartListeners();
 
         // On the SIP path, the remote answer reaches PeerConnection via
         // the SDH before the adapter emits 'answer', so payload.sdp is
@@ -393,15 +400,18 @@ class Call extends EventEmitter {
 
       const onHangup = (payload: any) => {
         if (payload?.callsid !== callSid) { return; }
+        this._removeIceRestartListeners();
+      };
+
+      this._removeIceRestartListeners = () => {
         this._signalingAdapter.removeListener('answer', onAnswerOrRinging);
         this._signalingAdapter.removeListener('hangup', onHangup);
       };
-
       this._signalingAdapter.on('answer', onAnswerOrRinging);
       this._signalingAdapter.on('hangup', onHangup);
-      // Adapter encapsulates its own offer-generation strategy. On
-      // failure the adapter emits 'hangup' for this callSid so the
-      // cleanup listeners above run.
+      // Adapter encapsulates its own offer-generation strategy. A fatal
+      // failure emits 'hangup' for this callSid. A rejection that keeps the
+      // call up emits nothing, so the next attempt drops these listeners.
       this._signalingAdapter.iceRestart(callSid, { mediaHandler: this._mediaHandler });
     });
 
@@ -1149,6 +1159,7 @@ class Call extends EventEmitter {
       this._signalingAdapter.removeListener('connected', this._onConnected);
       this._signalingAdapter.removeListener('message', this._onMessageReceived);
       this._signalingAdapter.removeListener('iceRestartNeeded', this._onIceRestartNeeded);
+      this._removeIceRestartListeners();
     };
 
     // This is kind of a hack, but it lets us avoid rewriting more code.

@@ -483,6 +483,38 @@ describe('SipSessionDescriptionHandler', () => {
     });
   });
 
+  describe('rollbackDescription', () => {
+    async function restartAndGetOffer(handler: SipSessionDescriptionHandler) {
+      await handler.getDescription();
+      await handler.setDescription(ANSWER_SDP);
+      handler.requestIceRestart();
+      await handler.getDescription();
+    }
+
+    function createRestartablePc() {
+      return createPeerConnectionStub({
+        makeOutgoingCall: stubMakeOutgoingCall(),
+        processAnswer: stubProcessAnswer(),
+        processOffer: stubProcessOffer(),
+        iceRestart: sinon.stub().callsFake(
+          (cb: (sdp: string) => void) => cb(REOFFER_SDP),
+        ) as sinon.SinonStub,
+      });
+    }
+
+    it('routes a later remote re-INVITE to processOffer after a rejected ICE restart', async () => {
+      const pc = createRestartablePc();
+      const { handler } = createHandler(pc);
+      await restartAndGetOffer(handler);
+
+      await handler.rollbackDescription();
+      await handler.setDescription(REOFFER_SDP);
+
+      sinon.assert.calledOnce(pc.processOffer);
+      sinon.assert.calledOnce(pc.processAnswer);
+    });
+  });
+
   describe('onMediaStarted', () => {
     const iceRestartStub = () => sinon.stub().callsFake(
       (cb: (sdp: string) => void) => cb(REOFFER_SDP),
