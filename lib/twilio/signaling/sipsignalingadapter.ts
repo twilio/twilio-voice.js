@@ -59,6 +59,9 @@ const CONNECT_SUCCESS_TIMEOUT_MS = 10000;
 const ABNORMAL_CLOSE_CODES = [1006, 1015];
 // Non-2xx responses to a re-INVITE that terminate the dialog.
 const DIALOG_ENDING_REINVITE_CODES = [408, 481];
+// Call's ICE backoff starts at 1ms, so a re-INVITE the server keeps rejecting
+// would otherwise be retried once per round trip.
+const REINVITE_RETRY_DELAY_MS = 2000;
 // SIP.js rejects an unanswered call with 480 after this many seconds. As on
 // VSP, only the server should end it, so use the longest setTimeout allows
 // (2^31-1 ms; past that it fires at once). 0 means SIP.js's 60s default.
@@ -597,10 +600,21 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
           const message = `ICE-restart re-INVITE rejected (${code ?? 'unknown'})`;
           this._log.warn(message);
           // Only 408 and 481 end the dialog (RFC 3261 14.1). Otherwise keep
-          // the call up and let Call's backoff retry, which also spaces out a
-          // 491 as 14.1 asks.
+          // the call up and, after a wait, let Call's backoff retry.
           if (!DIALOG_ENDING_REINVITE_CODES.includes(code)) {
-            sdh.failIceRestart(message);
+            const ownsCallId = this._outboundSessions.get(callSid) === session;
+            setTimeout(() => {
+              // Ended or hung up meanwhile.
+              if (this._getSession(callSid) !== session) {
+                return;
+              }
+              // Call won't retry while signaling is down. See iceRestart().
+              if (this._isReconnecting) {
+                this._pendingIceRestartRecovery.add(callSid);
+                return;
+              }
+              sdh.failIceRestart(message);
+            }, this._reinviteRetryDelay(code, ownsCallId));
             return;
           }
           this._endAfterFailedIceRestart(callSid, session, { code, message });
@@ -753,6 +767,17 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
   private _getSession(callSid: string): Session | undefined {
     return this._outboundSessions.get(callSid) || this._inboundSessions.get(callSid);
+  }
+
+  /**
+   * RFC 3261 14.1: after a 491, the Call-ID's owner (the caller) waits 2.1-4s
+   * and the callee 0-2s, so the two sides' retries don't collide again.
+   */
+  private _reinviteRetryDelay(code: number, ownsCallId: boolean): number {
+    if (code !== 491) {
+      return REINVITE_RETRY_DELAY_MS;
+    }
+    return ownsCallId ? 2100 + Math.random() * 1900 : Math.random() * 2000;
   }
 
   /**

@@ -1397,23 +1397,86 @@ describe('SipSignalingAdapter', () => {
       assert.strictEqual(onHangup.firstCall.args[0].error.code, 408);
     });
 
-    [488, 491, 500].forEach((statusCode) => {
-      it(`keeps the call up on a ${statusCode} re-INVITE rejection and hands it to Call's retry`, () => {
-        const { adapter, inviterStub } = createAdapter();
+    describe('non-fatal re-INVITE rejection', () => {
+      let clock: sinon.SinonFakeTimers;
+
+      beforeEach(() => {
+        clock = sinon.useFakeTimers();
+      });
+
+      afterEach(() => {
+        clock.restore();
+        sinon.restore();
+      });
+
+      function rejectOutbound(statusCode: number) {
+        const { adapter, uaStub, inviterStub } = createAdapter();
+        uaStub._triggerConnect();
         adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
         inviterStub.state = 'Established';
         const onHangup = sinon.stub();
         adapter.on('hangup', onHangup);
         adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
-        const rd = inviterStub.invite.lastCall.args[0]?.requestDelegate;
-        rd.onReject({ message: { statusCode } });
+        inviterStub.invite.lastCall.args[0].requestDelegate.onReject({ message: { statusCode } });
+        const failIceRestart = inviterStub.sessionDescriptionHandler.failIceRestart;
+        return { adapter, uaStub, onHangup, failIceRestart };
+      }
+
+      [488, 500].forEach((statusCode) => {
+        it(`keeps the call up on a ${statusCode} and hands it to Call's retry after 2s`, async () => {
+          const { onHangup, failIceRestart } = rejectOutbound(statusCode);
+          await clock.tickAsync(1999);
+          sinon.assert.notCalled(failIceRestart);
+          await clock.tickAsync(1);
+          sinon.assert.calledOnceWithExactly(failIceRestart, `ICE-restart re-INVITE rejected (${statusCode})`);
+          sinon.assert.notCalled(onHangup);
+        });
+      });
+
+      it('waits 2.1-4s after a 491 on an outbound call', async () => {
+        sinon.stub(Math, 'random').returns(0);
+        const { onHangup, failIceRestart } = rejectOutbound(491);
+        await clock.tickAsync(2099);
+        sinon.assert.notCalled(failIceRestart);
+        await clock.tickAsync(1);
+        sinon.assert.calledOnce(failIceRestart);
         sinon.assert.notCalled(onHangup);
-        sinon.assert.notCalled(inviterStub.bye);
-        // ICE is already failed, so without this nothing would retry.
-        sinon.assert.calledOnceWithExactly(
-          inviterStub.sessionDescriptionHandler.failIceRestart,
-          `ICE-restart re-INVITE rejected (${statusCode})`,
-        );
+      });
+
+      it('waits 0-2s after a 491 on an inbound call', async () => {
+        sinon.stub(Math, 'random').returns(0.5);
+        const { adapter, uaStub } = createAdapter();
+        uaStub._triggerConnect();
+        const inv = createInvitationStub();
+        uaStub._triggerInvite(inv);
+        adapter.answer('CA-test-call-sid', { peerConnection: createPeerConnectionStub() });
+        await clock.tickAsync(0);
+        inv.state = 'Established';
+        adapter.iceRestart('CA-test-call-sid', { mediaHandler: mediaHandlerStub() });
+        inv.invite.lastCall.args[0].requestDelegate.onReject({ message: { statusCode: 491 } });
+        await clock.tickAsync(999);
+        sinon.assert.notCalled(inv.sessionDescriptionHandler.failIceRestart);
+        await clock.tickAsync(1);
+        sinon.assert.calledOnce(inv.sessionDescriptionHandler.failIceRestart);
+      });
+
+      it('drops the retry if the call is hung up during the wait', async () => {
+        const { adapter, failIceRestart } = rejectOutbound(500);
+        adapter.hangup('call-1', {});
+        await clock.tickAsync(2000);
+        sinon.assert.notCalled(failIceRestart);
+      });
+
+      it('defers the retry to iceRestartNeeded if the WS is down when the wait ends', async () => {
+        const { adapter, uaStub, failIceRestart } = rejectOutbound(500);
+        uaStub._setReconnectImpl(() => new Promise(() => { /* never reconnects */ }));
+        uaStub._triggerDisconnect();
+        await clock.tickAsync(2000);
+        sinon.assert.notCalled(failIceRestart);
+        const onIceRestartNeeded = sinon.stub();
+        adapter.on('iceRestartNeeded', onIceRestartNeeded);
+        uaStub._triggerConnect();
+        sinon.assert.calledOnceWithExactly(onIceRestartNeeded, { callsid: 'call-1' });
       });
     });
 
