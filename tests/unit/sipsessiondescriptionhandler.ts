@@ -408,7 +408,10 @@ describe('SipSessionDescriptionHandler', () => {
 
     it('failIceRestart() reports the failure to Call without rejecting anything pending', async () => {
       const previousOnFailed = sinon.spy();
-      const pc = createPeerConnectionStub({ onfailed: previousOnFailed }); // answerIncomingCall never calls back
+      const pc = createPeerConnectionStub({
+        onfailed: previousOnFailed,
+        version: { pc: { iceConnectionState: 'failed' } },
+      }); // answerIncomingCall never calls back
       const { handler } = createHandler(pc);
       let settled = false;
       handler.setDescription(OFFER_SDP).then(() => { settled = true; }, () => { settled = true; });
@@ -416,6 +419,17 @@ describe('SipSessionDescriptionHandler', () => {
       await Promise.resolve();
       sinon.assert.calledOnceWithExactly(previousOnFailed, 'ICE-restart re-INVITE rejected (491)');
       assert.strictEqual(settled, false);
+    });
+
+    ['disconnected', 'connected', 'completed'].forEach((iceConnectionState) => {
+      const reports = iceConnectionState === 'disconnected';
+      it(`failIceRestart() ${reports ? 'reports' : 'skips'} the failure when ICE is ${iceConnectionState}`, () => {
+        const previousOnFailed = sinon.spy();
+        const pc = createPeerConnectionStub({ onfailed: previousOnFailed, version: { pc: { iceConnectionState } } });
+        const { handler } = createHandler(pc);
+        handler.failIceRestart('ICE-restart re-INVITE rejected (500)');
+        assert.strictEqual(previousOnFailed.called, reports);
+      });
     });
 
     it('cancelIceRestart() disarms the request', async () => {
