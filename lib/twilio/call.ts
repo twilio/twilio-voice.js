@@ -1374,7 +1374,7 @@ class Call extends EventEmitter {
   /**
    * Called when the SIP signaling adapter recovered the WS while an
    * ICE-restart re-INVITE was orphaned. The remote never received the new
-   * ICE/DTLS creds, so kick a fresh ICE restart.
+   * ICE/DTLS creds, so kick a fresh ICE restart unless media is healthy.
    */
   private _onIceRestartNeeded = (payload: { callsid?: string }): void => {
     if (payload?.callsid !== this.parameters.CallSid) {
@@ -1383,8 +1383,8 @@ class Call extends EventEmitter {
     if (this.status() !== Call.State.Open && this.status() !== Call.State.Reconnecting) {
       return;
     }
-    // Media recovered while the WS was down. A restart from healthy ICE could
-    // leave Call in Reconnecting, since PeerConnection reports no new state.
+    // Media is healthy, so there is nothing to restart. A restart from healthy
+    // ICE could leave Call in Reconnecting, since PeerConnection reports no new state.
     const iceState = this._mediaHandler.version?.pc?.iceConnectionState;
     if (this._mediaStatus === Call.State.Open && (iceState === 'connected' || iceState === 'completed')) {
       this._log.info('iceRestartNeeded after WS recovery; media already recovered');

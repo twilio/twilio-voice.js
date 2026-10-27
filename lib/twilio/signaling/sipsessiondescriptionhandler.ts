@@ -170,7 +170,7 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   /**
    * For a re-INVITE rejection that kept the dialog. Reports the restart as
    * failed, as PeerConnection does when it can't create the offer, so Call's
-   * backoff retries. Skipped if media recovered meanwhile, which Call heard.
+   * backoff retries. Skipped while media is healthy, as there's nothing to retry.
    */
   failIceRestart(message: string): void {
     const pc = this._pc.version?.pc;
