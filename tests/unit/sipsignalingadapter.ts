@@ -460,6 +460,29 @@ describe('SipSignalingAdapter', () => {
       assert.strictEqual(adapter.status, 'offline');
     });
 
+    it('should ignore a rejection for a Registerer replaced after a reconnect', () => {
+      const oldReg = createRegistererStub();
+      const newReg = createRegistererStub();
+      const createRegisterer = sinon.stub();
+      createRegisterer.onFirstCall().returns(oldReg);
+      createRegisterer.onSecondCall().returns(newReg);
+      const { adapter, uaStub } = createAdapter({ createRegisterer });
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      oldReg._simulateState('Unregistered');
+      adapter.register({ audio: true });
+      const oldOnReject = oldReg.register.lastCall.args[0].requestDelegate.onReject;
+      uaStub._triggerDisconnect(new Error('ws closed'));
+      uaStub._triggerConnect();
+      newReg._simulateState('Registered');
+      const onOffline = sinon.stub();
+      adapter.on('offline', onOffline);
+      // Timer F on the disposed Registerer's REGISTER.
+      oldOnReject({ message: { statusCode: 408 } });
+      sinon.assert.notCalled(onOffline);
+      assert.strictEqual(adapter.status, 'ready');
+    });
+
     it('should not emit a second "offline" when the first REGISTER is rejected', () => {
       const { adapter, uaStub, regStub } = createAdapter();
       uaStub._triggerConnect();

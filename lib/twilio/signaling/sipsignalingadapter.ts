@@ -354,11 +354,13 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   private _startRegisterer(): void {
     // SIP.js rejects from Unregistered without a state change, so the
     // stateChange listener can't report it, and Device.register() would hang.
-    const wasUnregistered = this._registerer?.state === RegistererState.Unregistered;
-    this._registerer?.register({
+    // A disposed Registerer's REGISTER can still be rejected after a reconnect.
+    const registerer = this._registerer;
+    const wasUnregistered = registerer?.state === RegistererState.Unregistered;
+    registerer?.register({
       requestDelegate: {
         onReject: () => {
-          if (wasUnregistered && this._status !== 'disconnected') {
+          if (wasUnregistered && this._registerer === registerer) {
             this._status = 'offline';
             this.emit('offline', this);
           }
