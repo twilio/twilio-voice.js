@@ -547,8 +547,9 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   /**
    * Re-INVITE for a fresh-ICE offer, which the armed SDH produces (so
    * _config is unused). Fatal failures BYE and emit 'hangup'. A failure that
-   * keeps the dialog goes to Call's ICE retry through pc.onfailed, and one
-   * orphaned by a disconnect defers to 'iceRestartNeeded'.
+   * keeps the dialog goes to Call through pc.onfailed, which retries on Chrome
+   * and ends the call elsewhere. One orphaned by a disconnect defers to
+   * 'iceRestartNeeded'.
    */
   iceRestart(callSid: string, _config: IceRestartConfig): void {
     const session = this._getSession(callSid);
@@ -612,7 +613,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
           const message = `ICE-restart re-INVITE rejected (${code ?? 'unknown'})`;
           this._log.warn(message);
           // Only 408 and 481 end the dialog (RFC 3261 14.1). Otherwise keep
-          // the call up and, after a wait, let Call's backoff retry.
+          // the dialog up and, after a wait, hand the failure to Call.
           if (!DIALOG_ENDING_REINVITE_CODES.includes(code)) {
             const ownsCallId = this._outboundSessions.get(callSid) === session;
             setTimeout(() => {

@@ -83,7 +83,7 @@ export interface SignalingAdapter extends EventEmitter {
    *  - SIP: arms the SDH via requestIceRestart(), then sends a re-INVITE;
    *    the SDH produces the offer when SIP.js asks it for one.
    * Fatal failures emit 'hangup' for the callSid. A SIP failure that leaves
-   * the dialog up emits nothing; Call's ICE retry handles it.
+   * the dialog up emits nothing; Call's media-failure handling takes over.
    */
   iceRestart(callSid: string, config: IceRestartConfig): void;
 

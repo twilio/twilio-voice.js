@@ -63,7 +63,7 @@ const CLOSED_ERROR_MESSAGE = 'SipSessionDescriptionHandler closed';
 
 /**
  * Error name for an ICE-restart offer that PeerConnection couldn't create.
- * Call has already been told and retries, so the call stays up.
+ * Call has already been told. It retries on Chrome and ends the call elsewhere.
  */
 export const ICE_RESTART_OFFER_FAILED = 'IceRestartOfferFailed';
 
@@ -150,7 +150,7 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
       if (this._iceRestartPending) {
         this._iceRestartPending = false;
         // Rejecting frees SIP.js for the next re-INVITE. previousOnFailed
-        // still runs so Call retries the restart, as it does on VSP.
+        // still runs so Call handles it as on VSP: a retry on Chrome.
         const error = new Error(message || 'PeerConnection failed');
         error.name = ICE_RESTART_OFFER_FAILED;
         this._failPending(error);
@@ -169,8 +169,9 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
 
   /**
    * For a re-INVITE rejection that kept the dialog. Reports the restart as
-   * failed, as PeerConnection does when it can't create the offer, so Call's
-   * backoff retries. Skipped while media is healthy, as there's nothing to retry.
+   * failed, as PeerConnection does when it can't create the offer, so Call
+   * handles it the same way. Skipped while media is healthy, as there's
+   * nothing to retry.
    */
   failIceRestart(message: string): void {
     const pc = this._pc.version?.pc;
