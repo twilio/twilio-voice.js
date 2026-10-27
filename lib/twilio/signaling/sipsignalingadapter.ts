@@ -300,15 +300,14 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       return;
     }
 
-    // SIP.js Registerer handles refresh internally, so skip if one already
-    // exists. Device's 30s re-register tick lands here. A failed REGISTER
-    // drops the Registerer, so the next tick retries.
+    // SIP.js Registerer handles refresh internally, so skip unless it is
+    // Unregistered. Device's 30s re-register tick lands here.
     if (this._registerer && this._registerer.state !== RegistererState.Unregistered) {
       this._log.debug('Registerer already exists, skipping duplicate register call');
       return;
     }
-    // Unregistered by unregister() or a failed refresh. SIP.js can register
-    // it again, but nothing else will.
+    // unregister() and a rejected REGISTER, initial or refresh, both leave it
+    // Unregistered. SIP.js can register it again, but nothing else will.
     if (this._registerer) {
       this._startRegisterer();
       return;

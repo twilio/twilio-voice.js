@@ -401,25 +401,24 @@ describe('SipSignalingAdapter', () => {
       adapter.register({ audio: false });
     });
 
-    it('should retry with a new Registerer on the next register() after a failure', async () => {
-      const failRegStub = createRegistererStub();
-      failRegStub.register = sinon.stub().rejects(new Error('503'));
-      const retryRegStub = createRegistererStub();
-      const createRegisterer = sinon.stub();
-      createRegisterer.onFirstCall().returns(failRegStub);
-      createRegisterer.onSecondCall().returns(retryRegStub);
+    it('should register again after a rejected initial REGISTER', () => {
+      const regStub = createRegistererStub();
+      const createRegisterer = sinon.stub().returns(regStub);
       const { adapter, uaStub } = createAdapter({ createRegisterer });
-      adapter.on('error', () => { /* expected 31201 */ });
       uaStub._triggerConnect();
       adapter.register({ audio: true });
-      await afterDispatch();
+      // SIP.js moves from Initial to Unregistered on a non-2xx.
+      regStub._simulateState('Unregistered');
       // Device's 30s re-register tick
       adapter.register({ audio: true });
-      sinon.assert.calledOnce(retryRegStub.register);
+      sinon.assert.calledTwice(regStub.register);
+      sinon.assert.calledOnce(createRegisterer);
     });
 
     it('should register again after unregister()', () => {
-      const { adapter, uaStub, regStub } = createAdapter();
+      const regStub = createRegistererStub();
+      const createRegisterer = sinon.stub().returns(regStub);
+      const { adapter, uaStub } = createAdapter({ createRegisterer });
       uaStub._triggerConnect();
       adapter.register({ audio: true });
       regStub._simulateState('Registered');
@@ -427,10 +426,13 @@ describe('SipSignalingAdapter', () => {
       regStub._simulateState('Unregistered');
       adapter.register({ audio: true });
       sinon.assert.calledTwice(regStub.register);
+      sinon.assert.calledOnce(createRegisterer);
     });
 
     it('should register again after a failed refresh', () => {
-      const { adapter, uaStub, regStub } = createAdapter();
+      const regStub = createRegistererStub();
+      const createRegisterer = sinon.stub().returns(regStub);
+      const { adapter, uaStub } = createAdapter({ createRegisterer });
       uaStub._triggerConnect();
       adapter.register({ audio: true });
       regStub._simulateState('Registered');
@@ -439,6 +441,7 @@ describe('SipSignalingAdapter', () => {
       // Device's 30s re-register tick
       adapter.register({ audio: true });
       sinon.assert.calledTwice(regStub.register);
+      sinon.assert.calledOnce(createRegisterer);
     });
 
     it('should keep the Registerer when register() overlaps a REGISTER in flight', async () => {
