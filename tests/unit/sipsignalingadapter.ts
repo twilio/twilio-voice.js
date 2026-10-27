@@ -446,6 +446,32 @@ describe('SipSignalingAdapter', () => {
       sinon.assert.calledOnce(createRegisterer);
     });
 
+    it('should emit "offline" when re-registering an Unregistered Registerer is rejected', () => {
+      const { adapter, uaStub, regStub } = createAdapter();
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      regStub._simulateState('Unregistered');
+      const onOffline = sinon.stub();
+      adapter.on('offline', onOffline);
+      adapter.register({ audio: true });
+      // SIP.js leaves the state alone on this rejection.
+      regStub.register.lastCall.args[0].requestDelegate.onReject({ message: { statusCode: 403 } });
+      sinon.assert.calledOnce(onOffline);
+      assert.strictEqual(adapter.status, 'offline');
+    });
+
+    it('should not emit a second "offline" when the first REGISTER is rejected', () => {
+      const { adapter, uaStub, regStub } = createAdapter();
+      uaStub._triggerConnect();
+      const onOffline = sinon.stub();
+      adapter.on('offline', onOffline);
+      adapter.register({ audio: true });
+      // SIP.js moves Initial to Unregistered, then calls onReject.
+      regStub._simulateState('Unregistered');
+      regStub.register.lastCall.args[0].requestDelegate.onReject({ message: { statusCode: 403 } });
+      sinon.assert.calledOnce(onOffline);
+    });
+
     it('should keep the Registerer when register() overlaps a REGISTER in flight', async () => {
       const { adapter, uaStub, regStub } = createAdapter();
       const onError = sinon.stub();
