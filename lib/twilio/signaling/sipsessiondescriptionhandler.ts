@@ -109,8 +109,9 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   private _iceRestartRequested: boolean = false;
   // pc.onfailed reports both a createOffer rejection during our restart and a
   // runtime ICE failure. Only the first should reject the pending Promise.
-  // Call._mediaReconnectBackoff fires serially, so at most one is in flight.
   private _iceRestartPending: boolean = false;
+  // A rejected attempt's createOffer can still land after Call starts the next.
+  private _iceRestartAttempts: number = 0;
   // PeerConnection reports failures through onerror, not the callbacks we pass
   // it, so every in-flight operation parks its reject here. A Set because SIP.js
   // can overlap setDescription calls (PRACK/UPDATE during early media).
@@ -196,8 +197,13 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
     if (this._iceRestartRequested) {
       this._iceRestartRequested = false;
       this._iceRestartPending = true;
+      const attempt = ++this._iceRestartAttempts;
       return this._awaitOperation<BodyAndContentType>((resolve) => {
         this._pc.iceRestart((offerSdp) => {
+          // onfailed already rejected this attempt and the call stays up.
+          if (!this._iceRestartPending || attempt !== this._iceRestartAttempts) {
+            return;
+          }
           this._iceRestartPending = false;
           // Set _hasSentOffer so SIP.js's follow-up setDescription for the
           // 200 OK's answer routes to processAnswer, matching outbound

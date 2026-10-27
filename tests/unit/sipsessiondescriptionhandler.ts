@@ -245,6 +245,50 @@ describe('SipSessionDescriptionHandler', () => {
       sinon.assert.calledOnceWithExactly(previousOnFailed, 'createOffer rejected');
     });
 
+    it('routes a later remote offer to processOffer when the restart offer arrives after onfailed', async () => {
+      let onOfferReady: (sdp: string) => void = () => {};
+      const pc = createPeerConnectionStub({
+        answerIncomingCall: stubAnswerIncomingCall(),
+        processOffer: stubProcessOffer(),
+        processAnswer: stubProcessAnswer(),
+        iceRestart: sinon.stub().callsFake((cb: (sdp: string) => void) => { onOfferReady = cb; }),
+      });
+      const { handler } = createHandler(pc);
+      await handler.setDescription(OFFER_SDP);
+      await handler.getDescription();
+      handler.requestIceRestart();
+      const pending = handler.getDescription();
+      pc.onfailed('Connection with Twilio was interrupted.');
+      await assert.rejects(pending, { name: ICE_RESTART_OFFER_FAILED });
+      onOfferReady(ICE_RESTART_OFFER_SDP);
+
+      await handler.setDescription(REOFFER_SDP);
+      sinon.assert.calledOnce(pc.processOffer);
+      sinon.assert.notCalled(pc.processAnswer);
+    });
+
+    it('resolves the next attempt when a rejected attempt\'s offer lands after it starts', async () => {
+      const callbacks: Array<(sdp: string) => void> = [];
+      const pc = createPeerConnectionStub({
+        answerIncomingCall: stubAnswerIncomingCall(),
+        iceRestart: sinon.stub().callsFake((cb: (sdp: string) => void) => { callbacks.push(cb); }),
+      });
+      const { handler } = createHandler(pc);
+      await handler.setDescription(OFFER_SDP);
+      await handler.getDescription();
+      handler.requestIceRestart();
+      const first = handler.getDescription();
+      pc.onfailed('Connection with Twilio was interrupted.');
+      await assert.rejects(first, { name: ICE_RESTART_OFFER_FAILED });
+      handler.requestIceRestart();
+      const second = handler.getDescription();
+
+      callbacks[0]('v=0\r\no=stale\r\n');
+      callbacks[1](ICE_RESTART_OFFER_SDP);
+      const result = await Promise.race([second, new Promise((resolve) => setTimeout(() => resolve('hung'), 10))]);
+      assert.deepStrictEqual(result, { body: ICE_RESTART_OFFER_SDP, contentType: APPLICATION_SDP });
+    });
+
     it('does NOT reject a pending setDescription when pc.onfailed fires outside of an ICE restart (runtime ICE failure)', async () => {
       const pc = createPeerConnectionStub(); // answerIncomingCall never calls back
       const { handler } = createHandler(pc);
