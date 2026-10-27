@@ -22,6 +22,8 @@ Bug Fixes
 
 - Fixed an issue where error `31402` (`AcquisitionFailedError`) did not include the underlying error. It is now set as `originalError`, for example the error from a local `AudioProcessor` that failed to create its processed stream.
 
+- Fixed an issue where `device.updateOptions()` threw `Cannot change Edge while on an active Call` but still stored the new options. Retrying the same edge after the call ended found no change and kept the signaling stream on the previous edge, and a signaling connection opened later, for example after the previous one closed, could use the rejected edge. A rejected `updateOptions()` call now leaves the `Device` options unchanged. This also applies when `updateOptions()` throws for an invalid `edge`, which previously made later `updateOptions()` calls throw until a valid `edge` was passed. Thanks @RaphaelFakhri for your [contribution](https://github.com/twilio/twilio-voice.js/pull/481).
+
 2.18.5 (September 10, 2026)
 ===========================
 
