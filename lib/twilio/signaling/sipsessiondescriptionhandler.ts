@@ -24,7 +24,7 @@ export interface IPeerConnection {
   // failures instead of hanging.
   onfailed: (message: string) => void;
   // Null until the RTCPeerConnection is created.
-  version?: { pc?: { iceConnectionState?: string } } | null;
+  version?: { pc?: { iceConnectionState?: string; connectionState?: string } } | null;
 
   makeOutgoingCall(
     callSid: string,
@@ -170,11 +170,14 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   /**
    * For a re-INVITE rejection that kept the dialog. Reports the restart as
    * failed, as PeerConnection does when it can't create the offer, so Call's
-   * backoff retries. Skipped once ICE has recovered, which Call already heard.
+   * backoff retries. Skipped if media recovered meanwhile, which Call heard.
    */
   failIceRestart(message: string): void {
-    const iceState = this._pc.version?.pc?.iceConnectionState;
-    if (iceState !== 'failed' && iceState !== 'disconnected') {
+    const pc = this._pc.version?.pc;
+    const iceState = pc?.iceConnectionState;
+    // connectionState also covers DTLS. PeerConnection reports both to Call.
+    if ((iceState === 'connected' || iceState === 'completed')
+      && (!pc?.connectionState || pc.connectionState === 'connected')) {
       return;
     }
     this._previousOnFailed(message);

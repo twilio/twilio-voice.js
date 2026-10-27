@@ -3006,6 +3006,18 @@ describe('Call', function() {
         assert(elapsed < 1000, `expected fresh start time, got elapsed=${elapsed}`);
       });
 
+      it('skips the restart when media recovered while the WS was down', () => {
+        conn['_status'] = Call.State.Open;
+        conn['_mediaStatus'] = Call.State.Open;
+        conn['_mediaReconnectBackoff'].backoff = sinon.stub();
+        mediaHandler.version.pc.iceConnectionState = 'connected';
+
+        pstream.emit('iceRestartNeeded', { callsid: 'CAtest' });
+
+        sinon.assert.notCalled(conn['_mediaReconnectBackoff'].backoff);
+        assert.strictEqual(conn.status(), Call.State.Open);
+      });
+
       it('ignores events for a different callSid', () => {
         conn['_status'] = Call.State.Open;
         conn['_mediaStatus'] = Call.State.Open;

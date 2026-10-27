@@ -1383,6 +1383,13 @@ class Call extends EventEmitter {
     if (this.status() !== Call.State.Open && this.status() !== Call.State.Reconnecting) {
       return;
     }
+    // Media recovered while the WS was down. A restart from healthy ICE could
+    // leave Call in Reconnecting, since PeerConnection reports no new state.
+    const iceState = this._mediaHandler.version?.pc?.iceConnectionState;
+    if (this._mediaStatus === Call.State.Open && (iceState === 'connected' || iceState === 'completed')) {
+      this._log.info('iceRestartNeeded after WS recovery; media already recovered');
+      return;
+    }
     this._log.info('iceRestartNeeded after WS recovery; retrying ICE restart');
     this._mediaReconnectStartTime = Date.now();
     this._onMediaFailure(Call.MediaFailure.ConnectionFailed);

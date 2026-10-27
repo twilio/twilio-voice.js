@@ -421,15 +421,32 @@ describe('SipSessionDescriptionHandler', () => {
       assert.strictEqual(settled, false);
     });
 
-    ['disconnected', 'connected', 'completed'].forEach((iceConnectionState) => {
-      const reports = iceConnectionState === 'disconnected';
-      it(`failIceRestart() ${reports ? 'reports' : 'skips'} the failure when ICE is ${iceConnectionState}`, () => {
+    [
+      { iceConnectionState: 'disconnected', connectionState: 'disconnected', reports: true },
+      { iceConnectionState: 'checking', connectionState: 'connected', reports: true },
+      { iceConnectionState: 'connected', connectionState: 'failed', reports: true },
+      { iceConnectionState: 'connected', connectionState: 'connected', reports: false },
+      { iceConnectionState: 'completed', connectionState: undefined, reports: false },
+    ].forEach(({ iceConnectionState, connectionState, reports }) => {
+      const verb = reports ? 'reports' : 'skips';
+      it(`failIceRestart() ${verb} the failure when ICE is ${iceConnectionState} and the PC ${connectionState}`, () => {
         const previousOnFailed = sinon.spy();
-        const pc = createPeerConnectionStub({ onfailed: previousOnFailed, version: { pc: { iceConnectionState } } });
+        const pc = createPeerConnectionStub({
+          onfailed: previousOnFailed,
+          version: { pc: { iceConnectionState, connectionState } },
+        });
         const { handler } = createHandler(pc);
         handler.failIceRestart('ICE-restart re-INVITE rejected (500)');
         assert.strictEqual(previousOnFailed.called, reports);
       });
+    });
+
+    it('failIceRestart() reports the failure when the PC is gone', () => {
+      const previousOnFailed = sinon.spy();
+      const pc = createPeerConnectionStub({ onfailed: previousOnFailed, version: null });
+      const { handler } = createHandler(pc);
+      handler.failIceRestart('ICE-restart re-INVITE rejected (500)');
+      sinon.assert.calledOnce(previousOnFailed);
     });
 
     it('cancelIceRestart() disarms the request', async () => {
