@@ -58,6 +58,10 @@ const CONNECT_SUCCESS_TIMEOUT_MS = 10000;
 const ABNORMAL_CLOSE_CODES = [1006, 1015];
 // Non-2xx responses to a re-INVITE that terminate the dialog.
 const DIALOG_ENDING_REINVITE_CODES = [408, 481];
+// SIP.js rejects an unanswered call with 480 after this many seconds. As on
+// VSP, only the server should end it, so use the longest setTimeout allows
+// (2^31-1 ms; past that it fires at once). 0 means SIP.js's 60s default.
+const NO_ANSWER_TIMEOUT_S = Math.floor((2 ** 31 - 1) / 1000);
 
 type SipSendMessageConfig = Pick<SendMessageConfig, 'content' | 'contentType' | 'voiceEventSid'>;
 
@@ -203,6 +207,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       },
       authorizationUsername: options.credentials.username,
       authorizationPassword: options.credentials.password,
+      noAnswerTimeout: NO_ANSWER_TIMEOUT_S,
       sessionDescriptionHandlerFactory: (session: Session) => {
         // Throwing here would bubble through SIP.js's synchronous setup path
         // (session.js setupSessionDescriptionHandler) in non-obvious ways. If
@@ -425,10 +430,20 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       this._log.warn('answer: no pending invitation for callSid', callSid);
       return;
     }
+    // Ended, but the deferred Terminated check hasn't run yet. Leave it
+    // pending so that check reports the 'cancel'.
+    if (invitation.state === SessionState.Terminated) {
+      return;
+    }
     this._pendingInvitations.delete(callSid);
     this._inboundSessions.set(callSid, invitation);
     this._bindSession(invitation, callSid, config);
     invitation.accept().catch((error: Error) => {
+      // Unmapped means the call already ended (local hangup or CANCEL), and
+      // this rejection is just a side effect of that.
+      if (this._inboundSessions.get(callSid) !== invitation) {
+        return;
+      }
       this._log.error('Failed to accept invitation', error);
       // Drop the half-bound session so a later hangup/retry for this callSid
       // doesn't dispatch against a Terminated-but-still-mapped invitation.
@@ -439,7 +454,13 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       // getPreciseSignalingErrorByCode rather than hardcoding 31000.
       // Consistent treatment needed across reject()/hangup()/reconnect()/
       // sendMessage() as well.
-      this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+      try {
+        this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+      } finally {
+        // 'error' only reaches Device, which throws it if the app has no
+        // listener. Call needs a hangup to leave Connecting either way.
+        this.emit('hangup', { callsid: callSid });
+      }
     });
   }
 
@@ -481,6 +502,10 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       return;
     }
     this._pendingInvitations.delete(callSid);
+    // Already ended. Now unmapped, so the deferred Terminated check is silent.
+    if (invitation.state === SessionState.Terminated) {
+      return;
+    }
     invitation.reject().catch((error: Error) => {
       this._log.error('Failed to reject invitation', error);
       this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
@@ -495,6 +520,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
    */
   iceRestart(callSid: string, _config: IceRestartConfig): void {
     const session = this._getSession(callSid);
+    // SIP.js just ended it. The Terminated listener reports that hangup, so
+    // emitting here would tell Call twice.
+    if (session?.state === SessionState.Terminated) {
+      return;
+    }
     if (!session || session.state !== SessionState.Established) {
       this._log.warn('iceRestart: no established session for callSid', callSid);
       this.emit('hangup', { callsid: callSid });
@@ -524,6 +554,10 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       requestDelegate: {
         onAccept: () => {
           this._inFlightIceRestarts.delete(inflight);
+          // See the INVITE's onAccept in _sendInvite.
+          if (session.state === SessionState.Terminated) {
+            return;
+          }
           // SDP intentionally empty: the SDH consumed the remote answer via
           // SIP.js's setDescription before this event fires, so Call's
           // onAnswerOrRinging skips processAnswer on empty SDP. Passing a
@@ -532,6 +566,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
         },
         onReject: (response: any) => {
           this._inFlightIceRestarts.delete(inflight);
+          // A BYE raced the re-INVITE, or SIP.js couldn't roll back the offer
+          // and sent one. See the top of iceRestart().
+          if (session.state === SessionState.Terminated) {
+            return;
+          }
           if (inflight.stale) {
             // The WS dropped while this was in flight. Don't hang up;
             // _onTransportConnect emits 'iceRestartNeeded' so Call re-triggers.
@@ -562,6 +601,10 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       if (error instanceof RequestPendingError) {
         sdh.cancelIceRestart();
         this._log.info('iceRestart skipped: previous re-INVITE still pending');
+        return;
+      }
+      // e.g. a BYE closed the SDH mid-offer. See the top of iceRestart().
+      if (session.state === SessionState.Terminated) {
         return;
       }
       this._log.warn('Failed to send ICE-restart re-INVITE', error);
@@ -623,6 +666,10 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
   private _hangupPendingInvitation(invitation: Invitation, callSid: string): void {
     this._pendingInvitations.delete(callSid);
+    // See reject().
+    if (invitation.state === SessionState.Terminated) {
+      return;
+    }
     invitation.reject().catch((error: Error) => {
       this._log.error('Failed to reject invitation during hangup', error);
       this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
@@ -723,16 +770,22 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       this._inboundSessions.delete(callSid);
       this.emit('cancel', { callsid: callSid });
     };
-    invitation.delegate.onBye = () => {
-      this._inboundSessions.delete(callSid);
-      this.emit('hangup', { callsid: callSid });
-    };
 
     invitation.stateChange.addListener((state: SessionState) => {
-      if (state === SessionState.Terminated) {
-        this._pendingInvitations.delete(callSid);
-        this._inboundSessions.delete(callSid);
+      if (state !== SessionState.Terminated) {
+        return;
       }
+      // See _sendInvite. A pending call ends as 'cancel', the only event Call
+      // listens for before accept(), as VSP cancels an unanswered invite.
+      setTimeout(() => {
+        if (this._pendingInvitations.get(callSid) === invitation) {
+          this._pendingInvitations.delete(callSid);
+          this.emit('cancel', { callsid: callSid });
+        } else if (this._inboundSessions.get(callSid) === invitation) {
+          this._inboundSessions.delete(callSid);
+          this.emit('hangup', { callsid: callSid });
+        }
+      });
     });
 
     const from = invitation.remoteIdentity?.uri?.toString() || '';
@@ -790,17 +843,21 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     this._bindSession(inviter, tempCallSid, config);
     this._outboundSessions.set(callSid, inviter);
 
-    inviter.delegate = {
-      onBye: () => {
+    inviter.stateChange.addListener((state: SessionState) => {
+      if (state !== SessionState.Terminated) {
+        return;
+      }
+      // Covers the BYE (no onBye, so SIP.js answers it and ends the session),
+      // a 3xx, and an unusable 2xx. Paths that tell Call unmap the session, but
+      // SIP.js terminates before calling onReject or rejecting invite(), so
+      // check once it's done dispatching.
+      setTimeout(() => {
+        if (this._outboundSessions.get(callSid) !== inviter) {
+          return;
+        }
         this._outboundSessions.delete(callSid);
         this.emit('hangup', { callsid: callSid });
-      },
-    };
-
-    inviter.stateChange.addListener((state: SessionState) => {
-      if (state === SessionState.Terminated) {
-        this._outboundSessions.delete(callSid);
-      }
+      });
     });
 
     inviter.invite({
@@ -809,6 +866,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
           this.emit('ringing', { callsid: callSid });
         },
         onAccept: (response: any) => {
+          // SIP.js still calls this after ACK+BYE on a 2xx it couldn't use.
+          // The Terminated listener reports that as a hangup instead.
+          if (inviter.state === SessionState.Terminated) {
+            return;
+          }
           const serverCallSid = response?.message?.getHeader?.('X-Twilio-CallSid');
           if (serverCallSid && serverCallSid !== callSid) {
             this._outboundSessions.delete(callSid);
@@ -832,6 +894,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
           this.emit('answer', payload);
         },
         onReject: (response: any) => {
+          // Unmapped means a local hangup sent the CANCEL. VSP doesn't echo
+          // the resulting 487 back to the caller.
+          if (this._outboundSessions.get(callSid) !== inviter) {
+            return;
+          }
           const code = response?.message?.statusCode || 31000;
           const message = response?.message?.reasonPhrase || 'Call rejected';
           this._outboundSessions.delete(callSid);
@@ -839,9 +906,17 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
         },
       },
     }).catch((error: Error) => {
+      // See the accept() catch in answer().
+      if (this._outboundSessions.get(callSid) !== inviter) {
+        return;
+      }
       this._log.error('Failed to send INVITE', error);
       this._outboundSessions.delete(callSid);
-      this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+      try {
+        this.emit('error', { error: { code: 31000, message: error.message }, callsid: callSid });
+      } finally {
+        this.emit('hangup', { callsid: callSid });
+      }
     });
   }
 
@@ -960,6 +1035,19 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       inflight.stale = true;
       this._pendingIceRestartRecovery.add(inflight.callSid);
     });
+
+    // Call and Device drop a ringing call on transportClose, so nothing can
+    // answer these. Reject them, as SIP.js's no-answer timer used to, rather
+    // than keep them for the life of the Device. Unmapped, so it's silent.
+    this._pendingInvitations.forEach((invitation: Invitation) => {
+      if (invitation.state === SessionState.Terminated) {
+        return;
+      }
+      invitation.reject().catch((err: Error) => {
+        this._log.warn('Error rejecting ringing invitation during disconnect', err);
+      });
+    });
+    this._pendingInvitations.clear();
 
     // Dispose the registerer — SIP.js requires a fresh Registerer after the
     // transport reconnects. Do NOT clear session maps; they remain addressable
