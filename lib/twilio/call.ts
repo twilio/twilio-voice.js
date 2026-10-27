@@ -1354,9 +1354,9 @@ class Call extends EventEmitter {
    */
   private _onConnected = (): void => {
     this._log.info('Received connected from pstream');
-    // A SIP dialog outlives the WS, so signaling is back as soon as the WS is,
-    // and a reconnect here would send a second INVITE. The adapter redoes an
-    // interrupted ICE restart itself through iceRestartNeeded.
+    // On SIP a reconnect would send a second INVITE, so the WS coming back
+    // counts as signaling back. Nothing confirms the dialog survived: a BYE
+    // lost in the gap shows up only when a later re-INVITE gets a 481.
     if (this._options.useSip) {
       this._onSignalingReconnected();
       return;
