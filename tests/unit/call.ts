@@ -2178,6 +2178,22 @@ describe('Call', function() {
         sinon.assert.notCalled(pstream.reconnect);
       });
 
+      it('should return a SIP call to open after the WS comes back', async () => {
+        conn = new Call(config, Object.assign(options, { callParameters: { CallSid: 'CA1234' }, useSip: true }));
+        conn.accept();
+        await clock.tickAsync(0);
+        // An answered call with healthy media.
+        // @ts-ignore
+        conn._status = conn._signalingStatus = conn._mediaStatus = Call.State.Open;
+        const onReconnected = sinon.stub();
+        conn.on('reconnected', onReconnected);
+        pstream.emit('transportClose');
+        assert.strictEqual(conn.status(), Call.State.Reconnecting);
+        pstream.emit('connected');
+        sinon.assert.calledOnce(onReconnected);
+        assert.strictEqual(conn.status(), Call.State.Open);
+      });
+
       it('should not call pstream.reconnect when CallSid is missing', async () => {
         conn = new Call(config, Object.assign(options));
         conn.accept();
