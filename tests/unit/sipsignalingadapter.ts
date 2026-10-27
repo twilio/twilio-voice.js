@@ -271,11 +271,13 @@ describe('SipSignalingAdapter', () => {
       });
 
       it('should stay silent if rejecting it fails', async () => {
-        const { uaStub, inv, events } = ringAndWatch();
+        const { adapter, uaStub, inv, events } = ringAndWatch();
+        const warnSpy = sinon.spy((adapter as any)._log, 'warn');
         inv.reject = sinon.stub().rejects(new Error('transport down'));
         uaStub._triggerDisconnect();
         await afterDispatch();
         assert.deepStrictEqual(events, []);
+        sinon.assert.calledWith(warnSpy, 'Error rejecting ringing invitation during disconnect');
       });
 
       it('should not reject a call SIP.js already ended', () => {
@@ -1371,6 +1373,28 @@ describe('SipSignalingAdapter', () => {
         await afterDispatch();
         sinon.assert.calledOnce(onHangup);
       });
+    });
+
+    it('sends BYE and emits one hangup when an inbound call\'s re-INVITE gets a 408', async () => {
+      const { adapter, uaStub } = createAdapter();
+      uaStub._triggerConnect();
+      const inv = createInvitationStub();
+      uaStub._triggerInvite(inv);
+      adapter.answer('CA-test-call-sid', { peerConnection: createPeerConnectionStub() });
+      await afterDispatch();
+      inv.state = 'Established';
+      inv.bye = sinon.stub().callsFake(() => {
+        inv._simulateState('Terminated');
+        return Promise.resolve();
+      });
+      const onHangup = sinon.stub();
+      adapter.on('hangup', onHangup);
+      adapter.iceRestart('CA-test-call-sid', { mediaHandler: mediaHandlerStub() });
+      inv.invite.lastCall.args[0].requestDelegate.onReject({ message: { statusCode: 408 } });
+      await afterDispatch();
+      sinon.assert.calledOnce(inv.bye);
+      sinon.assert.calledOnce(onHangup);
+      assert.strictEqual(onHangup.firstCall.args[0].error.code, 408);
     });
 
     [488, 491, 500].forEach((statusCode) => {

@@ -764,7 +764,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     session: Session,
     error?: { code: number; message: string },
   ): void {
-    // Unmapped first, so the Terminated listener stays silent.
+    // Unmapped, so the Terminated listener stays silent.
     if (this._outboundSessions.get(callSid) === session) {
       this._outboundSessions.delete(callSid);
     }
@@ -819,8 +819,8 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       if (state !== SessionState.Terminated) {
         return;
       }
-      // See _sendInvite. A pending call ends as 'cancel', the only event Call
-      // listens for before accept(), as VSP cancels an unanswered invite.
+      // See _sendInvite. A pending call ends as 'cancel', the only end-of-call
+      // event Call listens for before accept(), as VSP cancels an unanswered invite.
       setTimeout(() => {
         if (this._pendingInvitations.get(callSid) === invitation) {
           this._pendingInvitations.delete(callSid);
@@ -1081,8 +1081,8 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     });
 
     // Call and Device drop a ringing call on transportClose, so nothing can
-    // answer these. Reject them, as SIP.js's no-answer timer used to, rather
-    // than keep them for the life of the Device. Unmapped, so it's silent.
+    // answer these. Reject them rather than keep them for the life of the
+    // Device, now that noAnswerTimeout won't. Unmapped, so it's silent.
     this._pendingInvitations.forEach((invitation: Invitation) => {
       if (invitation.state === SessionState.Terminated) {
         return;
