@@ -57,8 +57,12 @@ const CONNECT_SUCCESS_TIMEOUT_MS = 10000;
 // Close codes meaning the server was unreachable rather than shut down
 // cleanly. 1006: abnormal close. 1015: TLS handshake failure.
 const ABNORMAL_CLOSE_CODES = [1006, 1015];
-// Non-2xx responses to a re-INVITE that terminate the dialog.
-const DIALOG_ENDING_REINVITE_CODES = [408, 481];
+// Non-2xx responses to a re-INVITE that end the call: those RFC 5057 Table 1
+// says destroy the usage or dialog, plus 408 (RFC 3261 12.2.1.2). Any other
+// code leaves the call up.
+const DIALOG_ENDING_REINVITE_CODES = [
+  404, 405, 408, 410, 416, 480, 481, 482, 483, 484, 485, 489, 501, 502, 604,
+];
 // Call's ICE backoff starts at 1ms, so a re-INVITE the server keeps rejecting
 // would otherwise be retried once per round trip.
 const REINVITE_RETRY_DELAY_MS = 2000;
@@ -614,8 +618,8 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
           const code = response?.message?.statusCode;
           const message = `ICE-restart re-INVITE rejected (${code ?? 'unknown'})`;
           this._log.warn(message);
-          // Only 408 and 481 end the dialog (RFC 3261 14.1). Otherwise keep
-          // the dialog up and, after a wait, hand the failure to Call.
+          // Unless the code ends the dialog, keep it up and, after a wait,
+          // hand the failure to Call.
           if (!DIALOG_ENDING_REINVITE_CODES.includes(code)) {
             const ownsCallId = this._outboundSessions.get(callSid) === session;
             setTimeout(() => {
@@ -811,8 +815,8 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     if (this._inboundSessions.get(callSid) === session) {
       this._inboundSessions.delete(callSid);
     }
-    // A 408/481 means the server may not answer it; SIP.js ends the session
-    // either way.
+    // After a dialog-ending code the server may not answer it; SIP.js ends
+    // the session either way.
     session.bye().catch((err: Error) => {
       this._log.warn('Failed to send BYE after a failed ICE restart', err);
     });

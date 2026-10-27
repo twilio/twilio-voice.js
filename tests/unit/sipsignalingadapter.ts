@@ -1390,7 +1390,7 @@ describe('SipSignalingAdapter', () => {
       adapter.iceRestart('nope', { mediaHandler: mediaHandlerStub() });
     });
 
-    [408, 481].forEach((statusCode) => {
+    [404, 408, 480, 481, 502].forEach((statusCode) => {
       it(`emits hangup with the status code when the re-INVITE gets a dialog-ending ${statusCode}`, () => {
         const { adapter, inviterStub } = createAdapter();
         adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
