@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import * as sinon from 'sinon';
 import {
+  ICE_RESTART_OFFER_FAILED,
   IPeerConnection,
   SipSessionDescriptionHandler,
 } from '../../lib/twilio/signaling/sipsessiondescriptionhandler';
@@ -228,20 +229,20 @@ describe('SipSessionDescriptionHandler', () => {
       createHandler(pc);
       // _iceRestartPending is false here (no ICE restart in flight), so the
       // wrap falls through to previousOnFailed. See the next test for the
-      // ICE-restart branch where previousOnFailed is intentionally skipped.
+      // ICE-restart branch.
       pc.onfailed('network down');
       sinon.assert.calledOnceWithExactly(previousOnFailed, 'network down');
     });
 
-    it('does NOT invoke previousOnFailed when onfailed fires DURING an ICE restart (avoids double-dispatch with session.invite rejection)', async () => {
+    it('still invokes previousOnFailed during an ICE restart, so Call retries as on VSP', async () => {
       const previousOnFailed = sinon.spy();
       const pc = createPeerConnectionStub({ onfailed: previousOnFailed }); // iceRestart stub never calls back
       const { handler } = createHandler(pc);
       handler.requestIceRestart();
       const pending = handler.getDescription();
       pc.onfailed('createOffer rejected');
-      await assert.rejects(pending, /createOffer rejected/);
-      sinon.assert.notCalled(previousOnFailed);
+      await assert.rejects(pending, { name: ICE_RESTART_OFFER_FAILED, message: 'createOffer rejected' });
+      sinon.assert.calledOnceWithExactly(previousOnFailed, 'createOffer rejected');
     });
 
     it('does NOT reject a pending setDescription when pc.onfailed fires outside of an ICE restart (runtime ICE failure)', async () => {

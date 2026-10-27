@@ -3,6 +3,7 @@ import * as sinon from 'sinon';
 import { RequestPendingError } from 'sip.js';
 import { GeneralErrors, SignalingErrors } from '../../lib/twilio/errors';
 import { SignalingAdapter } from '../../lib/twilio/signaling/signalingadapter';
+import { ICE_RESTART_OFFER_FAILED } from '../../lib/twilio/signaling/sipsessiondescriptionhandler';
 import { SipSignalingAdapter } from '../../lib/twilio/signaling/sipsignalingadapter';
 import { IPeerConnection, SipSessionDescriptionHandler } from '../../lib/twilio/signaling/sipsessiondescriptionhandler';
 
@@ -1332,6 +1333,22 @@ describe('SipSignalingAdapter', () => {
         done();
       });
       adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+    });
+
+    it('keeps the call up when the SDH could not create the offer', async () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      const offerError = new Error('createOffer rejected');
+      offerError.name = ICE_RESTART_OFFER_FAILED;
+      inviterStub.invite = sinon.stub().rejects(offerError);
+      const onHangup = sinon.stub();
+      adapter.on('hangup', onHangup);
+      adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+      await afterDispatch();
+      // The SDH passed the failure to Call, which retries the restart.
+      sinon.assert.notCalled(onHangup);
+      sinon.assert.notCalled(inviterStub.bye);
     });
 
     it('does not emit hangup when session.invite rejects with RequestPendingError', async () => {

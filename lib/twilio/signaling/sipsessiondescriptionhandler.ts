@@ -60,6 +60,12 @@ const APPLICATION_SDP = 'application/sdp';
 const CLOSED_ERROR_MESSAGE = 'SipSessionDescriptionHandler closed';
 
 /**
+ * Error name for an ICE-restart offer that PeerConnection couldn't create.
+ * Call has already been told and retries, so the call stays up.
+ */
+export const ICE_RESTART_OFFER_FAILED = 'IceRestartOfferFailed';
+
+/**
  * Bridges SIP.js's SessionDescriptionHandler interface to the SDK's
  * PeerConnection. The SDH does not own the RTCPeerConnection — it
  * delegates offer/answer creation and remote-SDP processing to
@@ -141,13 +147,11 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
       // setDescription Promises.
       if (this._iceRestartPending) {
         this._iceRestartPending = false;
-        this._failPending(new Error(message || 'PeerConnection failed'));
-        // Skip previousOnFailed: _failPending rejects session.invite(),
-        // the adapter's .catch emits 'hangup', and Call._onHangup handles
-        // the event. Running previousOnFailed here would also trigger
-        // Call._onMediaFailure(ConnectionFailed) — double-dispatch that
-        // kicks off another backoff cycle and emits a duplicate error.
-        return;
+        // Rejecting frees SIP.js for the next re-INVITE. previousOnFailed
+        // still runs so Call retries the restart, as it does on VSP.
+        const error = new Error(message || 'PeerConnection failed');
+        error.name = ICE_RESTART_OFFER_FAILED;
+        this._failPending(error);
       }
       previousOnFailed(message);
     };

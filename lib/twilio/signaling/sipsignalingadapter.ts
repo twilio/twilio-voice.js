@@ -28,6 +28,7 @@ import {
   SendMessageConfig,
 } from './signalingadapter';
 import {
+  ICE_RESTART_OFFER_FAILED,
   IPeerConnection,
   SipSessionDescriptionHandler,
 } from './sipsessiondescriptionhandler';
@@ -607,6 +608,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       }
       // e.g. a BYE closed the SDH mid-offer. See the top of iceRestart().
       if (session.state === SessionState.Terminated) {
+        return;
+      }
+      // Call already heard about it through pc.onfailed and retries.
+      if (error.name === ICE_RESTART_OFFER_FAILED) {
+        this._log.warn('ICE-restart offer failed; leaving the retry to Call', error);
         return;
       }
       this._log.warn('Failed to send ICE-restart re-INVITE', error);
