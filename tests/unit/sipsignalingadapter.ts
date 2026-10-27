@@ -1239,6 +1239,8 @@ describe('SipSignalingAdapter', () => {
       sinon.assert.calledOnceWithExactly(hangupSpy, { callsid: 'call-1' });
       // Only the initial INVITE; no re-INVITE was sent.
       sinon.assert.calledOnce(inviterStub.invite);
+      // Call won't send a hangup after hearing one.
+      sinon.assert.calledOnce(inviterStub.bye);
     });
 
     it('hangs up when the session has no usable description handler', () => {
@@ -1254,6 +1256,8 @@ describe('SipSignalingAdapter', () => {
       sinon.assert.calledOnceWithExactly(hangupSpy, { callsid: 'call-1' });
       // Only the initial INVITE; no re-INVITE was sent.
       sinon.assert.calledOnce(inviterStub.invite);
+      // Call won't send a hangup after hearing one.
+      sinon.assert.calledOnce(inviterStub.bye);
     });
 
     it('does NOT consult the mediaHandler (SIP SDH generates the offer itself)', () => {
@@ -1304,6 +1308,23 @@ describe('SipSignalingAdapter', () => {
         sinon.assert.calledOnce(onHangup);
         assert.strictEqual(onHangup.firstCall.args[0].callsid, 'call-1');
         assert.strictEqual(onHangup.firstCall.args[0].error.code, statusCode);
+        sinon.assert.calledOnce(inviterStub.bye);
+      });
+
+      it(`emits only one hangup once the BYE after a ${statusCode} ends the session`, async () => {
+        const { adapter, inviterStub } = createAdapter();
+        adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+        inviterStub.state = 'Established';
+        inviterStub.bye = sinon.stub().callsFake(() => {
+          inviterStub._simulateState('Terminated');
+          return Promise.resolve();
+        });
+        const onHangup = sinon.stub();
+        adapter.on('hangup', onHangup);
+        adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+        inviterStub.invite.lastCall.args[0].requestDelegate.onReject({ message: { statusCode } });
+        await afterDispatch();
+        sinon.assert.calledOnce(onHangup);
       });
     });
 
@@ -1318,6 +1339,7 @@ describe('SipSignalingAdapter', () => {
         const rd = inviterStub.invite.lastCall.args[0]?.requestDelegate;
         rd.onReject({ message: { statusCode } });
         sinon.assert.notCalled(onHangup);
+        sinon.assert.notCalled(inviterStub.bye);
       });
     });
 
@@ -1330,6 +1352,7 @@ describe('SipSignalingAdapter', () => {
       adapter.on('hangup', (payload: any) => {
         assert.strictEqual(payload.callsid, 'call-1');
         assert.ok(payload.error);
+        sinon.assert.calledOnce(inviterStub.bye);
         done();
       });
       adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });

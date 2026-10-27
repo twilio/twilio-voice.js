@@ -517,7 +517,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
   /**
    * Re-INVITE for a fresh-ICE offer, which the armed SDH produces (so
-   * _config is unused). Fatal failures emit 'hangup'; a rejection that keeps
+   * _config is unused). Fatal failures BYE and emit 'hangup'; a rejection that keeps
    * the dialog emits nothing, and one orphaned by a disconnect defers to
    * 'iceRestartNeeded'.
    */
@@ -546,7 +546,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       SipSessionDescriptionHandler | undefined;
     if (typeof sdh?.requestIceRestart !== 'function') {
       this._log.warn('iceRestart: no usable description handler for callSid', callSid);
-      this.emit('hangup', { callsid: callSid });
+      this._endAfterFailedIceRestart(callSid, session);
       return;
     }
     sdh.requestIceRestart();
@@ -588,10 +588,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
           if (!DIALOG_ENDING_REINVITE_CODES.includes(code)) {
             return;
           }
-          this.emit('hangup', {
-            callsid: callSid,
-            error: { code, message },
-          });
+          this._endAfterFailedIceRestart(callSid, session, { code, message });
         },
       },
     };
@@ -616,9 +613,9 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
         return;
       }
       this._log.warn('Failed to send ICE-restart re-INVITE', error);
-      this.emit('hangup', {
-        callsid: callSid,
-        error: { code: 31000, message: `Failed to send ICE-restart re-INVITE: ${error.message}` },
+      this._endAfterFailedIceRestart(callSid, session, {
+        code: 31000,
+        message: `Failed to send ICE-restart re-INVITE: ${error.message}`,
       });
     });
   }
@@ -741,6 +738,30 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
   private _getSession(callSid: string): Session | undefined {
     return this._outboundSessions.get(callSid) || this._inboundSessions.get(callSid);
+  }
+
+  /**
+   * Ends a call whose ICE restart failed with the dialog still up. Call won't
+   * send a hangup after hearing one, so the BYE has to come from here.
+   */
+  private _endAfterFailedIceRestart(
+    callSid: string,
+    session: Session,
+    error?: { code: number; message: string },
+  ): void {
+    // Unmapped first, so the Terminated listener stays silent.
+    if (this._outboundSessions.get(callSid) === session) {
+      this._outboundSessions.delete(callSid);
+    }
+    if (this._inboundSessions.get(callSid) === session) {
+      this._inboundSessions.delete(callSid);
+    }
+    // A 408/481 means the server may not answer it; SIP.js ends the session
+    // either way.
+    session.bye().catch((err: Error) => {
+      this._log.warn('Failed to send BYE after a failed ICE restart', err);
+    });
+    this.emit('hangup', error ? { callsid: callSid, error } : { callsid: callSid });
   }
 
   private _bindSession(
