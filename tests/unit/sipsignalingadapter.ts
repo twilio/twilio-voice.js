@@ -399,6 +399,23 @@ describe('SipSignalingAdapter', () => {
       adapter.register({ audio: false });
     });
 
+    it('should retry with a new Registerer on the next register() after a failure', async () => {
+      const failRegStub = createRegistererStub();
+      failRegStub.register = sinon.stub().rejects(new Error('503'));
+      const retryRegStub = createRegistererStub();
+      const createRegisterer = sinon.stub();
+      createRegisterer.onFirstCall().returns(failRegStub);
+      createRegisterer.onSecondCall().returns(retryRegStub);
+      const { adapter, uaStub } = createAdapter({ createRegisterer });
+      adapter.on('error', () => { /* expected 31201 */ });
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      await afterDispatch();
+      // Device's 30s re-register tick
+      adapter.register({ audio: true });
+      sinon.assert.calledOnce(retryRegStub.register);
+    });
+
     it('should skip if registerer already exists', () => {
       const { adapter, uaStub, regStub } = createAdapter();
       uaStub._triggerConnect();

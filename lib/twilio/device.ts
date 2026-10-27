@@ -1535,6 +1535,9 @@ class Device extends EventEmitter {
 
     stream.register({ audio: presence });
     if (presence) {
+      // Kept on SIP too, though SIP.js refreshes the registration itself. The
+      // adapter skips the tick while registered, and it's what retries a
+      // failed REGISTER, as the resend does on VSP.
       this._startRegistrationTimer();
     } else {
       this._stopRegistrationTimer();
