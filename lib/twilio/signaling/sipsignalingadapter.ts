@@ -527,9 +527,9 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
   /**
    * Re-INVITE for a fresh-ICE offer, which the armed SDH produces (so
-   * _config is unused). Fatal failures BYE and emit 'hangup'; a rejection that keeps
-   * the dialog emits nothing, and one orphaned by a disconnect defers to
-   * 'iceRestartNeeded'.
+   * _config is unused). Fatal failures BYE and emit 'hangup'. A failure that
+   * keeps the dialog goes to Call's ICE retry through pc.onfailed, and one
+   * orphaned by a disconnect defers to 'iceRestartNeeded'.
    */
   iceRestart(callSid: string, _config: IceRestartConfig): void {
     const session = this._getSession(callSid);
@@ -579,8 +579,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
         },
         onReject: (response: any) => {
           this._inFlightIceRestarts.delete(inflight);
-          // A BYE raced the re-INVITE, or SIP.js couldn't roll back the offer
-          // and sent one. See the top of iceRestart().
+          // A BYE raced the re-INVITE. See the top of iceRestart().
           if (session.state === SessionState.Terminated) {
             return;
           }
@@ -594,8 +593,10 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
           const message = `ICE-restart re-INVITE rejected (${code ?? 'unknown'})`;
           this._log.warn(message);
           // Only 408 and 481 end the dialog (RFC 3261 14.1). Otherwise keep
-          // the call up; as on VSP, the next ICE failure drives the retry.
+          // the call up and let Call's backoff retry, which also spaces out a
+          // 491 as 14.1 asks.
           if (!DIALOG_ENDING_REINVITE_CODES.includes(code)) {
+            sdh.failIceRestart(message);
             return;
           }
           this._endAfterFailedIceRestart(callSid, session, { code, message });

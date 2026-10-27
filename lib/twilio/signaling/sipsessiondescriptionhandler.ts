@@ -165,6 +165,15 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
     this._iceRestartRequested = false;
   }
 
+  /**
+   * For a re-INVITE rejection that kept the dialog. ICE is already failed, so
+   * no new failure would come; report one, as PeerConnection does when it
+   * can't create the offer, and Call's backoff retries.
+   */
+  failIceRestart(message: string): void {
+    this._previousOnFailed(message);
+  }
+
   getDescription(): Promise<BodyAndContentType> {
     if (this._closed) {
       return Promise.reject(new Error(CLOSED_ERROR_MESSAGE));

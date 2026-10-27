@@ -406,6 +406,18 @@ describe('SipSessionDescriptionHandler', () => {
       await assert.rejects(pending, /Error processing offer: boom/);
     });
 
+    it('failIceRestart() reports the failure to Call without rejecting anything pending', async () => {
+      const previousOnFailed = sinon.spy();
+      const pc = createPeerConnectionStub({ onfailed: previousOnFailed }); // answerIncomingCall never calls back
+      const { handler } = createHandler(pc);
+      let settled = false;
+      handler.setDescription(OFFER_SDP).then(() => { settled = true; }, () => { settled = true; });
+      handler.failIceRestart('ICE-restart re-INVITE rejected (491)');
+      await Promise.resolve();
+      sinon.assert.calledOnceWithExactly(previousOnFailed, 'ICE-restart re-INVITE rejected (491)');
+      assert.strictEqual(settled, false);
+    });
+
     it('cancelIceRestart() disarms the request', async () => {
       const pc = createPeerConnectionStub({
         makeOutgoingCall: stubMakeOutgoingCall(),

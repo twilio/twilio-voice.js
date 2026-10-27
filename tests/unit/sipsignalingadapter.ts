@@ -61,6 +61,7 @@ function createSessionStub(initialState: string = 'Initial') {
     sessionDescriptionHandler: {
       requestIceRestart: sinon.stub(),
       cancelIceRestart: sinon.stub(),
+      failIceRestart: sinon.stub(),
     },
     info: sinon.stub().resolves(),
     message: sinon.stub().resolves(),
@@ -1332,6 +1333,7 @@ describe('SipSignalingAdapter', () => {
         assert.strictEqual(onHangup.firstCall.args[0].callsid, 'call-1');
         assert.strictEqual(onHangup.firstCall.args[0].error.code, statusCode);
         sinon.assert.calledOnce(inviterStub.bye);
+        sinon.assert.notCalled(inviterStub.sessionDescriptionHandler.failIceRestart);
       });
 
       it(`emits only one hangup once the BYE after a ${statusCode} ends the session`, async () => {
@@ -1352,7 +1354,7 @@ describe('SipSignalingAdapter', () => {
     });
 
     [488, 491, 500].forEach((statusCode) => {
-      it(`keeps the call up on a ${statusCode} re-INVITE rejection`, () => {
+      it(`keeps the call up on a ${statusCode} re-INVITE rejection and hands it to Call's retry`, () => {
         const { adapter, inviterStub } = createAdapter();
         adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
         inviterStub.state = 'Established';
@@ -1363,6 +1365,11 @@ describe('SipSignalingAdapter', () => {
         rd.onReject({ message: { statusCode } });
         sinon.assert.notCalled(onHangup);
         sinon.assert.notCalled(inviterStub.bye);
+        // ICE is already failed, so without this nothing would retry.
+        sinon.assert.calledOnceWithExactly(
+          inviterStub.sessionDescriptionHandler.failIceRestart,
+          `ICE-restart re-INVITE rejected (${statusCode})`,
+        );
       });
     });
 
