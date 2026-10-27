@@ -441,6 +441,23 @@ describe('SipSignalingAdapter', () => {
       sinon.assert.calledTwice(regStub.register);
     });
 
+    it('should keep the Registerer when register() overlaps a REGISTER in flight', async () => {
+      const { adapter, uaStub, regStub } = createAdapter();
+      const onError = sinon.stub();
+      adapter.on('error', onError);
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      regStub._simulateState('Registered');
+      regStub._simulateState('Unregistered');
+      adapter.register({ audio: true });
+      // Still Unregistered while the re-REGISTER is in flight.
+      regStub.register = sinon.stub().rejects(new RequestPendingError('pending'));
+      adapter.register({ audio: true });
+      await afterDispatch();
+      sinon.assert.notCalled(onError);
+      sinon.assert.notCalled(regStub.dispose);
+    });
+
     it('should skip if registerer already exists', () => {
       const { adapter, uaStub, regStub } = createAdapter();
       uaStub._triggerConnect();

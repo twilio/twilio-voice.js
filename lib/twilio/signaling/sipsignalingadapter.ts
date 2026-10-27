@@ -351,6 +351,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
   private _startRegisterer(): void {
     this._registerer?.register().catch((error: Error) => {
+      // register() again while re-registering. The REGISTER in flight decides it.
+      if (error instanceof RequestPendingError) {
+        this._log.debug('REGISTER already in flight, skipping');
+        return;
+      }
       this._log.error('SIP registration failed', error);
       this._registerer?.dispose().catch((err: Error) => {
         this._log.warn('Error disposing registerer after failed registration', err);
