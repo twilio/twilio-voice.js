@@ -2168,6 +2168,16 @@ describe('Call', function() {
         });
       });
 
+      it('should not call reconnect on SIP, where the dialog outlives the WS', async () => {
+        conn = new Call(config, Object.assign(options, { callParameters: { CallSid: 'CA1234' }, useSip: true }));
+        conn.accept();
+        await clock.tickAsync(0);
+        // @ts-ignore
+        conn._signalingReconnectToken = 'foo';
+        pstream.emit('connected');
+        sinon.assert.notCalled(pstream.reconnect);
+      });
+
       it('should not call pstream.reconnect when CallSid is missing', async () => {
         conn = new Call(config, Object.assign(options));
         conn.accept();

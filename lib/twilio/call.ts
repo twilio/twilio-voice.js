@@ -1354,6 +1354,11 @@ class Call extends EventEmitter {
    */
   private _onConnected = (): void => {
     this._log.info('Received connected from pstream');
+    // A SIP dialog outlives the WS, and the adapter recovers media through
+    // iceRestartNeeded. A reconnect here would send a second INVITE.
+    if (this._options.useSip) {
+      return;
+    }
     const callSid = this.parameters.CallSid;
     if (this._signalingReconnectToken && this._mediaHandler.version && callSid) {
       const reconnectConfig: ReconnectConfig = {
