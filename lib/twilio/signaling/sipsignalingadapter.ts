@@ -303,8 +303,14 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
     // SIP.js Registerer handles refresh internally, so skip if one already
     // exists. Device's 30s re-register tick lands here. A failed REGISTER
     // drops the Registerer, so the next tick retries.
-    if (this._registerer) {
+    if (this._registerer && this._registerer.state !== RegistererState.Unregistered) {
       this._log.debug('Registerer already exists, skipping duplicate register call');
+      return;
+    }
+    // Unregistered by unregister() or a failed refresh. SIP.js can register
+    // it again, but nothing else will.
+    if (this._registerer) {
+      this._startRegisterer();
       return;
     }
 
@@ -340,7 +346,11 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       }
     });
 
-    this._registerer.register().catch((error: Error) => {
+    this._startRegisterer();
+  }
+
+  private _startRegisterer(): void {
+    this._registerer?.register().catch((error: Error) => {
       this._log.error('SIP registration failed', error);
       this._registerer?.dispose().catch((err: Error) => {
         this._log.warn('Error disposing registerer after failed registration', err);

@@ -417,6 +417,29 @@ describe('SipSignalingAdapter', () => {
       sinon.assert.calledOnce(retryRegStub.register);
     });
 
+    it('should register again after unregister()', () => {
+      const { adapter, uaStub, regStub } = createAdapter();
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      regStub._simulateState('Registered');
+      adapter.register({ audio: false });
+      regStub._simulateState('Unregistered');
+      adapter.register({ audio: true });
+      sinon.assert.calledTwice(regStub.register);
+    });
+
+    it('should register again after a failed refresh', () => {
+      const { adapter, uaStub, regStub } = createAdapter();
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      regStub._simulateState('Registered');
+      // SIP.js moves to Unregistered when a refresh REGISTER fails.
+      regStub._simulateState('Unregistered');
+      // Device's 30s re-register tick
+      adapter.register({ audio: true });
+      sinon.assert.calledTwice(regStub.register);
+    });
+
     it('should skip if registerer already exists', () => {
       const { adapter, uaStub, regStub } = createAdapter();
       uaStub._triggerConnect();
