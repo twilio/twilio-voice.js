@@ -6,6 +6,7 @@ import {
   NotSupportedError,
   SignalingErrors,
 } from '../errors';
+import Deferred from '../deferred';
 import Log from '../log';
 import * as util from '../util';
 import RTCPC from './rtcpc';
@@ -62,6 +63,8 @@ function PeerConnection(audioHelper, pstream, options) {
   this.sinkIds = new Set(['default']);
   this.outputs = new Map();
   this.status = 'connecting';
+  // Resolved by close(), so work waiting on the RTCPeerConnection can settle once it's gone.
+  this._closed = new Deferred();
   this.callSid = null;
   this.isMuted = false;
 
@@ -348,7 +351,20 @@ PeerConnection.prototype._setInputTracksFromStream = function(shouldClone, newSt
       this._sender = this.version.pc.getSenders()[0];
     }
 
-    return this._sender.replaceTrack(newStream.getAudioTracks()[0]).then(() => {
+    // close() can run while the track is being replaced. The browser may then resolve, reject, or never
+    // settle (Firefox), so the swap also settles on close. Either way there is no call left to swap on.
+    return Promise.race([
+      this._sender.replaceTrack(newStream.getAudioTracks()[0]),
+      this._closed.promise,
+    ]).catch(error => {
+      if (this.status !== 'closed') {
+        throw error;
+      }
+      this._log.info('Ignoring a replaceTrack failure after the call closed', error);
+    }).then(() => {
+      if (this.status === 'closed') {
+        return this.stream;
+      }
       this._updateInputStreamSource(newStream);
       this.stream = shouldClone ? cloneStream(newStream, this.options.MediaStream) : newStream;
       return getStreamPromise();
@@ -1022,6 +1038,7 @@ PeerConnection.prototype.close = function() {
     this._outputAnalyser2.disconnect();
   }
   this.status = 'closed';
+  this._closed.resolve();
   this.onclose();
 };
 PeerConnection.prototype.reject = function(callSid) {

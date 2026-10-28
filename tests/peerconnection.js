@@ -1,6 +1,7 @@
 const sinon = require('sinon');
 const assert = require('assert');
 const PeerConnection = require('./../lib/twilio/rtc/peerconnection').default;
+const Deferred = require('./../lib/twilio/deferred').default;
 
 const root = global;
 
@@ -216,6 +217,7 @@ describe('PeerConnection', () => {
       context = {
         stream: STREAM,
         mute: sinon.stub(),
+        _closed: new Deferred(),
         _sender: {},
         _stopStream: sinon.stub(),
       };
@@ -251,6 +253,69 @@ describe('PeerConnection', () => {
         assert.strictEqual(result.id, newStream.id);
       }).then(done).catch(done);
     });
+
+    it('Should not swap the stream when the call closed while replaceTrack resolved', () => {
+      context._updateInputStreamSource = sinon.stub();
+      context._sender.replaceTrack = sinon.spy(() => {
+        context.status = 'closed';
+        context.stream = null;
+        return Promise.resolve();
+      });
+      return toTest(false, newStream).then(result => {
+        assert.strictEqual(result, null);
+        assert.strictEqual(context.stream, null);
+        sinon.assert.notCalled(context._updateInputStreamSource);
+      });
+    });
+
+    it('Should resolve without swapping the stream when the call closed while replaceTrack never settles', () => {
+      context._updateInputStreamSource = sinon.stub();
+      context._sender.replaceTrack = sinon.spy(() => {
+        context.status = 'closed';
+        context.stream = null;
+        context._closed.resolve();
+        return new Promise(() => {});
+      });
+      return toTest(false, newStream).then(result => {
+        assert.strictEqual(result, null);
+        assert.strictEqual(context.stream, null);
+        sinon.assert.notCalled(context._updateInputStreamSource);
+      });
+    });
+
+    describe('when replaceTrack rejects', () => {
+      const ERROR = new Error('The peer connection is closed.');
+
+      beforeEach(() => {
+        context._log = { info: sinon.stub() };
+        context._updateInputStreamSource = sinon.stub();
+        context._sender.replaceTrack = sinon.stub().rejects(ERROR);
+      });
+
+      it('Should resolve without swapping the stream when the call closed meanwhile', () => {
+        context._sender.replaceTrack = sinon.spy(() => {
+          context.status = 'closed';
+          context.stream = null;
+          return Promise.reject(ERROR);
+        });
+        return toTest(false, newStream).then(result => {
+          assert.strictEqual(result, null);
+          assert.strictEqual(context.stream, null);
+          sinon.assert.notCalled(context._updateInputStreamSource);
+        });
+      });
+
+      it('Should reject when the call is still open', () => {
+        context.status = 'open';
+        return toTest(false, newStream).then(() => {
+          throw new Error('Expected a rejection');
+        }, error => {
+          assert.strictEqual(error, ERROR);
+          assert.strictEqual(context.stream, STREAM);
+          sinon.assert.notCalled(context._updateInputStreamSource);
+        });
+      });
+    });
     
     it('Should call this.options.MediaStream if provided, and stream provided', done => {
       const mediaStream = sinon.stub().returns({
@@ -259,6 +324,7 @@ describe('PeerConnection', () => {
       context = {
         stream: STREAM,
         mute: sinon.stub(),
+        _closed: new Deferred(),
         _sender: {},
         _stopStream: sinon.stub(),
         options: {
@@ -368,7 +434,8 @@ describe('PeerConnection', () => {
         mute: sinon.stub(),
         version: {
           pc
-        }
+        },
+        _closed: { resolve: sinon.stub() },
       };
       toTest = METHOD.bind(context);
     });
@@ -394,6 +461,7 @@ describe('PeerConnection', () => {
       assert.strictEqual(context.stream, null);
       assert.strictEqual(context.version.pc, null);
       assert.strictEqual(context.status, 'closed');
+      sinon.assert.calledOnce(context._closed.resolve);
     });
 
     it('Should do nothing on a repeat close', () => {

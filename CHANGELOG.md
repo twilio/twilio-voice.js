@@ -22,6 +22,8 @@ Bug Fixes
 
 - Fixed an issue where error `31402` (`AcquisitionFailedError`) did not include the underlying error. It is now set as `originalError`, for example the error from a local `AudioProcessor` that failed to create its processed stream.
 
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/459) where a call that ended while its microphone was being switched, by `device.audio.setInputDevice()` or by the SDK's own recovery after the active microphone was lost, produced `InvalidStateError: Failed to execute 'replaceTrack' on 'RTCRtpSender': The peer connection is closed.` The SDK's recovery surfaced it as an unhandled promise rejection. `setInputDevice()` rejected with it and left the new microphone open without selecting it. On Firefox, `setInputDevice()` could instead never settle, and every later `device.connect()` waited on it indefinitely. The switch now completes for future calls instead.
+
 2.18.5 (September 10, 2026)
 ===========================
 
