@@ -2450,6 +2450,81 @@ describe('SipSignalingAdapter', () => {
       sinon.assert.notCalled(onHangup);
     });
 
+    // SIP.js reports an internal 503 if the WS drops while the restart offer is
+    // being created. A sent re-INVITE gets no response, so Timer B gives an
+    // internal 408 about 32s later, usually after the WS is back.
+    [408, 503].forEach((statusCode) => {
+      it(`keeps the call and routes a later server re-INVITE to processOffer after a stale ${statusCode}`, async () => {
+        const { adapter, uaStub, inviterStub, getSdhFactory } = createAdapter();
+        const peerConnection = createPeerConnectionStub();
+        const callOnFailed = sinon.stub();
+        peerConnection.onfailed = callOnFailed;
+        (peerConnection.makeOutgoingCall as sinon.SinonStub).callsFake((_sid, _config, cb) => cb('v=0\r\no=offer\r\n'));
+        (peerConnection.processAnswer as sinon.SinonStub).callsFake((_sdp, cb) => cb({}));
+        let onRestartOffer: (sdp: string) => void = () => { /* set by pc.iceRestart */ };
+        (peerConnection.iceRestart as sinon.SinonStub).callsFake((cb) => { onRestartOffer = cb; });
+        (peerConnection.processOffer as sinon.SinonStub).callsFake((_sdp, onAnswer, cb) => {
+          onAnswer('v=0\r\no=reanswer\r\n');
+          cb();
+        });
+        adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection });
+        const sdh = getSdhFactory()(inviterStub) as SipSessionDescriptionHandler;
+        (inviterStub as any).sessionDescriptionHandler = sdh;
+        await sdh.getDescription();
+        await sdh.setDescription('v=0\r\no=answer\r\n');
+        inviterStub.state = 'Established';
+        uaStub._triggerConnect();
+
+        const onHangup = sinon.stub();
+        const onIceRestartNeeded = sinon.stub();
+        adapter.on('hangup', onHangup);
+        adapter.on('iceRestartNeeded', onIceRestartNeeded);
+        uaStub._setReconnectImpl(() => { uaStub._triggerConnect(); return Promise.resolve(); });
+        adapter.iceRestart('call-1', { mediaHandler: { iceRestart: sinon.stub() } });
+        const rd = inviterStub.invite.lastCall.args[0].requestDelegate;
+        // Session.invite() asks for the offer synchronously.
+        const offer = sdh.getDescription();
+        // SIP.js rolls the offer back before reporting the rejection.
+        const reject = async () => {
+          await sdh.rollbackDescription();
+          rd.onReject({ message: { statusCode } });
+        };
+        if (statusCode === 503) {
+          uaStub._triggerDisconnect();
+          onRestartOffer('v=0\r\no=restart\r\n');
+          await offer;
+          await reject();
+          await clock.tickAsync(100);
+        } else {
+          onRestartOffer('v=0\r\no=restart\r\n');
+          await offer;
+          uaStub._triggerDisconnect();
+          await clock.tickAsync(100);
+          sinon.assert.calledOnce(onIceRestartNeeded);
+          await clock.tickAsync(32000);
+          await reject();
+        }
+        await clock.tickAsync(5000);
+        // A later blip must not re-queue the settled restart.
+        uaStub._triggerDisconnect();
+        await clock.tickAsync(5000);
+        sinon.assert.notCalled(onHangup);
+        sinon.assert.notCalled(inviterStub.bye);
+        sinon.assert.notCalled(callOnFailed);
+        sinon.assert.calledOnceWithExactly(onIceRestartNeeded, { callsid: 'call-1' });
+
+        // SIP.js answers a server re-INVITE with setDescription, then getDescription.
+        await sdh.setDescription('v=0\r\no=reoffer\r\n');
+        const answer = await sdh.getDescription();
+        sinon.assert.calledOnceWithExactly(
+          peerConnection.processOffer as sinon.SinonStub, 'v=0\r\no=reoffer\r\n', sinon.match.func, sinon.match.func);
+        sinon.assert.calledOnce(peerConnection.processAnswer as sinon.SinonStub);
+        assert.deepStrictEqual(answer, { body: 'v=0\r\no=reanswer\r\n', contentType: 'application/sdp' });
+        adapter.hangup('call-1', {});
+        sinon.assert.calledOnce(inviterStub.bye);
+      });
+    });
+
     it('defers iceRestart while reconnecting: no re-INVITE sent', async () => {
       const { adapter, uaStub, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
