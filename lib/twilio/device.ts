@@ -787,12 +787,12 @@ class Device extends EventEmitter {
       );
     }
 
-    this._options = { ...this._defaultOptions, ...this._options, ...options };
+    const newOptions = { ...this._defaultOptions, ...this._options, ...options };
 
     const originalChunderURIs: Set<string> = new Set(this._chunderURIs);
 
-    const newChunderURIs = this._chunderURIs = (
-      this._getChunderws() || getChunderURIs(this._options.edge)
+    const newChunderURIs = (
+      this._getChunderws(newOptions) || getChunderURIs(newOptions.edge)
     ).map(createSignalingEndpointURL);
 
     let hasChunderURIsChanged = originalChunderURIs.size !== newChunderURIs.length;
@@ -809,6 +809,10 @@ class Device extends EventEmitter {
     if (this.isBusy && hasChunderURIsChanged) {
       throw new InvalidStateError('Cannot change Edge while on an active Call');
     }
+
+    // Store only once validated, so a rejected call leaves the Device unchanged.
+    this._options = newOptions;
+    this._chunderURIs = newChunderURIs;
 
     this._setupLoglevel(this._options.logLevel);
 
@@ -976,9 +980,9 @@ class Device extends EventEmitter {
   /**
    * Get chunderws array from the chunderw param
    */
-  private _getChunderws(): string[] | null {
-    return typeof this._options.chunderw === 'string' ? [this._options.chunderw]
-      : Array.isArray(this._options.chunderw) ? this._options.chunderw : null;
+  private _getChunderws(options: IExtendedDeviceOptions = this._options): string[] | null {
+    return typeof options.chunderw === 'string' ? [options.chunderw]
+      : Array.isArray(options.chunderw) ? options.chunderw : null;
   }
 
   /**
