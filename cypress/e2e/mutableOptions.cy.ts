@@ -54,7 +54,7 @@ describe('mutable options', function() {
     assert.throws(() => dev.updateOptions({ edge: 123 as any }), /must be of type `string`/);
 
     dev.updateOptions({ appName: 'foo' });
-    assert.equal(dev.edge, 'sydney');
+    assert.equal(dev['_options'].edge, 'sydney');
   });
 
   it('should not throw during re-registration', async function() {
