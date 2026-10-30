@@ -23,6 +23,8 @@ export interface IPeerConnection {
   // onerror so pending getDescription() Promises reject on ICE-restart
   // failures instead of hanging.
   onfailed: (message: string) => void;
+  // Null until the RTCPeerConnection is created.
+  version?: { pc?: { iceConnectionState?: string; connectionState?: string } } | null;
 
   makeOutgoingCall(
     callSid: string,
@@ -58,6 +60,12 @@ export interface IPeerConnection {
 
 const APPLICATION_SDP = 'application/sdp';
 const CLOSED_ERROR_MESSAGE = 'SipSessionDescriptionHandler closed';
+
+/**
+ * Error name for an ICE-restart offer that PeerConnection couldn't create.
+ * Call has already been told. It retries on Chrome and ends the call elsewhere.
+ */
+export const ICE_RESTART_OFFER_FAILED = 'IceRestartOfferFailed';
 
 /**
  * Bridges SIP.js's SessionDescriptionHandler interface to the SDK's
@@ -101,8 +109,9 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
   private _iceRestartRequested: boolean = false;
   // pc.onfailed reports both a createOffer rejection during our restart and a
   // runtime ICE failure. Only the first should reject the pending Promise.
-  // Call._mediaReconnectBackoff fires serially, so at most one is in flight.
   private _iceRestartPending: boolean = false;
+  // A rejected attempt's createOffer can still land after Call starts the next.
+  private _iceRestartAttempts: number = 0;
   // PeerConnection reports failures through onerror, not the callbacks we pass
   // it, so every in-flight operation parks its reject here. A Set because SIP.js
   // can overlap setDescription calls (PRACK/UPDATE during early media).
@@ -118,6 +127,10 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
     private _pc: IPeerConnection,
     private _callSid: string,
     private _rtcConfiguration: RTCConfiguration = {},
+    // Call's onAnswer. Fired once, after the initial offer/answer settles, so
+    // a throw can't strand SIP.js's Promise. ICE-restart answers and remote
+    // re-INVITEs don't re-fire it.
+    private _onMediaStarted?: (pc: RTCPeerConnection) => void,
   ) {
     const previousOnError = this._previousOnError = this._pc.onerror;
     this._pc.onerror = (error: PeerConnectionError) => {
@@ -137,13 +150,11 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
       // setDescription Promises.
       if (this._iceRestartPending) {
         this._iceRestartPending = false;
-        this._failPending(new Error(message || 'PeerConnection failed'));
-        // Skip previousOnFailed: _failPending rejects session.invite(),
-        // the adapter's .catch emits 'hangup', and Call._onHangup handles
-        // the event. Running previousOnFailed here would also trigger
-        // Call._onMediaFailure(ConnectionFailed) — double-dispatch that
-        // kicks off another backoff cycle and emits a duplicate error.
-        return;
+        // Rejecting frees SIP.js for the next re-INVITE. previousOnFailed
+        // still runs so Call handles it as on VSP: a retry on Chrome.
+        const error = new Error(message || 'PeerConnection failed');
+        error.name = ICE_RESTART_OFFER_FAILED;
+        this._failPending(error);
       }
       previousOnFailed(message);
     };
@@ -155,6 +166,23 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
 
   cancelIceRestart(): void {
     this._iceRestartRequested = false;
+  }
+
+  /**
+   * For a re-INVITE rejection that kept the dialog. Reports the restart as
+   * failed, as PeerConnection does when it can't create the offer, so Call
+   * handles it the same way. Skipped while media is healthy, as there's
+   * nothing to retry.
+   */
+  failIceRestart(message: string): void {
+    const pc = this._pc.version?.pc;
+    const iceState = pc?.iceConnectionState;
+    // connectionState also covers DTLS. PeerConnection reports both to Call.
+    if ((iceState === 'connected' || iceState === 'completed')
+      && (!pc?.connectionState || pc.connectionState === 'connected')) {
+      return;
+    }
+    this._previousOnFailed(message);
   }
 
   getDescription(): Promise<BodyAndContentType> {
@@ -169,8 +197,13 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
     if (this._iceRestartRequested) {
       this._iceRestartRequested = false;
       this._iceRestartPending = true;
+      const attempt = ++this._iceRestartAttempts;
       return this._awaitOperation<BodyAndContentType>((resolve) => {
         this._pc.iceRestart((offerSdp) => {
+          // onfailed already rejected this attempt and the call stays up.
+          if (!this._iceRestartPending || attempt !== this._iceRestartAttempts) {
+            return;
+          }
           this._iceRestartPending = false;
           // Set _hasSentOffer so SIP.js's follow-up setDescription for the
           // 200 OK's answer routes to processAnswer, matching outbound
@@ -204,7 +237,8 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
     }
     if (this._hasSentOffer) {
       return this._awaitOperation<void>((resolve) => {
-        this._pc.processAnswer(sdp, () => {
+        this._pc.processAnswer(sdp, (pc: RTCPeerConnection) => {
+          const isInitialAnswer = !this._hasNegotiated;
           // Outbound offer/answer exchange complete. Clear the flag so a
           // subsequent re-INVITE on the same session (SIP.js memoizes the
           // SDH per Session) can route correctly. A remote re-INVITE must
@@ -212,6 +246,9 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
           this._hasSentOffer = false;
           this._hasNegotiated = true;
           resolve();
+          if (isInitialAnswer) {
+            this._onMediaStarted?.(pc);
+          }
         });
       });
     }
@@ -232,12 +269,23 @@ export class SipSessionDescriptionHandler implements SessionDescriptionHandler {
         sdp,
         this._rtcConfiguration,
         (answerSdp) => { this._cachedAnswer = answerSdp; },
-        () => {
+        (pc: RTCPeerConnection) => {
           this._hasNegotiated = true;
           resolve();
+          this._onMediaStarted?.(pc);
         },
       );
     });
+  }
+
+  /**
+   * SIP.js calls this when our re-INVITE gets a non-2xx. The offer was never
+   * answered, so a later remote re-INVITE must route to processOffer. Must
+   * not reject: SIP.js sends BYE if it does.
+   */
+  rollbackDescription(): Promise<void> {
+    this._hasSentOffer = false;
+    return Promise.resolve();
   }
 
   close(): void {

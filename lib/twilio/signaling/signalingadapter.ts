@@ -12,6 +12,9 @@ export interface InviteConfig {
   params?: string;
   peerConnection?: IPeerConnection;
   rtcConfiguration?: RTCConfiguration;
+  // SIP only: the SDH calls this once the initial offer/answer completes,
+  // the same point PStream callers pass to processAnswer/answerIncomingCall.
+  onMediaStarted?: (pc: RTCPeerConnection) => void;
 }
 
 export interface AnswerConfig {
@@ -21,6 +24,8 @@ export interface AnswerConfig {
   sdp?: string;
   peerConnection?: IPeerConnection;
   rtcConfiguration?: RTCConfiguration;
+  // SIP only. See InviteConfig.onMediaStarted.
+  onMediaStarted?: (pc: RTCPeerConnection) => void;
 }
 
 export interface HangupConfig {
@@ -38,6 +43,8 @@ export interface ReconnectConfig {
   reconnectToken: string;
   peerConnection?: IPeerConnection;
   rtcConfiguration?: RTCConfiguration;
+  // SIP only. See InviteConfig.onMediaStarted.
+  onMediaStarted?: (pc: RTCPeerConnection) => void;
 }
 
 export interface DtmfConfig {
@@ -75,8 +82,8 @@ export interface SignalingAdapter extends EventEmitter {
    *    ships it via the existing reinvite wire.
    *  - SIP: arms the SDH via requestIceRestart(), then sends a re-INVITE;
    *    the SDH produces the offer when SIP.js asks it for one.
-   * On failure, emits 'hangup' for the callSid so Call can clean up its
-   * reinvite listeners.
+   * Fatal failures emit 'hangup' for the callSid. A SIP failure that leaves
+   * the dialog up emits nothing; Call's media-failure handling takes over.
    */
   iceRestart(callSid: string, config: IceRestartConfig): void;
 

@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import * as sinon from 'sinon';
 import {
+  ICE_RESTART_OFFER_FAILED,
   IPeerConnection,
   SipSessionDescriptionHandler,
 } from '../../lib/twilio/signaling/sipsessiondescriptionhandler';
@@ -228,20 +229,64 @@ describe('SipSessionDescriptionHandler', () => {
       createHandler(pc);
       // _iceRestartPending is false here (no ICE restart in flight), so the
       // wrap falls through to previousOnFailed. See the next test for the
-      // ICE-restart branch where previousOnFailed is intentionally skipped.
+      // ICE-restart branch.
       pc.onfailed('network down');
       sinon.assert.calledOnceWithExactly(previousOnFailed, 'network down');
     });
 
-    it('does NOT invoke previousOnFailed when onfailed fires DURING an ICE restart (avoids double-dispatch with session.invite rejection)', async () => {
+    it('still invokes previousOnFailed during an ICE restart, so Call retries as on VSP', async () => {
       const previousOnFailed = sinon.spy();
       const pc = createPeerConnectionStub({ onfailed: previousOnFailed }); // iceRestart stub never calls back
       const { handler } = createHandler(pc);
       handler.requestIceRestart();
       const pending = handler.getDescription();
       pc.onfailed('createOffer rejected');
-      await assert.rejects(pending, /createOffer rejected/);
-      sinon.assert.notCalled(previousOnFailed);
+      await assert.rejects(pending, { name: ICE_RESTART_OFFER_FAILED, message: 'createOffer rejected' });
+      sinon.assert.calledOnceWithExactly(previousOnFailed, 'createOffer rejected');
+    });
+
+    it('routes a later remote offer to processOffer when the restart offer arrives after onfailed', async () => {
+      let onOfferReady: (sdp: string) => void = () => {};
+      const pc = createPeerConnectionStub({
+        answerIncomingCall: stubAnswerIncomingCall(),
+        processOffer: stubProcessOffer(),
+        processAnswer: stubProcessAnswer(),
+        iceRestart: sinon.stub().callsFake((cb: (sdp: string) => void) => { onOfferReady = cb; }),
+      });
+      const { handler } = createHandler(pc);
+      await handler.setDescription(OFFER_SDP);
+      await handler.getDescription();
+      handler.requestIceRestart();
+      const pending = handler.getDescription();
+      pc.onfailed('Connection with Twilio was interrupted.');
+      await assert.rejects(pending, { name: ICE_RESTART_OFFER_FAILED });
+      onOfferReady(ICE_RESTART_OFFER_SDP);
+
+      await handler.setDescription(REOFFER_SDP);
+      sinon.assert.calledOnce(pc.processOffer);
+      sinon.assert.notCalled(pc.processAnswer);
+    });
+
+    it('resolves the next attempt when a rejected attempt\'s offer lands after it starts', async () => {
+      const callbacks: Array<(sdp: string) => void> = [];
+      const pc = createPeerConnectionStub({
+        answerIncomingCall: stubAnswerIncomingCall(),
+        iceRestart: sinon.stub().callsFake((cb: (sdp: string) => void) => { callbacks.push(cb); }),
+      });
+      const { handler } = createHandler(pc);
+      await handler.setDescription(OFFER_SDP);
+      await handler.getDescription();
+      handler.requestIceRestart();
+      const first = handler.getDescription();
+      pc.onfailed('Connection with Twilio was interrupted.');
+      await assert.rejects(first, { name: ICE_RESTART_OFFER_FAILED });
+      handler.requestIceRestart();
+      const second = handler.getDescription();
+
+      callbacks[0]('v=0\r\no=stale\r\n');
+      callbacks[1](ICE_RESTART_OFFER_SDP);
+      const result = await Promise.race([second, new Promise((resolve) => setTimeout(() => resolve('hung'), 10))]);
+      assert.deepStrictEqual(result, { body: ICE_RESTART_OFFER_SDP, contentType: APPLICATION_SDP });
     });
 
     it('does NOT reject a pending setDescription when pc.onfailed fires outside of an ICE restart (runtime ICE failure)', async () => {
@@ -405,6 +450,49 @@ describe('SipSessionDescriptionHandler', () => {
       await assert.rejects(pending, /Error processing offer: boom/);
     });
 
+    it('failIceRestart() reports the failure to Call without rejecting anything pending', async () => {
+      const previousOnFailed = sinon.spy();
+      const pc = createPeerConnectionStub({
+        onfailed: previousOnFailed,
+        version: { pc: { iceConnectionState: 'failed' } },
+      }); // answerIncomingCall never calls back
+      const { handler } = createHandler(pc);
+      let settled = false;
+      handler.setDescription(OFFER_SDP).then(() => { settled = true; }, () => { settled = true; });
+      handler.failIceRestart('ICE-restart re-INVITE rejected (491)');
+      await Promise.resolve();
+      sinon.assert.calledOnceWithExactly(previousOnFailed, 'ICE-restart re-INVITE rejected (491)');
+      assert.strictEqual(settled, false);
+    });
+
+    [
+      { iceConnectionState: 'disconnected', connectionState: 'disconnected', reports: true },
+      { iceConnectionState: 'checking', connectionState: 'connected', reports: true },
+      { iceConnectionState: 'connected', connectionState: 'failed', reports: true },
+      { iceConnectionState: 'connected', connectionState: 'connected', reports: false },
+      { iceConnectionState: 'completed', connectionState: undefined, reports: false },
+    ].forEach(({ iceConnectionState, connectionState, reports }) => {
+      const verb = reports ? 'reports' : 'skips';
+      it(`failIceRestart() ${verb} the failure when ICE is ${iceConnectionState} and the PC ${connectionState}`, () => {
+        const previousOnFailed = sinon.spy();
+        const pc = createPeerConnectionStub({
+          onfailed: previousOnFailed,
+          version: { pc: { iceConnectionState, connectionState } },
+        });
+        const { handler } = createHandler(pc);
+        handler.failIceRestart('ICE-restart re-INVITE rejected (500)');
+        assert.strictEqual(previousOnFailed.called, reports);
+      });
+    });
+
+    it('failIceRestart() reports the failure when the PC is gone', () => {
+      const previousOnFailed = sinon.spy();
+      const pc = createPeerConnectionStub({ onfailed: previousOnFailed, version: null });
+      const { handler } = createHandler(pc);
+      handler.failIceRestart('ICE-restart re-INVITE rejected (500)');
+      sinon.assert.calledOnce(previousOnFailed);
+    });
+
     it('cancelIceRestart() disarms the request', async () => {
       const pc = createPeerConnectionStub({
         makeOutgoingCall: stubMakeOutgoingCall(),
@@ -480,6 +568,117 @@ describe('SipSessionDescriptionHandler', () => {
 
       sinon.assert.calledOnce(pc.iceRestart);
       assert.deepStrictEqual(description, { body: REOFFER_SDP, contentType: APPLICATION_SDP });
+    });
+  });
+
+  describe('rollbackDescription', () => {
+    async function restartAndGetOffer(handler: SipSessionDescriptionHandler) {
+      await handler.getDescription();
+      await handler.setDescription(ANSWER_SDP);
+      handler.requestIceRestart();
+      await handler.getDescription();
+    }
+
+    function createRestartablePc() {
+      return createPeerConnectionStub({
+        makeOutgoingCall: stubMakeOutgoingCall(),
+        processAnswer: stubProcessAnswer(),
+        processOffer: stubProcessOffer(),
+        iceRestart: sinon.stub().callsFake(
+          (cb: (sdp: string) => void) => cb(REOFFER_SDP),
+        ) as sinon.SinonStub,
+      });
+    }
+
+    it('routes a later remote re-INVITE to processOffer after a rejected ICE restart', async () => {
+      const pc = createRestartablePc();
+      const { handler } = createHandler(pc);
+      await restartAndGetOffer(handler);
+
+      await handler.rollbackDescription();
+      await handler.setDescription(REOFFER_SDP);
+
+      sinon.assert.calledOnce(pc.processOffer);
+      sinon.assert.calledOnce(pc.processAnswer);
+    });
+  });
+
+  describe('onMediaStarted', () => {
+    const iceRestartStub = () => sinon.stub().callsFake(
+      (cb: (sdp: string) => void) => cb(REOFFER_SDP),
+    ) as sinon.SinonStub;
+
+    function createHandlerWithMediaStarted(pc: PcStub) {
+      const onMediaStarted = sinon.stub();
+      const handler = new SipSessionDescriptionHandler(pc, CALL_SID, {}, onMediaStarted);
+      return { handler, onMediaStarted };
+    }
+
+    it('fires once with the pc when the outbound answer is processed', async () => {
+      const mediaPc = {} as RTCPeerConnection;
+      const pc = createPeerConnectionStub({
+        makeOutgoingCall: stubMakeOutgoingCall(),
+        processAnswer: sinon.stub().callsFake(
+          (_sdp: string, cb: (pc: RTCPeerConnection) => void) => cb(mediaPc),
+        ) as sinon.SinonStub,
+      });
+      const { handler, onMediaStarted } = createHandlerWithMediaStarted(pc);
+      await handler.getDescription();
+      await handler.setDescription(ANSWER_SDP);
+
+      sinon.assert.calledOnce(onMediaStarted);
+      sinon.assert.calledWithExactly(onMediaStarted, mediaPc);
+    });
+
+    it('fires once when the inbound answer is created', async () => {
+      const pc = createPeerConnectionStub({ answerIncomingCall: stubAnswerIncomingCall() });
+      const { handler, onMediaStarted } = createHandlerWithMediaStarted(pc);
+      await handler.setDescription(OFFER_SDP);
+      await handler.getDescription();
+
+      sinon.assert.calledOnce(onMediaStarted);
+    });
+
+    it('does not re-fire on an ICE-restart answer', async () => {
+      const pc = createPeerConnectionStub({
+        makeOutgoingCall: stubMakeOutgoingCall(),
+        processAnswer: stubProcessAnswer(),
+        iceRestart: iceRestartStub(),
+      });
+      const { handler, onMediaStarted } = createHandlerWithMediaStarted(pc);
+      await handler.getDescription();
+      await handler.setDescription(ANSWER_SDP);
+
+      handler.requestIceRestart();
+      await handler.getDescription();
+      await handler.setDescription(REANSWER_SDP);
+
+      sinon.assert.calledTwice(pc.processAnswer);
+      sinon.assert.calledOnce(onMediaStarted);
+    });
+
+    it('does not re-fire on a remote re-INVITE', async () => {
+      const pc = createPeerConnectionStub({
+        answerIncomingCall: stubAnswerIncomingCall(),
+        processOffer: stubProcessOffer(),
+      });
+      const { handler, onMediaStarted } = createHandlerWithMediaStarted(pc);
+      await handler.setDescription(OFFER_SDP);
+      await handler.getDescription();
+
+      await handler.setDescription(REOFFER_SDP);
+
+      sinon.assert.calledOnce(pc.processOffer);
+      sinon.assert.calledOnce(onMediaStarted);
+    });
+
+    it('still resolves setDescription when onMediaStarted throws', async () => {
+      const pc = createPeerConnectionStub({ answerIncomingCall: stubAnswerIncomingCall() });
+      const handler = new SipSessionDescriptionHandler(pc, CALL_SID, {}, () => {
+        throw new Error('onAnswer failed');
+      });
+
+      await handler.setDescription(OFFER_SDP);
     });
   });
 

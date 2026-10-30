@@ -192,14 +192,6 @@ class Call extends EventEmitter {
   private _isAnswered: boolean = false;
 
   /**
-   * Whether the SIP-path onopen wrapper has already been installed. Guards
-   * against repeated `accept()` invocations chaining wrappers onto the
-   * previous one (each layer would retain its own onAnswerFired closure
-   * and fire independently against stale state).
-   */
-  private _sipOnOpenWrapped: boolean = false;
-
-  /**
    * Whether the call has been cancelled.
    */
   private _isCancelled: boolean = false;
@@ -234,6 +226,12 @@ class Call extends EventEmitter {
    * An instance of Backoff for media reconnection
    */
   private _mediaReconnectBackoff: any;
+
+  /**
+   * Removes the in-flight ICE restart's answer/hangup listeners. A rejected
+   * re-INVITE ends in neither, so the next attempt and teardown call this.
+   */
+  private _removeIceRestartListeners: () => void = () => { /* none in flight */ };
 
   /**
    * Timestamp for the initial media reconnection
@@ -379,13 +377,14 @@ class Call extends EventEmitter {
         return;
       }
 
+      this._removeIceRestartListeners();
+
       const onAnswerOrRinging = (payload: any) => {
         // The adapter is shared across concurrent calls; ignore events for
         // other calls so their answer/hangup doesn't abort this call's
         // in-flight ICE restart by removing the listeners below.
         if (payload?.callsid !== callSid) { return; }
-        this._signalingAdapter.removeListener('answer', onAnswerOrRinging);
-        this._signalingAdapter.removeListener('hangup', onHangup);
+        this._removeIceRestartListeners();
 
         // On the SIP path, the remote answer reaches PeerConnection via
         // the SDH before the adapter emits 'answer', so payload.sdp is
@@ -401,15 +400,18 @@ class Call extends EventEmitter {
 
       const onHangup = (payload: any) => {
         if (payload?.callsid !== callSid) { return; }
+        this._removeIceRestartListeners();
+      };
+
+      this._removeIceRestartListeners = () => {
         this._signalingAdapter.removeListener('answer', onAnswerOrRinging);
         this._signalingAdapter.removeListener('hangup', onHangup);
       };
-
       this._signalingAdapter.on('answer', onAnswerOrRinging);
       this._signalingAdapter.on('hangup', onHangup);
-      // Adapter encapsulates its own offer-generation strategy. On
-      // failure the adapter emits 'hangup' for this callSid so the
-      // cleanup listeners above run.
+      // Adapter encapsulates its own offer-generation strategy. A fatal
+      // failure emits 'hangup' for this callSid. A rejection that keeps the
+      // call up emits nothing, so the next attempt drops these listeners.
       this._signalingAdapter.iceRestart(callSid, { mediaHandler: this._mediaHandler });
     });
 
@@ -716,22 +718,6 @@ class Call extends EventEmitter {
 
       const callSid = this.parameters.CallSid;
 
-      if (this._options.useSip && !this._sipOnOpenWrapped) {
-        // PeerConnection.onopen fires from multiple stable-state observers,
-        // so we gate onAnswer to a single call. _sipOnOpenWrapped prevents a
-        // repeat accept() from chaining another wrapper over this one.
-        this._sipOnOpenWrapped = true;
-        const previousOnOpen = this._mediaHandler.onopen;
-        let onAnswerFired = false;
-        this._mediaHandler.onopen = () => {
-          previousOnOpen();
-          if (!onAnswerFired && this._mediaHandler.version?.pc) {
-            onAnswerFired = true;
-            onAnswer(this._mediaHandler.version.pc);
-          }
-        };
-      }
-
       const params = Array.from(this.customParameters.entries()).map(pair =>
         `${encodeURIComponent(pair[0])}=${encodeURIComponent(pair[1])}`).join('&');
       const outgoingCallSid = this._options.reconnectCallSid || this.outboundConnectionId!;
@@ -741,6 +727,7 @@ class Call extends EventEmitter {
         // SDP intentionally omitted: the SIP adapter derives the answer
         // from the invitation body via its SDH, not from the caller.
         this._signalingAdapter.answer(callSid, {
+          onMediaStarted: onAnswer,
           peerConnection: this._mediaHandler,
           rtcConfiguration,
         });
@@ -764,6 +751,7 @@ class Call extends EventEmitter {
           const reconnectConfig: ReconnectConfig = {
             sdp: '',
             reconnectToken: this._signalingReconnectToken,
+            onMediaStarted: onAnswer,
             peerConnection: this._mediaHandler,
             rtcConfiguration,
           };
@@ -774,6 +762,7 @@ class Call extends EventEmitter {
           // that's added, pass them as extraHeaders through InviteConfig.
           const inviteConfig: InviteConfig = {
             sdp: '',
+            onMediaStarted: onAnswer,
             peerConnection: this._mediaHandler,
             rtcConfiguration,
           };
@@ -1170,6 +1159,7 @@ class Call extends EventEmitter {
       this._signalingAdapter.removeListener('connected', this._onConnected);
       this._signalingAdapter.removeListener('message', this._onMessageReceived);
       this._signalingAdapter.removeListener('iceRestartNeeded', this._onIceRestartNeeded);
+      this._removeIceRestartListeners();
     };
 
     // This is kind of a hack, but it lets us avoid rewriting more code.
@@ -1364,6 +1354,13 @@ class Call extends EventEmitter {
    */
   private _onConnected = (): void => {
     this._log.info('Received connected from pstream');
+    // On SIP a reconnect would send a second INVITE, so the WS coming back
+    // counts as signaling back. Nothing confirms the dialog survived: a BYE
+    // lost in the gap shows up only when a later re-INVITE gets a 481.
+    if (this._options.useSip) {
+      this._onSignalingReconnected();
+      return;
+    }
     const callSid = this.parameters.CallSid;
     if (this._signalingReconnectToken && this._mediaHandler.version && callSid) {
       const reconnectConfig: ReconnectConfig = {
@@ -1377,13 +1374,20 @@ class Call extends EventEmitter {
   /**
    * Called when the SIP signaling adapter recovered the WS while an
    * ICE-restart re-INVITE was orphaned. The remote never received the new
-   * ICE/DTLS creds, so kick a fresh ICE restart.
+   * ICE/DTLS creds, so kick a fresh ICE restart unless media is healthy.
    */
   private _onIceRestartNeeded = (payload: { callsid?: string }): void => {
     if (payload?.callsid !== this.parameters.CallSid) {
       return;
     }
     if (this.status() !== Call.State.Open && this.status() !== Call.State.Reconnecting) {
+      return;
+    }
+    // Media is healthy, so there is nothing to restart. A restart from healthy
+    // ICE could leave Call in Reconnecting, since PeerConnection reports no new state.
+    const iceState = this._mediaHandler.version?.pc?.iceConnectionState;
+    if (this._mediaStatus === Call.State.Open && (iceState === 'connected' || iceState === 'completed')) {
+      this._log.info('iceRestartNeeded after WS recovery; media already recovered');
       return;
     }
     this._log.info('iceRestartNeeded after WS recovery; retrying ICE restart');

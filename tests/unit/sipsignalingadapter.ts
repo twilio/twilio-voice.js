@@ -3,6 +3,7 @@ import * as sinon from 'sinon';
 import { RequestPendingError } from 'sip.js';
 import { GeneralErrors, SignalingErrors } from '../../lib/twilio/errors';
 import { SignalingAdapter } from '../../lib/twilio/signaling/signalingadapter';
+import { ICE_RESTART_OFFER_FAILED } from '../../lib/twilio/signaling/sipsessiondescriptionhandler';
 import { SipSignalingAdapter } from '../../lib/twilio/signaling/sipsignalingadapter';
 import { IPeerConnection, SipSessionDescriptionHandler } from '../../lib/twilio/signaling/sipsessiondescriptionhandler';
 
@@ -17,6 +18,11 @@ function createPeerConnectionStub(): IPeerConnection {
     iceRestart: sinon.stub(),
     close: sinon.stub(),
   };
+}
+
+// Lets the adapter's deferred Terminated check run.
+function afterDispatch(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 /**
@@ -55,6 +61,7 @@ function createSessionStub(initialState: string = 'Initial') {
     sessionDescriptionHandler: {
       requestIceRestart: sinon.stub(),
       cancelIceRestart: sinon.stub(),
+      failIceRestart: sinon.stub(),
     },
     info: sinon.stub().resolves(),
     message: sinon.stub().resolves(),
@@ -172,6 +179,14 @@ describe('SipSignalingAdapter', () => {
       assert(uaStub.start.calledOnce);
     });
 
+    it('should leave ending an unanswered call to the server', () => {
+      let config: any;
+      createAdapter({ createUserAgent(c: any) { config = c; return createUserAgentStub() as any; } });
+      // SIP.js multiplies by 1000; past 2^31-1 ms setTimeout fires at once.
+      assert.strictEqual(config.noAnswerTimeout, 2147483);
+      assert(config.noAnswerTimeout * 1000 <= 2 ** 31 - 1);
+    });
+
     it('should have initial status "disconnected"', () => {
       const { adapter } = createAdapter();
       assert.strictEqual(adapter.status, 'disconnected');
@@ -231,6 +246,53 @@ describe('SipSignalingAdapter', () => {
       adapter.on('offline', offlineSpy);
       uaStub._triggerDisconnect();
       assert.strictEqual(offlineSpy.callCount, 1);
+    });
+
+    context('with a ringing inbound call', () => {
+      function ringAndWatch() {
+        const { adapter, uaStub } = createAdapter();
+        uaStub._triggerConnect();
+        const inv = createInvitationStub();
+        uaStub._triggerInvite(inv);
+        const events: string[] = [];
+        adapter.on('cancel', () => events.push('cancel'));
+        adapter.on('hangup', () => events.push('hangup'));
+        adapter.on('error', () => events.push('error'));
+        return { adapter, uaStub, inv, events };
+      }
+
+      it('should reject it silently when the transport disconnects', async () => {
+        const { uaStub, inv, events } = ringAndWatch();
+        uaStub._triggerDisconnect();
+        sinon.assert.calledOnce(inv.reject);
+        inv._simulateState('Terminated');
+        await afterDispatch();
+        assert.deepStrictEqual(events, []);
+      });
+
+      it('should stay silent if rejecting it fails', async () => {
+        const { adapter, uaStub, inv, events } = ringAndWatch();
+        const warnSpy = sinon.spy((adapter as any)._log, 'warn');
+        inv.reject = sinon.stub().rejects(new Error('transport down'));
+        uaStub._triggerDisconnect();
+        await afterDispatch();
+        assert.deepStrictEqual(events, []);
+        sinon.assert.calledWith(warnSpy, 'Error rejecting ringing invitation during disconnect');
+      });
+
+      it('should not reject a call SIP.js already ended', () => {
+        const { uaStub, inv } = ringAndWatch();
+        inv.state = 'Terminated';
+        uaStub._triggerDisconnect();
+        sinon.assert.notCalled(inv.reject);
+      });
+
+      it('should not reject an answered call', () => {
+        const { adapter, uaStub, inv } = ringAndWatch();
+        adapter.answer('CA-test-call-sid', { peerConnection: createPeerConnectionStub() });
+        uaStub._triggerDisconnect();
+        sinon.assert.notCalled(inv.reject);
+      });
     });
 
     it('should set status to "disconnected" when transport disconnects', () => {
@@ -339,6 +401,115 @@ describe('SipSignalingAdapter', () => {
         done();
       });
       adapter.register({ audio: false });
+    });
+
+    it('should register again after a rejected initial REGISTER', () => {
+      const regStub = createRegistererStub();
+      const createRegisterer = sinon.stub().returns(regStub);
+      const { adapter, uaStub } = createAdapter({ createRegisterer });
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      // SIP.js moves from Initial to Unregistered on a non-2xx.
+      regStub._simulateState('Unregistered');
+      // Device's 30s re-register tick
+      adapter.register({ audio: true });
+      sinon.assert.calledTwice(regStub.register);
+      sinon.assert.calledOnce(createRegisterer);
+    });
+
+    it('should register again after unregister()', () => {
+      const regStub = createRegistererStub();
+      const createRegisterer = sinon.stub().returns(regStub);
+      const { adapter, uaStub } = createAdapter({ createRegisterer });
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      regStub._simulateState('Registered');
+      adapter.register({ audio: false });
+      regStub._simulateState('Unregistered');
+      adapter.register({ audio: true });
+      sinon.assert.calledTwice(regStub.register);
+      sinon.assert.calledOnce(createRegisterer);
+    });
+
+    it('should register again after a failed refresh', () => {
+      const regStub = createRegistererStub();
+      const createRegisterer = sinon.stub().returns(regStub);
+      const { adapter, uaStub } = createAdapter({ createRegisterer });
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      regStub._simulateState('Registered');
+      // SIP.js moves to Unregistered when a refresh REGISTER fails.
+      regStub._simulateState('Unregistered');
+      // Device's 30s re-register tick
+      adapter.register({ audio: true });
+      sinon.assert.calledTwice(regStub.register);
+      sinon.assert.calledOnce(createRegisterer);
+    });
+
+    it('should emit "offline" when re-registering an Unregistered Registerer is rejected', () => {
+      const { adapter, uaStub, regStub } = createAdapter();
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      regStub._simulateState('Unregistered');
+      const onOffline = sinon.stub();
+      adapter.on('offline', onOffline);
+      adapter.register({ audio: true });
+      // SIP.js leaves the state alone on this rejection.
+      regStub.register.lastCall.args[0].requestDelegate.onReject({ message: { statusCode: 403 } });
+      sinon.assert.calledOnce(onOffline);
+      assert.strictEqual(adapter.status, 'offline');
+    });
+
+    it('should ignore a rejection for a Registerer replaced after a reconnect', () => {
+      const oldReg = createRegistererStub();
+      const newReg = createRegistererStub();
+      const createRegisterer = sinon.stub();
+      createRegisterer.onFirstCall().returns(oldReg);
+      createRegisterer.onSecondCall().returns(newReg);
+      const { adapter, uaStub } = createAdapter({ createRegisterer });
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      oldReg._simulateState('Unregistered');
+      adapter.register({ audio: true });
+      const oldOnReject = oldReg.register.lastCall.args[0].requestDelegate.onReject;
+      uaStub._triggerDisconnect(new Error('ws closed'));
+      uaStub._triggerConnect();
+      newReg._simulateState('Registered');
+      const onOffline = sinon.stub();
+      adapter.on('offline', onOffline);
+      // Timer F on the disposed Registerer's REGISTER.
+      oldOnReject({ message: { statusCode: 408 } });
+      sinon.assert.notCalled(onOffline);
+      assert.strictEqual(adapter.status, 'ready');
+    });
+
+    it('should not emit a second "offline" when the first REGISTER is rejected', () => {
+      const { adapter, uaStub, regStub } = createAdapter();
+      uaStub._triggerConnect();
+      const onOffline = sinon.stub();
+      adapter.on('offline', onOffline);
+      adapter.register({ audio: true });
+      // SIP.js moves Initial to Unregistered, then calls onReject.
+      regStub._simulateState('Unregistered');
+      regStub.register.lastCall.args[0].requestDelegate.onReject({ message: { statusCode: 403 } });
+      sinon.assert.calledOnce(onOffline);
+    });
+
+    it('should keep the Registerer when register() overlaps a REGISTER in flight', async () => {
+      const { adapter, uaStub, regStub } = createAdapter();
+      const onError = sinon.stub();
+      adapter.on('error', onError);
+      uaStub._triggerConnect();
+      adapter.register({ audio: true });
+      regStub._simulateState('Registered');
+      regStub._simulateState('Unregistered');
+      adapter.register({ audio: true });
+      // Still Unregistered while the re-REGISTER is in flight.
+      regStub.register = sinon.stub().rejects(new RequestPendingError('pending'));
+      adapter.register({ audio: true });
+      await afterDispatch();
+      sinon.assert.notCalled(onError);
+      sinon.assert.notCalled(regStub.dispose);
     });
 
     it('should skip if registerer already exists', () => {
@@ -468,6 +639,147 @@ describe('SipSignalingAdapter', () => {
       assert.doesNotThrow(() => adapter.hangup('call-1', {}));
     });
 
+    it('should emit "hangup" after "error" if invite() promise rejects', async () => {
+      const failInviterStub = createInviterStub();
+      failInviterStub.invite = sinon.stub().rejects(new Error('transport down'));
+      const { adapter } = createAdapter({
+        createInviter() { return failInviterStub as any; },
+      });
+      const events: string[] = [];
+      adapter.on('error', () => events.push('error'));
+      adapter.on('hangup', () => events.push('hangup'));
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      // SIP.js terminates the Inviter before rejecting invite().
+      failInviterStub._simulateState('Terminated');
+      await afterDispatch();
+      assert.deepStrictEqual(events, ['error', 'hangup']);
+    });
+
+    it('should still emit "hangup" if an "error" listener throws on invite() rejecting', async () => {
+      const failInviterStub = createInviterStub();
+      failInviterStub.invite = sinon.stub().rejects(new Error('transport down'));
+      const { adapter } = createAdapter({
+        createInviter() { return failInviterStub as any; },
+      });
+      // Device rethrows 'error' when the app has no listener for it.
+      adapter.on('error', () => { throw new Error('no error listener'); });
+      const onHangup = sinon.stub();
+      adapter.on('hangup', onHangup);
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      await afterDispatch();
+      sinon.assert.calledOnceWithExactly(onHangup, { callsid: 'call-1' });
+    });
+
+    it('should emit nothing when invite() rejects after a local hangup', async () => {
+      const inviter = createInviterStub();
+      let rejectInvite: (error: Error) => void = () => undefined;
+      inviter.invite = sinon.stub().returns(new Promise((_resolve, reject) => { rejectInvite = reject; }));
+      const { adapter } = createAdapter({ createInviter() { return inviter as any; } });
+      const events: string[] = [];
+      adapter.on('error', () => events.push('error'));
+      adapter.on('hangup', () => events.push('hangup'));
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      adapter.hangup('call-1', {});
+      inviter._simulateState('Terminated');
+      rejectInvite(new Error('Invalid session state Terminated'));
+      await afterDispatch();
+      sinon.assert.calledOnce(inviter.cancel);
+      assert.deepStrictEqual(events, []);
+    });
+
+    context('when SIP.js terminates the session', () => {
+      function inviteAndWatch(overrides?: Partial<any>) {
+        const { adapter, inviterStub } = createAdapter(overrides);
+        const onHangup = sinon.stub();
+        adapter.on('hangup', onHangup);
+        adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+        return { adapter, inviterStub, onHangup, rd: inviterStub._getRequestDelegate() };
+      }
+
+      it('should emit "hangup" when no delegate reported the end', async () => {
+        const { inviterStub, onHangup } = inviteAndWatch();
+        inviterStub._simulateState('Terminated');
+        await afterDispatch();
+        sinon.assert.calledOnceWithExactly(onHangup, { callsid: 'call-1' });
+      });
+
+      it('should emit "hangup" under the server CallSid after a re-key', async () => {
+        const { inviterStub, onHangup, rd } = inviteAndWatch();
+        rd.onAccept({ message: { getHeader: (name: string) => name === 'X-Twilio-CallSid' ? 'CA-server-123' : undefined } });
+        inviterStub._simulateState('Terminated');
+        await afterDispatch();
+        sinon.assert.calledOnceWithExactly(onHangup, { callsid: 'CA-server-123' });
+      });
+
+      it('should emit one "hangup", with the error, when a rejection follows', async () => {
+        const { inviterStub, onHangup, rd } = inviteAndWatch();
+        // SIP.js terminates the Inviter before calling onReject.
+        inviterStub._simulateState('Terminated');
+        rd.onReject({ message: { statusCode: 486, reasonPhrase: 'Busy Here' } });
+        await afterDispatch();
+        sinon.assert.calledOnce(onHangup);
+        assert.strictEqual(onHangup.firstCall.args[0].error.code, 486);
+      });
+
+      it('should leave the BYE to SIP.js and emit one "hangup"', async () => {
+        const { inviterStub, onHangup } = inviteAndWatch();
+        // An onBye delegate would stop SIP.js answering the BYE and, if a
+        // listener threw, ending the session.
+        assert.strictEqual(inviterStub.delegate?.onBye, undefined);
+        inviterStub._simulateState('Terminated');
+        await afterDispatch();
+        sinon.assert.calledOnceWithExactly(onHangup, { callsid: 'call-1' });
+      });
+
+      it('should not emit "answer" for a 2xx SIP.js already ended', async () => {
+        const { adapter, inviterStub, onHangup, rd } = inviteAndWatch();
+        const onAnswer = sinon.stub();
+        adapter.on('answer', onAnswer);
+        inviterStub._simulateState('Terminated');
+        rd.onAccept({});
+        await afterDispatch();
+        sinon.assert.notCalled(onAnswer);
+        sinon.assert.calledOnce(onHangup);
+      });
+
+      it('should emit nothing, not even the 487, after a local cancel', async () => {
+        const { adapter, inviterStub, onHangup, rd } = inviteAndWatch();
+        inviterStub.state = 'Establishing';
+        adapter.hangup('call-1', {});
+        inviterStub._simulateState('Terminated');
+        rd.onReject({ message: { statusCode: 487, reasonPhrase: 'Request Terminated' } });
+        await afterDispatch();
+        sinon.assert.calledOnce(inviterStub.cancel);
+        sinon.assert.notCalled(onHangup);
+      });
+
+      it('should emit nothing after destroy()', async () => {
+        const { adapter, inviterStub, onHangup } = inviteAndWatch();
+        inviterStub.state = 'Established';
+        adapter.destroy();
+        inviterStub._simulateState('Terminated');
+        await afterDispatch();
+        sinon.assert.notCalled(onHangup);
+      });
+
+      it('should leave a newer session for the same callSid alone', async () => {
+        const first = createInviterStub();
+        const second = createInviterStub();
+        const inviters = [first, second];
+        const { adapter, onHangup } = inviteAndWatch({ createInviter: () => inviters.shift() });
+        adapter.reconnect('call-1', { sdp: '', reconnectToken: 'token', peerConnection: createPeerConnectionStub() });
+
+        first._simulateState('Terminated');
+        first._getRequestDelegate().onReject({ message: { statusCode: 408, reasonPhrase: 'Request Timeout' } });
+        await afterDispatch();
+        sinon.assert.notCalled(onHangup);
+
+        second.state = 'Establishing';
+        adapter.hangup('call-1', {});
+        sinon.assert.calledOnce(second.cancel);
+      });
+    });
+
     it('should rekey outbound session when 200 OK carries a server CallSid', () => {
       const { adapter, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
@@ -571,27 +883,116 @@ describe('SipSignalingAdapter', () => {
       inv.delegate.onCancel();
     });
 
-    it('should emit "hangup" when session.delegate.onBye fires', (done) => {
-      const { adapter, uaStub } = createAdapter();
-      const inv = createInvitationStub();
-      adapter.on('hangup', (payload: any) => {
-        assert.strictEqual(payload.callsid, 'CA-test-call-sid');
-        done();
-      });
-      uaStub._triggerInvite(inv);
-      inv.delegate.onBye();
-    });
+    context('when SIP.js terminates the session', () => {
+      function receiveAndWatch() {
+        const { adapter, uaStub } = createAdapter();
+        const inv = createInvitationStub();
+        const onCancel = sinon.stub();
+        const onHangup = sinon.stub();
+        adapter.on('cancel', onCancel);
+        adapter.on('hangup', onHangup);
+        uaStub._triggerInvite(inv);
+        return { adapter, inv, onCancel, onHangup };
+      }
 
-    it('should emit "hangup" via onBye after answering an inbound call', (done) => {
-      const { adapter, uaStub } = createAdapter();
-      const inv = createInvitationStub();
-      uaStub._triggerInvite(inv);
-      adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer', peerConnection: createPeerConnectionStub() });
-      adapter.on('hangup', (payload: any) => {
-        assert.strictEqual(payload.callsid, 'CA-test-call-sid');
-        done();
+      it('should emit "cancel" for a pending call that ends without a CANCEL', async () => {
+        const { inv, onCancel, onHangup } = receiveAndWatch();
+        // e.g. SIP.js's Expires timer rejecting with 487
+        inv._simulateState('Terminated');
+        await afterDispatch();
+        sinon.assert.calledOnceWithExactly(onCancel, { callsid: 'CA-test-call-sid' });
+        sinon.assert.notCalled(onHangup);
       });
-      inv.delegate.onBye();
+
+      it('should emit one "cancel" when a CANCEL ended it', async () => {
+        const { inv, onCancel } = receiveAndWatch();
+        inv.delegate.onCancel();
+        inv._simulateState('Terminated');
+        await afterDispatch();
+        sinon.assert.calledOnce(onCancel);
+      });
+
+      it('should emit "hangup" for an answered call that ends without a BYE', async () => {
+        const { adapter, inv, onCancel, onHangup } = receiveAndWatch();
+        adapter.answer('CA-test-call-sid', { peerConnection: createPeerConnectionStub() });
+        // e.g. SIP.js's ACK timeout
+        inv._simulateState('Terminated');
+        await afterDispatch();
+        sinon.assert.calledOnceWithExactly(onHangup, { callsid: 'CA-test-call-sid' });
+        sinon.assert.notCalled(onCancel);
+      });
+
+      it('should leave the BYE to SIP.js and emit one "hangup"', async () => {
+        const { adapter, inv, onHangup } = receiveAndWatch();
+        adapter.answer('CA-test-call-sid', { peerConnection: createPeerConnectionStub() });
+        // See the outbound BYE test.
+        assert.strictEqual(inv.delegate.onBye, undefined);
+        inv._simulateState('Terminated');
+        await afterDispatch();
+        sinon.assert.calledOnceWithExactly(onHangup, { callsid: 'CA-test-call-sid' });
+      });
+
+      context('before the deferred check runs', () => {
+        function endedAndWatch() {
+          const watched = receiveAndWatch();
+          const onError = sinon.stub();
+          watched.adapter.on('error', onError);
+          watched.inv.reject = sinon.stub().rejects(new Error('Invalid session state Terminated'));
+          watched.inv._simulateState('Terminated');
+          return { ...watched, onError };
+        }
+
+        it('should report "cancel", not an error, for an answer()', async () => {
+          const { adapter, inv, onCancel, onHangup, onError } = endedAndWatch();
+          adapter.answer('CA-test-call-sid', { peerConnection: createPeerConnectionStub() });
+          await afterDispatch();
+          sinon.assert.notCalled(inv.accept);
+          sinon.assert.calledOnce(onCancel);
+          sinon.assert.notCalled(onHangup);
+          sinon.assert.notCalled(onError);
+        });
+
+        it('should emit nothing for a reject()', async () => {
+          const { adapter, inv, onCancel, onHangup, onError } = endedAndWatch();
+          adapter.reject('CA-test-call-sid');
+          await afterDispatch();
+          sinon.assert.notCalled(inv.reject);
+          sinon.assert.notCalled(onCancel);
+          sinon.assert.notCalled(onHangup);
+          sinon.assert.notCalled(onError);
+        });
+
+        it('should emit nothing for a hangup()', async () => {
+          const { adapter, inv, onCancel, onHangup, onError } = endedAndWatch();
+          adapter.hangup('CA-test-call-sid', {});
+          await afterDispatch();
+          sinon.assert.notCalled(inv.reject);
+          sinon.assert.notCalled(onCancel);
+          sinon.assert.notCalled(onHangup);
+          sinon.assert.notCalled(onError);
+        });
+      });
+
+      it('should emit nothing after a local reject()', async () => {
+        const { adapter, inv, onCancel, onHangup } = receiveAndWatch();
+        adapter.reject('CA-test-call-sid');
+        inv._simulateState('Terminated');
+        await afterDispatch();
+        sinon.assert.notCalled(onCancel);
+        sinon.assert.notCalled(onHangup);
+      });
+
+      it('should emit nothing after a local hangup', async () => {
+        const { adapter, inv, onCancel, onHangup } = receiveAndWatch();
+        adapter.answer('CA-test-call-sid', { peerConnection: createPeerConnectionStub() });
+        inv.state = 'Established';
+        adapter.hangup('CA-test-call-sid', {});
+        inv._simulateState('Terminated');
+        await afterDispatch();
+        sinon.assert.calledOnce(inv.bye);
+        sinon.assert.notCalled(onCancel);
+        sinon.assert.notCalled(onHangup);
+      });
     });
   });
 
@@ -622,6 +1023,54 @@ describe('SipSignalingAdapter', () => {
         done();
       });
       adapter.answer('CA-test-call-sid', { sdp: 'sdp-answer', peerConnection: createPeerConnectionStub() });
+    });
+
+    it('should emit "hangup" after "error" if accept() fails', async () => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      inv.accept = sinon.stub().rejects(new Error('accept failed'));
+      uaStub._triggerInvite(inv);
+      const events: string[] = [];
+      adapter.on('error', () => events.push('error'));
+      adapter.on('hangup', () => events.push('hangup'));
+      adapter.answer('CA-test-call-sid', { peerConnection: createPeerConnectionStub() });
+      // SIP.js terminates the Invitation before rejecting accept().
+      inv._simulateState('Terminated');
+      await afterDispatch();
+      assert.deepStrictEqual(events, ['error', 'hangup']);
+    });
+
+    it('should still emit "hangup" if an "error" listener throws on accept() failing', async () => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      inv.accept = sinon.stub().rejects(new Error('accept failed'));
+      uaStub._triggerInvite(inv);
+      // See the invite() equivalent.
+      adapter.on('error', () => { throw new Error('no error listener'); });
+      const onHangup = sinon.stub();
+      adapter.on('hangup', onHangup);
+      adapter.answer('CA-test-call-sid', { peerConnection: createPeerConnectionStub() });
+      await afterDispatch();
+      sinon.assert.calledOnceWithExactly(onHangup, { callsid: 'CA-test-call-sid' });
+    });
+
+    it('should emit nothing when accept() rejects after a local hangup', async () => {
+      const { adapter, uaStub } = createAdapter();
+      const inv = createInvitationStub();
+      let rejectAccept: (error: Error) => void = () => undefined;
+      inv.accept = sinon.stub().returns(new Promise((_resolve, reject) => { rejectAccept = reject; }));
+      uaStub._triggerInvite(inv);
+      const events: string[] = [];
+      adapter.on('error', () => events.push('error'));
+      adapter.on('hangup', () => events.push('hangup'));
+      adapter.answer('CA-test-call-sid', { peerConnection: createPeerConnectionStub() });
+      inv.state = 'Establishing';
+      adapter.hangup('CA-test-call-sid', {});
+      inv._simulateState('Terminated');
+      rejectAccept(new Error('Session ended before response could be sent'));
+      await afterDispatch();
+      sinon.assert.calledOnce(inv.reject);
+      assert.deepStrictEqual(events, []);
     });
 
     it('should drop the inbound session when accept() fails, so a later hangup is a no-op', async () => {
@@ -798,6 +1247,58 @@ describe('SipSignalingAdapter', () => {
       assert.strictEqual(reinviteOpts?.sessionDescriptionHandlerOptions, undefined);
     });
 
+    context('when SIP.js ends the session', () => {
+      function establishAndWatch() {
+        const { adapter, inviterStub } = createAdapter();
+        adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+        inviterStub.state = 'Established';
+        const onHangup = sinon.stub();
+        adapter.on('hangup', onHangup);
+        return { adapter, inviterStub, onHangup };
+      }
+
+      it('should emit one "hangup" when the restart starts after it ended', async () => {
+        const { adapter, inviterStub, onHangup } = establishAndWatch();
+        inviterStub._simulateState('Terminated');
+        adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+        await afterDispatch();
+        sinon.assert.calledOnceWithExactly(onHangup, { callsid: 'call-1' });
+      });
+
+      it('should emit one "hangup" when a 481 follows a BYE', async () => {
+        const { adapter, inviterStub, onHangup } = establishAndWatch();
+        adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+        inviterStub._simulateState('Terminated');
+        inviterStub.invite.lastCall.args[0].requestDelegate.onReject({ message: { statusCode: 481 } });
+        await afterDispatch();
+        sinon.assert.calledOnceWithExactly(onHangup, { callsid: 'call-1' });
+      });
+
+      it('should emit one "hangup" when the re-INVITE fails after it ended', async () => {
+        const { adapter, inviterStub, onHangup } = establishAndWatch();
+        inviterStub.invite = sinon.stub().callsFake(() => {
+          inviterStub._simulateState('Terminated');
+          return Promise.reject(new Error('SipSessionDescriptionHandler closed'));
+        });
+        adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+        await afterDispatch();
+        sinon.assert.calledOnceWithExactly(onHangup, { callsid: 'call-1' });
+      });
+    });
+
+    it('should not emit "answer" for a re-INVITE 2xx SIP.js already ended', () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+      const onAnswer = sinon.stub();
+      adapter.on('answer', onAnswer);
+      // SIP.js ACK+BYEs a 2xx whose answer the SDH rejected, then still calls onAccept.
+      inviterStub.state = 'Terminated';
+      inviterStub.invite.lastCall.args[0].requestDelegate.onAccept();
+      sinon.assert.notCalled(onAnswer);
+    });
+
     it('disarms the SDH when the invite is skipped as RequestPending', async () => {
       const { adapter, inviterStub } = createAdapter();
       adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
@@ -833,6 +1334,8 @@ describe('SipSignalingAdapter', () => {
       sinon.assert.calledOnceWithExactly(hangupSpy, { callsid: 'call-1' });
       // Only the initial INVITE; no re-INVITE was sent.
       sinon.assert.calledOnce(inviterStub.invite);
+      // Call won't send a hangup after hearing one.
+      sinon.assert.calledOnce(inviterStub.bye);
     });
 
     it('hangs up when the session has no usable description handler', () => {
@@ -848,6 +1351,8 @@ describe('SipSignalingAdapter', () => {
       sinon.assert.calledOnceWithExactly(hangupSpy, { callsid: 'call-1' });
       // Only the initial INVITE; no re-INVITE was sent.
       sinon.assert.calledOnce(inviterStub.invite);
+      // Call won't send a hangup after hearing one.
+      sinon.assert.calledOnce(inviterStub.bye);
     });
 
     it('does NOT consult the mediaHandler (SIP SDH generates the offer itself)', () => {
@@ -885,18 +1390,143 @@ describe('SipSignalingAdapter', () => {
       adapter.iceRestart('nope', { mediaHandler: mediaHandlerStub() });
     });
 
-    it('emits hangup (with status code) on requestDelegate.onReject', (done) => {
-      const { adapter, inviterStub } = createAdapter();
-      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
-      inviterStub.state = 'Established';
-      adapter.on('hangup', (payload: any) => {
-        assert.strictEqual(payload.callsid, 'call-1');
-        assert.strictEqual(payload.error.code, 488);
-        done();
+    [404, 408, 480, 481, 502].forEach((statusCode) => {
+      it(`emits hangup with the status code when the re-INVITE gets a dialog-ending ${statusCode}`, () => {
+        const { adapter, inviterStub } = createAdapter();
+        adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+        inviterStub.state = 'Established';
+        const onHangup = sinon.stub();
+        adapter.on('hangup', onHangup);
+        adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+        const rd = inviterStub.invite.lastCall.args[0]?.requestDelegate;
+        rd.onReject({ message: { statusCode } });
+        sinon.assert.calledOnce(onHangup);
+        assert.strictEqual(onHangup.firstCall.args[0].callsid, 'call-1');
+        assert.strictEqual(onHangup.firstCall.args[0].error.code, statusCode);
+        sinon.assert.calledOnce(inviterStub.bye);
+        sinon.assert.notCalled(inviterStub.sessionDescriptionHandler.failIceRestart);
       });
-      adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
-      const rd = inviterStub.invite.lastCall.args[0]?.requestDelegate;
-      rd.onReject({ message: { statusCode: 488 } });
+
+      it(`emits only one hangup once the BYE after a ${statusCode} ends the session`, async () => {
+        const { adapter, inviterStub } = createAdapter();
+        adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+        inviterStub.state = 'Established';
+        inviterStub.bye = sinon.stub().callsFake(() => {
+          inviterStub._simulateState('Terminated');
+          return Promise.resolve();
+        });
+        const onHangup = sinon.stub();
+        adapter.on('hangup', onHangup);
+        adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+        inviterStub.invite.lastCall.args[0].requestDelegate.onReject({ message: { statusCode } });
+        await afterDispatch();
+        sinon.assert.calledOnce(onHangup);
+      });
+    });
+
+    it('sends BYE and emits one hangup when an inbound call\'s re-INVITE gets a 408', async () => {
+      const { adapter, uaStub } = createAdapter();
+      uaStub._triggerConnect();
+      const inv = createInvitationStub();
+      uaStub._triggerInvite(inv);
+      adapter.answer('CA-test-call-sid', { peerConnection: createPeerConnectionStub() });
+      await afterDispatch();
+      inv.state = 'Established';
+      inv.bye = sinon.stub().callsFake(() => {
+        inv._simulateState('Terminated');
+        return Promise.resolve();
+      });
+      const onHangup = sinon.stub();
+      adapter.on('hangup', onHangup);
+      adapter.iceRestart('CA-test-call-sid', { mediaHandler: mediaHandlerStub() });
+      inv.invite.lastCall.args[0].requestDelegate.onReject({ message: { statusCode: 408 } });
+      await afterDispatch();
+      sinon.assert.calledOnce(inv.bye);
+      sinon.assert.calledOnce(onHangup);
+      assert.strictEqual(onHangup.firstCall.args[0].error.code, 408);
+    });
+
+    describe('non-fatal re-INVITE rejection', () => {
+      let clock: sinon.SinonFakeTimers;
+
+      beforeEach(() => {
+        clock = sinon.useFakeTimers();
+      });
+
+      afterEach(() => {
+        clock.restore();
+        sinon.restore();
+      });
+
+      function rejectOutbound(statusCode: number) {
+        const { adapter, uaStub, inviterStub } = createAdapter();
+        uaStub._triggerConnect();
+        adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+        inviterStub.state = 'Established';
+        const onHangup = sinon.stub();
+        adapter.on('hangup', onHangup);
+        adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+        inviterStub.invite.lastCall.args[0].requestDelegate.onReject({ message: { statusCode } });
+        const failIceRestart = inviterStub.sessionDescriptionHandler.failIceRestart;
+        return { adapter, uaStub, onHangup, failIceRestart };
+      }
+
+      [488, 500].forEach((statusCode) => {
+        it(`keeps the call up on a ${statusCode} and hands it to Call's retry after 2s`, async () => {
+          const { onHangup, failIceRestart } = rejectOutbound(statusCode);
+          await clock.tickAsync(1999);
+          sinon.assert.notCalled(failIceRestart);
+          await clock.tickAsync(1);
+          sinon.assert.calledOnceWithExactly(failIceRestart, `ICE-restart re-INVITE rejected (${statusCode})`);
+          sinon.assert.notCalled(onHangup);
+        });
+      });
+
+      it('waits 2.1-4s after a 491 on an outbound call', async () => {
+        sinon.stub(Math, 'random').returns(0);
+        const { onHangup, failIceRestart } = rejectOutbound(491);
+        await clock.tickAsync(2099);
+        sinon.assert.notCalled(failIceRestart);
+        await clock.tickAsync(1);
+        sinon.assert.calledOnce(failIceRestart);
+        sinon.assert.notCalled(onHangup);
+      });
+
+      it('waits 0-2s after a 491 on an inbound call', async () => {
+        sinon.stub(Math, 'random').returns(0.5);
+        const { adapter, uaStub } = createAdapter();
+        uaStub._triggerConnect();
+        const inv = createInvitationStub();
+        uaStub._triggerInvite(inv);
+        adapter.answer('CA-test-call-sid', { peerConnection: createPeerConnectionStub() });
+        await clock.tickAsync(0);
+        inv.state = 'Established';
+        adapter.iceRestart('CA-test-call-sid', { mediaHandler: mediaHandlerStub() });
+        inv.invite.lastCall.args[0].requestDelegate.onReject({ message: { statusCode: 491 } });
+        await clock.tickAsync(999);
+        sinon.assert.notCalled(inv.sessionDescriptionHandler.failIceRestart);
+        await clock.tickAsync(1);
+        sinon.assert.calledOnce(inv.sessionDescriptionHandler.failIceRestart);
+      });
+
+      it('drops the retry if the call is hung up during the wait', async () => {
+        const { adapter, failIceRestart } = rejectOutbound(500);
+        adapter.hangup('call-1', {});
+        await clock.tickAsync(2000);
+        sinon.assert.notCalled(failIceRestart);
+      });
+
+      it('defers the retry to iceRestartNeeded if the WS is down when the wait ends', async () => {
+        const { adapter, uaStub, failIceRestart } = rejectOutbound(500);
+        uaStub._setReconnectImpl(() => new Promise(() => { /* never reconnects */ }));
+        uaStub._triggerDisconnect();
+        await clock.tickAsync(2000);
+        sinon.assert.notCalled(failIceRestart);
+        const onIceRestartNeeded = sinon.stub();
+        adapter.on('iceRestartNeeded', onIceRestartNeeded);
+        uaStub._triggerConnect();
+        sinon.assert.calledOnceWithExactly(onIceRestartNeeded, { callsid: 'call-1' });
+      });
     });
 
     it('emits hangup when session.invite rejects asynchronously (via .catch)', (done) => {
@@ -908,9 +1538,26 @@ describe('SipSignalingAdapter', () => {
       adapter.on('hangup', (payload: any) => {
         assert.strictEqual(payload.callsid, 'call-1');
         assert.ok(payload.error);
+        sinon.assert.calledOnce(inviterStub.bye);
         done();
       });
       adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+    });
+
+    it('keeps the call up when the SDH could not create the offer', async () => {
+      const { adapter, inviterStub } = createAdapter();
+      adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection: createPeerConnectionStub() });
+      inviterStub.state = 'Established';
+      const offerError = new Error('createOffer rejected');
+      offerError.name = ICE_RESTART_OFFER_FAILED;
+      inviterStub.invite = sinon.stub().rejects(offerError);
+      const onHangup = sinon.stub();
+      adapter.on('hangup', onHangup);
+      adapter.iceRestart('call-1', { mediaHandler: mediaHandlerStub() });
+      await afterDispatch();
+      // The SDH passed the failure to Call, which retries the restart.
+      sinon.assert.notCalled(onHangup);
+      sinon.assert.notCalled(inviterStub.bye);
     });
 
     it('does not emit hangup when session.invite rejects with RequestPendingError', async () => {
@@ -1083,6 +1730,35 @@ describe('SipSignalingAdapter', () => {
       const answerIncomingCall = peerConnection.answerIncomingCall as sinon.SinonStub;
       assert(answerIncomingCall.calledOnce);
       assert.strictEqual(answerIncomingCall.firstCall.args[0], 'CA-test-call-sid');
+    });
+
+    it('should forward the bound onMediaStarted to the SDH', () => {
+      const { adapter, uaStub, getSdhFactory } = createAdapter();
+      const invitation = createInvitationStub();
+      uaStub._triggerInvite(invitation);
+      const peerConnection = createPeerConnectionStub();
+      const onMediaStarted = sinon.stub();
+      adapter.answer('CA-test-call-sid', { peerConnection, onMediaStarted });
+      const sdh = getSdhFactory()(invitation);
+      sdh.setDescription('v=0\r\no=remote\r\n');
+      const answerIncomingCall = peerConnection.answerIncomingCall as sinon.SinonStub;
+      const mediaPc = {} as RTCPeerConnection;
+      answerIncomingCall.firstCall.args[4](mediaPc);
+      sinon.assert.calledOnceWithExactly(onMediaStarted, mediaPc);
+    });
+
+    it('should forward onMediaStarted through reconnect()', () => {
+      const { adapter, inviterStub, getSdhFactory } = createAdapter();
+      const peerConnection = createPeerConnectionStub();
+      const onMediaStarted = sinon.stub();
+      adapter.reconnect('call-abc', { sdp: '', reconnectToken: 'token', peerConnection, onMediaStarted });
+      const sdh = getSdhFactory()(inviterStub);
+      sdh.getDescription();
+      (peerConnection.makeOutgoingCall as sinon.SinonStub).firstCall.args[2]('offer');
+      sdh.setDescription('answer');
+      const mediaPc = {} as RTCPeerConnection;
+      (peerConnection.processAnswer as sinon.SinonStub).firstCall.args[1](mediaPc);
+      sinon.assert.calledOnceWithExactly(onMediaStarted, mediaPc);
     });
   });
 
@@ -1772,6 +2448,81 @@ describe('SipSignalingAdapter', () => {
       // recovery; the late 408 must not tear down the (now reconnected) call.
       rd.onReject({ message: { statusCode: 408 } });
       sinon.assert.notCalled(onHangup);
+    });
+
+    // SIP.js reports an internal 503 if the WS drops while the restart offer is
+    // being created. A sent re-INVITE gets no response, so Timer B gives an
+    // internal 408 about 32s later, usually after the WS is back.
+    [408, 503].forEach((statusCode) => {
+      it(`keeps the call and routes a later server re-INVITE to processOffer after a stale ${statusCode}`, async () => {
+        const { adapter, uaStub, inviterStub, getSdhFactory } = createAdapter();
+        const peerConnection = createPeerConnectionStub();
+        const callOnFailed = sinon.stub();
+        peerConnection.onfailed = callOnFailed;
+        (peerConnection.makeOutgoingCall as sinon.SinonStub).callsFake((_sid, _config, cb) => cb('v=0\r\no=offer\r\n'));
+        (peerConnection.processAnswer as sinon.SinonStub).callsFake((_sdp, cb) => cb({}));
+        let onRestartOffer: (sdp: string) => void = () => { /* set by pc.iceRestart */ };
+        (peerConnection.iceRestart as sinon.SinonStub).callsFake((cb) => { onRestartOffer = cb; });
+        (peerConnection.processOffer as sinon.SinonStub).callsFake((_sdp, onAnswer, cb) => {
+          onAnswer('v=0\r\no=reanswer\r\n');
+          cb();
+        });
+        adapter.invite('call-1', { sdp: 'sdp', params: 'To=bob', peerConnection });
+        const sdh = getSdhFactory()(inviterStub) as SipSessionDescriptionHandler;
+        (inviterStub as any).sessionDescriptionHandler = sdh;
+        await sdh.getDescription();
+        await sdh.setDescription('v=0\r\no=answer\r\n');
+        inviterStub.state = 'Established';
+        uaStub._triggerConnect();
+
+        const onHangup = sinon.stub();
+        const onIceRestartNeeded = sinon.stub();
+        adapter.on('hangup', onHangup);
+        adapter.on('iceRestartNeeded', onIceRestartNeeded);
+        uaStub._setReconnectImpl(() => { uaStub._triggerConnect(); return Promise.resolve(); });
+        adapter.iceRestart('call-1', { mediaHandler: { iceRestart: sinon.stub() } });
+        const rd = inviterStub.invite.lastCall.args[0].requestDelegate;
+        // Session.invite() asks for the offer synchronously.
+        const offer = sdh.getDescription();
+        // SIP.js rolls the offer back before reporting the rejection.
+        const reject = async () => {
+          await sdh.rollbackDescription();
+          rd.onReject({ message: { statusCode } });
+        };
+        if (statusCode === 503) {
+          uaStub._triggerDisconnect();
+          onRestartOffer('v=0\r\no=restart\r\n');
+          await offer;
+          await reject();
+          await clock.tickAsync(100);
+        } else {
+          onRestartOffer('v=0\r\no=restart\r\n');
+          await offer;
+          uaStub._triggerDisconnect();
+          await clock.tickAsync(100);
+          sinon.assert.calledOnce(onIceRestartNeeded);
+          await clock.tickAsync(32000);
+          await reject();
+        }
+        await clock.tickAsync(5000);
+        // A later blip must not re-queue the settled restart.
+        uaStub._triggerDisconnect();
+        await clock.tickAsync(5000);
+        sinon.assert.notCalled(onHangup);
+        sinon.assert.notCalled(inviterStub.bye);
+        sinon.assert.notCalled(callOnFailed);
+        sinon.assert.calledOnceWithExactly(onIceRestartNeeded, { callsid: 'call-1' });
+
+        // SIP.js answers a server re-INVITE with setDescription, then getDescription.
+        await sdh.setDescription('v=0\r\no=reoffer\r\n');
+        const answer = await sdh.getDescription();
+        sinon.assert.calledOnceWithExactly(
+          peerConnection.processOffer as sinon.SinonStub, 'v=0\r\no=reoffer\r\n', sinon.match.func, sinon.match.func);
+        sinon.assert.calledOnce(peerConnection.processAnswer as sinon.SinonStub);
+        assert.deepStrictEqual(answer, { body: 'v=0\r\no=reanswer\r\n', contentType: 'application/sdp' });
+        adapter.hangup('call-1', {});
+        sinon.assert.calledOnce(inviterStub.bye);
+      });
     });
 
     it('defers iceRestart while reconnecting: no re-INVITE sent', async () => {

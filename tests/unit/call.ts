@@ -754,29 +754,21 @@ describe('Call', function() {
           });
         });
 
-        it('should install the onopen wrapper at most once across repeat accept() calls', () => {
+        it('should pass onAnswer to signalingAdapter.invite as onMediaStarted', () => {
           conn.accept();
           return wait.then(() => {
-            const afterFirst = mediaHandler.onopen;
-            // Force the Call back to Pending so a second accept() actually
-            // proceeds. This simulates any future bug where accept's guard is
-            // bypassed; the wrapper must NOT chain a second layer.
-            (conn as any)._status = Call.State.Pending;
-            conn.accept();
-            return wait.then(() => {
-              assert.strictEqual(mediaHandler.onopen, afterFirst,
-                'onopen should not have been re-wrapped on the second accept()');
-              // Also verify firing it once fires onAnswer exactly once (not
-              // twice from stacked wrappers).
-              const publisherInfo = publisher.info as sinon.SinonSpy;
-              publisherInfo.resetHistory();
-              mediaHandler.onopen();
-              const answeredCalls = publisherInfo.getCalls().filter(
-                (c: sinon.SinonSpyCall) => c.args[1] === 'accepted-by-remote' || c.args[1] === 'accepted-by-local',
-              );
-              assert.strictEqual(answeredCalls.length, 1,
-                'onAnswer should fire once, not once per stacked wrapper');
-            });
+            pstream.invite.args[0][1].onMediaStarted('foo');
+            sinon.assert.calledWith(publisher.info, 'connection', 'accepted-by-remote');
+            sinon.assert.calledWith(monitor.enable, 'foo');
+          });
+        });
+
+        it('should not fire onAnswer when the media handler opens', () => {
+          conn.accept();
+          return wait.then(() => {
+            mediaHandler.onopen();
+            sinon.assert.neverCalledWith(publisher.info, 'connection', 'accepted-by-remote');
+            sinon.assert.notCalled(monitor.enable);
           });
         });
 
@@ -788,6 +780,16 @@ describe('Call', function() {
             const reconnectConfig = pstream.reconnect.args[0][1];
             assert.strictEqual(reconnectConfig.peerConnection, mediaHandler);
             assert.strictEqual(reconnectConfig.reconnectToken, 'testReconnectToken');
+          });
+        });
+
+        it('should pass onAnswer to signalingAdapter.reconnect as onMediaStarted', () => {
+          setupSip({ reconnectToken: 'testReconnectToken' });
+          conn.accept();
+          return wait.then(() => {
+            pstream.reconnect.args[0][1].onMediaStarted('foo');
+            sinon.assert.calledWith(publisher.info, 'connection', 'accepted-by-remote');
+            sinon.assert.calledWith(monitor.enable, 'foo');
           });
         });
       });
@@ -811,6 +813,15 @@ describe('Call', function() {
           conn.accept();
           return wait.then(() => {
             sinon.assert.notCalled(mediaHandler.answerIncomingCall);
+          });
+        });
+
+        it('should pass onAnswer to signalingAdapter.answer as onMediaStarted', () => {
+          conn.accept();
+          return wait.then(() => {
+            pstream.answer.args[0][1].onMediaStarted('foo');
+            sinon.assert.calledWith(publisher.info, 'connection', 'accepted-by-local');
+            sinon.assert.calledWith(monitor.enable, 'foo');
           });
         });
       });
@@ -2157,6 +2168,32 @@ describe('Call', function() {
         });
       });
 
+      it('should not call reconnect on SIP, where the dialog outlives the WS', async () => {
+        conn = new Call(config, Object.assign(options, { callParameters: { CallSid: 'CA1234' }, useSip: true }));
+        conn.accept();
+        await clock.tickAsync(0);
+        // @ts-ignore
+        conn._signalingReconnectToken = 'foo';
+        pstream.emit('connected');
+        sinon.assert.notCalled(pstream.reconnect);
+      });
+
+      it('should return a SIP call to open after the WS comes back', async () => {
+        conn = new Call(config, Object.assign(options, { callParameters: { CallSid: 'CA1234' }, useSip: true }));
+        conn.accept();
+        await clock.tickAsync(0);
+        // An answered call with healthy media.
+        // @ts-ignore
+        conn._status = conn._signalingStatus = conn._mediaStatus = Call.State.Open;
+        const onReconnected = sinon.stub();
+        conn.on('reconnected', onReconnected);
+        pstream.emit('transportClose');
+        assert.strictEqual(conn.status(), Call.State.Reconnecting);
+        pstream.emit('connected');
+        sinon.assert.calledOnce(onReconnected);
+        assert.strictEqual(conn.status(), Call.State.Open);
+      });
+
       it('should not call pstream.reconnect when CallSid is missing', async () => {
         conn = new Call(config, Object.assign(options));
         conn.accept();
@@ -2880,6 +2917,36 @@ describe('Call', function() {
       assert.deepStrictEqual(pstream.iceRestart.firstCall.args[1], { mediaHandler: conn['_mediaHandler'] });
     });
 
+    it('should replace, not stack, the previous attempt\'s listeners when the backoff fires again', () => {
+      conn = new Call(config, Object.assign(options));
+      conn.parameters = { CallSid: 'CAtest' };
+      pstream.iceRestart = sinon.stub();
+      const answerCount = pstream.listenerCount('answer');
+      const hangupCount = pstream.listenerCount('hangup');
+
+      // A rejected re-INVITE emits neither answer nor hangup before the retry.
+      conn['_mediaReconnectBackoff'].emit('ready');
+      conn['_mediaReconnectBackoff'].emit('ready');
+      conn['_mediaReconnectBackoff'].emit('ready');
+
+      assert.strictEqual(pstream.listenerCount('answer'), answerCount + 1);
+      assert.strictEqual(pstream.listenerCount('hangup'), hangupCount + 1);
+    });
+
+    it('should remove the in-flight attempt\'s listeners on teardown', () => {
+      conn = new Call(config, Object.assign(options));
+      conn.parameters = { CallSid: 'CAtest' };
+      pstream.iceRestart = sinon.stub();
+      const before = pstream.listeners('answer');
+      conn['_mediaReconnectBackoff'].emit('ready');
+      const added = pstream.listeners('answer').filter((l: any) => !before.includes(l));
+      assert.strictEqual(added.length, 1);
+
+      conn['_cleanupEventListeners']();
+
+      assert(!pstream.listeners('answer').includes(added[0]));
+    });
+
     context('skips retry while signaling is disconnected', () => {
       beforeEach(() => {
         // Drive the call into media-Reconnecting so the next failure hits the
@@ -2937,6 +3004,18 @@ describe('Call', function() {
         // After reset, _mediaReconnectStartTime should be ~now, not -60s.
         const elapsed = Date.now() - conn['_mediaReconnectStartTime'];
         assert(elapsed < 1000, `expected fresh start time, got elapsed=${elapsed}`);
+      });
+
+      it('skips the restart when media recovered while the WS was down', () => {
+        conn['_status'] = Call.State.Open;
+        conn['_mediaStatus'] = Call.State.Open;
+        conn['_mediaReconnectBackoff'].backoff = sinon.stub();
+        mediaHandler.version.pc.iceConnectionState = 'connected';
+
+        pstream.emit('iceRestartNeeded', { callsid: 'CAtest' });
+
+        sinon.assert.notCalled(conn['_mediaReconnectBackoff'].backoff);
+        assert.strictEqual(conn.status(), Call.State.Open);
       });
 
       it('ignores events for a different callSid', () => {
