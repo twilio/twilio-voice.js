@@ -870,7 +870,10 @@ class Call extends EventEmitter {
         if (this._options.dialtonePlayer && !customSounds[digit]) {
           this._options.dialtonePlayer.play(digit);
         } else {
-          this._soundcache.get(digit).play();
+          const sound = this._soundcache.get(digit);
+          if (sound) {
+            sound.play();
+          }
         }
       }
       if (sequence.length) {
@@ -1991,9 +1994,9 @@ namespace Call {
     codecPreferences?: Codec[];
 
     /**
-     * A mapping of custom sound URLs by sound name.
+     * A mapping of custom sound URLs by sound name, or `false` if disabled.
      */
-    customSounds?: Partial<Record<Device.SoundName, string>>;
+    customSounds?: Partial<Record<Device.SoundName, string | false>>;
 
     /**
      * A DialTone player, to play mock DTMF sounds.

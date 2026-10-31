@@ -50,6 +50,25 @@ const checkDevice = async () => {
     edge: ['ashburn', 'dublin'],
   };
 
+  // preloadSounds accepts boolean, 'call-events', or a record
+  const optionsWithPreloadFalse: Device.Options = {
+    preloadSounds: false,
+  };
+  const optionsWithPreloadCallEvents: Device.Options = {
+    preloadSounds: 'call-events',
+  };
+  const optionsWithPreloadMap: Device.Options = {
+    preloadSounds: {
+      dtmf: false,
+      [Device.SoundName.Incoming]: true,
+    },
+  };
+  const optionsWithDisabledSound: Device.Options = {
+    sounds: {
+      [Device.SoundName.Dtmf0]: false,
+    },
+  };
+
   const device: Device = new Device('foo', options);
 
   // --- Static properties ---

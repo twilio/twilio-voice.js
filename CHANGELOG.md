@@ -3,6 +3,11 @@
 2.18.6 (In Progress)
 ====================
 
+Features
+--------
+
+- Added the `preloadSounds` option to `Device.Options` and `device.updateOptions()`, allowing integrations to opt out of preloading sounds upon `Device` initialization. Preloading fetches sound files muted to pre-warm audio elements against browser autoplay policies. Setting `preloadSounds: false` disables all preloads (loading sounds on demand when played), `preloadSounds: 'call-events'` preloads only the call-event sounds (`incoming`, `outgoing`, `disconnect`) while skipping the 12 default DTMF keypad sounds, and an object (e.g. `{ dtmf: false }` or `{ [Device.SoundName.Dtmf0]: false }`) allows fine-grained per-sound control. In addition, setting a sound to `false` in `options.sounds` now disables and skips preloading for that sound.
+
 Bug Fixes
 ---------
 
