@@ -215,6 +215,7 @@ describe('PeerConnection', () => {
       newStream = { getAudioTracks: sinon.stub().returns(['foo']), id: 2 };
       context = {
         stream: STREAM,
+        version: {},
         mute: sinon.stub(),
         _sender: {},
         _stopStream: sinon.stub(),
@@ -235,6 +236,33 @@ describe('PeerConnection', () => {
         assert(newStream.getAudioTracks.calledWithExactly());
         assert.equal(aError.message, 'Supplied input stream has no audio tracks');
       }).then(done).catch(done);
+    });
+
+    [false, true].forEach(shouldClone => {
+      [false, true].forEach(shouldManageStream => {
+        it(`Should replace input before connection setup (clone=${shouldClone}, managed=${shouldManageStream})`, async () => {
+          const clonedStream = { addTrack: sinon.stub() };
+          context.version = null;
+          context._sender = null;
+          context._shouldManageStream = shouldManageStream;
+          context._stopStream = sinon.stub();
+          context.options = { MediaStream: sinon.stub().returns(clonedStream) };
+          context.isMuted = true;
+
+          const result = await toTest(shouldClone, newStream);
+
+          assert.strictEqual(result, shouldClone ? clonedStream : newStream);
+          assert.strictEqual(context.stream, result);
+          assert.strictEqual(context.version, null);
+          assert.strictEqual(context._sender, null);
+          assert.strictEqual(context._stopStream.calledOnce, shouldManageStream);
+          assert(context.mute.calledOnceWithExactly(true));
+          assert.strictEqual(context.options.MediaStream.calledOnce, shouldClone);
+          if (shouldClone) {
+            assert(clonedStream.addTrack.calledOnceWithExactly('foo', 0, ['foo']));
+          }
+        });
+      });
     });
 
     it('Should replace tracks before returning the new stream', done => {
@@ -258,6 +286,7 @@ describe('PeerConnection', () => {
       });
       context = {
         stream: STREAM,
+        version: {},
         mute: sinon.stub(),
         _sender: {},
         _stopStream: sinon.stub(),
