@@ -792,6 +792,42 @@ describe('Call', function() {
             sinon.assert.calledWith(monitor.enable, 'foo');
           });
         });
+
+        it('should disconnect on a hangup the adapter emits while sending the INVITE', () => {
+          pstream.invite = sinon.stub().callsFake((callsid: string) => pstream.emit('hangup', { callsid }));
+          conn.accept();
+          return wait.then(() => {
+            sinon.assert.calledWith(publisher.info, 'connection', 'disconnected-by-remote');
+          });
+        });
+
+        // The adapter emits under the temp sid until the 200 OK's
+        // X-Twilio-CallSid re-keys it, then under the server CallSid.
+        context('when the adapter swaps the temp sid for the server CallSid', () => {
+          beforeEach(() => {
+            conn.accept();
+            return wait.then(() => {
+              sinon.assert.calledWith(pstream.invite, conn.outboundConnectionId);
+            });
+          });
+
+          it('should disconnect on a hangup under the temp sid before the answer', () => {
+            pstream.emit('hangup', { callsid: conn.outboundConnectionId });
+            sinon.assert.calledWith(publisher.info, 'connection', 'disconnected-by-remote');
+          });
+
+          it('should disconnect on a hangup under the server CallSid after the answer', () => {
+            pstream.emit('answer', { callsid: 'CA-server', sdp: '' });
+            assert.strictEqual(conn.parameters.CallSid, 'CA-server');
+            pstream.emit('hangup', { callsid: 'CA-server' });
+            sinon.assert.calledWith(publisher.info, 'connection', 'disconnected-by-remote');
+          });
+
+          it('should ignore a hangup for another call', () => {
+            pstream.emit('hangup', { callsid: 'CA-other' });
+            sinon.assert.neverCalledWith(publisher.info, 'connection', 'disconnected-by-remote');
+          });
+        });
       });
 
       context('incoming', () => {
@@ -3055,6 +3091,19 @@ describe('Call', function() {
       pstream.emit('hangup', { callsid: 'CAtest' });
       assert.strictEqual(pstream.listenerCount('answer'), answerBaseline);
       assert.strictEqual(pstream.listenerCount('hangup'), hangupBaseline);
+    });
+
+    it('keeps its ICE-restart listeners when another call on the adapter answers or hangs up', () => {
+      conn = new Call(config, Object.assign(options));
+      conn.parameters = { CallSid: 'CAtest' };
+      pstream.iceRestart = sinon.stub();
+      const answerBaseline = pstream.listenerCount('answer');
+      const hangupBaseline = pstream.listenerCount('hangup');
+      conn['_mediaReconnectBackoff'].emit('ready');
+      pstream.emit('answer', { callsid: 'CAother', sdp: '' });
+      pstream.emit('hangup', { callsid: 'CAother' });
+      assert.strictEqual(pstream.listenerCount('answer'), answerBaseline + 1);
+      assert.strictEqual(pstream.listenerCount('hangup'), hangupBaseline + 1);
     });
   });
 });

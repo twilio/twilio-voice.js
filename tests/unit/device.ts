@@ -802,6 +802,37 @@ describe('Device', function() {
             );
           });
 
+          [
+            'alice@registrar.example.com',
+            'sip:',
+            'sip:alice@',
+            'sip:alice',
+            'sip:registrar.example.com;transport=tcp',
+            'sip:al ice@registrar.example.com',
+            'sips:alice@registrar.example.com',
+            'tel:+15551234567',
+            'sip:alice@registrar.example.com?X-Foo=bar',
+            'sip:alice@registrar.example.com;transport=tcp',
+            'sip:alice@registrar.example.com;maddr=other.example.com',
+            'sip:alice:secret@registrar.example.com',
+            'sip:alice@registrar.example.com:',
+            'sip:alice@registrar.example.com:99999',
+          ].forEach((sipUri) => {
+            it(`should throw if useSignalingMethod is sip and sipUri is '${sipUri}'`, () => {
+              assert.throws(
+                () => device.updateOptions({
+                  signalingOptions: {
+                    useSignalingMethod: 'sip',
+                    sipServer: 'wss://sip.example.com',
+                    sipUri,
+                    sipCredentials: { username: 'u', password: 'p' },
+                  },
+                }),
+                { name: 'InvalidArgumentError', message: /sipUri.*must be a plain `sip:user@host`/ },
+              );
+            });
+          });
+
           it('should throw if useSignalingMethod is sip but sipCredentials is missing', () => {
             assert.throws(
               () => device.updateOptions({
@@ -853,6 +884,24 @@ describe('Device', function() {
                 sipCredentials: { username: 'u', password: 'p' },
               },
             }));
+          });
+
+          [
+            'sip:alice@registrar.example.com:5060',
+            'SIP:alice@registrar.example.com',
+            'sip:alice@[::1]',
+          ].forEach((sipUri) => {
+            it(`should not throw with sipUri '${sipUri}'`, () => {
+              assert.doesNotThrow(() => new Device(token, {
+                ...setupOptions,
+                signalingOptions: {
+                  useSignalingMethod: 'sip',
+                  sipServer: 'wss://sip.example.com',
+                  sipUri,
+                  sipCredentials: { username: 'u', password: 'p' },
+                },
+              }));
+            });
           });
 
           it('should not throw with VSP signalingOptions', () => {
