@@ -1,4 +1,34 @@
 // @ts-nocheck
+import Log from './log';
+
+const log = new Log('Request');
+
+/**
+ * Whether a fetch Response is a 2xx response. Uses `response.ok` when it is a
+ * boolean, otherwise derives it from `response.status`.
+ * @param {Response} response
+ * @returns {boolean}
+ */
+function isOkResponse(response) {
+  if (response && typeof response.ok === 'boolean') {
+    return response.ok;
+  }
+  const status = response && response.status;
+  return typeof status !== 'number' || (status >= 200 && status < 300);
+}
+
+/**
+ * Create the error passed to the callback for a non-2xx HTTP response.
+ * @param {number} status
+ * @param {string} [responseText]
+ * @returns {Error} An Error with a numeric `status` property.
+ */
+function createHttpError(status, responseText) {
+  const error = new Error(`Request failed with HTTP status ${status}`);
+  error.status = status;
+  error.responseText = responseText;
+  return error;
+}
 
 function request(method, params, callback) {
   const body = JSON.stringify(params.body || {});
@@ -8,9 +38,34 @@ function request(method, params, callback) {
   Object.entries(params.headers).forEach(([headerName, headerBody]) =>
     headers.append(headerName, headerBody));
 
+  // The callback is invoked exactly once: with an error for a network-level
+  // rejection or a non-2xx response (the error has a numeric `status`), or
+  // with (null, responseText) for a 2xx response.
+  let isSettled = false;
+  const settle = (error, responseText) => {
+    if (isSettled) { return; }
+    isSettled = true;
+    try {
+      callback(error, responseText);
+    } catch (e) {
+      // Keep a throwing callback from becoming an unhandled rejection.
+      log.error('Request callback threw an error', e);
+    }
+  };
+
   fetch(params.url, { body, headers, method })
-    .then(response => response.text(), callback)
-    .then(responseText => callback(null, responseText), callback);
+    .then(response => {
+      if (isOkResponse(response)) {
+        return response.text();
+      }
+      const status = response.status;
+      // The body is only diagnostic here; a failed read still reports the status.
+      return Promise.resolve()
+        .then(() => response.text())
+        .then(text => text, () => undefined)
+        .then(text => { throw createHttpError(status, text); });
+    })
+    .then(responseText => settle(null, responseText), error => settle(error));
 }
 /**
  * Use XMLHttpRequest to get a network resource.

@@ -16,6 +16,7 @@ import {
   TwilioError,
 } from './errors';
 import Publisher from './eventpublisher';
+import InsightsOutbox from './insightsoutbox';
 import Log from './log';
 import { PreflightTest } from './preflight/preflight';
 import PStream from './pstream';
@@ -364,6 +365,14 @@ class Device extends EventEmitter {
   private _identity: string | null = null;
 
   /**
+   * The Insights event buffer and retry loop. Created once and shared by every
+   * publisher this Device creates, so buffered events survive
+   * {@link Device.updateOptions} replacing the publisher, and Calls holding a
+   * replaced publisher post into the same buffer.
+   */
+  private _insightsOutbox: InsightsOutbox | null = null;
+
+  /**
    * Whether SDK is run as a browser extension
    */
   private _isBrowserExtension: boolean;
@@ -644,6 +653,7 @@ class Device extends EventEmitter {
     this._destroyAudioHelper();
     this._audioProcessorEventObserver?.destroy();
     this._destroyPublisher();
+    this._destroyInsightsOutbox();
 
     if (this._networkInformation && typeof this._networkInformation.removeEventListener === 'function') {
       this._networkInformation.removeEventListener('change', this._publishNetworkChange);
@@ -937,6 +947,15 @@ class Device extends EventEmitter {
     if (!this._audio) { return; }
     this._audio._destroy();
     this._audio = null;
+  }
+
+  /**
+   * Drop buffered Insights events and stop the retry timer.
+   */
+  private _destroyInsightsOutbox() {
+    if (!this._insightsOutbox) { return; }
+    this._insightsOutbox.destroy();
+    this._insightsOutbox = null;
   }
 
   /**
@@ -1585,12 +1604,17 @@ class Device extends EventEmitter {
       this._destroyPublisher();
     }
 
+    if (!this._insightsOutbox) {
+      this._insightsOutbox = new InsightsOutbox();
+    }
+
     const publisherOptions = {
       defaultPayload: this._createDefaultPayload,
       metadata: {
         app_name: this._options.appName,
         app_version: this._options.appVersion,
       },
+      outbox: this._insightsOutbox,
     } as any;
 
     if (this._options.eventgw) {
@@ -1610,6 +1634,11 @@ class Device extends EventEmitter {
         this._log.warn('Cannot connect to insights.', error);
       });
     }
+
+    // Send events buffered before this publisher replaced the previous one.
+    // No-op when the host is unknown, and the buffer is already empty when
+    // publishing is disabled.
+    this._insightsOutbox.flush();
 
     return this._publisher;
   }

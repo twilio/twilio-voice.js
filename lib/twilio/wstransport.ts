@@ -11,7 +11,14 @@ const HEARTBEAT_TIMEOUT = 15000;
 const MAX_PREFERRED_DURATION = 15000;
 const MAX_PRIMARY_DURATION = Infinity;
 const MAX_RETRY_AFTER_DURATION = 75000;
-const MAX_PREFERRED_DELAY = 1000;
+/**
+ * Same-edge (preferred URI) reconnect backoff settings. Exported so the
+ * Insights event buffer (insightsoutbox.ts) retries on the same schedule.
+ */
+export const MAX_PREFERRED_DELAY = 1000;
+export const PREFERRED_BACKOFF_FACTOR = 2.0;
+export const PREFERRED_BACKOFF_JITTER = 0.40;
+export const PREFERRED_BACKOFF_MIN_DELAY = 100;
 const MAX_PRIMARY_DELAY = 20000;
 const MAX_RETRY_AFTER_DELAY = 60000;
 
@@ -570,10 +577,10 @@ export default class WSTransport extends EventEmitter {
       : this._options.maxPreferredDurationMs;
 
     const preferredBackoffConfig = {
-      factor: 2.0,
-      jitter: 0.40,
+      factor: PREFERRED_BACKOFF_FACTOR,
+      jitter: PREFERRED_BACKOFF_JITTER,
       max: preferredRetryAfter ? this._options.maxRetryAfterDelayMs : this._options.maxPreferredDelayMs,
-      min: preferredRetryAfter || 100,
+      min: preferredRetryAfter || PREFERRED_BACKOFF_MIN_DELAY,
       useInitialValue: Boolean(preferredRetryAfter),
     };
     this._log.info('Initializing preferred transport backoff using config: ', preferredBackoffConfig);
