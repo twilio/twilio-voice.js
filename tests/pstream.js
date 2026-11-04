@@ -227,6 +227,207 @@ describe('PStream', () => {
     });
   });
 
+  // VBLOCKS-7513: the VSP `connected` message carries `payload.connectionId`
+  // (the backend WebSocket sessionId). PStream keeps it at signaling
+  // connection scope so Device can add it to every Insights event.
+  describe('connectionId (VBLOCKS-7513)', () => {
+    const receive = (type, payload) => {
+      pstream.transport.emit('message', {
+        data: JSON.stringify({ payload, type, version: EXPECTED_PSTREAM_VERSION }),
+      });
+    };
+
+    const connectedPayload = (connectionId) => {
+      const payload = {
+        edge: 'ashburn',
+        home: 'stage-us1',
+        region: 'US_EAST_VIRGINIA',
+        token: { identity: 'alice', ttl: 3600 },
+      };
+      if (connectionId !== undefined) {
+        payload.connectionId = connectionId;
+      }
+      return payload;
+    };
+
+    const openAndConnect = (connectionId) => {
+      pstream.transport.emit('open');
+      receive('connected', connectedPayload(connectionId));
+    };
+
+    it('should not have a connectionId before any connected message', () => {
+      assert.equal(pstream.connectionId, null);
+    });
+
+    it('should not have a connectionId after transport open but before connected', () => {
+      pstream.transport.emit('open');
+      assert.equal(pstream.connectionId, null);
+    });
+
+    it('should store the exact connectionId from a connected message', () => {
+      openAndConnect('6ee01b38-0000-4000-8000-00000000000a');
+      assert.strictEqual(pstream.connectionId, '6ee01b38-0000-4000-8000-00000000000a');
+    });
+
+    it('should treat the connectionId as an opaque string (no format validation)', () => {
+      openAndConnect('not-a-uuid:42');
+      assert.strictEqual(pstream.connectionId, 'not-a-uuid:42');
+    });
+
+    it('should still emit connected with the unmodified payload', () => {
+      const listener = sinon.spy();
+      pstream.on('connected', listener);
+      openAndConnect('CONN-A');
+      sinon.assert.calledOnce(listener);
+      assert.deepStrictEqual(listener.args[0][0], connectedPayload('CONN-A'));
+    });
+
+    it('should be readable by connected listeners when connected is emitted', () => {
+      let seen;
+      pstream.on('connected', () => { seen = pstream.connectionId; });
+      openAndConnect('CONN-A');
+      assert.strictEqual(seen, 'CONN-A');
+    });
+
+    it('should leave connectionId absent when connected has no connectionId (older backend)', () => {
+      const listener = sinon.spy();
+      pstream.on('connected', listener);
+      openAndConnect(undefined);
+      assert.equal(pstream.connectionId, null);
+      sinon.assert.calledOnce(listener);
+    });
+
+    it('should not read the never-shipped signalingConnectionId name', () => {
+      pstream.transport.emit('open');
+      receive('connected', { ...connectedPayload(undefined), signalingConnectionId: 'LEGACY-NAME' });
+      assert.equal(pstream.connectionId, null);
+    });
+
+    [
+      ['a number', 12345],
+      ['a boolean', true],
+      ['an object', { id: 'CONN-A' }],
+      ['an array', ['CONN-A']],
+      ['null', null],
+    ].forEach(([label, value]) => {
+      it(`should ignore a connectionId that is ${label}`, () => {
+        openAndConnect(value);
+        assert.equal(pstream.connectionId, null);
+      });
+    });
+
+    ['ready', 'offline', 'invite', 'answer', 'hangup', 'cancel', 'error', 'message', 'ringing', 'foo'].forEach(type => {
+      it(`should not set connectionId from a "${type}" message`, () => {
+        pstream.transport.emit('open');
+        const payload = { callsid: 'CA123', connectionId: `FROM-${type}` };
+        if (type === 'error') {
+          payload.error = { code: 31000, message: 'foo' };
+        }
+        receive(type, payload);
+        assert.equal(pstream.connectionId, null);
+      });
+
+      // A server `offline` message (unregister response) leaves the socket open;
+      // whether it clears the id is not fixed by the contract, so it is not asserted.
+      if (type === 'offline') {
+        return;
+      }
+
+      it(`should not overwrite an existing connectionId from a "${type}" message`, () => {
+        openAndConnect('CONN-A');
+        const payload = { callsid: 'CA123', connectionId: `FROM-${type}` };
+        if (type === 'error') {
+          payload.error = { code: 31000, message: 'foo' };
+        }
+        receive(type, payload);
+        assert.strictEqual(pstream.connectionId, 'CONN-A');
+      });
+    });
+
+    it('should keep the same connectionId when connected repeats the same id (e.g. after setToken)', () => {
+      openAndConnect('CONN-A');
+      pstream.setToken('new-token');
+      receive('connected', connectedPayload('CONN-A'));
+      assert.strictEqual(pstream.connectionId, 'CONN-A');
+    });
+
+    it('should replace the connectionId when connected carries a different id', () => {
+      openAndConnect('CONN-A');
+      receive('connected', connectedPayload('CONN-B'));
+      assert.strictEqual(pstream.connectionId, 'CONN-B');
+    });
+
+    context('when the transport closes', () => {
+      it('should clear the connectionId', () => {
+        openAndConnect('CONN-A');
+        pstream.transport.emit('close');
+        assert.equal(pstream.connectionId, null);
+      });
+
+      // CONTRACTS.md C2 allows events emitted synchronously while handling the
+      // close (e.g. from 'offline' / 'transportClose' listeners) to still carry
+      // the old id, so no assertion is made about the value inside those listeners.
+
+      it('should not restore the old connectionId when the transport reopens', () => {
+        openAndConnect('CONN-A');
+        pstream.transport.emit('close');
+        pstream.transport.emit('open');
+        assert.equal(pstream.connectionId, null);
+      });
+
+      it('should use the new connectionId after reopen and a new connected', () => {
+        openAndConnect('CONN-A');
+        pstream.transport.emit('close');
+        openAndConnect('CONN-B');
+        assert.strictEqual(pstream.connectionId, 'CONN-B');
+      });
+
+      it('should never bring back the old connectionId when the new connected has none', () => {
+        openAndConnect('CONN-A');
+        pstream.transport.emit('close');
+        openAndConnect(undefined);
+        assert.equal(pstream.connectionId, null);
+      });
+
+      it('should track each connection across several reconnects', () => {
+        ['CONN-1', 'CONN-2', 'CONN-3'].forEach(id => {
+          openAndConnect(id);
+          assert.strictEqual(pstream.connectionId, id);
+          pstream.transport.emit('close');
+          assert.equal(pstream.connectionId, null);
+        });
+      });
+    });
+
+    context('when the PStream is destroyed', () => {
+      it('should clear the connectionId on destroy()', () => {
+        openAndConnect('CONN-A');
+        pstream.destroy();
+        assert.equal(pstream.connectionId, null);
+      });
+
+      it('should clear the connectionId when the server sends close', () => {
+        openAndConnect('CONN-A');
+        receive('close', {});
+        assert.equal(pstream.connectionId, null);
+      });
+
+      it('should ignore a connected message delivered after destroy()', () => {
+        openAndConnect('CONN-A');
+        pstream.destroy();
+        receive('connected', connectedPayload('CONN-LATE'));
+        assert.equal(pstream.connectionId, null);
+      });
+    });
+
+    it('should not share the connectionId between PStream instances', () => {
+      openAndConnect('CONN-A');
+      const other = new PStream(token, uris, options);
+      assert.equal(other.connectionId, null);
+      assert.strictEqual(pstream.connectionId, 'CONN-A');
+    });
+  });
+
   describe('updatePreferredURI', () => {
     it('should update the preferred uri', () => {
       pstream.updatePreferredURI('foo');

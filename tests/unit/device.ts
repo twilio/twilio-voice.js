@@ -252,6 +252,134 @@ describe('Device', function() {
             root.chrome = origChrome;
           });
         });
+
+        // VBLOCKS-7513: signaling_connection_id comes from the stream, not the Call.
+        describe('signaling_connection_id', () => {
+          const basePayload = () => ({
+            aggressive_nomination: false,
+            browser_extension: false,
+            dscp: true,
+            ice_restart_enabled: true,
+            platform: 'WebRTC',
+            sdk_version: Device.version,
+          });
+
+          const createFakeCall = (callSid: string, tempCallSid: string): any => ({
+            codec: 'opus',
+            direction: 'OUTGOING',
+            outboundConnectionId: tempCallSid,
+            parameters: { CallSid: callSid },
+          });
+
+          const defaultPayload = (call?: any) => Publisher.lastCall.args[2].defaultPayload(call);
+
+          it('should include signaling_connection_id without a call', () => {
+            pstream.connectionId = 'CONN-A';
+            assert.deepStrictEqual(defaultPayload(), {
+              ...basePayload(),
+              signaling_connection_id: 'CONN-A',
+            });
+          });
+
+          it('should include signaling_connection_id when called with no arguments', () => {
+            pstream.connectionId = 'CONN-A';
+            assert.strictEqual(device['_createDefaultPayload']().signaling_connection_id, 'CONN-A');
+          });
+
+          it('should include signaling_connection_id alongside the call fields', () => {
+            pstream.connectionId = 'CONN-A';
+            assert.deepStrictEqual(defaultPayload(createFakeCall('CA1111', 'TJ1111')), {
+              ...basePayload(),
+              audio_codec: 'opus',
+              call_sid: 'CA1111',
+              direction: 'OUTGOING',
+              signaling_connection_id: 'CONN-A',
+              temp_call_sid: 'TJ1111',
+            });
+          });
+
+          it('should include signaling_connection_id for a call without a CallSid yet', () => {
+            pstream.connectionId = 'CONN-A';
+            const payload = defaultPayload(createFakeCall(undefined as any, 'TJ1111'));
+            assert.strictEqual(payload.signaling_connection_id, 'CONN-A');
+            assert.strictEqual(payload.temp_call_sid, 'TJ1111');
+            assert(!('call_sid' in payload));
+          });
+
+          [null, undefined].forEach(value => {
+            it(`should omit signaling_connection_id when the stream connectionId is ${value}`, () => {
+              pstream.connectionId = value;
+              assert.deepStrictEqual(defaultPayload(), basePayload());
+              assert(!('signaling_connection_id' in defaultPayload(createFakeCall('CA1111', 'TJ1111'))));
+            });
+          });
+
+          it('should omit signaling_connection_id when the stream never received one', () => {
+            assert(!('signaling_connection_id' in defaultPayload()));
+          });
+
+          it('should use the same id for two calls on the same stream', () => {
+            pstream.connectionId = 'CONN-A';
+            const payload1 = defaultPayload(createFakeCall('CA1111', 'TJ1111'));
+            const payload2 = defaultPayload(createFakeCall('CA2222', 'TJ2222'));
+            assert.strictEqual(payload1.signaling_connection_id, 'CONN-A');
+            assert.strictEqual(payload2.signaling_connection_id, 'CONN-A');
+            assert.notStrictEqual(payload1.call_sid, payload2.call_sid);
+          });
+
+          it('should use the new id after the stream reconnects', () => {
+            pstream.connectionId = 'CONN-A';
+            assert.strictEqual(defaultPayload().signaling_connection_id, 'CONN-A');
+            pstream.connectionId = null;
+            pstream.emit('offline');
+            assert(!('signaling_connection_id' in defaultPayload()));
+            pstream.connectionId = 'CONN-B';
+            pstream.emit('connected', { region: 'US_EAST_VIRGINIA' });
+            assert.strictEqual(defaultPayload().signaling_connection_id, 'CONN-B');
+          });
+
+          it('should read the id at payload creation, not when the publisher was created', () => {
+            const payloadFn = Publisher.lastCall.args[2].defaultPayload;
+            pstream.connectionId = 'CONN-A';
+            const first = payloadFn();
+            pstream.connectionId = 'CONN-B';
+            const second = payloadFn();
+            assert.strictEqual(first.signaling_connection_id, 'CONN-A');
+            assert.strictEqual(second.signaling_connection_id, 'CONN-B');
+          });
+
+          it('should omit signaling_connection_id after the server closes the stream', () => {
+            pstream.connectionId = 'CONN-A';
+            pstream.emit('close');
+            assert.equal(device['_stream'], null);
+            assert(!('signaling_connection_id' in defaultPayload()));
+          });
+
+          it('should not inherit the id from a replaced stream', async () => {
+            pstream.connectionId = 'CONN-A';
+            const oldStream = pstream;
+            const setupPromise = device['_setupStream']();
+            assert.notStrictEqual(pstream, oldStream);
+            assert(!('signaling_connection_id' in defaultPayload()));
+            pstream.connectionId = 'CONN-B';
+            pstream.emit('connected', { region: 'US_EAST_VIRGINIA' });
+            await setupPromise;
+            assert.strictEqual(defaultPayload().signaling_connection_id, 'CONN-B');
+          });
+
+          it('should keep signaling_connection_id after updateOptions recreates the publisher', () => {
+            pstream.connectionId = 'CONN-A';
+            device.updateOptions({ appName: 'foobar' });
+            assert.strictEqual(Publisher.lastCall.args[2].defaultPayload().signaling_connection_id, 'CONN-A');
+          });
+
+          it('should omit signaling_connection_id after the Device is destroyed', () => {
+            pstream.connectionId = 'CONN-A';
+            const payloadFn = Publisher.lastCall.args[2].defaultPayload;
+            device.destroy();
+            assert(!('signaling_connection_id' in payloadFn()));
+          });
+        });
       });
 
       describe('.connect()', () => {
@@ -1812,6 +1940,12 @@ describe('Device', function() {
 
         it('should not set host address before signaling is connected', () => {
           sinon.assert.notCalled(publisher.setHost);
+        });
+
+        it('should omit signaling_connection_id before a stream exists', () => {
+          assert.equal(device['_stream'], null);
+          const payload = Publisher.lastCall.args[2].defaultPayload();
+          assert(!('signaling_connection_id' in payload));
         });
       });
 
