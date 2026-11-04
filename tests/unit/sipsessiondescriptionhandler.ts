@@ -310,6 +310,46 @@ describe('SipSessionDescriptionHandler', () => {
       await pending;
       assert.strictEqual(settled, true);
     });
+
+    it('does NOT reject the restart answer when a runtime pc.onfailed fires after the restart offer was sent', async () => {
+      const pc = createPeerConnectionStub({ // processAnswer never calls back
+        iceRestart: sinon.stub().callsFake((cb: (sdp: string) => void) => cb(ICE_RESTART_OFFER_SDP)),
+      });
+      const { handler } = createHandler(pc);
+      handler.requestIceRestart();
+      await handler.getDescription();
+      let rejected = false;
+      const pending = handler.setDescription(ANSWER_SDP).catch(() => { rejected = true; });
+      pc.onfailed('ICE connection failed');
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.strictEqual(rejected, false);
+      handler.close();
+      await pending;
+    });
+
+    it('does NOT reject a later remote re-INVITE when a runtime pc.onfailed follows a failed restart', async () => {
+      const pc = createPeerConnectionStub({ // iceRestart and processOffer never call back
+        answerIncomingCall: stubAnswerIncomingCall(),
+      });
+      const { handler } = createHandler(pc);
+      await handler.setDescription(OFFER_SDP);
+      await handler.getDescription();
+      handler.requestIceRestart();
+      const restart = handler.getDescription();
+      pc.onfailed('createOffer rejected');
+      await assert.rejects(restart, { name: ICE_RESTART_OFFER_FAILED });
+
+      let rejected = false;
+      const pending = handler.setDescription(REOFFER_SDP).catch(() => { rejected = true; });
+      pc.onfailed('ICE connection failed');
+      await Promise.resolve();
+      await Promise.resolve();
+      sinon.assert.calledOnce(pc.processOffer);
+      assert.strictEqual(rejected, false);
+      handler.close();
+      await pending;
+    });
   });
 
   describe('setDescription after offer (outbound answer)', () => {

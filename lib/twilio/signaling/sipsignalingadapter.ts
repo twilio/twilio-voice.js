@@ -77,7 +77,6 @@ type SipSendMessageConfig = Pick<SendMessageConfig, 'content' | 'contentType' | 
  * Options for constructing a SipSignalingAdapter.
  */
 export interface SipSignalingAdapterOptions {
-  sipDomain: string;
   sipUri: string;
   sipTransportServer: string;
   credentials: { username: string; password: string };
@@ -126,6 +125,22 @@ interface QueuedMessage {
 }
 
 /**
+ * Parses a SIP identity URI. Returns undefined unless it is a plain
+ * `sip:user@host` or `sip:user@host:port`. SIP over WSS already secures the
+ * transport, so no `sips:`. No password, parameters or headers: they would
+ * leak into From and To, and SIP.js lets `;maddr=` replace the host.
+ */
+export function parseSipUri(sipUri: string): URI | undefined {
+  const uri = UserAgent.makeURI(sipUri);
+  if (!uri || uri.scheme !== 'sip' || !uri.user || uri.user.includes(':')
+      || (uri.port !== undefined && !(Number.isInteger(uri.port) && uri.port > 0 && uri.port < 65536))
+      || Object.keys(uri.parameters).length || Object.keys(uri.headers).length) {
+    return undefined;
+  }
+  return uri;
+}
+
+/**
  * Fallback SDH returned from the factory when no binding is registered
  * for a session. Every operation rejects with a clear error so SIP.js's
  * Promise-based accept/invite paths fail cleanly instead of crashing
@@ -159,6 +174,7 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
   private _registerer: Registerer | null = null;
   private _region: string | undefined;
   private _status: SignalingAdapterStatus = 'disconnected';
+  private _targetUri: URI;
   private _token: string = '';
   private _uri: string;
   private _userAgent: UserAgent | null = null;
@@ -200,10 +216,12 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
 
     const createUA = options.createUserAgent || ((...args: ConstructorParameters<typeof UserAgent>) => new UserAgent(...args));
 
-    const sipUri = UserAgent.makeURI(options.sipUri);
+    const sipUri = parseSipUri(options.sipUri);
     if (!sipUri) {
       throw new Error(`Failed to create SIP URI from "${options.sipUri}"`);
     }
+    // Host only: the WebSocket transport config handles port and transport.
+    this._targetUri = new URI('sip', '', sipUri.host);
 
     this._userAgent = createUA({
       uri: sipUri,
@@ -913,16 +931,9 @@ export class SipSignalingAdapter extends EventEmitter implements SignalingAdapte
       return;
     }
 
-    const targetUri = UserAgent.makeURI(`sip:${this._options.sipDomain}`);
-    if (!targetUri) {
-      this._log.error('Failed to create target URI for invite');
-      this.emit('error', { error: { code: 31000, message: 'Invalid SIP target URI' }, callsid: tempCallSid });
-      return;
-    }
-
     const createInv = this._options.createInviter
       || ((ua: UserAgent, uri: URI, opts?: InviterOptions) => new Inviter(ua, uri, opts));
-    const inviter = createInv(this._userAgent, targetUri);
+    const inviter = createInv(this._userAgent, this._targetUri);
 
     // Starts as the client-generated temp sid; replaced with the server-issued
     // CallSid from the 200 OK's X-Twilio-CallSid header once the INVITE is accepted.
