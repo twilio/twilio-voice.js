@@ -12,7 +12,9 @@ import { expectEvent } from '../../tests/lib/util';
 // 2.2.5+, stage today). It is skipped unless both of these Cypress env values are
 // set (for example via CYPRESS_DEVICE_CHUNDERW / CYPRESS_DEVICE_EVENTGW):
 //   DEVICE_CHUNDERW  signaling hostname, e.g. chunderw-vpc-gll.stage.twilio.com
-//   DEVICE_EVENTGW   insights hostname, e.g. eventgw.stage.twilio.com
+//   DEVICE_EVENTGW   initial insights hostname, e.g. eventgw.stage.twilio.com. The
+//                    Device replaces it on every `connected` with eventgw.<home>,
+//                    so it only matters for posts before the first `connected`.
 // The token's TwiML app must dial `<Client>` with either the `To` param (README
 // "Integration Tests" app) or the `recepient` param; both are sent.
 //
@@ -37,6 +39,8 @@ interface CapturedEvent {
 interface Observer {
   connected: Array<Record<string, any>>;
   events: CapturedEvent[];
+  // events.length when the first `connected` arrived; events before it have no id.
+  firstConnectedEventIndex: number | null;
   waitForConnected: (count: number, timeoutMs: number) => Promise<Record<string, any>>;
 }
 
@@ -81,6 +85,9 @@ function observe(device: Device): Observer {
       let parsed: any;
       try { parsed = JSON.parse(msg.data); } catch (e) { return; }
       if (parsed.type === 'connected') {
+        if (observer.firstConnectedEventIndex === null) {
+          observer.firstConnectedEventIndex = events.length;
+        }
         connected.push(parsed.payload || {});
         connectedWaiters.splice(0).forEach(fn => fn());
       }
@@ -99,7 +106,8 @@ function observe(device: Device): Observer {
     check();
   }), timeoutMs, `connected message #${count}`);
 
-  return { connected, events, waitForConnected };
+  const observer: Observer = { connected, events, firstConnectedEventIndex: null, waitForConnected };
+  return observer;
 }
 
 // HTTP status of every EndpointEvents fetch (the SDK itself ignores it).
@@ -121,6 +129,11 @@ let pendingEventgw = 0;
   let reconnectedId: string;
   let socket1: any;
   const callTempSids: string[] = [];
+  const deviceErrors: string[] = [];
+
+  // Events posted on a connection, i.e. after the first `connected`.
+  const connectedEvents = (observer: Observer) =>
+    observer.events.slice(observer.firstConnectedEventIndex || 0);
 
   const idsOf = (events: CapturedEvent[]) =>
     Array.from(new Set(events.map(e => e.payload.signaling_connection_id)));
@@ -153,13 +166,14 @@ let pendingEventgw = 0;
       const p = originalFetch.call(window, input, init);
       if (typeof url === 'string' && /\/v4\/EndpointEvents$/.test(url)) {
         pendingEventgw++;
-        p.finally(() => { pendingEventgw--; });
+        // Observe on a separate chain that never rejects; the SDK still gets `p`
+        // (and its rejection, if any) unchanged.
         p.then((res: Response) => {
           const key = String(res.status);
           eventgwStatuses[key] = (eventgwStatuses[key] || 0) + 1;
         }, () => {
           eventgwStatuses.network_error = (eventgwStatuses.network_error || 0) + 1;
-        });
+        }).then(() => { pendingEventgw--; });
       }
       return p;
     };
@@ -173,7 +187,8 @@ let pendingEventgw = 0;
     const options = { chunderw, eventgw };
     device1 = new Device(token1, options);
     device2 = new Device(token2, options);
-    [device1, device2].forEach(d => d.on(Device.EventName.Error, () => { /* recorded by assertions */ }));
+    device1.on(Device.EventName.Error, (e: any) => deviceErrors.push(`device1:${e && e.code}`));
+    device2.on(Device.EventName.Error, (e: any) => deviceErrors.push(`device2:${e && e.code}`));
     observer1 = observe(device1);
     observer2 = observe(device2);
     await Promise.all([device1.register(), device2.register()]);
@@ -213,11 +228,11 @@ let pendingEventgw = 0;
     assert(callEvents.length > 0, 'no Insights events were posted for the call');
     const bad = callEvents.filter(e => e.payload.signaling_connection_id !== connectionId1);
     assert.deepStrictEqual(bad.map(e => `${e.group}/${e.name}:${e.payload.signaling_connection_id}`), []);
-    // Every event device1 posted so far was on this connection.
-    assert.deepStrictEqual(idsOf(observer1.events), [connectionId1]);
+    // Every event device1 posted since its first `connected` was on this connection.
+    assert.deepStrictEqual(idsOf(connectedEvents(observer1)), [connectionId1]);
     // The callee side uses its own connection's id.
-    assert(observer2.events.length > 0, 'device2 posted no Insights events');
-    assert.deepStrictEqual(idsOf(observer2.events), [connectionId2]);
+    assert(connectedEvents(observer2).length > 0, 'device2 posted no Insights events');
+    assert.deepStrictEqual(idsOf(connectedEvents(observer2)), [connectionId2]);
   });
 
   it('should use the same id for a second call over the same WebSocket', async () => {
@@ -273,6 +288,7 @@ let pendingEventgw = 0;
     assert.strictEqual(device1.state, Device.State.Registered);
     assert.strictEqual(device2.state, Device.State.Registered);
     assert.strictEqual(device1.calls.length, 0);
+    assert.deepStrictEqual(deviceErrors, [], 'unexpected Device errors');
   });
 
   it('should have every Insights event post accepted by eventgw (HTTP 2xx)', async () => {
@@ -287,11 +303,12 @@ let pendingEventgw = 0;
       `non-2xx EndpointEvents responses: ${JSON.stringify(eventgwStatuses)}`);
   });
 
-  // Informational. cy.task('log') is rejected by Cypress 14 privileged-command
-  // verification once a call has run in this spec frame (root cause not found;
-  // see logs/S3-e2e.md), so the observed ids are reported through this test's
-  // title, which the spec reporter prints. Use them to look up the backend
-  // WebSocket sessionId and the Insights records.
+  // Informational: reports the observed ids through this test's title, which the
+  // spec reporter prints, for lookup in backend signaling logs and Insights.
+  // Not cy.task('log'): in Cypress 14.4.0 it is rejected as "must only be invoked
+  // from the spec file" in this spec once a call has run. The stack check looks
+  // normal; the privileged-command verification request is answered differently
+  // after a call (root cause not found).
   it('should report the observed connection ids', function() {
     const summary = {
       device1: observer1.connected.map(p => p.connectionId),
@@ -300,6 +317,7 @@ let pendingEventgw = 0;
       perCall: callTempSids.map(sid => ({ temp_call_sid: sid, events: eventsForCall(sid).length,
         ids: idsOf(eventsForCall(sid)) })),
       eventgwStatuses,
+      deviceErrors,
     };
     (this as any).test.title = `should report the observed connection ids ${JSON.stringify(summary)}`;
   });

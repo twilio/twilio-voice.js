@@ -327,7 +327,7 @@ describe('Device', function() {
             assert.notStrictEqual(payload1.call_sid, payload2.call_sid);
           });
 
-          it('should use the new id after the stream reconnects', () => {
+          it('should read the current stream id after a reconnect', () => {
             pstream.connectionId = 'CONN-A';
             assert.strictEqual(defaultPayload().signaling_connection_id, 'CONN-A');
             pstream.connectionId = null;
@@ -355,7 +355,7 @@ describe('Device', function() {
             assert(!('signaling_connection_id' in defaultPayload()));
           });
 
-          it('should not inherit the id from a replaced stream', async () => {
+          it('should read the replacement stream id, not the old stream id', async () => {
             pstream.connectionId = 'CONN-A';
             const oldStream = pstream;
             const setupPromise = device['_setupStream']();

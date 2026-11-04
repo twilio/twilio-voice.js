@@ -364,9 +364,39 @@ describe('PStream', () => {
         assert.equal(pstream.connectionId, null);
       });
 
-      // CONTRACTS.md C2 allows events emitted synchronously while handling the
-      // close (e.g. from 'offline' / 'transportClose' listeners) to still carry
-      // the old id, so no assertion is made about the value inside those listeners.
+      // 'transportClose' listeners describe the connection that just dropped
+      // (e.g. Call publishes `connection/reconnecting` and signaling errors
+      // there), so they still see its id. It is cleared before 'offline'.
+      it('should expose the old id to transportClose listeners and clear it before offline', () => {
+        openAndConnect('CONN-A');
+        const seen = [];
+        pstream.on('transportClose', () => { seen.push(['transportClose', pstream.connectionId]); });
+        pstream.on('offline', () => { seen.push(['offline', pstream.connectionId]); });
+        pstream.transport.emit('close');
+        assert.deepStrictEqual(seen, [
+          ['transportClose', 'CONN-A'],
+          ['offline', null],
+        ]);
+      });
+
+      it('should clear the connectionId even if a transportClose listener throws', () => {
+        openAndConnect('CONN-A');
+        pstream.on('transportClose', () => { throw new Error('listener failure'); });
+        assert.throws(() => pstream.transport.emit('close'), /listener failure/);
+        assert.equal(pstream.connectionId, null);
+      });
+
+      it('should not let the next connection see the old id after a throwing transportClose listener', () => {
+        openAndConnect('CONN-A');
+        const failing = () => { throw new Error('listener failure'); };
+        pstream.on('transportClose', failing);
+        assert.throws(() => pstream.transport.emit('close'));
+        pstream.removeListener('transportClose', failing);
+        pstream.transport.emit('open');
+        assert.equal(pstream.connectionId, null);
+        receive('connected', connectedPayload('CONN-B'));
+        assert.strictEqual(pstream.connectionId, 'CONN-B');
+      });
 
       it('should not restore the old connectionId when the transport reopens', () => {
         openAndConnect('CONN-A');

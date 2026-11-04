@@ -70,7 +70,8 @@ describe('signaling_connection_id (VBLOCKS-7513)', () => {
     });
   };
 
-  // Shape of the chundergateway 2.2.5 `connected` message (CONTRACTS.md C1).
+  // Shape of the chundergateway 2.2.5 `connected` message: `payload.connectionId`
+  // is an opaque string (the backend WebSocket sessionId).
   const receiveConnected = (connectionId?: any, stream: any = pstream) => {
     const payload: any = {
       edge: 'ashburn',
@@ -253,6 +254,25 @@ describe('signaling_connection_id (VBLOCKS-7513)', () => {
       assert.strictEqual(pstreams.length, 1);
     });
 
+    it('should stamp the old id on events published from transportClose listeners only', async () => {
+      await connectSignaling('CONN-A');
+      const call = createFakeCall('CA1111', 'TJ1111');
+      // Same timing as Call `connection/reconnecting`, which describes the dropped connection.
+      pstream.on('transportClose', () => {
+        device._publisher.info('connection', 'reconnecting', null, call);
+      });
+      pstream.on('offline', () => {
+        device._publisher.info('test-group', 'on-offline', null, call);
+      });
+      pstream.transport.emit('close');
+
+      const byName: Record<string, any> = {};
+      eventBodies().forEach(body => { byName[body.name] = body.payload; });
+      assert.strictEqual(byName.reconnecting.signaling_connection_id, 'CONN-A');
+      assert(!('signaling_connection_id' in byName['on-offline']));
+      assert(!('signaling_connection_id' in device._createDefaultPayload()));
+    });
+
     it('should never reuse the old id if the reconnected backend sends none', async () => {
       await connectSignaling('CONN-A');
       pstream.transport.emit('close');
@@ -309,7 +329,9 @@ describe('signaling_connection_id (VBLOCKS-7513)', () => {
     });
   });
 
-  describe('snapshot timing (CONTRACTS.md C3)', () => {
+  // The event, including its default payload and timestamp, is built when it is
+  // created, never when it is sent.
+  describe('snapshot timing', () => {
     it('should keep the id and timestamp the event had when it was created', async () => {
       await connectSignaling('CONN-A');
       const createdAt = new Date(Date.now()).toISOString();
@@ -352,7 +374,8 @@ describe('signaling_connection_id (VBLOCKS-7513)', () => {
     });
   });
 
-  describe('metrics samples (CONTRACTS.md C2)', () => {
+  // Metrics samples are array payloads and do not get the default payload.
+  describe('metrics samples', () => {
     it('should not add signaling_connection_id to EndpointMetrics samples', async () => {
       await connectSignaling('CONN-A');
       const sample = {

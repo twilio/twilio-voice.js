@@ -6,7 +6,7 @@
 Improvements
 ------------
 
-- Insights events published by the SDK now include `signaling_connection_id` in their payload when the signaling server provides a connection id in its `connected` message. The value identifies the current signaling WebSocket connection, so events can be correlated with each other and with server-side signaling records, including events sent outside a call. Calls that share a signaling connection report the same value, and events after a signaling reconnect report the new connection's value. The field is omitted until the server sends an id and after the signaling connection closes. Metrics samples are unchanged.
+- Insights events published by the SDK now include `signaling_connection_id` in their payload when the signaling server provides a connection id in its `connected` message. The value identifies the current signaling WebSocket connection, so events can be correlated with each other and with server-side signaling records. Calls that share a signaling connection report the same value, and events after a signaling reconnect report the new connection's value. The field is omitted until the server sends an id and after the signaling connection closes. Metrics samples are unchanged.
 
 Bug Fixes
 ---------

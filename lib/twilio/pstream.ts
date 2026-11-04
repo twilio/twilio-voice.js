@@ -51,7 +51,7 @@ class PStream extends EventEmitter {
     /**
      * The signaling connection id (`payload.connectionId`) received in the
      * most recent `connected` message on the current WebSocket, or `null` if
-     * none has been received since the transport last opened. Cleared after
+     * none has been received since the transport last closed. Cleared after
      * 'transportClose' listeners run and before 'offline' is emitted (or on
      * destroy), so a replacement connection never inherits the previous id.
      * @type {string|null}
