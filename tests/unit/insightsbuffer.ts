@@ -1,5 +1,5 @@
 // VBLOCKS-7468: bounded in-memory Insights event buffer with retry.
-// Written from CONTRACTS.md C3/C4 and the ticket, not from the implementation.
+// Written from the VBLOCKS-7468 requirements, not from the implementation.
 // The global `fetch` is stubbed, so the real request.ts and the real
 // EventPublisher are exercised end to end. Assertions are on what reaches
 // fetch (URL, X-Twilio-Token header, JSON body) and on timers, so they do not
@@ -32,8 +32,11 @@ const MAX_AGE_MS = 5 * 60 * 1000;
 const BACKOFF_MIN = 100;
 const BACKOFF_MAX = 1000;
 const BACKOFF_JITTER = 0.4;
+const REQUEST_TIMEOUT_MS = 10000;
 
-type Reply = number | 'network' | 'hold' | 'text-error';
+// 'hold' never settles on its own but rejects with an AbortError if the request is aborted;
+// 'hang' never settles and ignores aborts (a late response can still be delivered via `held`).
+type Reply = number | 'network' | 'hold' | 'hang' | 'text-error';
 
 interface FetchCall {
   at: number;
@@ -111,8 +114,16 @@ function createHarness() {
       if (reply === 'text-error') {
         return Promise.resolve(fakeResponse(200, true));
       }
-      if (reply === 'hold') {
+      if (reply === 'hold' || reply === 'hang') {
         return new Promise((resolve, reject) => {
+          const signal = init && init.signal;
+          if (reply === 'hold' && signal && typeof signal.addEventListener === 'function') {
+            signal.addEventListener('abort', () => {
+              const abortError: any = new Error('The operation was aborted');
+              abortError.name = 'AbortError';
+              reject(abortError);
+            });
+          }
           h.held.push({ resolve: (status: number = 200) => resolve(fakeResponse(status)), reject });
         });
       }
@@ -274,7 +285,7 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
       h.eventCalls().forEach((c: FetchCall) => assert.strictEqual(c.url, EVENTS_URL));
     });
 
-    it('should keep payload, call ids, signaling_connection_id and timestamp from creation time (C3)', async () => {
+    it('should keep payload, call ids, signaling_connection_id and timestamp from creation time (payload snapshot at creation)', async () => {
       const publisher = createPublisher();
       const conn = createConnection('CA-FIRST', 'TJ-FIRST');
       postSeq(publisher, 0, conn);
@@ -367,7 +378,7 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
       });
     });
 
-    it('should resend the identical body on retry (C3)', async () => {
+    it('should resend the identical body on retry (payload snapshot at creation)', async () => {
       const publisher = createPublisher({ host: HOST });
       h.replies = [503, 200];
       postSeq(publisher, 0);
@@ -466,7 +477,7 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
       let settled = '';
       postSeq(publisher, 0).then(() => { settled = 'resolved'; }, () => { settled = 'rejected'; });
       await h.runFor(1000);
-      assert.notStrictEqual(settled, 'rejected');
+      assert.strictEqual(settled, 'resolved');
     });
 
     it('should emit publisher "error" on an HTTP 5xx (documented behavior change)', async () => {
@@ -475,6 +486,54 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
       postSeq(publisher, 0);
       await h.runFor(5000);
       assert(errorSpy.called, 'expected publisher "error" on HTTP 503');
+    });
+
+    it('should emit publisher "error" once per retryable failure streak', async () => {
+      const publisher = createPublisher({ host: HOST });
+      h.replies = [503, 'network', 503, 429, 200];
+      postSeq(publisher, 0);
+      await h.runFor(10000);
+      assert.strictEqual(h.eventCalls().length, 5);
+      sinon.assert.calledOnce(errorSpy);
+
+      // A success ends the streak; the next failure starts a new one.
+      h.replies = [503, 503, 200];
+      postSeq(publisher, 1);
+      await h.runFor(10000);
+      assert.deepStrictEqual(h.eventCalls().filter(h.isSuccess).map((c: FetchCall) => c.body.payload.seq), [0, 1]);
+      sinon.assert.calledTwice(errorSpy);
+    });
+
+    it('should keep retry delays within [100, 1000] ms through a 17+ minute outage (no 0 ms retries)', async function() {
+      this.timeout(120000);
+      const publisher = createPublisher({ host: HOST });
+      h.defaultReply = 503;
+      // A new event every minute keeps the buffer non-empty past the 5 minute age bound.
+      const minutes = 19;
+      for (let m = 0; m < minutes; m++) {
+        postSeq(publisher, m);
+        await h.runUntil(T0 + (m + 1) * 60000);
+      }
+      const times = h.eventCalls().map((c: FetchCall) => c.at);
+      assert(times.length > 1018, `expected more than 1018 attempts, got ${times.length}`);
+      const intervals = times.slice(1).map((t: number, i: number) => t - times[i]);
+      // Attempt 0 is jittered around 100 ms (60..140); every later delay must be within [100, 1000].
+      assert(intervals[0] >= Math.floor(BACKOFF_MIN * (1 - BACKOFF_JITTER)) - 1, `first delay ${intervals[0]}ms`);
+      const outOfRange = intervals.slice(1)
+        .map((delay: number, i: number) => ({ at: times[i + 2] - T0, delay }))
+        .filter((x: any) => x.delay < BACKOFF_MIN || x.delay > BACKOFF_MAX);
+      assert.deepStrictEqual(outOfRange.slice(0, 5), [], `${outOfRange.length} retry delays outside [100, 1000] ms`);
+      const lastMinute = h.eventCalls().filter((c: FetchCall) => c.at > T0 + (minutes - 1) * 60000);
+      assert(lastMinute.length <= 61, `expected at most ~1 retry/s in the last minute, got ${lastMinute.length}`);
+
+      // Recovery: the newest events are delivered, expired ones are not, and nothing is left scheduled.
+      h.defaultReply = 200;
+      await h.runFor(10000);
+      const delivered = h.eventCalls().filter(h.isSuccess).map((c: FetchCall) => c.body.payload.seq);
+      [16, 17, 18].forEach(seq => assert(delivered.includes(seq), `expected event ${seq} to be delivered`));
+      range(0, 14).forEach(seq => assert(!delivered.includes(seq), `expired event ${seq} must not be delivered`));
+      assert.deepStrictEqual(countBy(delivered), countBy(Array.from(new Set(delivered))));
+      assert.strictEqual(h.clock.countTimers(), 0, 'expected no pending timers after recovery');
     });
   });
 
@@ -498,12 +557,86 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
       });
     });
 
+    it('should emit publisher "error" once per dropped event on non-retryable failures', async () => {
+      const publisher = createPublisher();
+      [0, 1, 2].forEach(seq => postSeq(publisher, seq));
+      h.replies = [400, 403, 404];
+      publisher.setHost(HOST);
+      await h.runFor(10000);
+      assert.deepStrictEqual(h.seqs(), [0, 1, 2]);
+      sinon.assert.calledThrice(errorSpy);
+    });
+
     it('should emit publisher "error" on an HTTP 4xx (documented behavior change)', async () => {
       const publisher = createPublisher({ host: HOST });
       h.replies = [400];
       postSeq(publisher, 0);
       await h.runFor(1000);
       sinon.assert.calledOnce(errorSpy);
+    });
+  });
+
+  describe('hung requests (per-attempt timeout)', () => {
+    it(`should time out a flush request after ${REQUEST_TIMEOUT_MS}ms, retry it, and deliver later events`, async () => {
+      const publisher = createPublisher();
+      [0, 1, 2].forEach(seq => postSeq(publisher, seq));
+      h.replies = ['hold'];
+      publisher.setHost(HOST);
+      await h.runUntil(T0 + REQUEST_TIMEOUT_MS - 1);
+      assert.deepStrictEqual(h.seqs(), [0], 'no retry before the timeout');
+
+      await h.runUntil(T0 + REQUEST_TIMEOUT_MS + 5000);
+      assert.deepStrictEqual(h.seqs(), [0, 0, 1, 2]);
+      const retryAt = h.eventCalls()[1].at - T0;
+      assert(retryAt >= REQUEST_TIMEOUT_MS && retryAt <= REQUEST_TIMEOUT_MS + BACKOFF_MAX,
+        `retry at +${retryAt}ms, expected within the backoff window after the timeout`);
+      assert.deepStrictEqual(h.eventCalls().filter(h.isSuccess).map((c: FetchCall) => c.body.payload.seq), [0, 1, 2]);
+    });
+
+    it('should count a timeout as a retryable failure (event kept, one "error" per streak)', async () => {
+      const publisher = createPublisher({ host: HOST });
+      h.replies = ['hang', 'hang', 200];
+      postSeq(publisher, 0);
+      await h.runFor(3 * REQUEST_TIMEOUT_MS + 5000);
+      assert.deepStrictEqual(h.seqs(), [0, 0, 0]);
+      assert.strictEqual(h.eventCalls().filter(h.isSuccess).length, 1);
+      sinon.assert.calledOnce(errorSpy);
+    });
+
+    [200, 503].forEach(lateStatus => {
+      it(`should not double-send when a late HTTP ${lateStatus} arrives after the timeout`, async () => {
+        const publisher = createPublisher();
+        [0, 1, 2].forEach(seq => postSeq(publisher, seq));
+        h.replies = ['hang'];
+        publisher.setHost(HOST);
+        await h.runFor(REQUEST_TIMEOUT_MS + 5000);
+        assert.deepStrictEqual(h.seqs(), [0, 0, 1, 2]);
+
+        // The hung request finally answers.
+        h.held.splice(0).forEach((held: any) => held.resolve(lateStatus));
+        await h.runFor(30000);
+        assert.deepStrictEqual(h.seqs(), [0, 0, 1, 2]);
+
+        postSeq(publisher, 3);
+        await h.runFor(5000);
+        assert.deepStrictEqual(h.seqs(), [0, 0, 1, 2, 3]);
+        assert.strictEqual(h.clock.countTimers(), 0, 'expected no pending timers once everything is delivered');
+      });
+    });
+
+    it('should not stall later events behind a hung direct send', async () => {
+      const publisher = createPublisher({ host: HOST });
+      h.replies = ['hang'];
+      postSeq(publisher, 0);
+      await h.runFor(1000);
+      postSeq(publisher, 1);
+      await h.runFor(REQUEST_TIMEOUT_MS + 5000);
+      const delivered = h.eventCalls().filter(h.isSuccess).map((c: FetchCall) => c.body.payload.seq);
+      assert.deepStrictEqual(countBy(delivered), { 0: 1, 1: 1 });
+      h.held.splice(0).forEach((held: any) => held.resolve(200));
+      await h.runFor(30000);
+      assert.strictEqual(h.eventCalls().filter(h.isSuccess).length, 2, 'a late response must not cause a resend');
+      assert.strictEqual(h.clock.countTimers(), 0);
     });
   });
 
@@ -671,7 +804,7 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
         let settled = '';
         Promise.resolve(result).then(() => { settled = 'resolved'; }, () => { settled = 'rejected'; });
         await h.runFor(60000);
-        assert.notStrictEqual(settled, 'rejected');
+        assert.strictEqual(settled, 'resolved');
         assert.deepStrictEqual(h.seqs(), ['forced'], 'forced posts keep today\'s single attempt');
         assert.deepStrictEqual(h.unhandled.map(String), []);
       });
@@ -973,6 +1106,19 @@ describe('Insights buffer with Device (VBLOCKS-7468)', () => {
       assert.strictEqual(h.clock.countTimers(), 0, 'expected no pending timers after destroy');
       await h.runFor(60000);
       assert.strictEqual(h.eventCalls().length, attempts);
+    });
+
+    it('should leave no pending timers when destroyed while a request is hung', async () => {
+      createDevice({ eventgw: HOST });
+      h.replies = ['hang'];
+      postSeq(device._publisher, 0);
+      await h.runFor(1000);
+      device.destroy();
+      await h.drain();
+      assert.strictEqual(h.clock.countTimers(), 0, 'expected the request timeout timer to be cleared');
+      h.held.splice(0).forEach((held: any) => held.resolve(200));
+      await h.runFor(30000);
+      assert.strictEqual(h.eventCalls().length, 1);
     });
 
     it('should drop the buffer so a late setHost on the old publisher sends nothing', async () => {

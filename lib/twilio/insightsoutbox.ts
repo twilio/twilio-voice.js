@@ -13,6 +13,15 @@
  * - Sends use the host, token and request function of the publisher attached
  *   most recently (the Device's current publisher) at send time.
  * - Only `EndpointEvents` go through the outbox. Metrics are not buffered.
+ * - Delivery is at least once: a request that fails after the gateway has
+ *   already accepted it (a 5xx after processing, a reset or timeout after the
+ *   body was sent, a 2xx whose body cannot be read) is resent with the same
+ *   body, so the backend can receive duplicates.
+ * - Buffered events are kept in memory only. They are lost when the page is
+ *   closed or the Device is destroyed.
+ * - A deterministic network-level block (ad blocker, CSP, firewall) looks like
+ *   a network error, so while new events keep arriving the outbox keeps
+ *   retrying at the backoff cap (about one request per second).
  * @module
  */
 import Backoff from './backoff';
@@ -41,6 +50,23 @@ export const INSIGHTS_BUFFER_MAX_AGE_MS = 5 * 60 * 1000;
 export const INSIGHTS_EVENTS_ENDPOINT = 'EndpointEvents';
 
 /**
+ * Per-attempt deadline for an outbox send. An attempt that has not completed
+ * by then is treated as a retryable failure (and aborted where
+ * `AbortController` is available), so one hung request cannot stall the
+ * buffer. A late response to a timed-out attempt is ignored.
+ */
+export const INSIGHTS_REQUEST_TIMEOUT_MS = 10000;
+
+/**
+ * Upper bound for the backoff attempt counter. `Backoff` computes
+ * `min * factor ^ attempts`, which overflows to `Infinity` (and then to a 0ms
+ * delay) after about 1018 attempts. With the same-edge config the delay is
+ * already at the 1000ms cap from attempt 4, so capping the counter at 10 does
+ * not change any delay.
+ */
+export const INSIGHTS_BACKOFF_MAX_ATTEMPTS = 10;
+
+/**
  * Callback signature of the request function used by the publisher.
  */
 export type InsightsRequestCallback = (error?: any, responseText?: string) => void;
@@ -65,7 +91,31 @@ export interface IInsightsPublisher {
 export interface IInsightsRequestParams {
   body: Record<string, any>;
   headers: Record<string, string>;
+
+  /**
+   * Abort signal for the attempt timeout. Defined as a non-enumerable property
+   * so the enumerable shape seen by custom request functions stays
+   * `{ body, headers, url }`. request.ts passes it to `fetch`.
+   */
+  signal?: AbortSignal;
   url: string;
+}
+
+/**
+ * A request started by {@link postInsightsRequest}.
+ */
+export interface IInsightsRequestHandle {
+  /**
+   * Whether `done` has been called.
+   */
+  readonly isSettled: boolean;
+
+  /**
+   * Stop the attempt timer without settling or aborting the request. Used on
+   * destroy so no timer outlives the outbox; the request completes best effort
+   * and its result is ignored.
+   */
+  cancelTimeout(): void;
 }
 
 /**
@@ -96,8 +146,13 @@ interface IInsightsEntry {
 
 /**
  * Whether a failed Insights request should be retried. Network-level failures
- * (no numeric `status`), HTTP 5xx and HTTP 429 are retryable. Any other HTTP
- * status (other 4xx, or an unexpected non-2xx such as 3xx) is not.
+ * (no numeric `status`), attempt timeouts, HTTP 5xx and HTTP 429 are
+ * retryable. Any other HTTP status (other 4xx, or an unexpected non-2xx such
+ * as 3xx) is not.
+ *
+ * In browsers an error response without CORS headers (for example a 403 or 502
+ * from a WAF or proxy) makes `fetch` reject without a status, so it is
+ * classified as a network error and retried until the age bound drops it.
  * @param error - The error passed to the request callback.
  */
 export function isRetryableInsightsError(error: any): boolean {
@@ -109,19 +164,37 @@ export function isRetryableInsightsError(error: any): boolean {
 }
 
 /**
+ * Let a timer not keep a Node.js process alive (no-op in browsers, where
+ * timers are numbers). Insights retries are background work; a test runner or
+ * other Node host must still be able to exit while a retry is pending.
+ * @param timer - A value returned by `setTimeout`.
+ */
+function unrefTimer(timer: any): void {
+  if (timer && typeof timer.unref === 'function') {
+    timer.unref();
+  }
+}
+
+/**
  * Post one event with the sender's current host, token and request function.
  * `done` is called exactly once, with `null` on success or with the error.
+ * With `timeoutMs`, an attempt still pending after that long settles with a
+ * retryable timeout error and is aborted where `AbortController` exists; a
+ * late response is then ignored.
  * @param sender - The publisher whose host, token and request are used.
  * @param endpointName - `EndpointEvents` or `EndpointMetrics`.
  * @param event - The built event body.
  * @param done - Completion callback.
+ * @param timeoutMs - Optional per-attempt deadline in milliseconds.
+ * @returns A handle for the attempt.
  */
 export function postInsightsRequest(
   sender: IInsightsPublisher,
   endpointName: string,
   event: Record<string, any>,
   done: (error: any | null) => void,
-): void {
+  timeoutMs?: number,
+): IInsightsRequestHandle {
   const params: IInsightsRequestParams = {
     body: event,
     headers: {
@@ -132,17 +205,57 @@ export function postInsightsRequest(
   };
 
   let isSettled = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let controller: AbortController | null = null;
+
+  const cancelTimeout = () => {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+
   const settle = (error: any) => {
     if (isSettled) { return; }
     isSettled = true;
+    cancelTimeout();
     done(error || null);
   };
+
+  if (typeof timeoutMs === 'number' && timeoutMs > 0) {
+    if (typeof AbortController === 'function') {
+      try {
+        controller = new AbortController();
+        Object.defineProperty(params, 'signal', { value: controller.signal });
+      } catch (e) {
+        controller = null;
+      }
+    }
+
+    // Started before the request so a synchronous callback clears it.
+    timer = setTimeout(() => {
+      timer = null;
+      const error: any = new Error(`Insights request timed out after ${timeoutMs}ms`);
+      error.name = 'TimeoutError';
+      // Settle first, so the rejection caused by abort() is ignored.
+      settle(error);
+      if (controller) {
+        try { controller.abort(); } catch (e) { /* the attempt is already settled */ }
+      }
+    }, timeoutMs);
+    unrefTimer(timer);
+  }
 
   try {
     sender._request.post(params, (error?: any) => settle(error));
   } catch (error) {
     settle(error || new Error('Insights request threw'));
   }
+
+  return {
+    cancelTimeout,
+    get isSettled() { return isSettled; },
+  };
 }
 
 /**
@@ -208,6 +321,17 @@ export default class InsightsOutbox {
   private _entries: IInsightsEntry[] = [];
 
   /**
+   * The buffered entry whose request the flush loop has in flight, if any.
+   */
+  private _flushingEntry: IInsightsEntry | null = null;
+
+  /**
+   * Attempts in flight (direct sends and the flush loop's request), so their
+   * timeout timers can be stopped on destroy.
+   */
+  private _inFlight: Set<IInsightsRequestHandle> = new Set();
+
+  /**
    * Whether the last request failed with a retryable error and no request has
    * succeeded since. Used to notify `error` listeners once per failure streak.
    */
@@ -246,6 +370,10 @@ export default class InsightsOutbox {
   private _seq: number = 0;
 
   constructor() {
+    // Backoff applies jitter before capping at `max`, so from the attempt at
+    // which the delay reaches the cap (attempt 4 here) every retry waits
+    // exactly MAX_PREFERRED_DELAY, without jitter. Kept identical to the
+    // same-edge signaling config on purpose.
     this._backoff = new Backoff({
       factor: PREFERRED_BACKOFF_FACTOR,
       jitter: PREFERRED_BACKOFF_JITTER,
@@ -258,6 +386,13 @@ export default class InsightsOutbox {
     });
 
     this._backoff.on('ready', () => {
+      // Backoff increments its attempt counter right after this handler. Cap
+      // it (see INSIGHTS_BACKOFF_MAX_ATTEMPTS) so a long outage cannot
+      // overflow the delay to 0ms. Delays are unchanged: they are at the cap.
+      const backoff = this._backoff as unknown as { _attempts: number };
+      if (backoff._attempts >= INSIGHTS_BACKOFF_MAX_ATTEMPTS) {
+        backoff._attempts = INSIGHTS_BACKOFF_MAX_ATTEMPTS - 1;
+      }
       this._isRetryScheduled = false;
       this.flush();
     });
@@ -351,7 +486,10 @@ export default class InsightsOutbox {
     if (this._destroyed) { return; }
     this.clear('the Device was destroyed');
     this._backoff.removeAllListeners();
+    this._inFlight.forEach(handle => handle.cancelTimeout());
+    this._inFlight.clear();
     this._destroyed = true;
+    this._flushingEntry = null;
     this._publisher = null;
   }
 
@@ -403,7 +541,12 @@ export default class InsightsOutbox {
   private _enforceMaxEvents(): void {
     while (this._entries.length > INSIGHTS_BUFFER_MAX_EVENTS) {
       const dropped = this._entries.shift() as IInsightsEntry;
-      this._log.warn(`Dropped buffered Insights event ${describe(dropped)}: the buffer is full (max ${INSIGHTS_BUFFER_MAX_EVENTS})`);
+      if (dropped === this._flushingEntry) {
+        this._log.warn(`Removed buffered Insights event ${describe(dropped)} from the full buffer (max ${INSIGHTS_BUFFER_MAX_EVENTS}) `
+          + 'while its request is in flight; it is delivered if that request succeeds and dropped otherwise');
+      } else {
+        this._log.warn(`Dropped buffered Insights event ${describe(dropped)}: the buffer is full (max ${INSIGHTS_BUFFER_MAX_EVENTS})`);
+      }
     }
   }
 
@@ -425,7 +568,9 @@ export default class InsightsOutbox {
       return;
     }
 
-    postInsightsRequest(publisher, INSIGHTS_EVENTS_ENDPOINT, entry.event, (error: any) => {
+    this._flushingEntry = entry;
+    this._send(publisher, entry, (error: any) => {
+      this._flushingEntry = null;
       if (this._destroyed) { return; }
 
       if (!error) {
@@ -539,6 +684,27 @@ export default class InsightsOutbox {
     }
     this._isRetryScheduled = true;
     this._backoff.backoff();
+    // Backoff keeps its timer in `_timeoutID`; see unrefTimer.
+    unrefTimer((this._backoff as unknown as { _timeoutID: any })._timeoutID);
+  }
+
+  /**
+   * Start one attempt for an entry with the per-attempt timeout, tracking it
+   * until it settles.
+   * @param publisher - The attached publisher (host, token, request).
+   * @param entry
+   * @param done - Called once with `null` or the error.
+   */
+  private _send(publisher: IInsightsPublisher, entry: IInsightsEntry, done: (error: any) => void): void {
+    let handle: IInsightsRequestHandle | null = null;
+    handle = postInsightsRequest(publisher, INSIGHTS_EVENTS_ENDPOINT, entry.event, (error: any) => {
+      if (handle) { this._inFlight.delete(handle); }
+      done(error);
+    }, INSIGHTS_REQUEST_TIMEOUT_MS);
+    // A synchronous callback has already settled it; nothing to track.
+    if (!handle.isSettled) {
+      this._inFlight.add(handle);
+    }
   }
 
   /**
@@ -548,7 +714,7 @@ export default class InsightsOutbox {
    * @param resolve - Resolves the Promise returned by {@link InsightsOutbox.add}.
    */
   private _sendNow(entry: IInsightsEntry, publisher: IInsightsPublisher, resolve: () => void): void {
-    postInsightsRequest(publisher, INSIGHTS_EVENTS_ENDPOINT, entry.event, (error: any) => {
+    this._send(publisher, entry, (error: any) => {
       if (this._destroyed) {
         resolve();
         return;

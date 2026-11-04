@@ -53,7 +53,14 @@ function request(method, params, callback) {
     }
   };
 
-  fetch(params.url, { body, headers, method })
+  // `params.signal` (optional) lets the caller abort the request, e.g. on a
+  // timeout. An abort rejects fetch and is reported like a network error.
+  const init = { body, headers, method };
+  if (params.signal) {
+    init.signal = params.signal;
+  }
+
+  fetch(params.url, init)
     .then(response => {
       if (isOkResponse(response)) {
         return response.text();

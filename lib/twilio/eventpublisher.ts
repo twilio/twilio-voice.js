@@ -102,7 +102,8 @@ class EventPublisher extends EventEmitter {
  *    publishing is disabled.
  * @returns {Promise} Always fulfilled. For EndpointEvents sent through the
  *   outbox, fulfilled after the first send attempt, or right away when the
- *   event is buffered (host unknown, or earlier events still pending).
+ *   event is buffered (host unknown, or earlier events still pending). So
+ *   while events are pending it can be fulfilled before this event is sent.
  *
  * EndpointEvents posted while publishing is enabled go through the outbox:
  * buffered while the host is unknown or after a retryable failure (network
@@ -184,7 +185,7 @@ EventPublisher.prototype._post = function _post(endpointName, level, group, name
  * @param {?Object} [payload=null] - The payload to pass. This will be extended
  *    onto the default payload object, if one exists.
  * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
+ * @returns {Promise} Always fulfilled, never rejected; see `_post` for when.
  */
 EventPublisher.prototype.post = function post(level, group, name, payload, connection, force) {
   return this._post('EndpointEvents', level, group, name, payload, connection, force);
@@ -197,7 +198,7 @@ EventPublisher.prototype.post = function post(level, group, name, payload, conne
  * @param {?Object} [payload=null] - The payload to pass. This will be extended
  *    onto the default payload object, if one exists.
  * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
+ * @returns {Promise} Always fulfilled, never rejected; see `_post` for when.
  */
 EventPublisher.prototype.debug = function debug(group, name, payload, connection) {
   return this.post('debug', group, name, payload, connection);
@@ -210,7 +211,7 @@ EventPublisher.prototype.debug = function debug(group, name, payload, connection
  * @param {?Object} [payload=null] - The payload to pass. This will be extended
  *    onto the default payload object, if one exists.
  * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
+ * @returns {Promise} Always fulfilled, never rejected; see `_post` for when.
  */
 EventPublisher.prototype.info = function info(group, name, payload, connection) {
   return this.post('info', group, name, payload, connection);
@@ -223,7 +224,7 @@ EventPublisher.prototype.info = function info(group, name, payload, connection) 
  * @param {?Object} [payload=null] - The payload to pass. This will be extended
  *    onto the default payload object, if one exists.
  * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
+ * @returns {Promise} Always fulfilled, never rejected; see `_post` for when.
  */
 EventPublisher.prototype.warn = function warn(group, name, payload, connection) {
   return this.post('warning', group, name, payload, connection);
@@ -236,7 +237,7 @@ EventPublisher.prototype.warn = function warn(group, name, payload, connection) 
  * @param {?Object} [payload=null] - The payload to pass. This will be extended
  *    onto the default payload object, if one exists.
  * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
+ * @returns {Promise} Always fulfilled, never rejected; see `_post` for when.
  */
 EventPublisher.prototype.error = function error(group, name, payload, connection) {
   return this.post('error', group, name, payload, connection);
@@ -248,7 +249,7 @@ EventPublisher.prototype.error = function error(group, name, payload, connection
  * @param {String} name - The designated event name.
  * @param {Array<Object>} metrics - The metrics to post.
  * @param {?Object} [customFields] - Custom fields to append to each payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
+ * @returns {Promise} Always fulfilled, never rejected; see `_post` for when.
  */
 EventPublisher.prototype.postMetrics = function postMetrics(group, name, metrics, customFields, connection) {
   return new Promise(resolve => {

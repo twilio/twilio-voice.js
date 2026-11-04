@@ -2,6 +2,7 @@ import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { TwilioError } from '../../lib/twilio/errors';
 import { PreflightTest } from '../../lib/twilio/preflight/preflight';
+import EventPublisher from '../../lib/twilio/eventpublisher';
 import { EventEmitter } from 'events';
 import { SinonFakeTimers } from 'sinon';
 import * as assert from 'assert';
@@ -449,6 +450,45 @@ describe('PreflightTest', () => {
       publisher.emit('error');
       await clock.tickAsync(1000);
       sinon.assert.calledOnce(onWarning);
+    });
+
+    [503, 400].forEach(status => {
+      it(`should emit insights-connection-error once when Insights answers HTTP ${status}`, async () => {
+        // A real EventPublisher with a stubbed fetch: the HTTP status alone must surface as an Insights error.
+        const root = global as any;
+        const originalFetch = root.fetch;
+        const fetchStub = sinon.stub().callsFake(() => Promise.resolve({
+          headers: { get: () => null },
+          json: () => Promise.resolve({}),
+          ok: false,
+          status,
+          statusText: `HTTP ${status}`,
+          text: () => Promise.resolve('error'),
+        }));
+        root.fetch = fetchStub;
+        try {
+          const realPublisher: any = new (EventPublisher as any)('twilio-js-sdk', 'token', {
+            defaultPayload: () => ({}),
+            host: 'eventgw.test.twilio.com',
+          });
+          call._publisher = realPublisher;
+          const onWarning = sinon.stub();
+          preflight.on('warning', onWarning);
+          device.emit(Device.EventName.Registered);
+          await clock.tickAsync(1000);
+
+          realPublisher.info('test-group', 'test-event', null, { outboundConnectionId: 'TJ1111', parameters: { CallSid: 'CA1111' } });
+          await clock.tickAsync(3000);
+          assert(fetchStub.called, 'expected an Insights request');
+          sinon.assert.calledOnce(onWarning);
+          sinon.assert.calledWithExactly(onWarning, {
+            description: 'Received an error when attempting to connect to Insights gateway',
+            name: 'insights-connection-error',
+          });
+        } finally {
+          root.fetch = originalFetch;
+        }
+      });
     });
   });
 

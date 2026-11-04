@@ -223,7 +223,8 @@ function checkPostParams(i, publisher, connection) {
 }
 
 function fakeRequest() {}
-fakeRequest.post = sinon.spy();
+// Settle every post successfully so no real-timer timeouts or retry loops outlive this suite.
+fakeRequest.post = sinon.spy((params, callback) => { if (callback) { callback(null, ''); } });
 
 function FakeConnection() {
   this.parameters = { CallSid: null };
