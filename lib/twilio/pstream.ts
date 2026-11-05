@@ -47,17 +47,6 @@ class PStream extends EventEmitter {
     this.status = 'disconnected';
     this.gateway = null;
     this.region = null;
-
-    /**
-     * The signaling connection id (`payload.connectionId`) received in the
-     * most recent `connected` message on the current WebSocket, or `null` if
-     * none has been received since the transport last closed. Cleared after
-     * 'transportClose' listeners run and before 'offline' is emitted (or on
-     * destroy), so a replacement connection never inherits the previous id.
-     * @type {string|null}
-     */
-    this.signalingConnectionId = null;
-
     this._messageQueue = [];
     this._preferredUri = null;
     this._uris = uris;
@@ -129,13 +118,7 @@ class PStream extends EventEmitter {
 }
 
 PStream.prototype._handleTransportClose = function() {
-  // 'transportClose' listeners describe the connection that just closed, so
-  // events they publish keep its id. Clear it before going offline.
-  try {
-    this.emit('transportClose');
-  } finally {
-    this._clearSignalingConnectionId();
-  }
+  this.emit('transportClose');
 
   if (this.status !== 'disconnected') {
     if (this.status !== 'offline') {
@@ -143,21 +126,6 @@ PStream.prototype._handleTransportClose = function() {
     }
     this.status = 'disconnected';
   }
-};
-
-PStream.prototype._clearSignalingConnectionId = function() {
-  if (this.signalingConnectionId !== null) {
-    this._log.info(`Clearing signaling connection id: ${this.signalingConnectionId}`);
-  }
-  this.signalingConnectionId = null;
-};
-
-PStream.prototype._updateSignalingConnectionId = function(signalingConnectionId) {
-  if (typeof signalingConnectionId !== 'string' || signalingConnectionId === this.signalingConnectionId) {
-    return;
-  }
-  this._log.info(`Setting signaling connection id: ${signalingConnectionId}`);
-  this.signalingConnectionId = signalingConnectionId;
 };
 
 PStream.prototype._handleTransportError = function(error) {
@@ -182,10 +150,6 @@ PStream.prototype._handleTransportMessage = function(msg) {
   const { type, payload = {} } = JSON.parse(msg.data);
   this.gateway = payload.gateway || this.gateway;
   this.region = payload.region || this.region;
-
-  if (type === 'connected') {
-    this._updateSignalingConnectionId(payload.connectionId);
-  }
 
   if (type === 'error' && payload.error) {
     payload.error.twilioError = new SignalingErrors.ConnectionError();
@@ -302,7 +266,6 @@ PStream.prototype._destroy = function() {
   this.transport.removeListener('open', this._handleTransportOpen);
   this.transport.close();
 
-  this._clearSignalingConnectionId();
   this.emit('offline', this);
 };
 

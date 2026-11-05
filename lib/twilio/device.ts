@@ -924,8 +924,6 @@ class Device extends EventEmitter {
 
     setIfDefined('gateway', this._stream && this._stream.gateway);
     setIfDefined('region', this._stream && this._stream.region);
-    // Signaling connection scope: set with or without a Call.
-    setIfDefined('signaling_connection_id', this._stream && this._stream.signalingConnectionId);
 
     return payload;
   }
