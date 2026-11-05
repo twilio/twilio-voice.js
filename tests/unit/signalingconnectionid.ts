@@ -134,7 +134,7 @@ describe('signaling_connection_id (VBLOCKS-7513)', () => {
   });
 
   describe('initial connection', () => {
-    it('should carry the exact connectionId on info, warning and error events', async () => {
+    it('should carry the exact signalingConnectionId on info, warning and error events', async () => {
       await connectSignaling('6ee01b38-0000-4000-8000-00000000000a');
       const call = createFakeCall('CA1111', 'TJ1111');
 
@@ -151,13 +151,13 @@ describe('signaling_connection_id (VBLOCKS-7513)', () => {
       assert.strictEqual(eventBodies().length, 3);
     });
 
-    it('should carry the connectionId on events posted through post()', async () => {
+    it('should carry the signalingConnectionId on events posted through post()', async () => {
       await connectSignaling('CONN-A');
       device._publisher.post('debug', 'test-group', 'test-post', null, createFakeCall('CA1111', 'TJ1111'));
       assert.strictEqual(lastEventBody().payload.signaling_connection_id, 'CONN-A');
     });
 
-    it('should carry the connectionId on a Device-published event (audio device-change)', async () => {
+    it('should carry the signalingConnectionId on a Device-published event (audio device-change)', async () => {
       await connectSignaling('CONN-A');
       device._activeCall = createFakeCall('CA1111', 'TJ1111');
       device.audio.emit('deviceChange', [{ deviceId: 'foo' }]);
@@ -167,7 +167,7 @@ describe('signaling_connection_id (VBLOCKS-7513)', () => {
       assert.strictEqual(body.payload.signaling_connection_id, 'CONN-A');
     });
 
-    it('should include the connectionId in the default payload without a call', async () => {
+    it('should include the signalingConnectionId in the default payload without a call', async () => {
       await connectSignaling('CONN-A');
       const payload = device._createDefaultPayload();
       assert.strictEqual(payload.signaling_connection_id, 'CONN-A');
@@ -176,7 +176,7 @@ describe('signaling_connection_id (VBLOCKS-7513)', () => {
       assert(!('direction' in payload));
     });
 
-    it('should carry the connectionId when the event payload is null', async () => {
+    it('should carry the signalingConnectionId when the event payload is null', async () => {
       await connectSignaling('CONN-A');
       device._publisher.info('test-group', 'test-null-payload', null, createFakeCall('CA1111', 'TJ1111'));
       assert.strictEqual(lastEventBody().payload.signaling_connection_id, 'CONN-A');
@@ -207,7 +207,7 @@ describe('signaling_connection_id (VBLOCKS-7513)', () => {
   });
 
   describe('multiple calls on one connection', () => {
-    it('should give events from two calls the same connectionId', async () => {
+    it('should give events from two calls the same signalingConnectionId', async () => {
       await connectSignaling('CONN-A');
       device._publisher.info('connection', 'outgoing', null, createFakeCall('CA1111', 'TJ1111'));
       device._publisher.info('connection', 'outgoing', null, createFakeCall('CA2222', 'TJ2222'));
@@ -218,7 +218,7 @@ describe('signaling_connection_id (VBLOCKS-7513)', () => {
       assert.strictEqual(second.payload.signaling_connection_id, 'CONN-A');
     });
 
-    it('should give the same connectionId before, during and after a call', async () => {
+    it('should give the same signalingConnectionId before, during and after a call', async () => {
       await connectSignaling('CONN-A');
       const before = device._createDefaultPayload();
       device._publisher.info('connection', 'outgoing', null, createFakeCall('CA1111', 'TJ1111'));

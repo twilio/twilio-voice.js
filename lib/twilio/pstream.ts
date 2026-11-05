@@ -56,7 +56,7 @@ class PStream extends EventEmitter {
      * destroy), so a replacement connection never inherits the previous id.
      * @type {string|null}
      */
-    this.connectionId = null;
+    this.signalingConnectionId = null;
 
     this._messageQueue = [];
     this._preferredUri = null;
@@ -134,7 +134,7 @@ PStream.prototype._handleTransportClose = function() {
   try {
     this.emit('transportClose');
   } finally {
-    this._clearConnectionId();
+    this._clearSignalingConnectionId();
   }
 
   if (this.status !== 'disconnected') {
@@ -145,19 +145,19 @@ PStream.prototype._handleTransportClose = function() {
   }
 };
 
-PStream.prototype._clearConnectionId = function() {
-  if (this.connectionId !== null) {
-    this._log.info(`Clearing signaling connection id: ${this.connectionId}`);
+PStream.prototype._clearSignalingConnectionId = function() {
+  if (this.signalingConnectionId !== null) {
+    this._log.info(`Clearing signaling connection id: ${this.signalingConnectionId}`);
   }
-  this.connectionId = null;
+  this.signalingConnectionId = null;
 };
 
-PStream.prototype._updateConnectionId = function(connectionId) {
-  if (typeof connectionId !== 'string' || connectionId === this.connectionId) {
+PStream.prototype._updateSignalingConnectionId = function(signalingConnectionId) {
+  if (typeof signalingConnectionId !== 'string' || signalingConnectionId === this.signalingConnectionId) {
     return;
   }
-  this._log.info(`Setting signaling connection id: ${connectionId}`);
-  this.connectionId = connectionId;
+  this._log.info(`Setting signaling connection id: ${signalingConnectionId}`);
+  this.signalingConnectionId = signalingConnectionId;
 };
 
 PStream.prototype._handleTransportError = function(error) {
@@ -184,7 +184,7 @@ PStream.prototype._handleTransportMessage = function(msg) {
   this.region = payload.region || this.region;
 
   if (type === 'connected') {
-    this._updateConnectionId(payload.connectionId);
+    this._updateSignalingConnectionId(payload.connectionId);
   }
 
   if (type === 'error' && payload.error) {
@@ -302,7 +302,7 @@ PStream.prototype._destroy = function() {
   this.transport.removeListener('open', this._handleTransportOpen);
   this.transport.close();
 
-  this._clearConnectionId();
+  this._clearSignalingConnectionId();
   this.emit('offline', this);
 };
 

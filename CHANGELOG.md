@@ -6,7 +6,7 @@
 Improvements
 ------------
 
-- Insights events published by the SDK now include `signaling_connection_id` in their payload when the signaling server provides a connection id in its `connected` message. The value identifies the current signaling WebSocket connection, so events from the same connection share a value that matches the signaling server's id for that connection. Querying by this field in Voice Insights requires a separate backend update. Calls that share a signaling connection report the same value, and events after a signaling reconnect report the new connection's value. The field is omitted until the server sends an id and after the signaling connection closes. Metrics samples are unchanged.
+- Insights events published by the SDK now include `signaling_connection_id` when provided by the signaling server in its `connected` message, improving telemetry and event correlation.
 
 Bug Fixes
 ---------
