@@ -3,6 +3,11 @@
 2.18.6 (In Progress)
 ====================
 
+Improvements
+------------
+
+- Insights events published by the SDK now include `signaling_connection_id` when provided by the signaling server in its `connected` message, improving telemetry and event correlation.
+
 Bug Fixes
 ---------
 
