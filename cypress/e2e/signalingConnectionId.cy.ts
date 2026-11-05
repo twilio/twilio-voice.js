@@ -216,7 +216,7 @@ let pendingEventgw = 0;
     connectionId2 = payload2.connectionId;
     // Repeated connected messages on one socket (e.g. listen re-sent) keep the id.
     observer1.connected.forEach(p => assert.strictEqual(p.connectionId, connectionId1));
-    assert.strictEqual((device1 as any)._stream.connectionId, connectionId1);
+    assert.strictEqual((device1 as any)._stream.signalingConnectionId, connectionId1);
     assert.notStrictEqual(connectionId1, connectionId2, 'two WebSockets share one connectionId');
     socket1 = (device1 as any)._stream.transport._socket;
     assert(socket1, 'no WebSocket on device1');
@@ -263,7 +263,7 @@ let pendingEventgw = 0;
     assert.notStrictEqual(reconnectedId, connectionId1, 'reconnect reused the previous connectionId');
     assert.notStrictEqual(stream.transport._socket, socket1, 'WebSocket was not replaced');
     assert.strictEqual((device1 as any)._stream, stream, 'PStream was replaced; expected a transport reconnect');
-    assert.strictEqual(stream.connectionId, reconnectedId);
+    assert.strictEqual(stream.signalingConnectionId, reconnectedId);
 
     // Nothing posted between close and the new connected may use the new id
     // (it did not exist yet); none were expected because no call was active.
