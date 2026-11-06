@@ -40,11 +40,10 @@ function request(method, params, callback) {
 
   // The callback is invoked exactly once: with an error for a network-level
   // rejection or a non-2xx response (the error has a numeric `status`), or
-  // with (null, responseText) for a 2xx response.
-  let isSettled = false;
+  // with (null, responseText) for a 2xx response. `settle` is only called from
+  // the two handlers of the final `.then` below, and a promise runs at most
+  // one of them, at most once.
   const settle = (error, responseText) => {
-    if (isSettled) { return; }
-    isSettled = true;
     try {
       callback(error, responseText);
     } catch (e) {

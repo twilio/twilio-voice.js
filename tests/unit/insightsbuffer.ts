@@ -462,6 +462,27 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
       assert.deepStrictEqual(secondRound, [[3, 0], [3, 100], [3, 300]]);
     });
 
+    it('should start a new failure streak at the minimum delay after a success inside a retry (synchronous request function)', async () => {
+      noJitter();
+      // A request function that calls back synchronously, so the retry's success happens inside the backoff 'ready' handler.
+      const replies: any[] = [{ status: 503 }, null, { status: 503 }, null];
+      const attempts: Array<[any, number]> = [];
+      const syncRequest = {
+        post: (params: any, callback: (error?: any) => void) => {
+          attempts.push([params.body.payload.seq, h.clock.now - T0]);
+          callback(replies.length ? replies.shift() : null);
+        },
+      };
+      const publisher = createPublisher({ host: HOST, request: syncRequest });
+      postSeq(publisher, 0);
+      await h.runFor(1000);
+      const t1 = h.clock.now - T0;
+      postSeq(publisher, 1);
+      await h.runFor(1000);
+      assert.deepStrictEqual(attempts, [[0, 0], [0, 100], [1, t1], [1, t1 + 100]]);
+      assert.strictEqual(h.clock.countTimers(), 0);
+    });
+
     it('should retry a network rejection and deliver the event exactly once (callback settles once)', async () => {
       const publisher = createPublisher({ host: HOST });
       h.replies = ['network', 200];
@@ -768,6 +789,34 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
   });
 
   describe('publishEvents: false (publisher disabled)', () => {
+    it('should drop buffered events on disable(), so enabling again does not send them', async () => {
+      const publisher = createPublisher();
+      [0, 1].forEach(seq => postSeq(publisher, seq));
+      publisher.disable();
+      assert(h.logSpies[2].getCalls().some((call: sinon.SinonSpyCall) =>
+        /Dropped 2 buffered Insights event\(s\): publishing is disabled/.test(String(call.args[0]))), 'expected the drop to be logged at warn');
+      publisher.enable();
+      publisher.setHost(HOST);
+      await h.runFor(60000);
+      sinon.assert.notCalled(h.fetch);
+
+      postSeq(publisher, 2);
+      await h.runFor(1000);
+      assert.deepStrictEqual(h.seqs(), [2]);
+    });
+
+    it('should drop a waiting retry on disable() and not send it after enable()', async () => {
+      const publisher = createPublisher({ host: HOST });
+      h.replies = [503];
+      postSeq(publisher, 0);
+      await h.drain();
+      publisher.disable();
+      publisher.enable();
+      await h.runFor(60000);
+      assert.deepStrictEqual(h.seqs(), [0]);
+      assert.strictEqual(h.clock.countTimers(), 0);
+    });
+
     it('should neither buffer nor send while the host is unknown', async () => {
       const publisher = createPublisher();
       publisher.disable();
@@ -1064,6 +1113,33 @@ describe('Insights buffer with Device (VBLOCKS-7468)', () => {
       const delivered = h.eventCalls().filter(h.isSuccess);
       assert.strictEqual(delivered.length, 1);
       assert.deepStrictEqual(h.seqs(), [0, 0]);
+    });
+  });
+
+  describe('publisher setup flush', () => {
+    it('should send buffered events as soon as updateOptions gives the new publisher a host', async () => {
+      createDevice();
+      postSeq(device._publisher, 0);
+      postSeq(device._publisher, 1);
+      await h.drain();
+      sinon.assert.notCalled(h.fetch);
+
+      device.updateOptions({ eventgw: HOST });
+      await h.drain();
+      // Sent without waiting for signaling or for another event.
+      assert.deepStrictEqual(h.seqs(), [0, 1]);
+      h.eventCalls().forEach((c: FetchCall) => assert.strictEqual(c.url, EVENTS_URL));
+    });
+
+    it('should not clear the buffer when a publisher that is no longer attached is disabled', async () => {
+      createDevice();
+      const oldPublisher = device._publisher;
+      device.updateOptions({ appName: 'recreated' });
+      postSeq(device._publisher, 0);
+      oldPublisher.disable();
+      await connectSignaling('us1');
+      await h.runFor(5000);
+      assert.deepStrictEqual(h.seqs(), [0]);
     });
   });
 

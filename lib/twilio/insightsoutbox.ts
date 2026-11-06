@@ -383,12 +383,6 @@ export default class InsightsOutbox {
   private _publisher: IInsightsPublisher | null = null;
 
   /**
-   * Whether the backoff must be reset again before the next retry. See
-   * {@link InsightsOutbox._onSuccess}.
-   */
-  private _resetBeforeNextRetry: boolean = false;
-
-  /**
    * Next creation sequence number.
    */
   private _seq: number = 0;
@@ -673,6 +667,10 @@ export default class InsightsOutbox {
   private _onRetryableFailure(entry: IInsightsEntry, error: any, isBuffered: boolean): void {
     if (!this._isFailing) {
       this._isFailing = true;
+      // A new failure streak retries from the minimum delay. Reset here, not
+      // only on success: a success inside the backoff 'ready' handler is
+      // followed by Backoff incrementing its attempt counter.
+      this._backoff.reset();
       this._log.warn(`Unable to post Insights event ${describe(entry)} (${describeError(error)}); buffering and retrying`);
       emitInsightsError(entry.origin, error, this._log);
     } else {
@@ -698,17 +696,13 @@ export default class InsightsOutbox {
   }
 
   /**
-   * Handle a successful request: reset the backoff and cancel a scheduled
-   * retry, since the gateway is reachable again.
+   * Handle a successful request: end the failure streak and cancel a
+   * scheduled retry, since the gateway is reachable again (the caller flushes
+   * right away).
    */
   private _onSuccess(): void {
     this._isFailing = false;
     this._cancelRetry();
-    // When the success happens synchronously inside the backoff 'ready'
-    // handler, Backoff increments its attempt counter after this reset. Reset
-    // again before the next retry so a new failure streak starts at the
-    // minimum delay.
-    this._resetBeforeNextRetry = true;
   }
 
   /**
@@ -727,10 +721,6 @@ export default class InsightsOutbox {
    */
   private _scheduleRetry(): void {
     if (this._destroyed || this._isRetryScheduled) { return; }
-    if (this._resetBeforeNextRetry) {
-      this._backoff.reset();
-      this._resetBeforeNextRetry = false;
-    }
     this._isRetryScheduled = true;
     this._backoff.backoff();
     // Backoff keeps its timer in `_timeoutID`; see unrefTimer.
