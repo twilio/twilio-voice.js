@@ -34,6 +34,7 @@ import getUserMedia from './rtc/getusermedia';
 import { generateVoiceEventSid } from './sid';
 import Sound from './sound';
 import {
+  getTokenPrincipal,
   isLegacyEdge,
   promisifyEvents,
   queryToJson,
@@ -271,6 +272,20 @@ class Device extends EventEmitter {
       }
     }
     return Device._audioContext;
+  }
+
+  /**
+   * Whether two tokens are for the same account SID and identity. A token that
+   * cannot be decoded counts as a different principal.
+   * @param a
+   * @param b
+   */
+  private static _isSameTokenPrincipal(a: string, b: string): boolean {
+    const first = getTokenPrincipal(a);
+    const second = getTokenPrincipal(b);
+    return !!first && !!second
+      && first.accountSid === second.accountSid
+      && first.identity === second.identity;
   }
 
   /**
@@ -876,6 +891,14 @@ class Device extends EventEmitter {
 
     if (typeof token !== 'string') {
       throw new InvalidArgumentError(INVALID_TOKEN_MESSAGE);
+    }
+
+    // Buffered Insights events are sent with the token current at send time.
+    // Drop them when the new token is for another account or identity, so
+    // they are not reported under it. A refresh for the same identity keeps them.
+    if (this._insightsOutbox && this._token && token !== this._token
+      && !Device._isSameTokenPrincipal(this._token, token)) {
+      this._insightsOutbox.clear('the new access token is for a different account or identity');
     }
 
     this._token = token;

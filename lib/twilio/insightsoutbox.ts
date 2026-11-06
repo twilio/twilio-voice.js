@@ -133,6 +133,12 @@ interface IInsightsEntry {
   event: Record<string, any>;
 
   /**
+   * The outbox's clear count when the event was created. See
+   * {@link InsightsOutbox._generation}.
+   */
+  generation: number;
+
+  /**
    * The publisher the event was posted on. Its `error` listeners are notified
    * when the event fails to send.
    */
@@ -335,6 +341,14 @@ export default class InsightsOutbox {
   private _flushingEntry: IInsightsEntry | null = null;
 
   /**
+   * Incremented by {@link InsightsOutbox.clear}. An event whose direct send
+   * was in flight when the buffer was cleared is not put back into the buffer
+   * if that send fails, so it is not retried later (for example with a token
+   * for another identity).
+   */
+  private _generation: number = 0;
+
+  /**
    * Attempts in flight (direct sends and the flush loop's request), so their
    * timeout timers can be stopped on destroy.
    */
@@ -442,7 +456,7 @@ export default class InsightsOutbox {
       return Promise.resolve();
     }
 
-    const entry: IInsightsEntry = { createdAt: Date.now(), event, origin, seq: this._seq++ };
+    const entry: IInsightsEntry = { createdAt: Date.now(), event, generation: this._generation, origin, seq: this._seq++ };
 
     if (!publisher._host || this._entries.length || this._isFlushing || this._isRetryScheduled) {
       this._log.debug(`Buffering Insights event ${describe(entry)}`, JSON.stringify({
@@ -480,6 +494,7 @@ export default class InsightsOutbox {
   clear(reason: string): void {
     const count = this._entries.length;
     this._entries = [];
+    this._generation++;
     this._isFailing = false;
     this._cancelRetry();
     if (count) {
@@ -645,6 +660,8 @@ export default class InsightsOutbox {
       const publisher = this._publisher;
       if (!publisher || !publisher.isEnabled) {
         this._log.debug(`Dropped Insights event ${describe(entry)}: publishing is disabled`);
+      } else if (entry.generation !== this._generation) {
+        this._log.debug(`Dropped Insights event ${describe(entry)}: the buffer was cleared while it was being sent`);
       } else if (Date.now() - entry.createdAt > INSIGHTS_BUFFER_MAX_AGE_MS) {
         this._log.warn(`Dropped Insights event ${describe(entry)}: older than ${INSIGHTS_BUFFER_MAX_AGE_MS}ms`);
       } else {

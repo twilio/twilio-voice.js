@@ -19,6 +19,7 @@ const root = global as any;
 // Captured at module load, before any suite installs fake timers.
 const realSetImmediate: (cb: () => void) => any = setImmediate;
 
+const AccessToken = require('twilio').jwt.AccessToken;
 const ClientCapability = require('twilio').jwt.ClientCapability;
 const CallClass = require('../../lib/twilio/call').default;
 
@@ -1042,7 +1043,9 @@ describe('Insights buffer with Device (VBLOCKS-7468)', () => {
       device.updateOptions({ appName: 'recreated' });
       postSeq(oldPublisher, 1);
 
-      const newToken = createToken('bob');
+      // A refresh for the same identity (a different ttl gives a different JWT).
+      const newToken = createToken('alice', 7200);
+      assert.notStrictEqual(newToken, token);
       device.updateToken(newToken);
       await connectSignaling('us1');
       await h.runFor(5000);
@@ -1089,6 +1092,98 @@ describe('Insights buffer with Device (VBLOCKS-7468)', () => {
       await h.runFor(60000);
       assert.deepStrictEqual(h.seqs(), ['forced']);
       assert.deepStrictEqual(h.unhandled.map(String), []);
+    });
+  });
+
+  describe('updateToken', () => {
+    const ACCOUNT_A = 'AC00000000000000000000000000000001';
+    const ACCOUNT_B = 'AC00000000000000000000000000000002';
+
+    const warnLogged = (pattern: RegExp): boolean => h.logSpies[2].getCalls().some((call: sinon.SinonSpyCall) =>
+      call.args.some((arg: any) => typeof arg === 'string' && pattern.test(arg)));
+
+    // Buffer two events (host unknown), update the token, then let the host become known.
+    const bufferThenUpdate = async (newToken: string) => {
+      createDevice();
+      postSeq(device._publisher, 0);
+      postSeq(device._publisher, 1);
+      device.updateToken(newToken);
+      await connectSignaling('us1');
+      await h.runFor(5000);
+    };
+
+    it('should keep buffered events and send them with the new token on a refresh for the same identity (Access Token)', async () => {
+      token = createAccessToken('alice', ACCOUNT_A, 3600);
+      const refreshed = createAccessToken('alice', ACCOUNT_A, 7200);
+      assert.notStrictEqual(refreshed, token);
+      await bufferThenUpdate(refreshed);
+      assert.deepStrictEqual(h.seqs(), [0, 1]);
+      h.eventCalls().forEach((c: FetchCall) => assert.strictEqual(c.token, refreshed));
+      assert(!warnLogged(/Dropped \d+ buffered Insights event/), 'nothing may be dropped');
+    });
+
+    it('should keep buffered events on a refresh for the same identity (Capability Token)', async () => {
+      const refreshed = createToken('alice', 7200);
+      assert.notStrictEqual(refreshed, token);
+      await bufferThenUpdate(refreshed);
+      assert.deepStrictEqual(h.seqs(), [0, 1]);
+      h.eventCalls().forEach((c: FetchCall) => assert.strictEqual(c.token, refreshed));
+    });
+
+    const dropCases: Array<[string, () => void, () => string]> = [
+      ['a different identity (Access Token)', () => { token = createAccessToken('alice', ACCOUNT_A); }, () => createAccessToken('bob', ACCOUNT_A)],
+      ['a different identity (Capability Token)', () => { token = createToken('alice'); }, () => createToken('bob')],
+      ['a different account (Access Token)', () => { token = createAccessToken('alice', ACCOUNT_A); }, () => createAccessToken('alice', ACCOUNT_B)],
+      ['a token that cannot be decoded', () => { token = createAccessToken('alice', ACCOUNT_A); }, () => 'not-a-jwt'],
+      ['a token whose payload is not JSON', () => { token = createAccessToken('alice', ACCOUNT_A); }, () => 'aGVhZGVy.bm90IGpzb24.c2ln'],
+      ['a new token when the previous token cannot be decoded', () => { token = 'not-a-jwt'; }, () => createAccessToken('alice', ACCOUNT_A)],
+    ];
+
+    dropCases.forEach(([description, setOldToken, createNewToken]) => {
+      it(`should drop buffered events and log the count at warn for ${description}`, async () => {
+        setOldToken();
+        const newToken = createNewToken();
+        await bufferThenUpdate(newToken);
+        assert.deepStrictEqual(h.seqs(), [], 'events created under the previous token must not be sent');
+        assert(warnLogged(/Dropped 2 buffered Insights event\(s\): the new access token is for a different account or identity/),
+          'expected the dropped count to be logged at warn');
+
+        // Events created after the update are sent with the new token.
+        postSeq(device._publisher, 2);
+        await h.runFor(5000);
+        assert.deepStrictEqual(h.seqs(), [2]);
+        assert.strictEqual(h.eventCalls()[0].token, newToken);
+      });
+    });
+
+    it('should not retry an event whose direct send was in flight when the identity changed', async () => {
+      token = createAccessToken('alice', ACCOUNT_A);
+      createDevice({ eventgw: HOST });
+      h.replies = ['hold'];
+      postSeq(device._publisher, 0);
+      await h.drain();
+      assert.strictEqual(h.held.length, 1, 'expected a request in flight');
+
+      device.updateToken(createAccessToken('bob', ACCOUNT_A));
+      h.held.splice(0).forEach((held: any) => held.resolve(503));
+      await h.runFor(10000);
+      assert.deepStrictEqual(h.seqs(), [0], 'the failed event must not be resent with the new token');
+      assert.strictEqual(h.clock.countTimers(), 0, 'expected no retry to be scheduled');
+    });
+
+    it('should keep an event whose direct send was in flight during a same-identity refresh and retry it with the new token', async () => {
+      token = createAccessToken('alice', ACCOUNT_A, 3600);
+      createDevice({ eventgw: HOST });
+      h.replies = ['hold'];
+      postSeq(device._publisher, 0);
+      await h.drain();
+
+      const refreshed = createAccessToken('alice', ACCOUNT_A, 7200);
+      device.updateToken(refreshed);
+      h.held.splice(0).forEach((held: any) => held.resolve(503));
+      await h.runFor(10000);
+      assert.deepStrictEqual(h.seqs(), [0, 0]);
+      assert.strictEqual(h.eventCalls()[1].token, refreshed);
     });
   });
 
@@ -1169,12 +1264,13 @@ function createEmitterStub(BaseClass: any): sinon.SinonStubbedInstance<any> {
 }
 
 /**
- * Create a Capability Token (same helper as tests/unit/device.ts).
+ * Create a Capability Token (same helper as tests/unit/device.ts, plus `ttl`).
  */
-function createToken(identity: string): string {
+function createToken(identity: string, ttl?: number): string {
   const capability = new ClientCapability({
     accountSid: 'AC1234567890123456789012',
     authToken: 'authToken',
+    ttl,
   });
 
   capability.addScope(new ClientCapability.OutgoingClientScope({
@@ -1184,4 +1280,13 @@ function createToken(identity: string): string {
 
   capability.addScope(new ClientCapability.IncomingClientScope(identity));
   return capability.toJwt();
+}
+
+/**
+ * Create a Voice Access Token.
+ */
+function createAccessToken(identity: string, accountSid: string, ttl: number = 3600): string {
+  const accessToken = new AccessToken(accountSid, 'SK00000000000000000000000000000001', 'secret', { identity, ttl });
+  accessToken.addGrant(new AccessToken.VoiceGrant({ incomingAllow: true }));
+  return accessToken.toJwt();
 }

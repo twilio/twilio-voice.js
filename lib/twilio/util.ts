@@ -140,6 +140,55 @@ function sortByMimeTypes(codecs, preferredOrder) {
   });
 }
 
+/**
+ * Read the account SID and identity from a Twilio JWT, so two tokens can be
+ * compared. Only the payload segment is decoded (base64url -> base64, then
+ * `atob` and `JSON.parse`, as Device does for `connectToken`); the signature is
+ * not verified.
+ *
+ * - Access Token: account SID from `sub`, identity from `grants.identity`.
+ * - Capability Token: account SID from `iss`, identity from the first
+ *   `clientName` parameter in `scope`.
+ *
+ * Non-ASCII characters are not UTF-8 decoded. The values are only compared,
+ * and the same bytes always produce the same string.
+ * @param {string} token
+ * @returns {{accountSid: string, identity: (string|null)}|null} null when the
+ *   token cannot be decoded or has no account SID.
+ */
+function getTokenPrincipal(token) {
+  try {
+    const parts = typeof token === 'string' ? token.split('.') : [];
+    if (parts.length !== 3) { return null; }
+
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(base64 + '==='.slice((base64.length + 3) % 4)));
+    if (!payload || typeof payload !== 'object') { return null; }
+
+    const accountSid = typeof payload.sub === 'string' ? payload.sub : payload.iss;
+    if (typeof accountSid !== 'string' || !accountSid) { return null; }
+
+    let identity = null;
+    if (payload.grants && typeof payload.grants === 'object') {
+      identity = typeof payload.grants.identity === 'string' ? payload.grants.identity : null;
+    } else if (typeof payload.scope === 'string') {
+      payload.scope.split(' ').some(scope => {
+        const query = scope.split('?')[1];
+        const clientName = query ? queryToJson(query).clientName : undefined;
+        if (typeof clientName === 'string' && clientName) {
+          identity = clientName;
+          return true;
+        }
+        return false;
+      });
+    }
+
+    return { accountSid, identity };
+  } catch (e) {
+    return null;
+  }
+}
+
 const Exception = TwilioException;
 
 export {
@@ -153,6 +202,7 @@ export {
   isSafari,
   queryToJson,
   flatMap,
+  getTokenPrincipal,
   promisifyEvents,
   sortByMimeTypes,
 };
