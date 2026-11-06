@@ -12,6 +12,12 @@ Improvements
 
   Additionally, Insights gateway HTTP errors are now properly reported, allowing PreflightTest to emit the insights-connection-error warning.
 
+- Errors that happen outside a call are now sent to Insights. Error-level Insights events were previously dropped when they had no call, so errors raised while no call was active never reached Insights. This covers the errors the `Device` emits from the signaling connection, such as token errors, connection errors and error messages from the signaling server, and the `31400` error for a malformed incoming call invite. Signaling errors that carry the CallSid of a pending incoming call are sent with that call. Events below error level still require a call. Nothing is sent when `publishEvents` is `false`.
+
+  Transport errors (`31000`, `31005` and `31009`) repeat on every reconnect attempt while the signaling connection is down, so only the first one is sent each time the connection is lost. That event carries the `signaling_connection_id` of the connection that was lost, including when the error comes from a reconnect attempt after the connection closed. The `Device` still emits `error` for every one.
+
+  Note: errors raised before the first signaling `connected` message are sent only if the Insights gateway host is known. Without the `eventgw` option, they are buffered and sent only if the `Device` connects within 5 minutes; otherwise they are dropped. An error caused by an invalid token is sent with that token, so the gateway can reject it.
+
 Bug Fixes
 ---------
 

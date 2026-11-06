@@ -19,7 +19,7 @@ import Publisher from './eventpublisher';
 import InsightsOutbox from './insightsoutbox';
 import Log from './log';
 import { PreflightTest } from './preflight/preflight';
-import PStream from './pstream';
+import PStream, { isTransportErrorPayload } from './pstream';
 import {
   createEventGatewayURI,
   createSignalingEndpointURL,
@@ -460,6 +460,14 @@ class Device extends EventEmitter {
     [Device.State.Registering]: Device.EventName.Registering,
     [Device.State.Registered]: Device.EventName.Registered,
   };
+
+  /**
+   * Whether a transport error has been published to Insights since the
+   * signaling connection was last established. Transport errors repeat on
+   * every reconnect attempt, so only the first one per lost connection is
+   * published. Device `error` is still emitted for each one.
+   */
+  private _isTransportErrorPublished: boolean = false;
 
   /**
    * The Signaling stream.
@@ -1311,6 +1319,7 @@ class Device extends EventEmitter {
    * Called when a 'connected' event is received from the signaling stream.
    */
   private _onSignalingConnected = (payload: Record<string, any>) => {
+    this._isTransportErrorPublished = false;
     const region = getRegionShortcode(payload.region);
     this._edge = payload.edge || regionToEdge[region as Region] || payload.region;
     this._region = region || payload.region;
@@ -1404,6 +1413,12 @@ class Device extends EventEmitter {
 
     this._log.error('Received error: ', twilioError);
     this._log.debug('#error', originalError);
+    if (!isTransportErrorPayload(payload)) {
+      this._publishError(twilioError, call);
+    } else if (!this._isTransportErrorPublished) {
+      this._isTransportErrorPublished = true;
+      this._publishError(twilioError, call, this._getDroppedSignalingConnectionId());
+    }
     this.emit(Device.EventName.Error, twilioError, call);
   }
 
@@ -1419,7 +1434,9 @@ class Device extends EventEmitter {
 
     if (!payload.callsid || !payload.sdp) {
       this._log.debug('#error', payload);
-      this.emit(Device.EventName.Error, new ClientErrors.BadRequest('Malformed invite from gateway'));
+      const error = new ClientErrors.BadRequest('Malformed invite from gateway');
+      this._publishError(error);
+      this.emit(Device.EventName.Error, error);
       return;
     }
 
@@ -1485,6 +1502,38 @@ class Device extends EventEmitter {
     this._log.info('Stream is ready');
 
     this._setState(Device.State.Registered);
+  }
+
+  /**
+   * The id of the signaling connection that dropped, when the current
+   * connection has none: the transport closed and has not reconnected yet.
+   * @returns The id, or `undefined` while connected or if none is known.
+   */
+  private _getDroppedSignalingConnectionId(): string | undefined {
+    const stream = this._stream;
+    if (!stream || stream.signalingConnectionId) {
+      return;
+    }
+    const droppedId = stream.lastClosedSignalingConnectionId;
+    return typeof droppedId === 'string' && droppedId ? droppedId : undefined;
+  }
+
+  /**
+   * Publish an error to Insights. Without a Call, the event has no call ids.
+   * @param twilioError - The error to publish.
+   * @param call - The Call the error belongs to, if any.
+   * @param droppedSignalingConnectionId - The id of the signaling connection
+   *   that dropped, set on this event only when the current one has none.
+   */
+  private _publishError(twilioError: TwilioError, call?: Call, droppedSignalingConnectionId?: string): void {
+    const payload: Record<string, any> = {
+      code: twilioError.code,
+      message: twilioError.message,
+    };
+    if (droppedSignalingConnectionId) {
+      payload.signaling_connection_id = droppedSignalingConnectionId;
+    }
+    this._publisher?.error('connection', 'error', payload, call);
   }
 
   /**
@@ -1677,6 +1726,7 @@ class Device extends EventEmitter {
     }
 
     this._log.info('Setting up VSP');
+    this._isTransportErrorPublished = false;
     this._stream = new (this._options.PStream || PStream)(
       this.token,
       this._chunderURIs,

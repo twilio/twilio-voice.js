@@ -98,6 +98,8 @@ class EventPublisher extends EventEmitter {
  * @param {?Object} [payload=null] - The payload to pass. This will be extended
  *    onto the default payload object, if one exists.
  * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
+ *    Error-level events are posted without one. Other events are dropped
+ *    unless it has a CallSid or a temporary call sid.
  * @param {?Boolean} [force=false] - Whether or not to send this even if
  *    publishing is disabled.
  * @returns {Promise} Always fulfilled. For EndpointEvents sent through the
@@ -122,7 +124,10 @@ EventPublisher.prototype._post = function _post(endpointName, level, group, name
     return Promise.resolve();
   }
 
-  if (!connection || ((!connection.parameters || !connection.parameters.CallSid) && !connection.outboundConnectionId)) {
+  // Errors are published with or without a Call. Other events need a Call.
+  const hasCallInfo = !!connection
+    && ((!!connection.parameters && !!connection.parameters.CallSid) || !!connection.outboundConnectionId);
+  if (!hasCallInfo && level !== 'error') {
     if (!connection) {
       this._log.debug('Publishing cancelled. Missing connection object');
     } else {
