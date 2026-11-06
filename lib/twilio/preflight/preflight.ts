@@ -452,11 +452,12 @@ export class PreflightTest extends EventEmitter {
 
     const publisher = this._call['_publisher'] as any;
     publisher.on('error', () => {
-      if (!this._hasInsightsErrored) {
-        this._emitWarning('insights-connection-error',
-          'Received an error when attempting to connect to Insights gateway');
-      }
+      if (this._hasInsightsErrored) { return; }
+      // Set before emitting, so a throwing `warning` listener cannot cause the
+      // warning to be emitted again on a later Insights failure.
       this._hasInsightsErrored = true;
+      this._emitWarning('insights-connection-error',
+        'Received an error when attempting to connect to Insights gateway');
     });
   }
 

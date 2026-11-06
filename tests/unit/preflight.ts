@@ -3,12 +3,26 @@ import Device from '../../lib/twilio/device';
 import { TwilioError } from '../../lib/twilio/errors';
 import { PreflightTest } from '../../lib/twilio/preflight/preflight';
 import EventPublisher from '../../lib/twilio/eventpublisher';
+import Log from '../../lib/twilio/log';
 import { EventEmitter } from 'events';
 import { SinonFakeTimers } from 'sinon';
 import * as assert from 'assert';
 import * as sinon from 'sinon';
 import { inherits } from 'util';
 import RTCSample from '../../lib/twilio/rtc/sample';
+
+// Captured at module load, before any test installs fake timers.
+const realSetImmediate: (cb: () => void) => any = setImmediate;
+
+/**
+ * Let real macrotasks run (without advancing the fake clock), so Node reports
+ * unhandled rejections created in the meantime.
+ */
+async function waitForRealMacrotasks(): Promise<void> {
+  for (let i = 0; i < 5; i++) {
+    await new Promise<void>(resolve => realSetImmediate(resolve));
+  }
+}
 
 describe('PreflightTest', () => {
   const CALL_SID = 'foo-bar';
@@ -489,6 +503,69 @@ describe('PreflightTest', () => {
           root.fetch = originalFetch;
         }
       });
+    });
+
+    it('should emit insights-connection-error once, log at error level, raise an unhandled rejection and still deliver when the warning listener throws', async () => {
+      const root = global as any;
+      const originalFetch = root.fetch;
+      // 503 then 200 for the first event, and again for the second event (a second failure streak).
+      const replies = [503, 200, 503, 200];
+      const fetchStub = sinon.stub().callsFake(() => {
+        const status = replies.length ? replies.shift() as number : 200;
+        return Promise.resolve({
+          headers: { get: () => null },
+          json: () => Promise.resolve({}),
+          ok: status >= 200 && status < 300,
+          status,
+          statusText: `HTTP ${status}`,
+          text: () => Promise.resolve(status < 300 ? '{}' : 'error'),
+        });
+      });
+      const listenerError = new Error('warning listener threw');
+      const unhandled: any[] = [];
+      const onUnhandled = (reason: any) => { unhandled.push(reason); };
+      const errorLog = sinon.stub(Log.prototype, 'error');
+      root.fetch = fetchStub;
+      process.on('unhandledRejection', onUnhandled);
+      try {
+        const realPublisher: any = new (EventPublisher as any)('twilio-js-sdk', 'token', {
+          defaultPayload: () => ({}),
+          host: 'eventgw.test.twilio.com',
+        });
+        call._publisher = realPublisher;
+        const onWarning = sinon.stub().throws(listenerError);
+        preflight.on('warning', onWarning);
+        device.emit(Device.EventName.Registered);
+        await clock.tickAsync(1000);
+
+        const conn = { outboundConnectionId: 'TJ1111', parameters: { CallSid: 'CA1111' } };
+        let firstSettled = false;
+        realPublisher.info('test-group', 'first', null, conn).then(() => { firstSettled = true; });
+        await clock.tickAsync(3000);
+        await waitForRealMacrotasks();
+        assert(firstSettled, 'expected the Promise returned for the first event to settle');
+
+        // A second failure streak must not emit the warning again.
+        realPublisher.info('test-group', 'second', null, conn);
+        await clock.tickAsync(3000);
+        await waitForRealMacrotasks();
+
+        sinon.assert.calledOnce(onWarning);
+        sinon.assert.calledWithExactly(onWarning, {
+          description: 'Received an error when attempting to connect to Insights gateway',
+          name: 'insights-connection-error',
+        });
+        sinon.assert.calledWith(errorLog, 'An Insights error listener threw an error', listenerError);
+        // Mocha re-emits an unhandled rejection it does not own, so the same reason can be seen twice.
+        assert.deepStrictEqual(Array.from(new Set(unhandled)), [listenerError]);
+
+        const sent = fetchStub.args.map((args: any[]) => JSON.parse(args[1].body).name);
+        assert.deepStrictEqual(sent, ['first', 'first', 'second', 'second'], 'each event is retried once and delivered');
+      } finally {
+        root.fetch = originalFetch;
+        process.removeListener('unhandledRejection', onUnhandled);
+        errorLog.restore();
+      }
     });
   });
 

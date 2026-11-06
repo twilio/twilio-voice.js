@@ -15,7 +15,7 @@ Improvements
 Bug Fixes
 ---------
 
-- Fixed an issue where an exception thrown by an application's `PreflightTest` `warning` listener while handling the `insights-connection-error` warning raised an unhandled promise rejection. In that case the warning was also emitted twice for one failed Insights request.
+- Fixed an issue where an exception thrown by an application's `PreflightTest` `warning` listener while handling the `insights-connection-error` warning caused the warning to be emitted again, twice for one failed Insights request. The warning is now emitted at most once per test. The exception is still raised as an unhandled promise rejection, as before, and is now also written to the SDK log at error level.
 
 - Fixed an issue where losing the signaling transport before a call received a signaling-reconnect token left its media open and the Device busy with a closed call. The SDK now closes the media and emits `disconnect`, releasing the active-call slot so a later `device.connect()` is not rejected with `InvalidStateError`. Calls with a reconnect token retain their existing recovery behavior. Thanks @ip4422 for your [contribution](https://github.com/twilio/twilio-voice.js/pull/482).
 

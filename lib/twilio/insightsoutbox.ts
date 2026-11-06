@@ -259,9 +259,16 @@ export function postInsightsRequest(
 }
 
 /**
- * Emit `error` on a publisher without throwing. Skipped when the publisher has
- * no `error` listener, because an EventEmitter throws on an unhandled `error`.
- * A throwing listener is logged and ignored. Never posts to Insights.
+ * Emit `error` on a publisher without throwing into the caller. Skipped when
+ * the publisher has no `error` listener, because an EventEmitter throws on an
+ * unhandled `error`. Never posts to Insights.
+ *
+ * An exception thrown by a listener is logged at error level and then raised
+ * as a rejected Promise that nothing handles, so the application sees it as an
+ * unhandled rejection, the same channel as before the outbox existed (the
+ * listener used to run inside the `fetch` promise chain). The rejection is
+ * created outside the caller's own promise chain, so the outbox still retries
+ * or drops the event and still settles the Promise returned by `add()`.
  * @param target - The publisher to emit on.
  * @param error - The request error.
  * @param log - Logger used when a listener throws.
@@ -277,8 +284,10 @@ export function emitInsightsError(target: IInsightsPublisher | null | undefined,
     target.emit('error', error);
   } catch (e) {
     if (log) {
-      log.warn('An Insights error listener threw an error', e);
+      log.error('An Insights error listener threw an error', e);
     }
+    // Deliberately unhandled; see above.
+    Promise.reject(e);
   }
 }
 
