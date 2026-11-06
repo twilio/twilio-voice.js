@@ -346,7 +346,7 @@ const keyOf = (e: { body: string }) => {
   it('should deliver every buffered event exactly once, in creation order, with creation-time ids and timestamps, after recovery', () => {
     cy.then({ timeout: 90000 }, async () => {
       await waitIdle('before');
-      const idAtCreation = (device1 as any)._stream.connectionId;
+      const idAtCreation = (device1 as any)._stream.signalingConnectionId;
       assert.strictEqual(typeof idAtCreation, 'string', 'device1 has no signaling connection id');
 
       fault = 'network';
@@ -368,9 +368,9 @@ const keyOf = (e: { body: string }) => {
       (device1 as any)._stream.transport._socket.close();
       await waitUntil(() => {
         const stream = (device1 as any)._stream;
-        return !!stream && typeof stream.connectionId === 'string' && stream.connectionId !== idAtCreation;
+        return !!stream && typeof stream.signalingConnectionId === 'string' && stream.signalingConnectionId !== idAtCreation;
       }, 30000, 'a new signaling connection id after reconnect');
-      const idAfterReconnect = (device1 as any)._stream.connectionId;
+      const idAfterReconnect = (device1 as any)._stream.signalingConnectionId;
       const retriesBeforeRecovery = retriesFor(events).length;
       assert(tracker1.created.slice(start).length === events.length, 'events were created during the reconnect');
 
@@ -548,7 +548,7 @@ const keyOf = (e: { body: string }) => {
 
       const attemptsBefore = attempts.length;
       await device4.register();
-      const id4 = (device4 as any)._stream.connectionId;
+      const id4 = (device4 as any)._stream.signalingConnectionId;
       assert.strictEqual(typeof id4, 'string');
       const tempSid = await placeAnsweredCall(device4);
       await sleep(1500);
