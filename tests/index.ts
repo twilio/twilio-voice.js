@@ -116,6 +116,7 @@ require('./unit/icecandidate');
 require('./unit/call');
 require('./unit/device');
 require('./unit/signalingconnectionid');
+require('./unit/insightsbuffer');
 require('./unit/deferred');
 require('./unit/preflight');
 require('./unit/wstransport');

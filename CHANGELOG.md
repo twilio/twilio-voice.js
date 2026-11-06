@@ -8,8 +8,14 @@ Improvements
 
 - Insights events published by the SDK now include `signaling_connection_id` when provided by the signaling server in its `connected` message, improving telemetry and event correlation.
 
+- Insights events are now buffered in memory when the gateway is unknown or temporarily unreachable, and retried once connectivity is restored. The buffer holds up to 200 events, dropping the oldest events when full, and an event is not sent if it is older than 5 minutes when it would be sent. Events are delivered oldest first with exponential backoff for network errors, HTTP 5xx, and HTTP 429 responses. Buffered events are preserved across device.updateOptions() calls but are lost when the page closes. When device.destroy() is called, each buffered event is sent one final time, without retries, and dropped if that send fails or the gateway is still unknown. Delivery is at least once, so duplicate events are possible. Buffered events are sent with the access token current at send time; when device.updateToken() is called with a token for a different account or identity, or with a token that cannot be decoded, buffered events are dropped, while a token refresh for the same identity keeps them.
+
+  Additionally, Insights gateway HTTP errors are now properly reported, allowing PreflightTest to emit the insights-connection-error warning.
+
 Bug Fixes
 ---------
+
+- Fixed an issue where an exception thrown by an application's `PreflightTest` `warning` listener while handling the `insights-connection-error` warning caused the warning to be emitted again, twice for one failed Insights request. The warning is now emitted at most once per test. The exception is still raised as an unhandled promise rejection, as before, and is now also written to the SDK log at error level.
 
 - Fixed an issue where losing the signaling transport before a call received a signaling-reconnect token left its media open and the Device busy with a closed call. The SDK now closes the media and emits `disconnect`, releasing the active-call slot so a later `device.connect()` is not rejected with `InvalidStateError`. Calls with a reconnect token retain their existing recovery behavior. Thanks @ip4422 for your [contribution](https://github.com/twilio/twilio-voice.js/pull/482).
 
