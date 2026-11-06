@@ -10,6 +10,31 @@ const PSTREAM_VERSION = '1.6';
 // In seconds
 const MAX_RECONNECT_TIMEOUT_ALLOWED = 30;
 
+// Non-enumerable mark on 'error' payloads raised because the transport failed
+// (socket error or abnormal close, or no transport to send on), as opposed to
+// an error message received from the signaling server.
+const TRANSPORT_ERROR_MARK = '_isTransportError';
+
+/**
+ * Mark an 'error' payload as raised by the transport.
+ * @param payload - The payload to mark.
+ * @returns The same payload.
+ */
+export function markTransportErrorPayload(payload) {
+  if (payload && typeof payload === 'object') {
+    Object.defineProperty(payload, TRANSPORT_ERROR_MARK, { value: true });
+  }
+  return payload;
+}
+
+/**
+ * Whether an 'error' payload was raised by the transport.
+ * @param payload - The payload to check.
+ */
+export function isTransportErrorPayload(payload) {
+  return !!payload && typeof payload === 'object' && payload[TRANSPORT_ERROR_MARK] === true;
+}
+
 /**
  * Constructor for PStream objects.
  *
@@ -57,6 +82,18 @@ class PStream extends EventEmitter {
      * @type {string|null}
      */
     this.signalingConnectionId = null;
+
+    /**
+     * The signaling connection id of the connection that most recently closed
+     * after receiving one, or `null`. Set when the transport closes, kept
+     * across reconnect attempts that never reach `connected`, and cleared on
+     * the next `connected` message (with or without an id) and on destroy.
+     * Device uses it only for the one Insights transport error event published
+     * per lost connection, so that event names the connection that dropped
+     * even when the transport closed before raising any error.
+     * @type {string|null}
+     */
+    this.lastClosedSignalingConnectionId = null;
 
     this._messageQueue = [];
     this._preferredUri = null;
@@ -134,6 +171,9 @@ PStream.prototype._handleTransportClose = function() {
   try {
     this.emit('transportClose');
   } finally {
+    if (this.signalingConnectionId !== null) {
+      this.lastClosedSignalingConnectionId = this.signalingConnectionId;
+    }
     this._clearSignalingConnectionId();
   }
 
@@ -162,16 +202,16 @@ PStream.prototype._updateSignalingConnectionId = function(signalingConnectionId)
 
 PStream.prototype._handleTransportError = function(error) {
   if (!error) {
-    this.emit('error', { error: {
+    this.emit('error', markTransportErrorPayload({ error: {
       code: 31000,
       message: 'Websocket closed without a provided reason',
       twilioError: new SignalingErrors.ConnectionDisconnected(),
-    } });
+    } }));
     return;
   }
   // We receive some errors without call metadata (just the error). We need to convert these
   // to be contained within the 'error' field so that these errors match the expected format.
-  this.emit('error', typeof error.code !== 'undefined' ?  { error } : error);
+  this.emit('error', markTransportErrorPayload(typeof error.code !== 'undefined' ?  { error } : error));
 };
 
 PStream.prototype._handleTransportMessage = function(msg) {
@@ -184,6 +224,8 @@ PStream.prototype._handleTransportMessage = function(msg) {
   this.region = payload.region || this.region;
 
   if (type === 'connected') {
+    // A new connection is established: the dropped one no longer applies.
+    this.lastClosedSignalingConnectionId = null;
     this._updateSignalingConnectionId(payload.connectionId);
   }
 
@@ -303,6 +345,7 @@ PStream.prototype._destroy = function() {
   this.transport.close();
 
   this._clearSignalingConnectionId();
+  this.lastClosedSignalingConnectionId = null;
   this.emit('offline', this);
 };
 
@@ -335,11 +378,11 @@ PStream.prototype._publish = function(type, payload, shouldRetry) {
   const isSent = !!this.transport.send(msg);
 
   if (!isSent) {
-    this.emit('error', { error: {
+    this.emit('error', markTransportErrorPayload({ error: {
       code: 31009,
       message: 'No transport available to send or receive messages',
       twilioError: new GeneralErrors.TransportError(),
-    } });
+    } }));
 
     if (shouldRetry) {
       this._messageQueue.push([type, payload, true]);
