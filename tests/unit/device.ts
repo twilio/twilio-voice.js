@@ -1383,6 +1383,23 @@ describe('Device', function() {
               sinon.assert.calledTwice(publisher.error);
             });
 
+            it('should publish the first transport error of a new stream after the stream is replaced', () => {
+              const firstStream = pstream;
+              const firstPublisher = publisher;
+              pstream.emit('error', transportError(31005));
+
+              device.updateOptions({ edge: 'ashburn' });
+              assert.notStrictEqual(pstream, firstStream);
+
+              pstream.emit('error', transportError(31005));
+              const publishedErrors: sinon.SinonSpyCall[] = firstPublisher.error.getCalls().concat(
+                publisher === firstPublisher ? [] : publisher.error.getCalls(),
+              );
+              assert.equal(publishedErrors.length, 2);
+              publishedErrors.forEach((publishedError: sinon.SinonSpyCall) =>
+                assert.deepEqual(publishedError.args.slice(0, 2), ['connection', 'error']));
+            });
+
             it('should still publish every server error while transport errors are suppressed', () => {
               pstream.emit('error', transportError(31005));
               pstream.emit('error', transportError(31005));
