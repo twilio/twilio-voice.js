@@ -18,7 +18,8 @@
  *   body was sent, a 2xx whose body cannot be read) is resent with the same
  *   body, so the backend can receive duplicates.
  * - Buffered events are kept in memory only. They are lost when the page is
- *   closed or the Device is destroyed.
+ *   closed. When the Device is destroyed they are sent once, without retries,
+ *   and dropped if that fails or the host is unknown.
  * - A deterministic network-level block (ad blocker, CSP, firewall) looks like
  *   a network error, so while new events keep arriving the outbox keeps
  *   retrying at the backoff cap (about one request per second).
@@ -503,18 +504,40 @@ export default class InsightsOutbox {
   }
 
   /**
-   * Drop the buffer, stop the retry timer and stop accepting events. Requests
+   * Send each buffered event once, then stop the retry timer and stop
+   * accepting events. Called when the Device is destroyed, after its calls
+   * were disconnected, so their teardown events queued behind a backlog are
+   * not discarded unsent.
+   *
+   * Each remaining event is sent once, in creation order, with the attached
+   * publisher's host and token. The requests are started right away, not one
+   * after another, and are not retried; each has the usual per-attempt
+   * timeout ({@link INSIGHTS_REQUEST_TIMEOUT_MS}), so none outlives the
+   * destroy by more than that. A failed event is dropped and logged. Without a
+   * known host (or with publishing disabled) nothing is sent and the events
+   * are dropped with a log line. Expired events are dropped first. The event
+   * whose flush request is already in flight is not sent again. Requests
    * already in flight complete, but their results are ignored.
    */
   destroy(): void {
     if (this._destroyed) { return; }
-    this.clear('the Device was destroyed');
+    this._dropExpired();
+    const remaining = this._entries.filter(entry => entry !== this._flushingEntry);
+    const publisher = this._publisher;
+
+    this._entries = [];
+    this._isFailing = false;
+    this._cancelRetry();
     this._backoff.removeAllListeners();
     this._inFlight.forEach(handle => handle.cancelTimeout());
     this._inFlight.clear();
     this._destroyed = true;
     this._flushingEntry = null;
     this._publisher = null;
+
+    if (remaining.length) {
+      this._sendOnce(remaining, publisher);
+    }
   }
 
   /**
@@ -712,6 +735,29 @@ export default class InsightsOutbox {
     this._backoff.backoff();
     // Backoff keeps its timer in `_timeoutID`; see unrefTimer.
     unrefTimer((this._backoff as unknown as { _timeoutID: any })._timeoutID);
+  }
+
+  /**
+   * Send events once, without retries, after the outbox is destroyed. See
+   * {@link InsightsOutbox.destroy}.
+   * @param entries - The events, in creation order.
+   * @param publisher - The publisher that was attached at destroy.
+   */
+  private _sendOnce(entries: IInsightsEntry[], publisher: IInsightsPublisher | null): void {
+    if (!publisher || !publisher.isEnabled || !publisher._host) {
+      const reason = publisher && publisher.isEnabled ? 'the Insights host is not known' : 'publishing is disabled';
+      this._log.warn(`Dropped ${entries.length} buffered Insights event(s): the Device was destroyed and ${reason}`);
+      return;
+    }
+
+    this._log.debug(`Sending ${entries.length} buffered Insights event(s) once because the Device was destroyed`);
+    entries.forEach(entry => {
+      postInsightsRequest(publisher, INSIGHTS_EVENTS_ENDPOINT, entry.event, (error: any) => {
+        if (error) {
+          this._log.warn(`Dropped Insights event ${describe(entry)}: its final send after the Device was destroyed failed (${describeError(error)})`);
+        }
+      }, INSIGHTS_REQUEST_TIMEOUT_MS);
+    });
   }
 
   /**

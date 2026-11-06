@@ -973,7 +973,7 @@ class Device extends EventEmitter {
   }
 
   /**
-   * Drop buffered Insights events and stop the retry timer.
+   * Send buffered Insights events once (no retries) and stop the retry timer.
    */
   private _destroyInsightsOutbox() {
     if (!this._insightsOutbox) { return; }

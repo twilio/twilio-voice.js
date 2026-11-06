@@ -1188,7 +1188,10 @@ describe('Insights buffer with Device (VBLOCKS-7468)', () => {
   });
 
   describe('destroy', () => {
-    it('should stop retrying and leave no pending timers', async () => {
+    const logged = (level: number, pattern: RegExp): boolean => h.logSpies[level].getCalls().some((call: sinon.SinonSpyCall) =>
+      call.args.some((arg: any) => typeof arg === 'string' && pattern.test(arg)));
+
+    it('should send a waiting event once more, then stop retrying and leave no pending timers', async () => {
       createDevice({ eventgw: HOST });
       h.defaultReply = 503;
       postSeq(device._publisher, 0);
@@ -1198,9 +1201,88 @@ describe('Insights buffer with Device (VBLOCKS-7468)', () => {
 
       device.destroy();
       await h.drain();
+      assert.strictEqual(h.eventCalls().length, attempts + 1, 'expected exactly one final attempt');
       assert.strictEqual(h.clock.countTimers(), 0, 'expected no pending timers after destroy');
       await h.runFor(60000);
-      assert.strictEqual(h.eventCalls().length, attempts);
+      assert.strictEqual(h.eventCalls().length, attempts + 1);
+    });
+
+    it('should send each buffered event exactly once, in creation order, with the current token, and drop failures without retrying', async () => {
+      createDevice({ eventgw: HOST });
+      h.replies = [503];
+      postSeq(device._publisher, 0);
+      await h.drain();
+      // Queued behind the event waiting for its retry.
+      postSeq(device._publisher, 1);
+      postSeq(device._publisher, 2);
+      postSeq(device._publisher, 3);
+      assert.deepStrictEqual(h.seqs(), [0]);
+
+      const refreshed = createToken('alice', 7200);
+      device.updateToken(refreshed);
+      // Final sends: 0 fails again (5xx), 1 succeeds, 2 fails (network), 3 succeeds.
+      h.replies = [503, 200, 'network', 200];
+      device.destroy();
+      await h.runFor(60000);
+
+      assert.deepStrictEqual(h.seqs(), [0, 0, 1, 2, 3]);
+      h.eventCalls().slice(1).forEach((c: FetchCall) => assert.strictEqual(c.token, refreshed));
+      assert.deepStrictEqual(countBy(h.seqs()), { 0: 2, 1: 1, 2: 1, 3: 1 }, 'no retries after destroy');
+      assert(logged(2, /final send after the Device was destroyed failed \(HTTP 503\)/), 'expected the HTTP failure to be logged');
+      assert(logged(2, /final send after the Device was destroyed failed \(TypeError: fetch failed\)/), 'expected the network failure to be logged');
+      assert.strictEqual(h.clock.countTimers(), 0);
+    });
+
+    it('should not keep a timer longer than the per-request timeout when a final send hangs', async () => {
+      createDevice({ eventgw: HOST });
+      h.replies = [503];
+      postSeq(device._publisher, 0);
+      await h.drain();
+      postSeq(device._publisher, 1);
+
+      h.replies = ['hold', 'hang'];
+      const destroyedAt = h.clock.now;
+      device.destroy();
+      await h.drain();
+      assert.deepStrictEqual(h.seqs(), [0, 0, 1]);
+      const next = h.nextTimerAt();
+      assert(next !== undefined && next <= destroyedAt + REQUEST_TIMEOUT_MS, 'expected only the per-request timeout timers');
+
+      await h.runFor(REQUEST_TIMEOUT_MS);
+      assert.strictEqual(h.clock.countTimers(), 0, 'expected no timers after the per-request timeout');
+      assert(logged(2, /final send after the Device was destroyed failed \(TimeoutError/), 'expected the timeout to be logged');
+      await h.runFor(60000);
+      assert.deepStrictEqual(h.seqs(), [0, 0, 1], 'no retries after destroy');
+    });
+
+    it('should not send the event whose flush request is in flight a second time', async () => {
+      createDevice();
+      postSeq(device._publisher, 0);
+      postSeq(device._publisher, 1);
+      h.replies = ['hold'];
+      await connectSignaling('us1');
+      await h.drain();
+      assert.deepStrictEqual(h.seqs(), [0], 'expected the flush of event 0 in flight');
+
+      device.destroy();
+      await h.drain();
+      assert.deepStrictEqual(h.seqs(), [0, 1]);
+      h.held.splice(0).forEach((held: any) => held.resolve(503));
+      await h.runFor(60000);
+      assert.deepStrictEqual(h.seqs(), [0, 1]);
+      assert.strictEqual(h.clock.countTimers(), 0);
+    });
+
+    it('should send nothing and log the drop when the host is not known at destroy', async () => {
+      createDevice();
+      postSeq(device._publisher, 0);
+      postSeq(device._publisher, 1);
+      device.destroy();
+      await h.runFor(60000);
+      sinon.assert.notCalled(h.fetch);
+      assert(logged(2, /Dropped 2 buffered Insights event\(s\): the Device was destroyed and the Insights host is not known/),
+        'expected the drop to be logged at warn');
+      assert.strictEqual(h.clock.countTimers(), 0);
     });
 
     it('should leave no pending timers when destroyed while a request is hung', async () => {
