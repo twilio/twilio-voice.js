@@ -41,7 +41,7 @@ function setMaxAverageBitrate(sdp, maxAverageBitrate) {
   const opusId = matches && matches.length ? matches[1] : defaultOpusId;
   const regex = new RegExp(`a=fmtp:${opusId}`);
   const lines = sdp.split('\n').map(line => regex.test(line)
-    ? line.replace(/(\r?)$/, `;maxaveragebitrate=${maxAverageBitrate}$1`)
+    ? line + `;maxaveragebitrate=${maxAverageBitrate}`
     : line);
 
   return lines.join('\n');
