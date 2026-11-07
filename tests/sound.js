@@ -100,6 +100,14 @@ describe('Sound', () => {
     it('should play on init', () => {
       assert(sound.isPlaying);
     });
+
+    it('should not play on init if preload is false', () => {
+      const noPreloadSound = new Sound('test', 'http://example.com/test.mp3', {
+        preload: false,
+      });
+      assert(!noPreloadSound.isPlaying);
+      assert.equal(noPreloadSound._activeEls.size, 0);
+    });
   });
 
   context('Sound.prototype._playAudioElement', () => {
