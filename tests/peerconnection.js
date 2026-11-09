@@ -440,6 +440,65 @@ describe('PeerConnection', () => {
       toTest = METHOD.bind(context);
     });
 
+    describe('dtls transport closed state', () => {
+      let transport;
+
+      beforeEach(() => {
+        transport = { state: 'connected' };
+        context.getRTCDtlsTransport = sinon.stub().returns(transport);
+        context._log = log;
+        context._reportDtlsTransportState = PeerConnection.prototype._reportDtlsTransportState;
+        context.ondtlstransportstatechange = sinon.stub();
+        PeerConnection.prototype._setupRTCDtlsTransportListener.call(context);
+        context.ondtlstransportstatechange.resetHistory();
+      });
+
+      it('Should report closed when the browser fires no statechange on close', () => {
+        toTest();
+        sinon.assert.calledOnce(context.ondtlstransportstatechange);
+        sinon.assert.calledWithExactly(context.ondtlstransportstatechange, 'closed');
+      });
+
+      it('Should report closed once when the browser fires statechange on close', () => {
+        pc.close = sinon.spy(() => {
+          transport.state = 'closed';
+          transport.onstatechange();
+        });
+        toTest();
+        sinon.assert.calledOnce(context.ondtlstransportstatechange);
+        sinon.assert.calledWithExactly(context.ondtlstransportstatechange, 'closed');
+      });
+
+      it('Should report closed once when the browser fires statechange after close', () => {
+        pc.close = sinon.spy(() => { transport.state = 'closed'; });
+        toTest();
+        transport.onstatechange();
+        sinon.assert.calledOnce(context.ondtlstransportstatechange);
+      });
+
+      it('Should not call a statechange handler the SDK did not install', () => {
+        const foreignHandler = sinon.stub();
+        transport.onstatechange = foreignHandler;
+        toTest();
+        sinon.assert.notCalled(foreignHandler);
+      });
+
+      it('Should report closed when the RTCPeerConnection was already closed', () => {
+        pc.signalingState = 'closed';
+        toTest();
+        sinon.assert.notCalled(pc.close);
+        sinon.assert.calledOnce(context.ondtlstransportstatechange);
+        sinon.assert.calledWithExactly(context.ondtlstransportstatechange, 'closed');
+      });
+
+      it('Should not report closed when no dtls state was reported', () => {
+        context._dtlsTransportState = null;
+        toTest();
+        sinon.assert.notCalled(context.ondtlstransportstatechange);
+        assert.strictEqual(context.status, 'closed');
+      });
+    });
+
     it('Should stop everything, removeListeners, disconnect analysers, close sockets, etc..', () => {
       toTest();
       assert(context._outputAnalyser.disconnect.calledOnce);
@@ -1372,6 +1431,7 @@ describe('PeerConnection', () => {
         context = {
           getRTCDtlsTransport: sinon.stub().returns(transport),
           _log: log,
+          _reportDtlsTransportState: PeerConnection.prototype._reportDtlsTransportState,
           ondtlstransportstatechange: sinon.stub(),
         };
         toTest = METHOD.bind(context);
@@ -1401,6 +1461,7 @@ describe('PeerConnection', () => {
         context = {
           getRTCDtlsTransport: sinon.stub().returns(transport),
           _log: log,
+          _reportDtlsTransportState: PeerConnection.prototype._reportDtlsTransportState,
           ondtlstransportstatechange: sinon.stub(),
         };
         METHOD.call(context);
@@ -1409,7 +1470,7 @@ describe('PeerConnection', () => {
         sinon.assert.calledOnce(context.ondtlstransportstatechange);
       });
 
-      ['new', 'connecting', 'connected', 'closed', 'failed'].forEach(state => {
+      ['connecting', 'connected', 'closed', 'failed'].forEach(state => {
         it(`should call ondtlstransportstatechange when dtls transport state is ${state}`, () => {
           context.ondtlstransportstatechange = sinon.stub();
           transport.state = state;
@@ -1419,6 +1480,20 @@ describe('PeerConnection', () => {
           sinon.assert.calledOnce(context.ondtlstransportstatechange);
         });
       });
+    });
+
+    it('should not call ondtlstransportstatechange again for an already reported state', () => {
+      const transport = { state: 'connected' };
+      const context = {
+        getRTCDtlsTransport: sinon.stub().returns(transport),
+        _log: log,
+        _reportDtlsTransportState: PeerConnection.prototype._reportDtlsTransportState,
+        ondtlstransportstatechange: sinon.stub(),
+      };
+      METHOD.call(context);
+      transport.onstatechange();
+      sinon.assert.calledOnce(context.ondtlstransportstatechange);
+      sinon.assert.calledWithExactly(context.ondtlstransportstatechange, 'connected');
     });
   });
 

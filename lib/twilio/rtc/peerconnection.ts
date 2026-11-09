@@ -50,6 +50,7 @@ function PeerConnection(audioHelper, pstream, options) {
   this.onreconnected = noop;
   this.onsignalingstatechange = noop;
   this.ondtlstransportstatechange = noop;
+  this._dtlsTransportState = null;
   this.onicegatheringfailure = noop;
   this.onicegatheringstatechange = noop;
   this.oniceconnectionstatechange = noop;
@@ -830,14 +831,21 @@ PeerConnection.prototype._setupRTCDtlsTransportListener = function() {
     return;
   }
 
-  const handler = () => {
-    this._log.info(`dtlsTransportState is "${dtlsTransport.state}"`);
-    this.ondtlstransportstatechange(dtlsTransport.state);
-  };
+  const handler = () => this._reportDtlsTransportState(dtlsTransport.state);
 
   // Publish initial state
   handler();
   dtlsTransport.onstatechange = handler;
+};
+
+PeerConnection.prototype._reportDtlsTransportState = function(state) {
+  // Skip a repeat of the last reported state, e.g. a browser closed event after close() reported it.
+  if (state === this._dtlsTransportState) {
+    return;
+  }
+  this._dtlsTransportState = state;
+  this._log.info(`dtlsTransportState is "${state}"`);
+  this.ondtlstransportstatechange(state);
 };
 
 /**
@@ -1003,6 +1011,10 @@ PeerConnection.prototype.close = function() {
   if (this.version && this.version.pc) {
     if (this.version.pc.signalingState !== 'closed') {
       this.version.pc.close();
+    }
+    // Per spec, a local close() fires no statechange (Chrome 154+, Firefox), so report closed here.
+    if (this._dtlsTransportState) {
+      this._reportDtlsTransportState('closed');
     }
 
     this.version.pc = null;
