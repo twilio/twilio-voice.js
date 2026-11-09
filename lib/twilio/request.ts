@@ -18,15 +18,40 @@ function isOkResponse(response) {
 }
 
 /**
+ * The raw `Retry-After` header of a fetch Response, if it can be read.
+ *
+ * In browsers a cross-origin response exposes `Retry-After` only when the
+ * server sends `Access-Control-Expose-Headers: Retry-After`; otherwise
+ * `headers.get` returns null. eventgw.twilio.com did not expose it when this
+ * was written (checked 2026-11-09).
+ * @param {Response} response
+ * @returns {string|undefined}
+ */
+function getRetryAfter(response) {
+  try {
+    const headers = response && response.headers;
+    const value = headers && typeof headers.get === 'function' ? headers.get('Retry-After') : null;
+    return typeof value === 'string' ? value : undefined;
+  } catch (e) {
+    return undefined;
+  }
+}
+
+/**
  * Create the error passed to the callback for a non-2xx HTTP response.
  * @param {number} status
  * @param {string} [responseText]
- * @returns {Error} An Error with a numeric `status` property.
+ * @param {string} [retryAfter] - The raw `Retry-After` header, if any.
+ * @returns {Error} An Error with a numeric `status` property, and a
+ *   `retryAfter` string property when the response had `Retry-After`.
  */
-function createHttpError(status, responseText) {
+function createHttpError(status, responseText, retryAfter) {
   const error = new Error(`Request failed with HTTP status ${status}`);
   error.status = status;
   error.responseText = responseText;
+  if (typeof retryAfter === 'string') {
+    error.retryAfter = retryAfter;
+  }
   return error;
 }
 
@@ -65,11 +90,12 @@ function request(method, params, callback) {
         return response.text();
       }
       const status = response.status;
+      const retryAfter = getRetryAfter(response);
       // The body is only diagnostic here; a failed read still reports the status.
       return Promise.resolve()
         .then(() => response.text())
         .then(text => text, () => undefined)
-        .then(text => { throw createHttpError(status, text); });
+        .then(text => { throw createHttpError(status, text, retryAfter); });
     })
     .then(responseText => settle(null, responseText), error => settle(error));
 }

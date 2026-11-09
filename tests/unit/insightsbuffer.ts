@@ -9,6 +9,14 @@ import { EventEmitter } from 'events';
 import * as sinon from 'sinon';
 import Device from '../../lib/twilio/device';
 import EventPublisher from '../../lib/twilio/eventpublisher';
+import {
+  getInsightsRetryAfterDelay,
+  getInsightsRetryDelay,
+  INSIGHTS_DRAIN_INTERVAL_MS,
+  INSIGHTS_RETRY_BASE_DELAY_MS,
+  INSIGHTS_RETRY_MAX_DELAY_MS,
+  INSIGHTS_RETRY_MIN_DELAY_MS,
+} from '../../lib/twilio/insightsoutbox';
 import Log from '../../lib/twilio/log';
 import request from '../../lib/twilio/request';
 
@@ -30,25 +38,33 @@ const HOST = 'eventgw.test.twilio.com';
 const EVENTS_URL = `https://${HOST}/v4/EndpointEvents`;
 const MAX_EVENTS = 200;
 const MAX_AGE_MS = 5 * 60 * 1000;
-const BACKOFF_MIN = 100;
-const BACKOFF_MAX = 1000;
-const BACKOFF_JITTER = 0.4;
+const RETRY_MIN = 100;
+const RETRY_BASE = 1000;
+const RETRY_MAX = 30000;
+const DRAIN_INTERVAL = 200;
 const REQUEST_TIMEOUT_MS = 10000;
 
 // 'hold' never settles on its own but rejects with an AbortError if the request is aborted;
 // 'hang' never settles and ignores aborts (a late response can still be delivered via `held`).
 type Reply = number | 'network' | 'hold' | 'hang' | 'text-error';
 
+// An HTTP response with the given status and response headers.
+interface HttpReply { status: number; headers: Record<string, string>; }
+
+// The retry delay for a 0-based attempt with Math.random() returning `random`.
+const expectedDelay = (attempt: number, random: number): number =>
+  Math.max(RETRY_MIN, Math.floor(random * Math.min(RETRY_MAX, RETRY_BASE * Math.pow(2, attempt))));
+
 interface FetchCall {
   at: number;
   body: any;
-  reply: Reply;
+  reply: Reply | HttpReply;
   token: any;
   url: string;
 }
 
-const fakeResponse = (status: number, textFails?: boolean): any => ({
-  headers: { get: () => null },
+const fakeResponse = (status: number, textFails?: boolean, headers: Record<string, string> = {}): any => ({
+  headers: { get: (name: string) => Object.prototype.hasOwnProperty.call(headers, name) ? headers[name] : null },
   json: () => Promise.resolve({}),
   ok: status >= 200 && status < 300,
   status,
@@ -101,7 +117,7 @@ function createHarness() {
     h.unhandled = [];
     h.originalFetch = root.fetch;
     h.fetch = sinon.spy((url: string, init: any) => {
-      const reply: Reply = h.replies.length ? h.replies.shift() : h.defaultReply;
+      const reply: Reply | HttpReply = h.replies.length ? h.replies.shift() : h.defaultReply;
       h.calls.push({
         at: h.clock.now,
         body: parseBody(init && init.body),
@@ -127,6 +143,9 @@ function createHarness() {
           }
           h.held.push({ resolve: (status: number = 200) => resolve(fakeResponse(status)), reject });
         });
+      }
+      if (typeof reply === 'object') {
+        return Promise.resolve(fakeResponse(reply.status, false, reply.headers));
       }
       return Promise.resolve(fakeResponse(reply as number));
     });
@@ -200,6 +219,12 @@ function createHarness() {
 
   h.seqs = (): any[] => h.eventCalls().map((c: FetchCall) => c.body.payload.seq);
 
+  // Times between consecutive event requests.
+  h.intervals = (): number[] => {
+    const times = h.eventCalls().map((c: FetchCall) => c.at);
+    return times.slice(1).map((t: number, i: number) => t - times[i]);
+  };
+
   h.isSuccess = (c: FetchCall) => typeof c.reply === 'number' && c.reply >= 200 && c.reply < 300;
 
   h.dropLogged = (): boolean => h.logSpies.some((spy: sinon.SinonSpy) => spy.getCalls().some((call: sinon.SinonSpyCall) =>
@@ -255,9 +280,9 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
   const postSeq = (publisher: any, seq: any, conn: any = connection) =>
     publisher.info(GROUP, NAME, { seq }, conn);
 
-  // Make the backoff jitter deterministic: with Math.random() === 0 the
-  // deviation is 0, so delays are exactly min * factor^attempt capped at max.
-  const noJitter = () => h.sandbox.stub(Math, 'random').returns(0);
+  // Make the retry jitter deterministic: each delay is then
+  // max(RETRY_MIN, floor(value * min(RETRY_MAX, RETRY_BASE * 2^attempt))).
+  const stubRandom = (value: number) => h.sandbox.stub(Math, 'random').returns(value);
 
   beforeEach(() => {
     h.setup();
@@ -371,8 +396,8 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
         assert.deepStrictEqual(h.seqs(), [0, 0]);
         assert.strictEqual(h.eventCalls()[1].reply, 200);
         const delay = h.eventCalls()[1].at - h.eventCalls()[0].at;
-        assert(delay >= BACKOFF_MIN * (1 - BACKOFF_JITTER) - 1 && delay <= BACKOFF_MAX,
-          `first retry delay ${delay}ms outside [${BACKOFF_MIN * (1 - BACKOFF_JITTER)}, ${BACKOFF_MAX}]`);
+        assert(delay >= RETRY_MIN && delay < RETRY_BASE,
+          `first retry delay ${delay}ms outside [${RETRY_MIN}, ${RETRY_BASE})`);
         // Delivered: no further attempts.
         await h.runFor(30000);
         assert.strictEqual(h.eventCalls().length, 2);
@@ -392,50 +417,66 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
       assert.strictEqual(retry.timestamp, new Date(T0).toISOString());
     });
 
-    it('should retry with the same-edge backoff schedule (factor 2, min 100, max 1000)', async () => {
-      noJitter();
-      const publisher = createPublisher({ host: HOST });
-      h.replies = [503, 503, 503, 503, 503, 503, 503, 503, 200];
-      postSeq(publisher, 0);
-      await h.runFor(10000);
-      const times = h.eventCalls().map((c: FetchCall) => c.at - T0);
-      const intervals = times.slice(1).map((t: number, i: number) => t - times[i]);
-      assert.deepStrictEqual(intervals, [100, 200, 400, 800, 1000, 1000, 1000, 1000]);
+    // Full jitter after the cap: delay = max(100, floor(random * min(30000, 1000 * 2^attempt))).
+    const schedules: Array<[number, number[]]> = [
+      [0, [100, 100, 100, 100, 100, 100, 100, 100]],
+      [0.5, [500, 1000, 2000, 4000, 8000, 15000, 15000, 15000]],
+      [0.999, [999, 1998, 3996, 7992, 15984, 29970, 29970, 29970]],
+    ];
+
+    schedules.forEach(([random, expected]) => {
+      it(`should retry with exponential backoff and full jitter after the cap (Math.random() = ${random})`, async () => {
+        stubRandom(random);
+        const publisher = createPublisher({ host: HOST });
+        h.replies = [503, 503, 503, 503, 503, 503, 503, 503, 200];
+        postSeq(publisher, 0);
+        await h.runFor(5 * 60 * 1000);
+        assert.deepStrictEqual(h.intervals(), expected);
+        assert.deepStrictEqual(expected, expected.map((_: number, attempt: number) => expectedDelay(attempt, random)));
+      });
     });
 
-    it('should keep every retry delay within the jittered [min, max] bounds', async () => {
+    it('should never retry sooner than 100 ms, even when the jittered delay rounds to 0', async () => {
+      stubRandom(0.00001);
+      const publisher = createPublisher({ host: HOST });
+      h.replies = [503, 503, 200];
+      postSeq(publisher, 0);
+      await h.runFor(5000);
+      assert.deepStrictEqual(h.intervals(), [RETRY_MIN, RETRY_MIN]);
+    });
+
+    it('should keep every retry delay within [100, min(30000, 1000 * 2^attempt)) ms', async () => {
       const publisher = createPublisher({ host: HOST });
       h.defaultReply = 503;
       postSeq(publisher, 0);
-      await h.runFor(15000);
-      const times = h.eventCalls().map((c: FetchCall) => c.at);
-      const intervals = times.slice(1).map((t: number, i: number) => t - times[i]);
-      assert(intervals.length >= 10, `expected at least 10 retries in 15s, got ${intervals.length}`);
+      await h.runFor(MAX_AGE_MS);
+      const intervals = h.intervals();
+      // At most 1 + 2 + 4 + 8 + 16 + 30 s for the first six retries, then at most 30 s each.
+      assert(intervals.length >= 10, `expected at least 10 retries in 5 minutes, got ${intervals.length}`);
       intervals.forEach((delay: number, attempt: number) => {
-        const base = BACKOFF_MIN * Math.pow(2, attempt);
-        const lo = Math.min(Math.floor(base * (1 - BACKOFF_JITTER)), BACKOFF_MAX) - 1;
-        const hi = Math.min(Math.ceil(base * (1 + BACKOFF_JITTER)), BACKOFF_MAX);
-        assert(delay >= lo && delay <= hi, `retry #${attempt} delay ${delay}ms outside [${lo}, ${hi}]`);
+        const hi = Math.min(RETRY_MAX, RETRY_BASE * Math.pow(2, attempt));
+        assert(delay >= RETRY_MIN && delay < hi, `retry #${attempt} delay ${delay}ms outside [${RETRY_MIN}, ${hi})`);
       });
     });
 
     it('should not apply the 15s max backoff duration (keeps retrying past 15s)', async () => {
+      stubRandom(0.999);
       const publisher = createPublisher({ host: HOST });
       h.defaultReply = 503;
       postSeq(publisher, 0);
-      await h.runFor(40000);
-      const late = h.eventCalls().filter((c: FetchCall) => c.at >= T0 + 20000);
-      assert(late.length >= 18, `expected retries between 20s and 40s, got ${late.length}`);
+      await h.runFor(120000);
+      const late = h.eventCalls().filter((c: FetchCall) => c.at >= T0 + 60000);
+      assert(late.length >= 2, `expected retries between 60s and 120s, got ${late.length}`);
     });
 
     it('should stop retrying once the event is older than 5 minutes', async () => {
       const publisher = createPublisher({ host: HOST });
       h.defaultReply = 503;
       postSeq(publisher, 0);
-      await h.runUntil(T0 + MAX_AGE_MS + 5000);
+      await h.runUntil(T0 + MAX_AGE_MS + RETRY_MAX + 1000);
       const attempts = h.eventCalls();
       assert(attempts.length > 1);
-      attempts.forEach((c: FetchCall) => assert(c.at <= T0 + MAX_AGE_MS + BACKOFF_MAX,
+      attempts.forEach((c: FetchCall) => assert(c.at <= T0 + MAX_AGE_MS,
         `attempt at +${c.at - T0}ms is after the 5 minute age bound`));
       const count = attempts.length;
       await h.runFor(10 * 60 * 1000);
@@ -443,28 +484,49 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
       assert(h.dropLogged(), 'expected the expired drop to be logged');
     });
 
-    it('should reset the backoff after a success and flush the remaining events', async () => {
-      noJitter();
+    it('should reset the retry attempt once the buffer has drained after a success', async () => {
+      stubRandom(0.5);
       const publisher = createPublisher();
       [0, 1, 2].forEach(seq => postSeq(publisher, seq));
       h.replies = [503, 200, 200, 200];
       publisher.setHost(HOST);
       await h.runFor(5000);
       const firstRound = h.eventCalls().map((c: FetchCall) => [c.body.payload.seq, c.at - T0]);
-      assert.deepStrictEqual(firstRound, [[0, 0], [0, 100], [1, 100], [2, 100]]);
+      assert.deepStrictEqual(firstRound, [[0, 0], [0, 500], [1, 700], [2, 900]]);
 
-      // A later failure starts again from the minimum delay.
+      // The buffer drained, so a later failure starts again from attempt 0.
       const t1 = h.clock.now;
       h.replies = [503, 503, 200];
       postSeq(publisher, 3);
       await h.runFor(5000);
       const secondRound = h.eventCalls().slice(4).map((c: FetchCall) => [c.body.payload.seq, c.at - t1]);
-      assert.deepStrictEqual(secondRound, [[3, 0], [3, 100], [3, 300]]);
+      assert.deepStrictEqual(secondRound, [[3, 0], [3, 500], [3, 1500]]);
     });
 
-    it('should start a new failure streak at the minimum delay after a success inside a retry (synchronous request function)', async () => {
-      noJitter();
-      // A request function that calls back synchronously, so the retry's success happens inside the backoff 'ready' handler.
+    it('should not reset the retry attempt on a success or a new failure streak while a backlog remains (flapping gateway)', async () => {
+      stubRandom(0.5);
+      const publisher = createPublisher();
+      [0, 1, 2].forEach(seq => postSeq(publisher, seq));
+      // Each event fails once and then succeeds: success and failure alternate while events are buffered.
+      h.replies = [503, 200, 503, 200, 503, 200];
+      publisher.setHost(HOST);
+      await h.runFor(10000);
+      const sends = h.eventCalls().map((c: FetchCall) => [c.body.payload.seq, c.at - T0]);
+      // Retry delays 500, 1000, 2000 (attempts 0, 1, 2), with the 200 ms drain interval after each success.
+      assert.deepStrictEqual(sends, [[0, 0], [0, 500], [1, 700], [1, 1700], [2, 1900], [2, 3900]]);
+      assert.strictEqual(errorSpy.callCount, 3, 'one "error" per failure streak');
+
+      // Drained: the next failure retries from attempt 0.
+      const t1 = h.clock.now;
+      h.replies = [503, 200];
+      postSeq(publisher, 3);
+      await h.runFor(5000);
+      assert.deepStrictEqual(h.eventCalls().slice(6).map((c: FetchCall) => c.at - t1), [0, 500]);
+    });
+
+    it('should reset the retry attempt after a drained retry with a synchronous request function', async () => {
+      stubRandom(0.5);
+      // A request function that calls back synchronously, so the retry's success happens inside the retry timer callback.
       const replies: any[] = [{ status: 503 }, null, { status: 503 }, null];
       const attempts: Array<[any, number]> = [];
       const syncRequest = {
@@ -479,7 +541,7 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
       const t1 = h.clock.now - T0;
       postSeq(publisher, 1);
       await h.runFor(1000);
-      assert.deepStrictEqual(attempts, [[0, 0], [0, 100], [1, t1], [1, t1 + 100]]);
+      assert.deepStrictEqual(attempts, [[0, 0], [0, 500], [1, t1], [1, t1 + 500]]);
       assert.strictEqual(h.clock.countTimers(), 0);
     });
 
@@ -514,7 +576,8 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
       const publisher = createPublisher({ host: HOST });
       h.replies = [503, 'network', 503, 429, 200];
       postSeq(publisher, 0);
-      await h.runFor(10000);
+      // Four retries take at most 1 + 2 + 4 + 8 s.
+      await h.runFor(20000);
       assert.strictEqual(h.eventCalls().length, 5);
       sinon.assert.calledOnce(errorSpy);
 
@@ -526,7 +589,7 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
       sinon.assert.calledTwice(errorSpy);
     });
 
-    it('should keep retry delays within [100, 1000] ms through a 17+ minute outage (no 0 ms retries)', async function() {
+    it('should keep retry delays within [100, 30000] ms through a 17+ minute outage (no 0 ms retries)', async function() {
       this.timeout(120000);
       const publisher = createPublisher({ host: HOST });
       h.defaultReply = 503;
@@ -537,25 +600,210 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
         await h.runUntil(T0 + (m + 1) * 60000);
       }
       const times = h.eventCalls().map((c: FetchCall) => c.at);
-      assert(times.length > 1018, `expected more than 1018 attempts, got ${times.length}`);
-      const intervals = times.slice(1).map((t: number, i: number) => t - times[i]);
-      // Attempt 0 is jittered around 100 ms (60..140); every later delay must be within [100, 1000].
-      assert(intervals[0] >= Math.floor(BACKOFF_MIN * (1 - BACKOFF_JITTER)) - 1, `first delay ${intervals[0]}ms`);
-      const outOfRange = intervals.slice(1)
-        .map((delay: number, i: number) => ({ at: times[i + 2] - T0, delay }))
-        .filter((x: any) => x.delay < BACKOFF_MIN || x.delay > BACKOFF_MAX);
-      assert.deepStrictEqual(outOfRange.slice(0, 5), [], `${outOfRange.length} retry delays outside [100, 1000] ms`);
+      const intervals = h.intervals();
+      const outOfRange = intervals
+        .map((delay: number, i: number) => ({ at: times[i + 1] - T0, delay }))
+        .filter((x: any) => x.delay < RETRY_MIN || x.delay > RETRY_MAX);
+      assert.deepStrictEqual(outOfRange.slice(0, 5), [], `${outOfRange.length} retry delays outside [100, 30000] ms`);
+      // With full jitter at the 30 s cap the mean delay is about 15 s, so the last minute sees a few attempts, not 60.
       const lastMinute = h.eventCalls().filter((c: FetchCall) => c.at > T0 + (minutes - 1) * 60000);
-      assert(lastMinute.length <= 61, `expected at most ~1 retry/s in the last minute, got ${lastMinute.length}`);
+      assert(lastMinute.length <= 20, `expected a few retries in the last minute, got ${lastMinute.length}`);
 
       // Recovery: the newest events are delivered, expired ones are not, and nothing is left scheduled.
       h.defaultReply = 200;
-      await h.runFor(10000);
+      await h.runFor(RETRY_MAX + 10000);
       const delivered = h.eventCalls().filter(h.isSuccess).map((c: FetchCall) => c.body.payload.seq);
       [16, 17, 18].forEach(seq => assert(delivered.includes(seq), `expected event ${seq} to be delivered`));
       range(0, 14).forEach(seq => assert(!delivered.includes(seq), `expired event ${seq} must not be delivered`));
       assert.deepStrictEqual(countBy(delivered), countBy(Array.from(new Set(delivered))));
       assert.strictEqual(h.clock.countTimers(), 0, 'expected no pending timers after recovery');
+    });
+  });
+
+  describe('Retry-After', () => {
+    const withRetryAfter = (status: number, value: string): HttpReply => ({ status, headers: { 'Retry-After': value } });
+
+    // The first retry delay after one failed send, with Math.random() = 0 (jittered delay 100 ms).
+    const firstRetryDelay = async (reply: Reply | HttpReply): Promise<number> => {
+      stubRandom(0);
+      const publisher = createPublisher({ host: HOST });
+      h.replies = [reply, 200];
+      postSeq(publisher, 0);
+      await h.runFor(MAX_AGE_MS + 1000);
+      assert.deepStrictEqual(h.seqs(), [0, 0]);
+      return h.intervals()[0];
+    };
+
+    [429, 503].forEach(status => {
+      it(`should wait the Retry-After delta-seconds on HTTP ${status}`, async () => {
+        assert.strictEqual(await firstRetryDelay(withRetryAfter(status, '5')), 5000);
+      });
+
+      it(`should wait until the Retry-After HTTP-date on HTTP ${status}`, async () => {
+        assert.strictEqual(await firstRetryDelay(withRetryAfter(status, new Date(T0 + 7000).toUTCString())), 7000);
+      });
+
+      it(`should cap Retry-After at the 5 minute age bound on HTTP ${status}`, async () => {
+        assert.strictEqual(await firstRetryDelay(withRetryAfter(status, '3600')), MAX_AGE_MS);
+      });
+    });
+
+    [500, 502, 504].forEach(status => {
+      it(`should ignore Retry-After on HTTP ${status}`, async () => {
+        assert.strictEqual(await firstRetryDelay(withRetryAfter(status, '5')), RETRY_MIN);
+      });
+    });
+
+    // '-2099' and '2099.5' are not delta-seconds; Date.parse would read them as dates in 2099.
+    ['', 'soon', '-5', '-2099', '1.5', '2099.5', '0', new Date(T0 - 60000).toUTCString()].forEach(value => {
+      it(`should ignore an invalid, zero or past Retry-After (${JSON.stringify(value)})`, async () => {
+        assert.strictEqual(await firstRetryDelay(withRetryAfter(503, value)), RETRY_MIN);
+      });
+    });
+
+    it('should use the jittered delay when it is longer than Retry-After', async () => {
+      stubRandom(0.5);
+      const publisher = createPublisher({ host: HOST });
+      h.replies = [503, 503, 503, withRetryAfter(503, '1'), 200];
+      postSeq(publisher, 0);
+      await h.runFor(60000);
+      // Attempts 0..3: 500, 1000, 2000, then max(4000, 1000).
+      assert.deepStrictEqual(h.intervals(), [500, 1000, 2000, 4000]);
+    });
+
+    it('should not reset the retry attempt on a success while another request is in flight', async () => {
+      stubRandom(0.5);
+      const publisher = createPublisher({ host: HOST });
+      // Two failed attempts raise the retry attempt to 2; disable() drops the event but keeps the attempt.
+      h.replies = [503, 503];
+      postSeq(publisher, 0);
+      await h.runFor(1000);
+      assert.deepStrictEqual(h.intervals(), [500]);
+      publisher.disable();
+      publisher.enable();
+
+      // Two direct sends in flight: the second succeeds first, then the first fails.
+      h.replies = ['hold', 'hold'];
+      postSeq(publisher, 1);
+      postSeq(publisher, 2);
+      await h.drain();
+      const [first, second] = h.held.splice(0);
+      second.resolve(200);
+      await h.drain();
+      first.resolve(503);
+      await h.drain();
+      const failedAt = h.clock.now;
+      await h.runFor(10000);
+      const retry = h.eventCalls().filter((c: FetchCall) => c.body.payload.seq === 1)[1];
+      // Attempt 2: 0.5 * 4000. A reset by the success would give 500.
+      assert.strictEqual(retry.at - failedAt, 2000);
+    });
+
+    it('should keep growing the retry attempt while Retry-After sets the delay', async () => {
+      stubRandom(0.5);
+      const publisher = createPublisher({ host: HOST });
+      h.replies = [withRetryAfter(429, '10'), withRetryAfter(429, '10'), 503, 200];
+      postSeq(publisher, 0);
+      await h.runFor(60000);
+      // Attempt 2 after two Retry-After retries: 0.5 * 4000.
+      assert.deepStrictEqual(h.intervals(), [10000, 10000, 2000]);
+    });
+  });
+
+  describe('drain pacing', () => {
+    it(`should wait ${DRAIN_INTERVAL} ms between buffered events`, async () => {
+      const publisher = createPublisher();
+      [0, 1, 2, 3].forEach(seq => postSeq(publisher, seq));
+      publisher.setHost(HOST);
+      await h.runFor(5000);
+      assert.deepStrictEqual(h.seqs(), [0, 1, 2, 3]);
+      assert.deepStrictEqual(h.eventCalls().map((c: FetchCall) => c.at - T0), [0, 200, 400, 600]);
+    });
+
+    it('should measure the drain interval from the end of the previous request', async () => {
+      const publisher = createPublisher();
+      [0, 1].forEach(seq => postSeq(publisher, seq));
+      h.replies = ['hold'];
+      publisher.setHost(HOST);
+      await h.runFor(50);
+      h.held.splice(0).forEach((held: any) => held.resolve(200));
+      await h.runFor(5000);
+      assert.deepStrictEqual(h.eventCalls().map((c: FetchCall) => c.at - T0), [0, 250]);
+    });
+
+    it('should wait the drain interval after a non-retryable drop', async () => {
+      const publisher = createPublisher();
+      [0, 1].forEach(seq => postSeq(publisher, seq));
+      h.replies = [400, 200];
+      publisher.setHost(HOST);
+      await h.runFor(5000);
+      assert.deepStrictEqual(h.eventCalls().map((c: FetchCall) => c.at - T0), [0, 200]);
+    });
+
+    it('should pace the backlog after a retry succeeds', async () => {
+      stubRandom(0.5);
+      const publisher = createPublisher({ host: HOST });
+      h.replies = [503];
+      postSeq(publisher, 0);
+      await h.drain();
+      [1, 2].forEach(seq => postSeq(publisher, seq));
+      await h.runFor(5000);
+      assert.deepStrictEqual(h.eventCalls().map((c: FetchCall) => [c.body.payload.seq, c.at - T0]), [[0, 0], [0, 500], [1, 700], [2, 900]]);
+    });
+
+    it('should not delay direct sends when nothing is buffered', async () => {
+      const publisher = createPublisher({ host: HOST });
+      [0, 1, 2].forEach(seq => postSeq(publisher, seq));
+      await h.drain();
+      postSeq(publisher, 3);
+      await h.drain();
+      assert.deepStrictEqual(h.seqs(), [0, 1, 2, 3]);
+      h.eventCalls().forEach((c: FetchCall) => assert.strictEqual(c.at, T0));
+    });
+
+    it('should buffer an event created while the drain waits behind the waiting events', async () => {
+      const publisher = createPublisher();
+      [0, 1].forEach(seq => postSeq(publisher, seq));
+      publisher.setHost(HOST);
+      await h.drain();
+      assert.deepStrictEqual(h.seqs(), [0]);
+      postSeq(publisher, 2);
+      // A flush trigger while waiting does not skip the interval.
+      publisher.setHost(HOST);
+      await h.drain();
+      assert.deepStrictEqual(h.seqs(), [0]);
+      await h.runFor(5000);
+      assert.deepStrictEqual(h.eventCalls().map((c: FetchCall) => [c.body.payload.seq, c.at - T0]), [[0, 0], [1, 200], [2, 400]]);
+    });
+
+    it('should cancel a waiting drain on clear (disable) and send new events directly afterwards', async () => {
+      const publisher = createPublisher();
+      [0, 1].forEach(seq => postSeq(publisher, seq));
+      publisher.setHost(HOST);
+      await h.drain();
+      assert.deepStrictEqual(h.seqs(), [0]);
+      assert.strictEqual(h.clock.countTimers(), 1, 'expected the drain timer');
+
+      publisher.disable();
+      assert.strictEqual(h.clock.countTimers(), 0, 'expected the drain timer to be cleared');
+      publisher.enable();
+      await h.runFor(5000);
+      assert.deepStrictEqual(h.seqs(), [0]);
+
+      postSeq(publisher, 2);
+      await h.drain();
+      assert.deepStrictEqual(h.seqs(), [0, 2]);
+      assert.strictEqual(h.eventCalls()[1].at, h.clock.now);
+    });
+
+    it('should cancel a pending retry on clear (disable)', async () => {
+      const publisher = createPublisher({ host: HOST });
+      h.replies = [503];
+      postSeq(publisher, 0);
+      await h.drain();
+      assert.strictEqual(h.clock.countTimers(), 1, 'expected the retry timer');
+      publisher.disable();
+      assert.strictEqual(h.clock.countTimers(), 0, 'expected the retry timer to be cleared');
     });
   });
 
@@ -610,8 +858,8 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
       await h.runUntil(T0 + REQUEST_TIMEOUT_MS + 5000);
       assert.deepStrictEqual(h.seqs(), [0, 0, 1, 2]);
       const retryAt = h.eventCalls()[1].at - T0;
-      assert(retryAt >= REQUEST_TIMEOUT_MS && retryAt <= REQUEST_TIMEOUT_MS + BACKOFF_MAX,
-        `retry at +${retryAt}ms, expected within the backoff window after the timeout`);
+      assert(retryAt >= REQUEST_TIMEOUT_MS + RETRY_MIN && retryAt < REQUEST_TIMEOUT_MS + RETRY_BASE,
+        `retry at +${retryAt}ms, expected within the first retry window after the timeout`);
       assert.deepStrictEqual(h.eventCalls().filter(h.isSuccess).map((c: FetchCall) => c.body.payload.seq), [0, 1, 2]);
     });
 
@@ -667,7 +915,7 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
       const publisher = createPublisher();
       range(0, MAX_EVENTS + 1).forEach(seq => postSeq(publisher, seq));
       publisher.setHost(HOST);
-      await h.runFor(5000);
+      await h.runFor(MAX_EVENTS * DRAIN_INTERVAL);
       assert.deepStrictEqual(h.seqs(), range(1, MAX_EVENTS + 1));
     });
 
@@ -675,7 +923,7 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
       const publisher = createPublisher();
       range(0, MAX_EVENTS + 50).forEach(seq => postSeq(publisher, seq));
       publisher.setHost(HOST);
-      await h.runFor(5000);
+      await h.runFor(MAX_EVENTS * DRAIN_INTERVAL);
       assert.deepStrictEqual(h.seqs(), range(50, MAX_EVENTS + 50));
     });
 
@@ -684,7 +932,7 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
       range(0, MAX_EVENTS + 1).forEach(seq => postSeq(publisher, seq));
       assert(h.dropLogged(), 'expected the overflow drop to be logged');
       publisher.setHost(HOST);
-      await h.runFor(5000);
+      await h.runFor(MAX_EVENTS * DRAIN_INTERVAL);
       assert.strictEqual(h.calls.length, MAX_EVENTS, 'only the buffered events themselves may be posted');
       h.calls.forEach((c: FetchCall) => {
         assert.strictEqual(c.url, EVENTS_URL);
@@ -742,7 +990,7 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
     });
 
     it('should not resend already delivered events after a failure mid-flush', async () => {
-      noJitter();
+      stubRandom(0);
       const publisher = createPublisher();
       [0, 1, 2, 3].forEach(seq => postSeq(publisher, seq));
       h.replies = [200, 200, 503, 200, 200];
@@ -929,13 +1177,54 @@ describe('Insights event buffer (VBLOCKS-7468)', () => {
   });
 });
 
+describe('Insights retry delay helpers (VBLOCKS-7468)', () => {
+  let sandbox: sinon.SinonSandbox;
+
+  beforeEach(() => { sandbox = sinon.createSandbox(); });
+  afterEach(() => sandbox.restore());
+
+  it('should export the retry and drain constants the tests assume', () => {
+    assert.deepStrictEqual(
+      [INSIGHTS_RETRY_MIN_DELAY_MS, INSIGHTS_RETRY_BASE_DELAY_MS, INSIGHTS_RETRY_MAX_DELAY_MS, INSIGHTS_DRAIN_INTERVAL_MS],
+      [RETRY_MIN, RETRY_BASE, RETRY_MAX, DRAIN_INTERVAL]);
+  });
+
+  it('should stay within [100, 30000) ms for very large attempts', () => {
+    sandbox.stub(Math, 'random').returns(0.999);
+    [5, 6, 50, 1100, 100000].forEach(attempt => assert.strictEqual(getInsightsRetryDelay(attempt), 29970));
+  });
+
+  it('should treat a negative attempt as attempt 0', () => {
+    sandbox.stub(Math, 'random').returns(0.5);
+    assert.strictEqual(getInsightsRetryDelay(-1), 500);
+  });
+
+  it('should return null for a Retry-After that is zero or in the past', () => {
+    const now = T0;
+    [
+      { retryAfter: '0', status: 503 },
+      { retryAfter: new Date(T0).toUTCString(), status: 503 },
+      { retryAfter: new Date(T0 - 1000).toUTCString(), status: 429 },
+    ].forEach(error => assert.strictEqual(getInsightsRetryAfterDelay(error, now), null, JSON.stringify(error)));
+  });
+
+  it('should return null without a status, a string value, or for other statuses', () => {
+    [null, undefined, {}, { retryAfter: '5' }, { retryAfter: 5, status: 503 }, { retryAfter: '5', status: 500 }]
+      .forEach(error => assert.strictEqual(getInsightsRetryAfterDelay(error, T0), null, JSON.stringify(error)));
+  });
+
+  it('should accept delta-seconds with surrounding whitespace', () => {
+    assert.strictEqual(getInsightsRetryAfterDelay({ retryAfter: ' 7 ', status: 429 }, T0), 7000);
+  });
+});
+
 describe('request.ts HTTP status handling (VBLOCKS-7468)', () => {
   const h = createHarness();
 
   beforeEach(() => h.setup());
   afterEach(() => h.teardown());
 
-  const post = async (reply: Reply) => {
+  const post = async (reply: Reply | HttpReply) => {
     h.replies = [reply];
     const callback = sinon.spy();
     (request as any).post({ body: { a: 1 }, headers: { 'X-Twilio-Token': 'tok' }, url: EVENTS_URL }, callback);
@@ -981,6 +1270,39 @@ describe('request.ts HTTP status handling (VBLOCKS-7468)', () => {
     assert.deepStrictEqual(h.calls[0].body, { a: 1 });
     assert.strictEqual(h.calls[0].token, 'tok');
     assert.strictEqual(h.fetch.args[0][1].method, 'POST');
+  });
+
+  [429, 503, 500].forEach(status => {
+    it(`should attach the raw Retry-After header to the error on HTTP ${status}`, async () => {
+      const callback = await post({ status, headers: { 'Retry-After': '120' } });
+      sinon.assert.calledOnce(callback);
+      assert.strictEqual(callback.args[0][0].status, status);
+      assert.strictEqual(callback.args[0][0].retryAfter, '120');
+    });
+  });
+
+  it('should not set retryAfter when the response has no Retry-After header', async () => {
+    const callback = await post(503);
+    assert.strictEqual(callback.args[0][0].status, 503);
+    assert(!('retryAfter' in callback.args[0][0]), 'expected no retryAfter property');
+  });
+
+  [
+    ['headers.get throws', { get: () => { throw new Error('get threw'); } }],
+    ['headers.get returns a non-string', { get: () => 120 }],
+    ['headers has no get function', { }],
+    ['headers is missing', undefined],
+  ].forEach(([description, headers]) => {
+    it(`should still report the HTTP status without retryAfter when ${description}`, async () => {
+      h.fetch = sinon.spy(() => Promise.resolve({ headers, ok: false, status: 503, text: () => Promise.resolve('error') }));
+      root.fetch = h.fetch;
+      const callback = sinon.spy();
+      (request as any).post({ body: {}, headers: {}, url: EVENTS_URL }, callback);
+      await h.drain();
+      sinon.assert.calledOnce(callback);
+      assert.strictEqual(callback.args[0][0].status, 503);
+      assert.strictEqual(callback.args[0][0].retryAfter, undefined);
+    });
   });
 
   it('should not leave an unhandled rejection when the callback throws', async () => {
@@ -1126,7 +1448,9 @@ describe('Insights buffer with Device (VBLOCKS-7468)', () => {
 
       device.updateOptions({ eventgw: HOST });
       await h.drain();
-      // Sent without waiting for signaling or for another event.
+      // Sent without waiting for signaling or for another event, the second after the drain interval.
+      assert.deepStrictEqual(h.seqs(), [0]);
+      await h.runFor(DRAIN_INTERVAL);
       assert.deepStrictEqual(h.seqs(), [0, 1]);
       h.eventCalls().forEach((c: FetchCall) => assert.strictEqual(c.url, EVENTS_URL));
     });
@@ -1347,6 +1671,23 @@ describe('Insights buffer with Device (VBLOCKS-7468)', () => {
       await h.runFor(60000);
       assert.deepStrictEqual(h.seqs(), [0, 1]);
       assert.strictEqual(h.clock.countTimers(), 0);
+    });
+
+    it('should cancel a waiting drain and send the remaining events once, without pacing', async () => {
+      createDevice();
+      [0, 1, 2].forEach(seq => postSeq(device._publisher, seq));
+      await connectSignaling('us1');
+      await h.drain();
+      assert.deepStrictEqual(h.seqs(), [0], 'expected the drain to wait before event 1');
+
+      const destroyedAt = h.clock.now;
+      device.destroy();
+      await h.drain();
+      assert.deepStrictEqual(h.seqs(), [0, 1, 2]);
+      h.eventCalls().slice(1).forEach((c: FetchCall) => assert.strictEqual(c.at, destroyedAt));
+      assert.strictEqual(h.clock.countTimers(), 0, 'expected no drain timer after destroy');
+      await h.runFor(60000);
+      assert.deepStrictEqual(h.seqs(), [0, 1, 2]);
     });
 
     it('should send nothing and log the drop when the host is not known at destroy', async () => {

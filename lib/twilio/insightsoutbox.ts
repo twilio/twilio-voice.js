@@ -20,19 +20,20 @@
  * - Buffered events are kept in memory only. They are lost when the page is
  *   closed. When the Device is destroyed they are sent once, without retries,
  *   and dropped if that fails or the host is unknown.
+ * - Retries use their own schedule, not the signaling reconnect backoff:
+ *   exponential from {@link INSIGHTS_RETRY_BASE_DELAY_MS} up to
+ *   {@link INSIGHTS_RETRY_MAX_DELAY_MS} with full jitter, so clients that
+ *   lost the gateway at the same time do not retry in step. A `Retry-After`
+ *   on HTTP 429 or 503 is honored when the response exposes it.
+ * - After the gateway recovers, buffered events are sent one at a time with
+ *   {@link INSIGHTS_DRAIN_INTERVAL_MS} between requests, not back to back.
  * - A deterministic network-level block (ad blocker, CSP, firewall) looks like
  *   a network error, so while new events keep arriving the outbox keeps
- *   retrying at the backoff cap (about one request per second).
+ *   retrying at the retry cap (about one request every 15 seconds on
+ *   average).
  * @module
  */
-import Backoff from './backoff';
 import Log from './log';
-import {
-  MAX_PREFERRED_DELAY,
-  PREFERRED_BACKOFF_FACTOR,
-  PREFERRED_BACKOFF_JITTER,
-  PREFERRED_BACKOFF_MIN_DELAY,
-} from './wstransport';
 
 /**
  * Maximum number of buffered events. On overflow the oldest is dropped.
@@ -59,13 +60,36 @@ export const INSIGHTS_EVENTS_ENDPOINT = 'EndpointEvents';
 export const INSIGHTS_REQUEST_TIMEOUT_MS = 10000;
 
 /**
- * Upper bound for the backoff attempt counter. `Backoff` computes
- * `min * factor ^ attempts`, which overflows to `Infinity` (and then to a 0ms
- * delay) after about 1018 attempts. With the same-edge config the delay is
- * already at the 1000ms cap from attempt 4, so capping the counter at 10 does
- * not change any delay.
+ * Retry delay ceiling for the first retry of a backlog. Doubles with each
+ * further retry, up to {@link INSIGHTS_RETRY_MAX_DELAY_MS}.
  */
-export const INSIGHTS_BACKOFF_MAX_ATTEMPTS = 10;
+export const INSIGHTS_RETRY_BASE_DELAY_MS = 1000;
+
+/**
+ * Upper bound for the retry delay ceiling.
+ */
+export const INSIGHTS_RETRY_MAX_DELAY_MS = 30000;
+
+/**
+ * Lower bound for a retry delay, so a jittered delay is never 0ms.
+ */
+export const INSIGHTS_RETRY_MIN_DELAY_MS = 100;
+
+/**
+ * Upper bound for the retry attempt counter used as the exponent. From this
+ * attempt on, `INSIGHTS_RETRY_BASE_DELAY_MS * 2 ^ attempt` (32000ms) is
+ * already above {@link INSIGHTS_RETRY_MAX_DELAY_MS}, so capping the counter
+ * here does not change any delay and keeps the exponent bounded during a long
+ * outage.
+ */
+export const INSIGHTS_RETRY_MAX_EXPONENT = 5;
+
+/**
+ * Time between the end of one request of the flush loop and the start of the
+ * next, while buffered events are sent one after another. Spreads the backlog
+ * sent after the gateway recovers instead of sending it back to back.
+ */
+export const INSIGHTS_DRAIN_INTERVAL_MS = 200;
 
 /**
  * Callback signature of the request function used by the publisher.
@@ -168,6 +192,66 @@ export function isRetryableInsightsError(error: any): boolean {
     return true;
   }
   return status === 429 || (status >= 500 && status <= 599);
+}
+
+/**
+ * The delay before a retry, with full jitter applied after the cap: a random
+ * value between {@link INSIGHTS_RETRY_MIN_DELAY_MS} and
+ * `min(INSIGHTS_RETRY_MAX_DELAY_MS, INSIGHTS_RETRY_BASE_DELAY_MS * 2 ^ attempt)`.
+ * @param attempt - The 0-based retry attempt.
+ * @returns The delay in milliseconds.
+ */
+export function getInsightsRetryDelay(attempt: number): number {
+  const exponent = Math.min(Math.max(attempt, 0), INSIGHTS_RETRY_MAX_EXPONENT);
+  const ceiling = Math.min(INSIGHTS_RETRY_MAX_DELAY_MS, INSIGHTS_RETRY_BASE_DELAY_MS * Math.pow(2, exponent));
+  return Math.max(INSIGHTS_RETRY_MIN_DELAY_MS, Math.floor(Math.random() * ceiling));
+}
+
+/**
+ * The delay a failed request asks for with `Retry-After`, honored on HTTP 429
+ * and 503 only. Accepts delta-seconds or an HTTP-date. A missing, malformed,
+ * negative or past value is ignored. The result is capped at
+ * {@link INSIGHTS_BUFFER_MAX_AGE_MS}, past which the event would be dropped
+ * anyway.
+ *
+ * request.ts reads the header into `error.retryAfter`. In browsers a
+ * cross-origin response exposes `Retry-After` only when the gateway sends
+ * `Access-Control-Expose-Headers: Retry-After`; eventgw.twilio.com did not
+ * send it when this was written (checked 2026-11-09), so in browsers the
+ * header is honored only once the gateway exposes it. Custom request
+ * functions may not provide it either.
+ * @param error - The error passed to the request callback.
+ * @param now - The current time, `Date.now()`.
+ * @returns The delay in milliseconds, or `null`.
+ */
+export function getInsightsRetryAfterDelay(error: any, now: number): number | null {
+  const status = error && typeof error.status === 'number' ? error.status : null;
+  if (status !== 429 && status !== 503) {
+    return null;
+  }
+  const value = typeof error.retryAfter === 'string' ? error.retryAfter.trim() : '';
+  if (!value) {
+    return null;
+  }
+
+  let delay: number;
+  if (/^\d+$/.test(value)) {
+    delay = parseInt(value, 10) * 1000;
+  } else if (/^[-+]?[\d.]+$/.test(value)) {
+    // Negative or fractional seconds, which `Date.parse` could read as a year.
+    return null;
+  } else {
+    const date = Date.parse(value);
+    if (isNaN(date)) {
+      return null;
+    }
+    delay = date - now;
+  }
+
+  if (!(delay > 0)) {
+    return null;
+  }
+  return Math.min(delay, INSIGHTS_BUFFER_MAX_AGE_MS);
 }
 
 /**
@@ -319,17 +403,32 @@ function describeError(error: any): string {
 
 /**
  * The buffer, retry timer and flush loop for Insights events.
+ *
+ * Retries do not use the signaling reconnect backoff (backoff.ts): that
+ * schedule (100ms to 1s) applies jitter before its cap, so after a few
+ * attempts every client would retry at exactly 1s, in step. They are
+ * scheduled with {@link getInsightsRetryDelay} instead.
  */
 export default class InsightsOutbox {
   /**
-   * Retry schedule: the same-edge (preferred URI) signaling reconnect backoff.
+   * The retry attempt used for the next retry delay (see
+   * {@link getInsightsRetryDelay}). Kept across failure streaks and successes
+   * while a backlog remains, so a gateway that keeps failing between
+   * successes does not get retried at the shortest delays again; reset only
+   * once the buffer has drained.
    */
-  private _backoff: Backoff;
+  private _attempts: number = 0;
 
   /**
    * Whether {@link InsightsOutbox.destroy} was called.
    */
   private _destroyed: boolean = false;
+
+  /**
+   * The timer that starts the flush loop's next request, while the loop
+   * waits {@link INSIGHTS_DRAIN_INTERVAL_MS} between buffered events.
+   */
+  private _drainTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Buffered events, in creation order.
@@ -362,12 +461,13 @@ export default class InsightsOutbox {
   private _isFailing: boolean = false;
 
   /**
-   * Whether the flush loop has a request in flight.
+   * Whether the flush loop has a request in flight or is waiting
+   * {@link INSIGHTS_DRAIN_INTERVAL_MS} before its next request.
    */
   private _isFlushing: boolean = false;
 
   /**
-   * Whether a retry is scheduled on the backoff.
+   * Whether a retry is scheduled.
    */
   private _isRetryScheduled: boolean = false;
 
@@ -383,38 +483,14 @@ export default class InsightsOutbox {
   private _publisher: IInsightsPublisher | null = null;
 
   /**
+   * The scheduled retry, if any.
+   */
+  private _retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
    * Next creation sequence number.
    */
   private _seq: number = 0;
-
-  constructor() {
-    // Backoff applies jitter before capping at `max`, so from the attempt at
-    // which the delay reaches the cap (attempt 4 here) every retry waits
-    // exactly MAX_PREFERRED_DELAY, without jitter. Kept identical to the
-    // same-edge signaling config on purpose.
-    this._backoff = new Backoff({
-      factor: PREFERRED_BACKOFF_FACTOR,
-      jitter: PREFERRED_BACKOFF_JITTER,
-      max: MAX_PREFERRED_DELAY,
-      min: PREFERRED_BACKOFF_MIN_DELAY,
-    });
-
-    this._backoff.on('backoff', (attempt: number, delay: number) => {
-      this._log.debug(`Retrying buffered Insights events in ${delay}ms (attempt ${attempt + 1})`);
-    });
-
-    this._backoff.on('ready', () => {
-      // Backoff increments its attempt counter right after this handler. Cap
-      // it (see INSIGHTS_BACKOFF_MAX_ATTEMPTS) so a long outage cannot
-      // overflow the delay to 0ms. Delays are unchanged: they are at the cap.
-      const backoff = this._backoff as unknown as { _attempts: number };
-      if (backoff._attempts >= INSIGHTS_BACKOFF_MAX_ATTEMPTS) {
-        backoff._attempts = INSIGHTS_BACKOFF_MAX_ATTEMPTS - 1;
-      }
-      this._isRetryScheduled = false;
-      this.flush();
-    });
-  }
 
   /**
    * Whether {@link InsightsOutbox.destroy} was called.
@@ -483,7 +559,8 @@ export default class InsightsOutbox {
   }
 
   /**
-   * Drop every buffered event and cancel a scheduled retry.
+   * Drop every buffered event and cancel a scheduled retry or a waiting
+   * flush loop.
    * @param reason - Logged with the number of dropped events.
    */
   clear(reason: string): void {
@@ -492,6 +569,7 @@ export default class InsightsOutbox {
     this._generation++;
     this._isFailing = false;
     this._cancelRetry();
+    this._cancelDrain();
     if (count) {
       this._log.warn(`Dropped ${count} buffered Insights event(s): ${reason}`);
     }
@@ -522,7 +600,7 @@ export default class InsightsOutbox {
     this._entries = [];
     this._isFailing = false;
     this._cancelRetry();
-    this._backoff.removeAllListeners();
+    this._cancelDrain();
     this._inFlight.forEach(handle => handle.cancelTimeout());
     this._inFlight.clear();
     this._destroyed = true;
@@ -543,9 +621,10 @@ export default class InsightsOutbox {
   }
 
   /**
-   * Send buffered events, oldest first, one request at a time. No-op while a
-   * flush is in flight, or when the host is unknown or publishing is disabled.
-   * Expired events are dropped first.
+   * Send buffered events, oldest first, one request at a time, waiting
+   * {@link INSIGHTS_DRAIN_INTERVAL_MS} between requests. No-op while a flush
+   * is in flight or waiting, or when the host is unknown or publishing is
+   * disabled. Expired events are dropped first.
    */
   flush(): void {
     if (this._destroyed || this._isFlushing) { return; }
@@ -556,10 +635,25 @@ export default class InsightsOutbox {
   }
 
   /**
-   * Cancel a scheduled retry.
+   * Stop the flush loop while it waits between buffered events. A flush
+   * request already in flight is not affected.
+   */
+  private _cancelDrain(): void {
+    if (this._drainTimer === null) { return; }
+    clearTimeout(this._drainTimer);
+    this._drainTimer = null;
+    this._isFlushing = false;
+  }
+
+  /**
+   * Cancel a scheduled retry. The retry attempt is kept; see
+   * {@link InsightsOutbox._attempts}.
    */
   private _cancelRetry(): void {
-    this._backoff.reset();
+    if (this._retryTimer !== null) {
+      clearTimeout(this._retryTimer);
+      this._retryTimer = null;
+    }
     this._isRetryScheduled = false;
   }
 
@@ -592,6 +686,23 @@ export default class InsightsOutbox {
   }
 
   /**
+   * Continue the flush loop: wait {@link INSIGHTS_DRAIN_INTERVAL_MS} when more
+   * events are buffered, so a backlog is not sent back to back once the
+   * gateway recovers. Otherwise end the loop right away.
+   */
+  private _flushAfterInterval(): void {
+    if (!this._entries.length) {
+      this._flushNext();
+      return;
+    }
+    this._drainTimer = setTimeout(() => {
+      this._drainTimer = null;
+      this._flushNext();
+    }, INSIGHTS_DRAIN_INTERVAL_MS);
+    unrefTimer(this._drainTimer);
+  }
+
+  /**
    * Send the oldest buffered event, then continue with the next one until the
    * buffer is empty or a retryable failure stops the loop.
    */
@@ -617,14 +728,14 @@ export default class InsightsOutbox {
       if (!error) {
         this._remove(entry);
         this._onSuccess();
-        this._flushNext();
+        this._flushAfterInterval();
         return;
       }
 
       if (!isRetryableInsightsError(error)) {
         this._remove(entry);
         this._onDropped(entry, error);
-        this._flushNext();
+        this._flushAfterInterval();
         return;
       }
 
@@ -667,10 +778,8 @@ export default class InsightsOutbox {
   private _onRetryableFailure(entry: IInsightsEntry, error: any, isBuffered: boolean): void {
     if (!this._isFailing) {
       this._isFailing = true;
-      // A new failure streak retries from the minimum delay. Reset here, not
-      // only on success: a success inside the backoff 'ready' handler is
-      // followed by Backoff incrementing its attempt counter.
-      this._backoff.reset();
+      // The retry attempt is not reset here: a new streak while a backlog
+      // remains continues the schedule. See InsightsOutbox._attempts.
       this._log.warn(`Unable to post Insights event ${describe(entry)} (${describeError(error)}); buffering and retrying`);
       emitInsightsError(entry.origin, error, this._log);
     } else {
@@ -691,18 +800,23 @@ export default class InsightsOutbox {
     }
 
     if (this._entries.length) {
-      this._scheduleRetry();
+      this._scheduleRetry(error);
     }
   }
 
   /**
    * Handle a successful request: end the failure streak and cancel a
    * scheduled retry, since the gateway is reachable again (the caller flushes
-   * right away).
+   * right away). The retry attempt is reset only once nothing is buffered or
+   * in flight, so a gateway that fails again while a backlog remains is
+   * retried with the delays the backlog had reached.
    */
   private _onSuccess(): void {
     this._isFailing = false;
     this._cancelRetry();
+    if (!this._entries.length && !this._inFlight.size) {
+      this._attempts = 0;
+    }
   }
 
   /**
@@ -717,14 +831,26 @@ export default class InsightsOutbox {
   }
 
   /**
-   * Schedule one retry on the backoff, unless one is already scheduled.
+   * Schedule one retry, unless one is already scheduled. The delay is the
+   * jittered delay for the current attempt, or the failed response's
+   * `Retry-After` when that is longer (see {@link getInsightsRetryAfterDelay}).
+   * @param error - The error of the failed request.
    */
-  private _scheduleRetry(): void {
+  private _scheduleRetry(error: any): void {
     if (this._destroyed || this._isRetryScheduled) { return; }
+    const attempt = this._attempts;
+    const retryAfter = getInsightsRetryAfterDelay(error, Date.now());
+    const delay = Math.max(getInsightsRetryDelay(attempt), retryAfter || 0);
+    this._attempts = Math.min(attempt + 1, INSIGHTS_RETRY_MAX_EXPONENT);
     this._isRetryScheduled = true;
-    this._backoff.backoff();
-    // Backoff keeps its timer in `_timeoutID`; see unrefTimer.
-    unrefTimer((this._backoff as unknown as { _timeoutID: any })._timeoutID);
+    this._log.debug(`Retrying buffered Insights events in ${delay}ms (attempt ${attempt + 1}`
+      + `${retryAfter === null ? '' : `, Retry-After ${retryAfter}ms`})`);
+    this._retryTimer = setTimeout(() => {
+      this._retryTimer = null;
+      this._isRetryScheduled = false;
+      this.flush();
+    }, delay);
+    unrefTimer(this._retryTimer);
   }
 
   /**
