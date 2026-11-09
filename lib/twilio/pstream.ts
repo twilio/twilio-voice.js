@@ -10,6 +10,31 @@ const PSTREAM_VERSION = '1.6';
 // In seconds
 const MAX_RECONNECT_TIMEOUT_ALLOWED = 30;
 
+// Non-enumerable mark on 'error' payloads raised because the transport failed
+// (socket error or abnormal close, or no transport to send on), as opposed to
+// an error message received from the signaling server.
+const TRANSPORT_ERROR_MARK = '_isTransportError';
+
+/**
+ * Mark an 'error' payload as raised by the transport.
+ * @param payload - The payload to mark.
+ * @returns The same payload.
+ */
+export function markTransportErrorPayload(payload) {
+  if (payload && typeof payload === 'object') {
+    Object.defineProperty(payload, TRANSPORT_ERROR_MARK, { value: true });
+  }
+  return payload;
+}
+
+/**
+ * Whether an 'error' payload was raised by the transport.
+ * @param payload - The payload to check.
+ */
+export function isTransportErrorPayload(payload) {
+  return !!payload && typeof payload === 'object' && payload[TRANSPORT_ERROR_MARK] === true;
+}
+
 /**
  * Constructor for PStream objects.
  *
@@ -47,6 +72,29 @@ class PStream extends EventEmitter {
     this.status = 'disconnected';
     this.gateway = null;
     this.region = null;
+
+    /**
+     * The signaling connection id (`payload.connectionId`) received in the
+     * most recent `connected` message on the current WebSocket, or `null` if
+     * none has been received since the transport last closed. Cleared after
+     * 'transportClose' listeners run and before 'offline' is emitted (or on
+     * destroy), so a replacement connection never inherits the previous id.
+     * @type {string|null}
+     */
+    this.signalingConnectionId = null;
+
+    /**
+     * The signaling connection id of the connection that most recently closed
+     * after receiving one, or `null`. Set when the transport closes, kept
+     * across reconnect attempts that never reach `connected`, and cleared on
+     * the next `connected` message (with or without an id) and on destroy.
+     * Device uses it only for the one Insights transport error event published
+     * per lost connection, so that event names the connection that dropped
+     * even when the transport closed before raising any error.
+     * @type {string|null}
+     */
+    this.lastClosedSignalingConnectionId = null;
+
     this._messageQueue = [];
     this._preferredUri = null;
     this._uris = uris;
@@ -118,7 +166,16 @@ class PStream extends EventEmitter {
 }
 
 PStream.prototype._handleTransportClose = function() {
-  this.emit('transportClose');
+  // 'transportClose' listeners describe the connection that just closed, so
+  // events they publish keep its id. Clear it before going offline.
+  try {
+    this.emit('transportClose');
+  } finally {
+    if (this.signalingConnectionId !== null) {
+      this.lastClosedSignalingConnectionId = this.signalingConnectionId;
+    }
+    this._clearSignalingConnectionId();
+  }
 
   if (this.status !== 'disconnected') {
     if (this.status !== 'offline') {
@@ -128,18 +185,33 @@ PStream.prototype._handleTransportClose = function() {
   }
 };
 
+PStream.prototype._clearSignalingConnectionId = function() {
+  if (this.signalingConnectionId !== null) {
+    this._log.info(`Clearing signaling connection id: ${this.signalingConnectionId}`);
+  }
+  this.signalingConnectionId = null;
+};
+
+PStream.prototype._updateSignalingConnectionId = function(signalingConnectionId) {
+  if (typeof signalingConnectionId !== 'string' || signalingConnectionId === this.signalingConnectionId) {
+    return;
+  }
+  this._log.info(`Setting signaling connection id: ${signalingConnectionId}`);
+  this.signalingConnectionId = signalingConnectionId;
+};
+
 PStream.prototype._handleTransportError = function(error) {
   if (!error) {
-    this.emit('error', { error: {
+    this.emit('error', markTransportErrorPayload({ error: {
       code: 31000,
       message: 'Websocket closed without a provided reason',
       twilioError: new SignalingErrors.ConnectionDisconnected(),
-    } });
+    } }));
     return;
   }
   // We receive some errors without call metadata (just the error). We need to convert these
   // to be contained within the 'error' field so that these errors match the expected format.
-  this.emit('error', typeof error.code !== 'undefined' ?  { error } : error);
+  this.emit('error', markTransportErrorPayload(typeof error.code !== 'undefined' ?  { error } : error));
 };
 
 PStream.prototype._handleTransportMessage = function(msg) {
@@ -150,6 +222,12 @@ PStream.prototype._handleTransportMessage = function(msg) {
   const { type, payload = {} } = JSON.parse(msg.data);
   this.gateway = payload.gateway || this.gateway;
   this.region = payload.region || this.region;
+
+  if (type === 'connected') {
+    // A new connection is established: the dropped one no longer applies.
+    this.lastClosedSignalingConnectionId = null;
+    this._updateSignalingConnectionId(payload.connectionId);
+  }
 
   if (type === 'error' && payload.error) {
     payload.error.twilioError = new SignalingErrors.ConnectionError();
@@ -266,6 +344,8 @@ PStream.prototype._destroy = function() {
   this.transport.removeListener('open', this._handleTransportOpen);
   this.transport.close();
 
+  this._clearSignalingConnectionId();
+  this.lastClosedSignalingConnectionId = null;
   this.emit('offline', this);
 };
 
@@ -298,11 +378,11 @@ PStream.prototype._publish = function(type, payload, shouldRetry) {
   const isSent = !!this.transport.send(msg);
 
   if (!isSent) {
-    this.emit('error', { error: {
+    this.emit('error', markTransportErrorPayload({ error: {
       code: 31009,
       message: 'No transport available to send or receive messages',
       twilioError: new GeneralErrors.TransportError(),
-    } });
+    } }));
 
     if (shouldRetry) {
       this._messageQueue.push([type, payload, true]);

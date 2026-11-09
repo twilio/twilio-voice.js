@@ -1,5 +1,10 @@
 // @ts-nocheck
 import { EventEmitter } from 'events';
+import InsightsOutbox, {
+  emitInsightsError,
+  INSIGHTS_EVENTS_ENDPOINT,
+  postInsightsRequest,
+} from './insightsoutbox';
 import Log from './log';
 import request from './request';
 
@@ -26,6 +31,10 @@ import request from './request';
  *   should return an object representing the default payload. This is
  *   useful for fields that should always be present when they are
  *   available, but are not always available.
+ * @property {InsightsOutbox} [outbox] - The buffer and retry loop for
+ *   EndpointEvents. A Device passes the same outbox to every publisher it
+ *   creates, so buffered events survive the publisher being replaced. When
+ *   omitted, the publisher creates its own.
  */
 class EventPublisher extends EventEmitter {
   constructor(productName, token, options) {
@@ -46,6 +55,7 @@ class EventPublisher extends EventEmitter {
 
     let isEnabled = true;
     const metadata = Object.assign({ app_name: undefined, app_version: undefined }, options.metadata);
+    const outbox = options.outbox instanceof InsightsOutbox ? options.outbox : new InsightsOutbox();
 
     Object.defineProperties(this, {
       _defaultPayload: { value: defaultPayload },
@@ -55,6 +65,7 @@ class EventPublisher extends EventEmitter {
         set(_isEnabled) { isEnabled = _isEnabled; },
       },
       _log: { value: new Log('EventPublisher') },
+      _outbox: { value: outbox },
       _request: { value: options.request || request, writable: true },
       _token: { value: token, writable: true },
       isEnabled: {
@@ -71,6 +82,9 @@ class EventPublisher extends EventEmitter {
         get() { return this._token; },
       },
     });
+
+    // The newest publisher sends for every publisher sharing this outbox.
+    outbox.attach(this);
   }
 }
 
@@ -84,17 +98,36 @@ class EventPublisher extends EventEmitter {
  * @param {?Object} [payload=null] - The payload to pass. This will be extended
  *    onto the default payload object, if one exists.
  * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
+ *    Error-level events are posted without one. Other events are dropped
+ *    unless it has a CallSid or a temporary call sid.
  * @param {?Boolean} [force=false] - Whether or not to send this even if
  *    publishing is disabled.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
+ * @returns {Promise} Always fulfilled. For EndpointEvents sent through the
+ *   outbox, fulfilled after the first send attempt, or right away when the
+ *   event is buffered (host unknown, or earlier events still pending). So
+ *   while events are pending it can be fulfilled before this event is sent.
+ *
+ * EndpointEvents posted while publishing is enabled go through the outbox:
+ * buffered while the host is unknown or after a retryable failure (network
+ * error, HTTP 5xx, HTTP 429) and retried with backoff. Other HTTP 4xx drop the
+ * event. EndpointMetrics, forced posts while disabled, and posts after the
+ * outbox is destroyed are sent once, without buffering or retries, and are
+ * dropped when the host is unknown.
  */
 EventPublisher.prototype._post = function _post(endpointName, level, group, name, payload, connection, force) {
-  if ((!this.isEnabled && !force) || !this._host) {
+  const outbox = this._outbox;
+  const useOutbox = endpointName === INSIGHTS_EVENTS_ENDPOINT && this.isEnabled === true
+    && !!outbox && !outbox.isDestroyed;
+
+  if ((!this.isEnabled && !force) || (!useOutbox && !this._host)) {
     this._log.debug('Publishing cancelled', JSON.stringify({ isEnabled: this.isEnabled, force, host: this._host }));
     return Promise.resolve();
   }
 
-  if (!connection || ((!connection.parameters || !connection.parameters.CallSid) && !connection.outboundConnectionId)) {
+  // Errors are published with or without a Call. Other events need a Call.
+  const hasCallInfo = !!connection
+    && ((!!connection.parameters && !!connection.parameters.CallSid) || !!connection.outboundConnectionId);
+  if (!hasCallInfo && level !== 'error') {
     if (!connection) {
       this._log.debug('Publishing cancelled. Missing connection object');
     } else {
@@ -105,6 +138,7 @@ EventPublisher.prototype._post = function _post(endpointName, level, group, name
     return Promise.resolve();
   }
 
+  // Built now, at creation: buffered events keep this payload and timestamp.
   const event = {
     group,
     level: level.toUpperCase(),
@@ -121,26 +155,21 @@ EventPublisher.prototype._post = function _post(endpointName, level, group, name
     event.publisher_metadata = this.metadata;
   }
 
-  if (endpointName === 'EndpointEvents') {
+  if (endpointName === INSIGHTS_EVENTS_ENDPOINT) {
     this._log.debug(
       'Publishing insights',
       JSON.stringify({ endpointName, event, force, host: this._host }),
     );
   }
 
-  const requestParams = {
-    body: event,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Twilio-Token': this.token,
-    },
-    url: `https://${this._host}/v4/${endpointName}`,
-  };
+  if (useOutbox) {
+    return outbox.add(event, this);
+  }
 
   return new Promise((resolve, reject) => {
-    this._request.post(requestParams, err => {
+    postInsightsRequest(this, endpointName, event, err => {
       if (err) {
-        this.emit('error', err);
+        emitInsightsError(this, err, this._log);
         reject(err);
       } else {
         resolve();
@@ -161,7 +190,7 @@ EventPublisher.prototype._post = function _post(endpointName, level, group, name
  * @param {?Object} [payload=null] - The payload to pass. This will be extended
  *    onto the default payload object, if one exists.
  * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
+ * @returns {Promise} Always fulfilled, never rejected; see `_post` for when.
  */
 EventPublisher.prototype.post = function post(level, group, name, payload, connection, force) {
   return this._post('EndpointEvents', level, group, name, payload, connection, force);
@@ -174,7 +203,7 @@ EventPublisher.prototype.post = function post(level, group, name, payload, conne
  * @param {?Object} [payload=null] - The payload to pass. This will be extended
  *    onto the default payload object, if one exists.
  * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
+ * @returns {Promise} Always fulfilled, never rejected; see `_post` for when.
  */
 EventPublisher.prototype.debug = function debug(group, name, payload, connection) {
   return this.post('debug', group, name, payload, connection);
@@ -187,7 +216,7 @@ EventPublisher.prototype.debug = function debug(group, name, payload, connection
  * @param {?Object} [payload=null] - The payload to pass. This will be extended
  *    onto the default payload object, if one exists.
  * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
+ * @returns {Promise} Always fulfilled, never rejected; see `_post` for when.
  */
 EventPublisher.prototype.info = function info(group, name, payload, connection) {
   return this.post('info', group, name, payload, connection);
@@ -200,7 +229,7 @@ EventPublisher.prototype.info = function info(group, name, payload, connection) 
  * @param {?Object} [payload=null] - The payload to pass. This will be extended
  *    onto the default payload object, if one exists.
  * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
+ * @returns {Promise} Always fulfilled, never rejected; see `_post` for when.
  */
 EventPublisher.prototype.warn = function warn(group, name, payload, connection) {
   return this.post('warning', group, name, payload, connection);
@@ -213,7 +242,7 @@ EventPublisher.prototype.warn = function warn(group, name, payload, connection) 
  * @param {?Object} [payload=null] - The payload to pass. This will be extended
  *    onto the default payload object, if one exists.
  * @param {?Connection} [connection=null] - The {@link Connection} which is posting this payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
+ * @returns {Promise} Always fulfilled, never rejected; see `_post` for when.
  */
 EventPublisher.prototype.error = function error(group, name, payload, connection) {
   return this.post('error', group, name, payload, connection);
@@ -225,7 +254,7 @@ EventPublisher.prototype.error = function error(group, name, payload, connection
  * @param {String} name - The designated event name.
  * @param {Array<Object>} metrics - The metrics to post.
  * @param {?Object} [customFields] - Custom fields to append to each payload.
- * @returns {Promise} Fulfilled if the HTTP response is 20x.
+ * @returns {Promise} Always fulfilled, never rejected; see `_post` for when.
  */
 EventPublisher.prototype.postMetrics = function postMetrics(group, name, metrics, customFields, connection) {
   return new Promise(resolve => {
@@ -243,6 +272,9 @@ EventPublisher.prototype.postMetrics = function postMetrics(group, name, metrics
  */
 EventPublisher.prototype.setHost = function setHost(host) {
   this._host = host;
+  if (this._outbox && this._outbox.isAttached(this)) {
+    this._outbox.flush();
+  }
 };
 
 /**
@@ -266,6 +298,9 @@ EventPublisher.prototype.enable = function enable() {
  */
 EventPublisher.prototype.disable = function disable() {
   this._isEnabled = false;
+  if (this._outbox && this._outbox.isAttached(this)) {
+    this._outbox.clear('publishing is disabled');
+  }
 };
 
 function formatMetric(sample) {

@@ -1,6 +1,7 @@
 import * as loglevel from 'loglevel';
 import CallType from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
+import { markTransportErrorPayload } from '../../lib/twilio/pstream';
 import { GeneralErrors, InvalidArgumentError } from '../../lib/twilio/errors';
 import {
   Edge,
@@ -250,6 +251,134 @@ describe('Device', function() {
               sdk_version: Device.version,
             });
             root.chrome = origChrome;
+          });
+        });
+
+        // VBLOCKS-7513: signaling_connection_id comes from the stream, not the Call.
+        describe('signaling_connection_id', () => {
+          const basePayload = () => ({
+            aggressive_nomination: false,
+            browser_extension: false,
+            dscp: true,
+            ice_restart_enabled: true,
+            platform: 'WebRTC',
+            sdk_version: Device.version,
+          });
+
+          const createFakeCall = (callSid: string, tempCallSid: string): any => ({
+            codec: 'opus',
+            direction: 'OUTGOING',
+            outboundConnectionId: tempCallSid,
+            parameters: { CallSid: callSid },
+          });
+
+          const defaultPayload = (call?: any) => Publisher.lastCall.args[2].defaultPayload(call);
+
+          it('should include signaling_connection_id without a call', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            assert.deepStrictEqual(defaultPayload(), {
+              ...basePayload(),
+              signaling_connection_id: 'CONN-A',
+            });
+          });
+
+          it('should include signaling_connection_id when called with no arguments', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            assert.strictEqual(device['_createDefaultPayload']().signaling_connection_id, 'CONN-A');
+          });
+
+          it('should include signaling_connection_id alongside the call fields', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            assert.deepStrictEqual(defaultPayload(createFakeCall('CA1111', 'TJ1111')), {
+              ...basePayload(),
+              audio_codec: 'opus',
+              call_sid: 'CA1111',
+              direction: 'OUTGOING',
+              signaling_connection_id: 'CONN-A',
+              temp_call_sid: 'TJ1111',
+            });
+          });
+
+          it('should include signaling_connection_id for a call without a CallSid yet', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            const payload = defaultPayload(createFakeCall(undefined as any, 'TJ1111'));
+            assert.strictEqual(payload.signaling_connection_id, 'CONN-A');
+            assert.strictEqual(payload.temp_call_sid, 'TJ1111');
+            assert(!('call_sid' in payload));
+          });
+
+          [null, undefined].forEach(value => {
+            it(`should omit signaling_connection_id when the stream signalingConnectionId is ${value}`, () => {
+              pstream.signalingConnectionId = value;
+              assert.deepStrictEqual(defaultPayload(), basePayload());
+              assert(!('signaling_connection_id' in defaultPayload(createFakeCall('CA1111', 'TJ1111'))));
+            });
+          });
+
+          it('should omit signaling_connection_id when the stream never received one', () => {
+            assert(!('signaling_connection_id' in defaultPayload()));
+          });
+
+          it('should use the same id for two calls on the same stream', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            const payload1 = defaultPayload(createFakeCall('CA1111', 'TJ1111'));
+            const payload2 = defaultPayload(createFakeCall('CA2222', 'TJ2222'));
+            assert.strictEqual(payload1.signaling_connection_id, 'CONN-A');
+            assert.strictEqual(payload2.signaling_connection_id, 'CONN-A');
+            assert.notStrictEqual(payload1.call_sid, payload2.call_sid);
+          });
+
+          it('should read the current stream id after a reconnect', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            assert.strictEqual(defaultPayload().signaling_connection_id, 'CONN-A');
+            pstream.signalingConnectionId = null;
+            pstream.emit('offline');
+            assert(!('signaling_connection_id' in defaultPayload()));
+            pstream.signalingConnectionId = 'CONN-B';
+            pstream.emit('connected', { region: 'US_EAST_VIRGINIA' });
+            assert.strictEqual(defaultPayload().signaling_connection_id, 'CONN-B');
+          });
+
+          it('should read the id at payload creation, not when the publisher was created', () => {
+            const payloadFn = Publisher.lastCall.args[2].defaultPayload;
+            pstream.signalingConnectionId = 'CONN-A';
+            const first = payloadFn();
+            pstream.signalingConnectionId = 'CONN-B';
+            const second = payloadFn();
+            assert.strictEqual(first.signaling_connection_id, 'CONN-A');
+            assert.strictEqual(second.signaling_connection_id, 'CONN-B');
+          });
+
+          it('should omit signaling_connection_id after the server closes the stream', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            pstream.emit('close');
+            assert.equal(device['_stream'], null);
+            assert(!('signaling_connection_id' in defaultPayload()));
+          });
+
+          it('should read the replacement stream id, not the old stream id', async () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            const oldStream = pstream;
+            const setupPromise = device['_setupStream']();
+            assert.notStrictEqual(pstream, oldStream);
+            assert(!('signaling_connection_id' in defaultPayload()));
+            pstream.signalingConnectionId = 'CONN-B';
+            pstream.emit('connected', { region: 'US_EAST_VIRGINIA' });
+            await setupPromise;
+            assert.strictEqual(defaultPayload().signaling_connection_id, 'CONN-B');
+          });
+
+          it('should keep signaling_connection_id after updateOptions recreates the publisher', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            device.updateOptions({ appName: 'foobar' });
+            assert.strictEqual(Publisher.lastCall.args[2].defaultPayload().signaling_connection_id, 'CONN-A');
+          });
+
+          it('should omit signaling_connection_id after the Device is destroyed', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            const payloadFn = Publisher.lastCall.args[2].defaultPayload;
+            device.destroy();
+            assert(!('signaling_connection_id' in payloadFn()));
           });
         });
       });
@@ -1178,6 +1307,146 @@ describe('Device', function() {
           assert.equal(31005, errorObject.code);
           assert.equal('ConnectionError (31005): A connection error occurred during the call', errorObject.message);
         });
+
+        describe('Insights', () => {
+          it('should publish the error without a call if payload.callsid is missing', () => {
+            pstream.emit('error', { error: { code: 31005 } });
+            sinon.assert.calledOnce(publisher.error);
+            const [group, name, payload, call] = publisher.error.getCall(0).args;
+            assert.deepEqual([group, name], ['connection', 'error']);
+            assert.deepEqual(payload, {
+              code: 31005,
+              message: 'ConnectionError (31005): A connection error occurred during the call',
+            });
+            assert.equal(call, undefined);
+          });
+
+          it('should publish the error with the call if payload.callsid matches a call', async () => {
+            pstream.emit('invite', { callsid: 'foo', sdp: 'bar' });
+            await clock.tickAsync(0);
+            const call = device.calls[0];
+            call.parameters = { CallSid: 'foo' };
+            pstream.emit('error', { error: { twilioError }, callsid: 'foo' });
+            sinon.assert.calledOnce(publisher.error);
+            sinon.assert.calledWith(publisher.error, 'connection', 'error',
+              { code: twilioError.code, message: twilioError.message }, call);
+          });
+
+          it('should publish the error without a call if payload.callsid matches no call', () => {
+            pstream.emit('error', { error: { twilioError }, callsid: 'unknown' });
+            sinon.assert.calledOnce(publisher.error);
+            assert.equal(publisher.error.getCall(0).args[3], undefined);
+          });
+
+          it('should publish the mapped token error', () => {
+            pstream.emit('error', { error: { code: 31205, message: 'expired' } });
+            sinon.assert.calledOnce(publisher.error);
+            const payload = publisher.error.getCall(0).args[2];
+            assert.equal(payload.code, 20104);
+          });
+
+          it('should publish before emitting Device.error', () => {
+            const spy = device.emit = sinon.spy();
+            pstream.emit('error', { error: { twilioError } });
+            sinon.assert.callOrder(publisher.error, spy);
+          });
+
+          it('should not publish if a voiceeventsid is passed', () => {
+            pstream.emit('error', { error: { code: 31005 }, voiceeventsid: 'foo' });
+            sinon.assert.notCalled(publisher.error);
+          });
+
+          it('should not publish if payload.error is missing', () => {
+            pstream.emit('error', { });
+            sinon.assert.notCalled(publisher.error);
+          });
+
+          describe('transport errors', () => {
+            const transportError = (code: number) =>
+              markTransportErrorPayload({ error: { code, message: 'foo' } });
+
+            it('should publish only the first transport error until connected', () => {
+              const spy = device.emit = sinon.spy();
+              pstream.emit('error', transportError(31000));
+              pstream.emit('error', transportError(31005));
+              pstream.emit('error', transportError(31009));
+              sinon.assert.calledOnce(publisher.error);
+              assert.equal(publisher.error.getCall(0).args[2].code, 31000);
+              assert.equal(spy.withArgs('error').callCount, 3);
+            });
+
+            it('should publish the next transport error after connected', () => {
+              pstream.emit('error', transportError(31005));
+              pstream.emit('connected', { region: 'EU_IRELAND' });
+              pstream.emit('error', transportError(31005));
+              pstream.emit('error', transportError(31005));
+              sinon.assert.calledTwice(publisher.error);
+            });
+
+            it('should publish the first transport error of a new stream after the stream is replaced', () => {
+              const firstStream = pstream;
+              const firstPublisher = publisher;
+              pstream.emit('error', transportError(31005));
+
+              device.updateOptions({ edge: 'ashburn' });
+              assert.notStrictEqual(pstream, firstStream);
+
+              pstream.emit('error', transportError(31005));
+              const publishedErrors: sinon.SinonSpyCall[] = firstPublisher.error.getCalls().concat(
+                publisher === firstPublisher ? [] : publisher.error.getCalls(),
+              );
+              assert.equal(publishedErrors.length, 2);
+              publishedErrors.forEach((publishedError: sinon.SinonSpyCall) =>
+                assert.deepEqual(publishedError.args.slice(0, 2), ['connection', 'error']));
+            });
+
+            it('should still publish every server error while transport errors are suppressed', () => {
+              pstream.emit('error', transportError(31005));
+              pstream.emit('error', transportError(31005));
+              pstream.emit('error', { error: { code: 31100, message: 'server' } });
+              pstream.emit('error', { error: { code: 31100, message: 'server' } });
+              sinon.assert.calledThrice(publisher.error);
+            });
+
+            describe('signaling connection id of the dropped connection', () => {
+              it('should be set on the published transport error while disconnected', () => {
+                pstream.signalingConnectionId = null;
+                pstream.lastClosedSignalingConnectionId = 'CONN-A';
+                pstream.emit('error', transportError(31000));
+                sinon.assert.calledOnce(publisher.error);
+                assert.strictEqual(publisher.error.getCall(0).args[2].signaling_connection_id, 'CONN-A');
+              });
+
+              it('should not be set while the current connection has an id', () => {
+                pstream.signalingConnectionId = 'CONN-B';
+                pstream.lastClosedSignalingConnectionId = 'CONN-A';
+                pstream.emit('error', transportError(31005));
+                assert.equal('signaling_connection_id' in publisher.error.getCall(0).args[2], false);
+              });
+
+              it('should not be set when no connection has closed', () => {
+                pstream.signalingConnectionId = null;
+                pstream.lastClosedSignalingConnectionId = null;
+                pstream.emit('error', transportError(31005));
+                assert.deepEqual(Object.keys(publisher.error.getCall(0).args[2]), ['code', 'message']);
+              });
+
+              it('should not be set on a server error', () => {
+                pstream.signalingConnectionId = null;
+                pstream.lastClosedSignalingConnectionId = 'CONN-A';
+                pstream.emit('error', { error: { code: 31100, message: 'server' } });
+                assert.equal('signaling_connection_id' in publisher.error.getCall(0).args[2], false);
+              });
+            });
+
+            it('should not mark a server error as a transport error', () => {
+              pstream.emit('error', { error: { code: 31100, message: 'server' } });
+              pstream.emit('error', transportError(31005));
+              sinon.assert.calledTwice(publisher.error);
+              assert.equal(publisher.error.getCall(1).args[2].code, 31005);
+            });
+          });
+        });
       });
 
       describe('on signaling.invite', () => {
@@ -1194,6 +1463,15 @@ describe('Device', function() {
           assert.equal(device.calls.length, 0);
           sinon.assert.calledOnce(device.emit as any);
           sinon.assert.calledWith(device.emit as any, 'error');
+        });
+
+        it('should publish the malformed invite error without a call', () => {
+          pstream.emit('invite', { sdp: 'bar' });
+          sinon.assert.calledOnce(publisher.error);
+          const [group, name, payload, call] = publisher.error.getCall(0).args;
+          assert.deepEqual([group, name], ['connection', 'error']);
+          assert.equal(payload.code, 31400);
+          assert.equal(call, undefined);
         });
 
         it('should emit an error and not create a new call if payload is missing sdp', () => {
@@ -1795,6 +2073,23 @@ describe('Device', function() {
                   { audio_device_ids: sinkIds });
               });
             });
+
+            context('if unsuccessful while no call is active', () => {
+              let sinkIds: string[];
+              beforeEach(() => {
+                sinkIds = ['default'];
+                sounds[Device.SoundName.Incoming].setSinkIds = sinon.spy(() => Promise.reject(new Error('foo')));
+                return updateSinkIds('ringtone', sinkIds).then(
+                  () => { throw Error('Expected a rejection'); },
+                  () => Promise.resolve());
+              });
+
+              it('should publish a ringtone-devices-set-failed event without a call', () => {
+                sinon.assert.calledOnce(publisher.error);
+                sinon.assert.calledWith(publisher.error, 'audio', 'ringtone-devices-set-failed',
+                  { audio_device_ids: sinkIds, message: 'foo' }, null);
+              });
+            });
           });
         });
       });
@@ -1812,6 +2107,12 @@ describe('Device', function() {
 
         it('should not set host address before signaling is connected', () => {
           sinon.assert.notCalled(publisher.setHost);
+        });
+
+        it('should omit signaling_connection_id before a stream exists', () => {
+          assert.equal(device['_stream'], null);
+          const payload = Publisher.lastCall.args[2].defaultPayload();
+          assert(!('signaling_connection_id' in payload));
         });
       });
 

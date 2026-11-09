@@ -3,8 +3,25 @@
 2.18.6 (In Progress)
 ====================
 
+Improvements
+------------
+
+- Insights events published by the SDK now include `signaling_connection_id` when provided by the signaling server in its `connected` message, improving telemetry and event correlation.
+
+- Insights events are now buffered in memory when the gateway is unknown or temporarily unreachable, and retried once connectivity is restored. The buffer holds up to 200 events, dropping the oldest events when full, and an event is not sent if it is older than 5 minutes when it would be sent. Events are delivered oldest first. Network errors, HTTP 5xx, and HTTP 429 responses are retried with exponential backoff and full jitter, with the maximum delay between attempts growing from 1 to 30 seconds, and the `Retry-After` header of an HTTP 429 or 503 response is honored when the gateway exposes it. After the gateway recovers, buffered events are sent at most one every 200 ms. Buffered events are preserved across `device.updateOptions()` calls but are lost when the page closes. When `device.destroy()` is called, each buffered event is sent one final time, without retries, and dropped if that send fails or the gateway is still unknown. Delivery is at least once, so duplicate events are possible. Buffered events are sent with the access token current at send time; when `device.updateToken()` is called with a token for a different account or identity, or with a token that cannot be decoded, buffered events are dropped, while a token refresh for the same identity keeps them.
+
+  Additionally, Insights gateway HTTP errors are now properly reported, allowing `PreflightTest` to emit the `insights-connection-error` warning.
+
+- Errors that happen outside a call are now sent to Insights. Error-level Insights events were previously dropped when they had no call, so errors raised while no call was active never reached Insights. This covers the errors the `Device` emits from the signaling connection, such as token errors, connection errors and error messages from the signaling server, and the `31400` error for a malformed incoming call invite. Signaling errors that carry the CallSid of a pending incoming call are sent with that call. Events below error level still require a call. Nothing is sent when `publishEvents` is `false`.
+
+  Transport errors (`31000`, `31005` and `31009`) repeat on every reconnect attempt while the signaling connection is down, so only the first one is sent each time the connection is lost. That event carries the `signaling_connection_id` of the connection that was lost, including when the error comes from a reconnect attempt after the connection closed. The `Device` still emits `error` for every one.
+
+  Note: errors raised before the first signaling `connected` message are sent only if the Insights gateway host is known. Without the `eventgw` option, they are buffered and sent only if the `Device` connects within 5 minutes; otherwise they are dropped. An error caused by an invalid token is sent with that token, so the gateway can reject it.
+
 Bug Fixes
 ---------
+
+- Fixed an issue where an exception thrown by an application's `PreflightTest` `warning` listener while handling the `insights-connection-error` warning caused the warning to be emitted again, twice for one failed Insights request. The warning is now emitted at most once per test. The exception is still raised as an unhandled promise rejection, as before, and is now also written to the SDK log at error level.
 
 - Fixed an issue where losing the signaling transport before a call received a signaling-reconnect token left its media open and the Device busy with a closed call. The SDK now closes the media and emits `disconnect`, releasing the active-call slot so a later `device.connect()` is not rejected with `InvalidStateError`. Calls with a reconnect token retain their existing recovery behavior. Thanks @ip4422 for your [contribution](https://github.com/twilio/twilio-voice.js/pull/482).
 

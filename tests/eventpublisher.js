@@ -148,6 +148,61 @@ describe('EventPublisher', () => {
     });
   });
 
+  describe('without a Call', () => {
+    let pub;
+    let req;
+
+    beforeEach(() => {
+      req = { post: sinon.spy((params, cb) => { cb(null, ''); }) };
+      pub = new EventPublisher('test', 'token', {
+        defaultPayload: () => ({ sdk_version: 'baz' }),
+        host: 'foo',
+        request: req,
+      });
+    });
+
+    afterEach(() => {
+      pub._outbox.destroy();
+    });
+
+    it('should post an error-level event when no connection is passed', async () => {
+      await pub.error('connection', 'error', { code: 31005, message: 'm' });
+      sinon.assert.calledOnce(req.post);
+      const body = req.post.args[0][0].body;
+      assert.equal(body.level, 'ERROR');
+      assert.deepEqual(body.payload, { code: 31005, message: 'm', sdk_version: 'baz' });
+    });
+
+    it('should post an error-level event without a code', async () => {
+      await pub.error('audio', 'ringtone-devices-set-failed', { audio_device_ids: ['x'], message: 'm' }, null);
+      sinon.assert.calledOnce(req.post);
+      assert.equal(req.post.args[0][0].body.payload.code, undefined);
+    });
+
+    it('should post an error-level event when the connection has no call ids', async () => {
+      await pub.error('connection', 'error', { code: 31005 }, { parameters: { } });
+      sinon.assert.calledOnce(req.post);
+    });
+
+    ['debug', 'info', 'warn'].forEach(level => {
+      it(`should not post a ${level}-level event when no connection is passed`, async () => {
+        await pub[level]('group', 'name', { abc: 'xyz' });
+        sinon.assert.notCalled(req.post);
+      });
+    });
+
+    it('should not post a non-error event when the connection has no call ids', async () => {
+      await pub.info('group', 'name', null, { parameters: { CallSid: null }, outboundConnectionId: null });
+      sinon.assert.notCalled(req.post);
+    });
+
+    it('should not post an error-level event when publishing is disabled', async () => {
+      pub.disable();
+      await pub.error('connection', 'error', { code: 31005 });
+      sinon.assert.notCalled(req.post);
+    });
+  });
+
   describe('setToken', () => {
     it('should change .token to the passed value', () => {
       publisher.setToken('abc123');
@@ -223,7 +278,8 @@ function checkPostParams(i, publisher, connection) {
 }
 
 function fakeRequest() {}
-fakeRequest.post = sinon.spy();
+// Settle every post successfully so no real-timer timeouts or retry loops outlive this suite.
+fakeRequest.post = sinon.spy((params, callback) => { if (callback) { callback(null, ''); } });
 
 function FakeConnection() {
   this.parameters = { CallSid: null };
