@@ -1,6 +1,6 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
-2.18.6 (In Progress)
+2.19.0 (In Progress)
 ====================
 
 Bug Fixes
@@ -23,6 +23,8 @@ Bug Fixes
 - Fixed an issue where `device.updateOptions()` threw `Cannot change Edge while on an active Call` but still stored the new options. Retrying the same edge after the call ended found no change and kept the signaling stream on the previous edge, and a signaling connection opened later, for example after the previous one closed, could use the rejected edge. A rejected `updateOptions()` call now leaves the `Device` options unchanged. This also applies when `updateOptions()` throws for an invalid `edge`, which previously made later `updateOptions()` calls throw until a valid `edge` was passed. Thanks @RaphaelFakhri for your [contribution](https://github.com/twilio/twilio-voice.js/pull/481).
 
 - Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/459) where a call that ended while its microphone was being switched, by `device.audio.setInputDevice()` or by the SDK's own recovery after the active microphone was lost, produced `InvalidStateError: Failed to execute 'replaceTrack' on 'RTCRtpSender': The peer connection is closed.` The SDK's recovery surfaced it as an unhandled promise rejection. `setInputDevice()` rejected with it and left the new microphone open without selecting it. On Firefox, `setInputDevice()` could instead never settle, and every later `device.connect()` waited on it indefinitely. The switch now completes for future calls instead.
+
+- Fixed an issue where Voice Insights did not receive the `dtls-transport-state` `closed` event when a call ended on Chrome 154 and later or on Firefox. These browsers do not fire the DTLS transport's `statechange` event when the SDK closes the `RTCPeerConnection`, so the SDK now reports the `closed` state itself.
 
 2.18.5 (September 10, 2026)
 ===========================
