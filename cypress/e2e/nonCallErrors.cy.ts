@@ -7,11 +7,15 @@ import { generateAccessToken } from '../../tests/lib/token';
 // pass no Call (for example `audio` / `ringtone-devices-set-failed`) are no
 // longer dropped. Non-error events without a Call are still dropped.
 //
-// This spec runs against a real backend and is skipped unless both of these
-// Cypress env values are set (for example via CYPRESS_DEVICE_CHUNDERW /
-// CYPRESS_DEVICE_EVENTGW):
+// This spec runs against the SDK default hosts (prod) unless these optional
+// Cypress env values override them (for example via CYPRESS_DEVICE_CHUNDERW /
+// CYPRESS_DEVICE_EVENTGW, to run against stage):
 //   DEVICE_CHUNDERW  signaling hostname, e.g. chunderw-vpc-gll.stage.twilio.com
 //   DEVICE_EVENTGW   insights hostname, e.g. eventgw.stage.twilio.com
+// Errors raised before the first `connected` are only posted when the Device
+// has an `eventgw` option (the host is otherwise learned from `connected`), so
+// the tests for those pass DEVICE_EVENTGW or, without it, the SDK's default
+// gateway host.
 //
 // No call is placed. Every Device uses appName = RUN_ID and appVersion = the
 // test's tag, so the events can be found in the Insights store afterwards. The
@@ -22,10 +26,11 @@ import { generateAccessToken } from '../../tests/lib/token';
 
 const chunderw: string | undefined = Cypress.env('DEVICE_CHUNDERW');
 const eventgw: string | undefined = Cypress.env('DEVICE_EVENTGW');
-const isConfigured = !!(chunderw && eventgw);
-const suiteTitle = isConfigured
-  ? 'Errors outside a call (Insights)'
-  : 'Errors outside a call (Insights) (skipped: set CYPRESS_DEVICE_CHUNDERW and CYPRESS_DEVICE_EVENTGW, e.g. to stage)';
+// Only the overrides that are set are passed, so the SDK defaults apply otherwise.
+const hostOptions = { ...(chunderw ? { chunderw } : {}), ...(eventgw ? { eventgw } : {}) };
+// The gateway the pre-`connected` tests set: the override, or the SDK default
+// (defaultEventGatewayURI in lib/twilio/regions.ts).
+const preConnectEventgw = eventgw || 'eventgw.twilio.com';
 
 const RUN_ID = `vblocks-7516-e2e-${Date.now()}`;
 const UNREACHABLE_HOST = 'voice-e2e-unreachable.invalid';
@@ -79,7 +84,7 @@ function assertNonCallError(body: Record<string, any>, code: number) {
 
 const isOk = (status: Post['status']) => typeof status === 'number' && status >= 200 && status < 300;
 
-(isConfigured ? describe : describe.skip)(suiteTitle, function() {
+describe('Errors outside a call (Insights)', function() {
   this.timeout(120000);
   Cypress.config('defaultCommandTimeout', 120000);
 
@@ -87,7 +92,7 @@ const isOk = (status: Post['status']) => typeof status === 'number' && status >=
   const report: Record<string, any> = { runId: RUN_ID, tests: {} };
 
   const createDevice = (token: string, tag: string, options: Record<string, any> = {}) => {
-    const device = new Device(token, { appName: RUN_ID, appVersion: tag, chunderw, eventgw, ...options });
+    const device = new Device(token, { appName: RUN_ID, appVersion: tag, ...hostOptions, ...options });
     devices.push(device);
     const errors: number[] = [];
     device.on(Device.EventName.Error, (error: any) => { errors.push(error && error.code); });
@@ -141,7 +146,7 @@ const isOk = (status: Post['status']) => typeof status === 'number' && status >=
 
   it('should publish a token error before connect (invalid token)', async () => {
     const tag = 'invalid-token';
-    const { device, errors } = createDevice('invalid-token-voice-e2e', tag);
+    const { device, errors } = createDevice('invalid-token-voice-e2e', tag, { eventgw: preConnectEventgw });
     device.register().catch(() => { /* rejected when the server closes the stream */ });
     await waitUntil(() => errors.length >= 1, 20000, 'a Device error');
     await sleep(1000);
@@ -151,7 +156,7 @@ const isOk = (status: Post['status']) => typeof status === 'number' && status >=
     const sent = errorPostsFor(tag);
     assert.strictEqual(sent.length, 1);
     assertNonCallError(sent[0].body, 20101);
-    assert.strictEqual(sent[0].host, eventgw);
+    assert.strictEqual(sent[0].host, preConnectEventgw);
     // The post carries the same invalid token; the gateway may reject it.
     record(tag);
     destroy(device);
@@ -161,7 +166,7 @@ const isOk = (status: Post['status']) => typeof status === 'number' && status >=
     const tag = 'expired-token';
     const token = await mintToken('noncall-expired', 1);
     await sleep(2500);
-    const { device, errors } = createDevice(token, tag);
+    const { device, errors } = createDevice(token, tag, { eventgw: preConnectEventgw });
     device.register().catch(() => { /* rejected when the server closes the stream */ });
     await waitUntil(() => errors.length >= 1, 20000, 'a Device error');
     await sleep(1000);
@@ -199,7 +204,8 @@ const isOk = (status: Post['status']) => typeof status === 'number' && status >=
 
   it('should publish one transport error while signaling is unreachable', async () => {
     const tag = 'transport-unreachable';
-    const { device, errors } = createDevice(await mintToken('noncall-unreach'), tag, { chunderw: UNREACHABLE_HOST });
+    const { device, errors } = createDevice(await mintToken('noncall-unreach'), tag,
+      { chunderw: UNREACHABLE_HOST, eventgw: preConnectEventgw });
     const start = Date.now();
     device.register().catch(() => { /* never connects */ });
     await sleep(10000);
@@ -214,7 +220,7 @@ const isOk = (status: Post['status']) => typeof status === 'number' && status >=
     // published. Device error is still emitted for every attempt.
     assert.deepStrictEqual(sent.map(p => p.body.payload.code), [errors[0]]);
     assertNonCallError(sent[0].body, errors[0]);
-    assert.strictEqual(sent[0].host, eventgw);
+    assert.strictEqual(sent[0].host, preConnectEventgw);
     record(tag, { deviceErrors: errors.length, elapsedMs });
   });
 

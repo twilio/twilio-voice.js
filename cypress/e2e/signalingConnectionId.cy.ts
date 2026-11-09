@@ -8,9 +8,10 @@ import { expectEvent } from '../../tests/lib/util';
 // and the SDK copies it into every Insights event as
 // `payload.signaling_connection_id`.
 //
-// This spec only runs against a backend that sends `connectionId` (chundergateway
-// 2.2.5+, stage today). It is skipped unless both of these Cypress env values are
-// set (for example via CYPRESS_DEVICE_CHUNDERW / CYPRESS_DEVICE_EVENTGW):
+// It needs a backend that sends `connectionId` (chundergateway 2.2.5+; prod and
+// stage both do). It runs against the SDK default hosts (prod) unless these
+// optional Cypress env values override them (for example via
+// CYPRESS_DEVICE_CHUNDERW / CYPRESS_DEVICE_EVENTGW, to run against stage):
 //   DEVICE_CHUNDERW  signaling hostname, e.g. chunderw-vpc-gll.stage.twilio.com
 //   DEVICE_EVENTGW   initial insights hostname, e.g. eventgw.stage.twilio.com. The
 //                    Device replaces it on every `connected` with eventgw.<home>,
@@ -23,11 +24,8 @@ import { expectEvent } from '../../tests/lib/util';
 
 const chunderw: string | undefined = Cypress.env('DEVICE_CHUNDERW');
 const eventgw: string | undefined = Cypress.env('DEVICE_EVENTGW');
-const isConfigured = !!(chunderw && eventgw);
-const suiteTitle = isConfigured
-  ? 'Signaling connection id'
-  : 'Signaling connection id (skipped: set CYPRESS_DEVICE_CHUNDERW and CYPRESS_DEVICE_EVENTGW '
-    + 'to a backend that sends connected.payload.connectionId, e.g. stage)';
+// Only the overrides that are set are passed, so the SDK defaults apply otherwise.
+const hostOptions = { ...(chunderw ? { chunderw } : {}), ...(eventgw ? { eventgw } : {}) };
 
 interface CapturedEvent {
   index: number;
@@ -116,7 +114,7 @@ const eventgwStatuses: Record<string, number> = {};
 const originalFetch = window.fetch;
 let pendingEventgw = 0;
 
-(isConfigured ? describe : describe.skip)(suiteTitle, { retries: 0 }, function() {
+describe('Signaling connection id', { retries: 0 }, function() {
   this.timeout(90000);
 
   let device1: Device;
@@ -184,9 +182,8 @@ let pendingEventgw = 0;
       generateAccessToken(identity1, 900),
       generateAccessToken(identity2, 900),
     ]);
-    const options = { chunderw, eventgw };
-    device1 = new Device(token1, options);
-    device2 = new Device(token2, options);
+    device1 = new Device(token1, hostOptions);
+    device2 = new Device(token2, hostOptions);
     device1.on(Device.EventName.Error, (e: any) => deviceErrors.push(`device1:${e && e.code}`));
     device2.on(Device.EventName.Error, (e: any) => deviceErrors.push(`device2:${e && e.code}`));
     observer1 = observe(device1);

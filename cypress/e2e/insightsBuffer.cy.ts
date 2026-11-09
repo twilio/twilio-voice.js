@@ -6,13 +6,14 @@ import { expectEvent } from '../../tests/lib/util';
 
 // VBLOCKS-7468: Insights EndpointEvents are buffered in memory while the event
 // gateway host is unknown or a post fails with a retryable error (network
-// error, HTTP 5xx, HTTP 429), retried with the same-edge signaling backoff
-// (100 ms doubling, 40% jitter, max 1000 ms) and flushed in creation order.
-// Other HTTP 4xx responses drop the event.
+// error, HTTP 5xx, HTTP 429), retried with full-jitter exponential backoff
+// (random delay up to 1000 ms doubling per retry, capped at 30000 ms, at least
+// 100 ms) and flushed in creation order, 200 ms apart. Other HTTP 4xx
+// responses drop the event.
 //
-// This spec runs against a real backend and is skipped unless both of these
-// Cypress env values are set (for example via CYPRESS_DEVICE_CHUNDERW /
-// CYPRESS_DEVICE_EVENTGW):
+// This spec runs against the SDK default hosts (prod) unless these optional
+// Cypress env values override them (for example via CYPRESS_DEVICE_CHUNDERW /
+// CYPRESS_DEVICE_EVENTGW, to run against stage):
 //   DEVICE_CHUNDERW  signaling hostname, e.g. chunderw-vpc-gll.stage.twilio.com
 //   DEVICE_EVENTGW   insights hostname, e.g. eventgw.stage.twilio.com
 // The token's TwiML app must dial `<Client>` with either the `To` param (README
@@ -26,6 +27,11 @@ import { expectEvent } from '../../tests/lib/util';
 // call-through wrapper around the Device outbox `add` records every event at
 // creation. Request headers (the access token) are never recorded.
 //
+// To keep retry delays short and exact, Math.random returns RETRY_RANDOM when
+// it is called from the outbox's retry delay function (found by its name on
+// the call stack). Every other caller, such as the temp call sid generator,
+// gets the real Math.random.
+//
 // cy.intercept was tried first and is not used: in this harness its routes
 // intermittently did not match the SDK's eventgw posts (an active route saw
 // none of a test's requests, which then reached the real gateway), so faults
@@ -33,17 +39,19 @@ import { expectEvent } from '../../tests/lib/util';
 
 const chunderw: string | undefined = Cypress.env('DEVICE_CHUNDERW');
 const eventgw: string | undefined = Cypress.env('DEVICE_EVENTGW');
-const isConfigured = !!(chunderw && eventgw);
-const suiteTitle = isConfigured
-  ? 'Insights event buffer'
-  : 'Insights event buffer (skipped: set CYPRESS_DEVICE_CHUNDERW and CYPRESS_DEVICE_EVENTGW, e.g. to stage)';
+// Only the overrides that are set are passed, so the SDK defaults apply otherwise.
+const hostOptions = { ...(chunderw ? { chunderw } : {}), ...(eventgw ? { eventgw } : {}) };
 
-// Same-edge signaling backoff used for Insights retries.
-const BACKOFF_MIN_MS = 100;
-const BACKOFF_FACTOR = 2;
-const BACKOFF_JITTER = 0.4;
-const BACKOFF_MAX_MS = 1000;
-// Allowance for timer and event loop latency on top of the backoff delay.
+// Insights retry schedule: the k-th retry (0-based) waits
+// max(RETRY_MIN_MS, floor(random * min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ^ k))).
+const RETRY_BASE_MS = 1000;
+const RETRY_MAX_MS = 30000;
+const RETRY_MIN_MS = 100;
+// The random value the retry delay function gets here: delays 150, 300, 600,
+// 1200, 2400, then 4500 ms.
+const RETRY_RANDOM = 0.15;
+const RETRY_DELAY_FUNCTION = 'getInsightsRetryDelay';
+// Allowance for timer and event loop latency on top of the retry delay.
 const DELAY_SLACK_MS = 250;
 
 type Fault = 'none' | 'network' | number;
@@ -96,6 +104,19 @@ const originalFetch = window.fetch;
 let fault: Fault = 'none';
 // Latency of an injected failure, so it settles asynchronously like a real one.
 const FAULT_LATENCY_MS = 5;
+
+const originalRandom = Math.random;
+let pinnedRandomCalls = 0;
+
+function pinRetryRandom() {
+  Math.random = () => {
+    if ((new Error().stack || '').indexOf(RETRY_DELAY_FUNCTION) !== -1) {
+      pinnedRandomCalls++;
+      return RETRY_RANDOM;
+    }
+    return originalRandom.call(Math);
+  };
+}
 
 const explain = (list: Attempt[]) => list.map(a => `${keyOf(a)} outcome=${a.outcome} start=${a.start}`);
 
@@ -176,8 +197,8 @@ const isIdle = (tracker: Tracker, events: Created[] = tracker.created) =>
 
 /**
  * Retry attempts of the events created in a window: attempts whose body was
- * already attempted before. While the gateway keeps failing, each backoff
- * `ready` sends only the oldest buffered event.
+ * already attempted before. While the gateway keeps failing, each retry
+ * sends only the oldest buffered event.
  */
 const retriesFor = (events: Created[]): Attempt[] => {
   const seen = new Set<string>();
@@ -200,11 +221,10 @@ function retryDelays(events: Created[]): number[] {
   return retries.map((r, i) => r.start - (i === 0 ? firstFailure : retries[i - 1].end as number));
 }
 
-/** Accepted range of the k-th backoff delay (0-based), before slack. */
-function backoffRange(k: number): [number, number] {
-  const raw = BACKOFF_MIN_MS * Math.pow(BACKOFF_FACTOR, k);
-  return [Math.min(Math.floor(raw * (1 - BACKOFF_JITTER)), BACKOFF_MAX_MS),
-    Math.min(Math.ceil(raw * (1 + BACKOFF_JITTER)), BACKOFF_MAX_MS)];
+/** The k-th retry delay (0-based) with Math.random pinned to RETRY_RANDOM. */
+function retryDelay(k: number): number {
+  const ceiling = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * Math.pow(2, k));
+  return Math.max(RETRY_MIN_MS, Math.floor(RETRY_RANDOM * ceiling));
 }
 
 const keyOf = (e: { body: string }) => {
@@ -212,7 +232,7 @@ const keyOf = (e: { body: string }) => {
   return `${parsed.group}/${parsed.name}@${parsed.timestamp}`;
 };
 
-(isConfigured ? describe : describe.skip)(suiteTitle, { retries: 0 }, function() {
+describe('Insights event buffer', { retries: 0 }, function() {
   this.timeout(120000);
 
   let device1: Device;
@@ -268,14 +288,15 @@ const keyOf = (e: { body: string }) => {
 
   before(async () => {
     installFetchRecorder();
+    pinRetryRandom();
     const identity1 = 'insbuf1-' + Date.now();
     identity2 = 'insbuf2-' + Date.now();
     const [token1, token2] = await Promise.all([
       generateAccessToken(identity1, 900),
       generateAccessToken(identity2, 900),
     ]);
-    device1 = new Device(token1, { chunderw, eventgw });
-    device2 = new Device(token2, { chunderw, eventgw });
+    device1 = new Device(token1, hostOptions);
+    device2 = new Device(token2, hostOptions);
     [device1, device2].forEach(d => d.on(Device.EventName.Error, noop));
     tracker1 = track(device1);
     tracker2 = track(device2);
@@ -299,6 +320,7 @@ const keyOf = (e: { body: string }) => {
       }
     });
     (window as any).fetch = originalFetch;
+    Math.random = originalRandom;
   });
 
   it('should buffer events and retry them with backoff while eventgw is unreachable (network error)', () => {
@@ -321,18 +343,18 @@ const keyOf = (e: { body: string }) => {
       assert.deepStrictEqual(tracker1.outbox._entries.map((e: any) => JSON.stringify(e.event)),
         events.map(e => e.body), 'buffer is not in creation order');
 
-      // Each backoff ready resends only the oldest buffered event.
+      // Each retry resends only the oldest buffered event.
       const retries = retriesFor(events);
       assert.deepStrictEqual(Array.from(new Set(retries.map(keyOf))), [keyOf(events[0])],
         'retries did not target the oldest buffered event');
 
+      assert(pinnedRandomCalls > 0, `Math.random was never called from ${RETRY_DELAY_FUNCTION}; the retry delays are not pinned`);
       const delays = retryDelays(events);
       const outOfRange = delays.map((d, k) => {
-        const [lo, hi] = backoffRange(k);
-        return (d < lo - 5 || d > hi + DELAY_SLACK_MS) ? `retry ${k}: ${d} ms not in [${lo}, ${hi}]` : null;
+        const expected = retryDelay(k);
+        return (d < expected - 5 || d > expected + DELAY_SLACK_MS) ? `retry ${k}: ${d} ms, expected ${expected} ms` : null;
       }).filter(Boolean);
       assert.deepStrictEqual(outOfRange, [], `retry delays ${JSON.stringify(delays)}`);
-      assert(Math.max(...delays) <= BACKOFF_MAX_MS + DELAY_SLACK_MS, `a delay exceeded ~1s: ${delays}`);
       assert(delays[delays.length - 1] > 3 * delays[0], `delays did not grow: ${delays}`);
 
       report.networkError = { events: events.length, retries: retries.length, delays };
@@ -457,7 +479,7 @@ const keyOf = (e: { body: string }) => {
         const tried = attemptsFor(created);
         return created.length > 0 && tried.length >= created.length && tried.every(a => a.end !== undefined);
       }, 15000, 'every event attempted once');
-      // Longer than the first several backoff delays (100 + 200 + 400 + 800 ms).
+      // Longer than the first several retry delays (150 + 300 + 600 + 1200 ms).
       await sleep(2500);
       const events = tracker1.created.slice(start);
       const all = attemptsFor(events);
@@ -482,7 +504,7 @@ const keyOf = (e: { body: string }) => {
     cy.then({ timeout: 60000 }, async () => {
       const token3 = await generateAccessToken('insbuf3-' + Date.now(), 600);
       // No eventgw option: the publisher host comes from connected.payload.home.
-      device3 = new Device(token3, { chunderw });
+      device3 = new Device(token3, chunderw ? { chunderw } : {});
       device3.on(Device.EventName.Error, noop);
       const tracker3 = track(device3);
       const publisher = (device3 as any)._publisher;
@@ -528,7 +550,7 @@ const keyOf = (e: { body: string }) => {
     cy.then({ timeout: 60000 }, async () => {
       await waitIdle('before');
       const token4 = await generateAccessToken('insbuf4-' + Date.now(), 600);
-      device4 = new Device(token4, { chunderw, eventgw, publishEvents: false });
+      device4 = new Device(token4, { ...hostOptions, publishEvents: false });
       device4.on(Device.EventName.Error, noop);
       const tracker4 = track(device4);
       const publisher = (device4 as any)._publisher;
