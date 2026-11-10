@@ -45,6 +45,18 @@ describe('mutable options', function() {
     });
   });
 
+  it('should keep the previous options after rejecting an invalid edge', async function() {
+    this.timeout(10000);
+
+    const dev = device = new Device(token, { edge: 'sydney' });
+
+    await dev.register();
+    assert.throws(() => dev.updateOptions({ edge: 123 as any }), /must be of type `string`/);
+
+    dev.updateOptions({ appName: 'foo' });
+    assert.equal(dev['_options'].edge, 'sydney');
+  });
+
   it('should not throw during re-registration', async function() {
     this.timeout(10000);
 
@@ -125,11 +137,7 @@ describe('mutable options', function() {
       const logSpy = sinon.spy();
       caller['_log'].warn = logSpy;
 
-      try {
-        caller.updateOptions({ edge: 'ashburn' });
-      } catch (e) {
-        assert.equal(e.message, 'Cannot change Edge while on an active Call');
-      }
+      assert.throws(() => caller.updateOptions({ edge: 'ashburn' }), /Cannot change Edge while on an active Call/);
     });
 
     it('should allow updating options after all calls have ended', function() {
@@ -138,6 +146,24 @@ describe('mutable options', function() {
 
       callerCall.disconnect();
       caller.updateOptions({ edge: 'ashburn' });
+    });
+
+    it('should apply an edge rejected during a call when retried after the call ends', async function() {
+      assert.throws(() => caller.updateOptions({ edge: 'sydney' }), /Cannot change Edge/);
+
+      callerCall.disconnect();
+      const registeredPromise = new Promise(resolve => {
+        caller.once(Device.EventName.Registered, resolve);
+      });
+      caller.updateOptions({ edge: 'sydney' });
+
+      await Promise.race([
+        registeredPromise,
+        waitFor(15000).then(() => {
+          throw new Error(`Device did not re-register on sydney, edge is ${caller.edge}`);
+        }),
+      ]);
+      assert.equal(caller.edge, 'sydney');
     });
   });
 });

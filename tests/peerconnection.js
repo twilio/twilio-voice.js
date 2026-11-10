@@ -1,6 +1,7 @@
 const sinon = require('sinon');
 const assert = require('assert');
 const PeerConnection = require('./../lib/twilio/rtc/peerconnection').default;
+const Deferred = require('./../lib/twilio/deferred').default;
 
 const root = global;
 
@@ -18,17 +19,26 @@ describe('PeerConnection', () => {
 
   context('PeerConnection.prototype.openDefaultDeviceWithConstraints', () => {
     const METHOD = PeerConnection.prototype.openDefaultDeviceWithConstraints;
-    const USER_MEDIA_RESULT = 'foobar';
+    const USER_MEDIA_RESULT = { processed: null, processor: null, raw: 'foobar' };
     const INPUT_TRACKS_FROM_STREAM = '_setInputTracksFromStream';
-    const EXPECTED_ERROR = new Error(USER_MEDIA_RESULT);
+    const EXPECTED_ERROR = new Error('foobar');
 
     let context = null;
     let toTest = null;
 
     beforeEach(() => {
       context = {
+        status: 'connecting',
+        stream: 'app stream',
+        _log: { info: sinon.stub() },
+        _shouldManageStream: true,
         _setInputTracksFromStream: sinon.stub().returns(Promise.resolve(INPUT_TRACKS_FROM_STREAM)),
-        _audioHelper: { _openDefaultDeviceWithConstraints: sinon.stub().returns(Promise.resolve(USER_MEDIA_RESULT)) }
+        _audioHelper: {
+          _adoptDefaultInputDeviceStream: sinon.stub(),
+          _localProcessor: null,
+          _openDefaultDeviceWithConstraints: sinon.stub().returns(Promise.resolve(USER_MEDIA_RESULT)),
+          _stopDefaultInputDeviceStream: sinon.stub(),
+        },
       };
       toTest = METHOD.bind(context);
     });
@@ -36,11 +46,87 @@ describe('PeerConnection', () => {
     it('Should resolve when _setInputTracksFromStream resolves', done => {
       toTest({not: 'is random'}).then(stream => {
         assert(context._setInputTracksFromStream.calledOn(context));
-        assert(context._setInputTracksFromStream.calledWithExactly(false, USER_MEDIA_RESULT));
+        assert(context._setInputTracksFromStream.calledWithExactly(false, USER_MEDIA_RESULT.raw));
         assert(context._audioHelper._openDefaultDeviceWithConstraints.calledWithExactly({not: 'is random'}));
         assert(context._audioHelper._openDefaultDeviceWithConstraints.calledBefore(context._setInputTracksFromStream));
         assert.deepStrictEqual(INPUT_TRACKS_FROM_STREAM, stream);
+        assert.strictEqual(context._openedInput, USER_MEDIA_RESULT);
+        sinon.assert.calledOnceWithExactly(context._audioHelper._adoptDefaultInputDeviceStream, USER_MEDIA_RESULT);
       }).then(done).catch(done);
+    });
+
+    it('Should adopt and own the stream only after _setInputTracksFromStream released the previous one', () => {
+      context._openedInput = 'previous input';
+      let ownedDuringSwap;
+      context._setInputTracksFromStream = sinon.spy(() => {
+        ownedDuringSwap = context._openedInput;
+        sinon.assert.notCalled(context._audioHelper._adoptDefaultInputDeviceStream);
+        // As _stopStream does.
+        context._openedInput = null;
+        return Promise.resolve(INPUT_TRACKS_FROM_STREAM);
+      });
+      return toTest().then(() => {
+        assert.strictEqual(ownedDuringSwap, 'previous input');
+        assert.strictEqual(context._openedInput, USER_MEDIA_RESULT);
+      });
+    });
+
+    [
+      ['the call is closed', ctx => { ctx.status = 'closed'; }],
+      ['the app owns the stream', ctx => { ctx._shouldManageStream = false; }],
+    ].forEach(([when, setup]) => {
+      it(`Should release a late result without installing it when ${when}`, () => {
+        setup(context);
+        return toTest().then(result => {
+          sinon.assert.calledOnceWithExactly(context._audioHelper._stopDefaultInputDeviceStream, USER_MEDIA_RESULT);
+          sinon.assert.notCalled(context._audioHelper._adoptDefaultInputDeviceStream);
+          sinon.assert.notCalled(context._setInputTracksFromStream);
+          assert.strictEqual(context._openedInput, undefined);
+          assert.strictEqual(result, 'app stream');
+        });
+      });
+    });
+
+    it('Should send the processed stream when there is one', async () => {
+      const input = { processed: 'processed', processor: 'processor', raw: 'raw' };
+      context._audioHelper._localProcessor = 'processor';
+      context._audioHelper._openDefaultDeviceWithConstraints.returns(Promise.resolve(input));
+      await toTest();
+      sinon.assert.calledOnceWithExactly(context._setInputTracksFromStream, false, 'processed');
+    });
+
+    it('Should open again when the local processor changed while opening', async () => {
+      context._audioHelper._localProcessor = 'other processor';
+      context.openDefaultDeviceWithConstraints = sinon.stub().returns(Promise.resolve('reopened'));
+      const result = await toTest('constraints');
+      assert.strictEqual(result, 'reopened');
+      sinon.assert.calledOnceWithExactly(context.openDefaultDeviceWithConstraints, 'constraints');
+      sinon.assert.calledOnceWithExactly(context._audioHelper._stopDefaultInputDeviceStream, USER_MEDIA_RESULT);
+      sinon.assert.notCalled(context._setInputTracksFromStream);
+    });
+
+    it('Should keep the current input when the swap rejects the new stream', async () => {
+      context._openedInput = 'current input';
+      context._setInputTracksFromStream.returns(Promise.reject(EXPECTED_ERROR));
+      await assert.rejects(toTest(), EXPECTED_ERROR);
+      sinon.assert.calledOnceWithExactly(context._audioHelper._stopDefaultInputDeviceStream, USER_MEDIA_RESULT);
+      sinon.assert.notCalled(context._audioHelper._adoptDefaultInputDeviceStream);
+      assert.strictEqual(context._openedInput, 'current input');
+    });
+
+    it('Should keep the switched stream when the default request fails after setInputDevice', async () => {
+      context._shouldManageStream = false;
+      context._log.warn = sinon.stub();
+      context._audioHelper._openDefaultDeviceWithConstraints.returns(Promise.reject(EXPECTED_ERROR));
+      assert.strictEqual(await toTest('constraints'), 'app stream');
+      sinon.assert.notCalled(context._setInputTracksFromStream);
+    });
+
+    it('Should reject when openDefaultDeviceWithConstraints rejects for a closed call', async () => {
+      context.status = 'closed';
+      context._shouldManageStream = false;
+      context._audioHelper._openDefaultDeviceWithConstraints.returns(Promise.reject(EXPECTED_ERROR));
+      await assert.rejects(toTest('constraints'), EXPECTED_ERROR);
     });
 
     it('Should reject when openDefaultDeviceWithConstraints rejects', done => {
@@ -57,7 +143,7 @@ describe('PeerConnection', () => {
       toTest(undefined).catch(aError => {
         assert.equal(aError.message, EXPECTED_ERROR.message);
         assert(context._setInputTracksFromStream.calledOn(context));
-        assert(context._setInputTracksFromStream.calledWithExactly(false, USER_MEDIA_RESULT));
+        assert(context._setInputTracksFromStream.calledWithExactly(false, USER_MEDIA_RESULT.raw));
         assert(context._audioHelper._openDefaultDeviceWithConstraints.calledWithExactly(undefined));
       }).then(done).catch(done);
     });
@@ -72,6 +158,7 @@ describe('PeerConnection', () => {
 
     beforeEach(() => {
       context = {
+        _inputSwap: 0,
         _setInputTracksFromStream: sinon.stub().returns(Promise.resolve(INPUT_TRACK_FROM_STATE)),
         _shouldManageStream: 'before'
       };
@@ -84,6 +171,27 @@ describe('PeerConnection', () => {
         assert(context._setInputTracksFromStream.calledWithExactly(true, {arg: 'val'}));
         assert.strictEqual(context._shouldManageStream, false);
       }).then(done).catch(done);
+    });
+
+    it('Should stop managing the stream before the swap settles', () => {
+      let managedDuringSwap;
+      context._setInputTracksFromStream = sinon.spy(() => {
+        managedDuringSwap = context._shouldManageStream;
+        return Promise.resolve();
+      });
+      return toTest({arg: 'val'}).then(() => {
+        assert.strictEqual(managedDuringSwap, false);
+      });
+    });
+
+    it('Should not restore _shouldManageStream when a later swap started before this one rejected', async () => {
+      let rejectFirst;
+      context._setInputTracksFromStream.onFirstCall().returns(new Promise((_, reject) => { rejectFirst = reject; }));
+      const first = toTest({arg: 'first'});
+      await toTest({arg: 'second'});
+      rejectFirst(new Error('first swap failed'));
+      await assert.rejects(first, /first swap failed/);
+      assert.strictEqual(context._shouldManageStream, false);
     });
 
     it('setInputTracksFromStream rejects', done => {
@@ -109,7 +217,9 @@ describe('PeerConnection', () => {
       context = {
         stream: STREAM,
         mute: sinon.stub(),
-        _sender: {}
+        _closed: new Deferred(),
+        _sender: {},
+        _stopStream: sinon.stub(),
       };
       toTest = METHOD.bind(context);
     });
@@ -143,6 +253,69 @@ describe('PeerConnection', () => {
         assert.strictEqual(result.id, newStream.id);
       }).then(done).catch(done);
     });
+
+    it('Should not swap the stream when the call closed while replaceTrack resolved', () => {
+      context._updateInputStreamSource = sinon.stub();
+      context._sender.replaceTrack = sinon.spy(() => {
+        context.status = 'closed';
+        context.stream = null;
+        return Promise.resolve();
+      });
+      return toTest(false, newStream).then(result => {
+        assert.strictEqual(result, null);
+        assert.strictEqual(context.stream, null);
+        sinon.assert.notCalled(context._updateInputStreamSource);
+      });
+    });
+
+    it('Should resolve without swapping the stream when the call closed while replaceTrack never settles', () => {
+      context._updateInputStreamSource = sinon.stub();
+      context._sender.replaceTrack = sinon.spy(() => {
+        context.status = 'closed';
+        context.stream = null;
+        context._closed.resolve();
+        return new Promise(() => {});
+      });
+      return toTest(false, newStream).then(result => {
+        assert.strictEqual(result, null);
+        assert.strictEqual(context.stream, null);
+        sinon.assert.notCalled(context._updateInputStreamSource);
+      });
+    });
+
+    describe('when replaceTrack rejects', () => {
+      const ERROR = new Error('The peer connection is closed.');
+
+      beforeEach(() => {
+        context._log = { info: sinon.stub() };
+        context._updateInputStreamSource = sinon.stub();
+        context._sender.replaceTrack = sinon.stub().rejects(ERROR);
+      });
+
+      it('Should resolve without swapping the stream when the call closed meanwhile', () => {
+        context._sender.replaceTrack = sinon.spy(() => {
+          context.status = 'closed';
+          context.stream = null;
+          return Promise.reject(ERROR);
+        });
+        return toTest(false, newStream).then(result => {
+          assert.strictEqual(result, null);
+          assert.strictEqual(context.stream, null);
+          sinon.assert.notCalled(context._updateInputStreamSource);
+        });
+      });
+
+      it('Should reject when the call is still open', () => {
+        context.status = 'open';
+        return toTest(false, newStream).then(() => {
+          throw new Error('Expected a rejection');
+        }, error => {
+          assert.strictEqual(error, ERROR);
+          assert.strictEqual(context.stream, STREAM);
+          sinon.assert.notCalled(context._updateInputStreamSource);
+        });
+      });
+    });
     
     it('Should call this.options.MediaStream if provided, and stream provided', done => {
       const mediaStream = sinon.stub().returns({
@@ -151,7 +324,9 @@ describe('PeerConnection', () => {
       context = {
         stream: STREAM,
         mute: sinon.stub(),
+        _closed: new Deferred(),
         _sender: {},
+        _stopStream: sinon.stub(),
         options: {
           MediaStream: mediaStream,
         },
@@ -186,6 +361,27 @@ describe('PeerConnection', () => {
       toTest(true, newStream).then(() => {
         assert(mediaStream.calledOnce);
       }).then(done).catch(done);
+    });
+
+    describe('when there is no RTCPeerConnection yet', () => {
+      beforeEach(() => {
+        context = {
+          stream: STREAM,
+          mute: sinon.stub(),
+          version: null,
+          _stopStream: sinon.stub(),
+          options: { MediaStream: sinon.stub().returns({ addTrack: sinon.stub(), id: 3 }) },
+        };
+        toTest = METHOD.bind(context);
+      });
+
+      it('Should swap a managed default stream for the app stream', () => {
+        return toTest(true, newStream).then(result => {
+          sinon.assert.calledOnce(context._stopStream);
+          assert.strictEqual(result.id, 3);
+          assert.strictEqual(context.stream.id, 3);
+        });
+      });
     });
   });
 
@@ -238,9 +434,69 @@ describe('PeerConnection', () => {
         mute: sinon.stub(),
         version: {
           pc
-        }
+        },
+        _closed: { resolve: sinon.stub() },
       };
       toTest = METHOD.bind(context);
+    });
+
+    describe('dtls transport closed state', () => {
+      let transport;
+
+      beforeEach(() => {
+        transport = { state: 'connected' };
+        context.getRTCDtlsTransport = sinon.stub().returns(transport);
+        context._log = log;
+        context._reportDtlsTransportState = PeerConnection.prototype._reportDtlsTransportState;
+        context.ondtlstransportstatechange = sinon.stub();
+        PeerConnection.prototype._setupRTCDtlsTransportListener.call(context);
+        context.ondtlstransportstatechange.resetHistory();
+      });
+
+      it('Should report closed when the browser fires no statechange on close', () => {
+        toTest();
+        sinon.assert.calledOnce(context.ondtlstransportstatechange);
+        sinon.assert.calledWithExactly(context.ondtlstransportstatechange, 'closed');
+      });
+
+      it('Should report closed once when the browser fires statechange on close', () => {
+        pc.close = sinon.spy(() => {
+          transport.state = 'closed';
+          transport.onstatechange();
+        });
+        toTest();
+        sinon.assert.calledOnce(context.ondtlstransportstatechange);
+        sinon.assert.calledWithExactly(context.ondtlstransportstatechange, 'closed');
+      });
+
+      it('Should report closed once when the browser fires statechange after close', () => {
+        pc.close = sinon.spy(() => { transport.state = 'closed'; });
+        toTest();
+        transport.onstatechange();
+        sinon.assert.calledOnce(context.ondtlstransportstatechange);
+      });
+
+      it('Should not call a statechange handler the SDK did not install', () => {
+        const foreignHandler = sinon.stub();
+        transport.onstatechange = foreignHandler;
+        toTest();
+        sinon.assert.notCalled(foreignHandler);
+      });
+
+      it('Should report closed when the RTCPeerConnection was already closed', () => {
+        pc.signalingState = 'closed';
+        toTest();
+        sinon.assert.notCalled(pc.close);
+        sinon.assert.calledOnce(context.ondtlstransportstatechange);
+        sinon.assert.calledWithExactly(context.ondtlstransportstatechange, 'closed');
+      });
+
+      it('Should not report closed when no dtls state was reported', () => {
+        context._dtlsTransportState = null;
+        toTest();
+        sinon.assert.notCalled(context.ondtlstransportstatechange);
+        assert.strictEqual(context.status, 'closed');
+      });
     });
 
     it('Should stop everything, removeListeners, disconnect analysers, close sockets, etc..', () => {
@@ -264,6 +520,15 @@ describe('PeerConnection', () => {
       assert.strictEqual(context.stream, null);
       assert.strictEqual(context.version.pc, null);
       assert.strictEqual(context.status, 'closed');
+      sinon.assert.calledOnce(context._closed.resolve);
+    });
+
+    it('Should do nothing on a repeat close', () => {
+      toTest();
+      toTest();
+      assert(context._stopStream.calledOnce);
+      assert(context._audioHelper._destroyRemoteProcessedStream.calledOnce);
+      assert(context.onclose.calledOnce);
     });
 
     it('Should stop everything what is available with minimum context', () => {
@@ -279,6 +544,13 @@ describe('PeerConnection', () => {
       assert.strictEqual(context.stream, null);
       assert.strictEqual(context.version, false);
       assert.strictEqual(context.status, 'closed');
+    });
+
+    it('Should release the opened input when there is no stream', () => {
+      context.stream = null;
+      context._openedInput = 'opened input';
+      toTest();
+      assert(context._stopStream.calledOnce);
     });
 
     it('Should stop everything what is available with _outputAnalyser', () => {
@@ -411,7 +683,7 @@ describe('PeerConnection', () => {
 
   context('PeerConnection.prototype.answerIncomingCall', () => {
     const METHOD = PeerConnection.prototype.answerIncomingCall;
-    const EXPECTED_ERROR = {info: {code: 31000, message: 'Error creating the answer: error message'}};
+    const EXPECTED_ERROR = {disconnect: true, info: {code: 31000, message: 'Error creating the answer: error message'}};
     const eCallSid = 'callSid';
     const eSDP = 'sdp';
     const eIceServers = 'iceServers';
@@ -430,6 +702,7 @@ describe('PeerConnection', () => {
       };
       context = {
         _initializeMediaStream: sinon.stub(),
+        _log: { info: sinon.stub() },
         _maybeSetIceAggressiveNomination: (sdp) => sdp,
         _setEncodingParameters: sinon.stub(),
         _setupRTCDtlsTransportListener: sinon.stub(),
@@ -500,10 +773,21 @@ describe('PeerConnection', () => {
       assert.equal(context.onerror.called, false);
     });
 
+    it('Should not call onerror when processSDP fails after the call is closed', () => {
+      context._initializeMediaStream.returns(true);
+      version.processSDP.callsArgWith(5, new Error('error message'));
+      toTest();
+      sinon.assert.notCalled(context.onerror);
+    });
+
     it('Should call onerror event when processSDP error callback is called and returns error object', () => {
       const error = new Error('error message');
-      const expectedError = {info: {code: 31000, message: 'Error creating the answer: error message'}};
+      const expectedError = {
+        disconnect: true,
+        info: {code: 31000, message: 'Error creating the answer: error message'},
+      };
       context._initializeMediaStream.returns(true);
+      context.status = 'connecting';
       version.processSDP.callsArgWith(5, error);
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
@@ -522,6 +806,7 @@ describe('PeerConnection', () => {
 
     it('Should call onerror event when processSDP error callback is called and returns error message', () => {
       context._initializeMediaStream.returns(true);
+      context.status = 'connecting';
       version.processSDP.callsArgWith(5, 'error message');
       toTest();
       assert(context._initializeMediaStream.calledWithExactly(eIceServers));
@@ -554,6 +839,7 @@ describe('PeerConnection', () => {
 
     it('Should call onerror for each error callback processSDP calls', () => {
       context._initializeMediaStream.returns(true);
+      context.status = 'connecting';
       version.getSDP.returns('sdp');
       toTest();
       version.processSDP.callArg(5, new Error('error message'));
@@ -568,6 +854,28 @@ describe('PeerConnection', () => {
       sinon.assert.notCalled(context._setupRTCDtlsTransportListener);
     });
 
+  });
+
+  context('PeerConnection.prototype._initializeMediaStream', () => {
+    const METHOD = PeerConnection.prototype._initializeMediaStream;
+
+    it('Should disconnect with an error when the RTCPeerConnection cannot be created', () => {
+      const error = new Error('invalid rtcConfiguration');
+      const context = {
+        onerror: sinon.stub(),
+        pstream: { status: 'connected' },
+        status: 'connecting',
+        _setupChannel: sinon.stub(),
+        _setupPeerConnection: sinon.stub().throws(error),
+      };
+      assert.strictEqual(METHOD.call(context, 'rtcConfiguration'), false);
+      sinon.assert.calledOnce(context.onerror);
+      const { disconnect, info } = context.onerror.args[0][0];
+      assert.strictEqual(disconnect, true);
+      assert.strictEqual(info.twilioError.code, 31000);
+      assert.strictEqual(info.twilioError.originalError, error);
+      sinon.assert.notCalled(context._setupChannel);
+    });
   });
 
   context('PeerConnection.prototype._removeReconnectionListeners', () => {
@@ -1123,6 +1431,7 @@ describe('PeerConnection', () => {
         context = {
           getRTCDtlsTransport: sinon.stub().returns(transport),
           _log: log,
+          _reportDtlsTransportState: PeerConnection.prototype._reportDtlsTransportState,
           ondtlstransportstatechange: sinon.stub(),
         };
         toTest = METHOD.bind(context);
@@ -1152,6 +1461,7 @@ describe('PeerConnection', () => {
         context = {
           getRTCDtlsTransport: sinon.stub().returns(transport),
           _log: log,
+          _reportDtlsTransportState: PeerConnection.prototype._reportDtlsTransportState,
           ondtlstransportstatechange: sinon.stub(),
         };
         METHOD.call(context);
@@ -1160,7 +1470,7 @@ describe('PeerConnection', () => {
         sinon.assert.calledOnce(context.ondtlstransportstatechange);
       });
 
-      ['new', 'connecting', 'connected', 'closed', 'failed'].forEach(state => {
+      ['connecting', 'connected', 'closed', 'failed'].forEach(state => {
         it(`should call ondtlstransportstatechange when dtls transport state is ${state}`, () => {
           context.ondtlstransportstatechange = sinon.stub();
           transport.state = state;
@@ -1170,6 +1480,20 @@ describe('PeerConnection', () => {
           sinon.assert.calledOnce(context.ondtlstransportstatechange);
         });
       });
+    });
+
+    it('should not call ondtlstransportstatechange again for an already reported state', () => {
+      const transport = { state: 'connected' };
+      const context = {
+        getRTCDtlsTransport: sinon.stub().returns(transport),
+        _log: log,
+        _reportDtlsTransportState: PeerConnection.prototype._reportDtlsTransportState,
+        ondtlstransportstatechange: sinon.stub(),
+      };
+      METHOD.call(context);
+      transport.onstatechange();
+      sinon.assert.calledOnce(context.ondtlstransportstatechange);
+      sinon.assert.calledWithExactly(context.ondtlstransportstatechange, 'connected');
     });
   });
 
@@ -2170,14 +2494,15 @@ describe('PeerConnection', () => {
       toTest = METHOD.bind(context);
     });
 
-    it('should stop default stream', () => {
-      context._shouldManageStream = true;
+    it('should stop the default stream it opened', () => {
+      context._openedInput = 'opened input';
       toTest();
-      sinon.assert.calledOnce(stub);
+      sinon.assert.calledOnceWithExactly(stub, 'opened input');
+      assert.strictEqual(context._openedInput, null);
     });
 
-    it('should do nothing if _shouldManageStream is false', () => {
-      context._shouldManageStream = false;
+    it('should not stop a stream it did not open', () => {
+      context.stream = 'cloned app stream';
       toTest();
       sinon.assert.notCalled(stub);
     });
@@ -2226,6 +2551,7 @@ describe('PeerConnection', () => {
       versionCreate = sinon.stub();
       versionPc = {
         addStream: sinon.stub(),
+        close: sinon.stub(),
         getSenders: () => [sender],
         getTransceivers: () => [transceiver],
       };
@@ -2269,6 +2595,7 @@ describe('PeerConnection', () => {
       assert(versionCreate.calledWithExactly(ICE_SERVERS));
       assert.equal(versionPc.addStream.called, false);
       assert.equal(typeof versionPc.onaddstream, 'undefined');
+      sinon.assert.notCalled(versionPc.close);
     });
 
     it('Should not create onaddstream callback function when pc addstream throws error', () => {
@@ -2277,6 +2604,7 @@ describe('PeerConnection', () => {
       assert(versionCreate.calledWithExactly(ICE_SERVERS));
       assert(versionPc.addStream.calledWithExactly(STREAM));
       assert.equal(typeof versionPc.onaddstream, 'undefined');
+      sinon.assert.calledOnce(versionPc.close);
     });
 
     it('Should call _onAddTrack when sink is supported', () => {

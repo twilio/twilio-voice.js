@@ -1,15 +1,49 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
-2.18.6 (In Progress)
+2.19.0 (In Progress)
 ====================
+
+Improvements
+------------
+
+- Insights events published by the SDK now include `signaling_connection_id` when provided by the signaling server in its `connected` message, improving telemetry and event correlation.
+
+- Insights events are now buffered in memory when the gateway is unknown or temporarily unreachable, and retried once connectivity is restored. The buffer holds up to 200 events, dropping the oldest events when full, and an event is not sent if it is older than 5 minutes when it would be sent. Events are delivered oldest first. Network errors, HTTP 5xx, and HTTP 429 responses are retried with exponential backoff and full jitter, with the maximum delay between attempts growing from 1 to 30 seconds, and the `Retry-After` header of an HTTP 429 or 503 response is honored when the gateway exposes it. After the gateway recovers, buffered events are sent at most one every 200 ms. Buffered events are preserved across `device.updateOptions()` calls but are lost when the page closes. When `device.destroy()` is called, each buffered event is sent one final time, without retries, and dropped if that send fails or the gateway is still unknown. Delivery is at least once, so duplicate events are possible. Buffered events are sent with the access token current at send time; when `device.updateToken()` is called with a token for a different account or identity, or with a token that cannot be decoded, buffered events are dropped, while a token refresh for the same identity keeps them.
+
+  Additionally, Insights gateway HTTP errors are now properly reported, allowing `PreflightTest` to emit the `insights-connection-error` warning.
+
+- Errors that happen outside a call are now sent to Insights. Error-level Insights events were previously dropped when they had no call, so errors raised while no call was active never reached Insights. This covers the errors the `Device` emits from the signaling connection, such as token errors, connection errors and error messages from the signaling server, and the `31400` error for a malformed incoming call invite. Signaling errors that carry the CallSid of a pending incoming call are sent with that call. Events below error level still require a call. Nothing is sent when `publishEvents` is `false`.
+
+  Transport errors (`31000`, `31005` and `31009`) repeat on every reconnect attempt while the signaling connection is down, so only the first one is sent each time the connection is lost. That event carries the `signaling_connection_id` of the connection that was lost, including when the error comes from a reconnect attempt after the connection closed. The `Device` still emits `error` for every one.
+
+  Note: errors raised before the first signaling `connected` message are sent only if the Insights gateway host is known. Without the `eventgw` option, they are buffered and sent only if the `Device` connects within 5 minutes; otherwise they are dropped. An error caused by an invalid token is sent with that token, so the gateway can reject it.
 
 Bug Fixes
 ---------
 
 - Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/464) where overlapping audio output updates could throw when a previous update had already removed the master output during reassignment.
+
+- Fixed an issue where an exception thrown by an application's `PreflightTest` `warning` listener while handling the `insights-connection-error` warning caused the warning to be emitted again, twice for one failed Insights request. The warning is now emitted at most once per test. The exception is still raised as an unhandled promise rejection, as before, and is now also written to the SDK log at error level.
+
 - Fixed an issue where losing the signaling transport before a call received a signaling-reconnect token left its media open and the Device busy with a closed call. The SDK now closes the media and emits `disconnect`, releasing the active-call slot so a later `device.connect()` is not rejected with `InvalidStateError`. Calls with a reconnect token retain their existing recovery behavior. Thanks @ip4422 for your [contribution](https://github.com/twilio/twilio-voice.js/pull/482).
 
-- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/376) where setting the `maxAverageBitrate` option produced a malformed Opus `a=fmtp` line in the SDP, with `;maxaveragebitrate` added after the line's carriage return. Chrome re-serializes the SDP and hid the problem, but WebRTC redirection layers that pass the SDP through as-is, such as Citrix HDX, sent it unchanged and calls failed with error `31000`. The parameter is now added before the line ending.
+- Fixed an issue where a `Device` could end up with two open calls. An incoming call only counted as the `Device`'s active call once its media was connected, which can take several seconds while waiting on `getUserMedia`. Accepting a second incoming call in that window did not disconnect the first, and with `allowIncomingWhileBusy: false` a new incoming call was still surfaced. An accepted incoming call now becomes the active call as soon as `accept()` is called, as outgoing calls already did. While it connects, the `Device` now treats it as active: `device.isBusy` is `true`, `device.connect()` rejects with `InvalidStateError`, `device.audio.unsetInputDevice()` rejects with `InvalidStateError` when an input device is set, an `edge`-changing `device.updateOptions()` throws `InvalidStateError`, `device.audio.setInputDevice()` switches the connecting call's microphone, another incoming call is surfaced without a ringtone (or ignored when `allowIncomingWhileBusy` is `false`), and `closeProtection` prompts before the page unloads. Accepting an incoming call while `device.connect()` is still creating its call also no longer leaves both calls open, for example when `device.connect()` is called from the `disconnect` handler of the call being replaced; the outgoing call replaces the accepted one. While `accept()` replaces a call, that call's `disconnect` handlers still see the `Device` idle: a call they accept or connect replaces the accepting one, and `device.disconnectAll()` there ends it.
+
+- Fixed an issue where a `Call` emitted `disconnect` twice when it was disconnected while its microphone was still being acquired, for example by calling `call.disconnect()` right after `call.accept()` or `device.connect()`. The second event fired once `getUserMedia` resolved. `disconnect` is now emitted once, and the `Call` no longer emits an `error` if `getUserMedia` then fails.
+
+- Fixed an issue where an incoming call whose offer the browser rejected never emitted an `error` and stayed connecting after `accept()`. It now disconnects and emits error `53402` (`ClientRemoteDescFailed`). An incoming call also now disconnects when creating its answer fails, where it previously emitted the same error but stayed connecting. An incoming call that is disconnected while its answer is being created no longer emits this error afterwards.
+
+- Fixed an issue where a `Call` whose `RTCPeerConnection` could not be created or set up, for example because `rtcConfiguration` lists a TURN server without credentials, stayed connecting without emitting anything. It now disconnects and emits error `31000`.
+
+- Fixed issues where the SDK left a microphone track running or stopped the wrong one. A call that ended while its microphone was still being acquired could leave that microphone on, and with a local `AudioProcessor` a call could leave its raw microphone track running. When the default microphone was lost during a call, the SDK reacquired it and then stopped the new track, leaving the call silent. A call that ended while its microphone was being acquired also no longer destroys the next call's remote processed stream once `getUserMedia` resolves, and a local `AudioProcessor` removed while it was creating a call's processed stream no longer keeps processing that call's audio.
+
+- Fixed an issue where error `31402` (`AcquisitionFailedError`) did not include the underlying error. It is now set as `originalError`, for example the error from a local `AudioProcessor` that failed to create its processed stream.
+
+- Fixed an issue where `device.updateOptions()` threw `Cannot change Edge while on an active Call` but still stored the new options. Retrying the same edge after the call ended found no change and kept the signaling stream on the previous edge, and a signaling connection opened later, for example after the previous one closed, could use the rejected edge. A rejected `updateOptions()` call now leaves the `Device` options unchanged. This also applies when `updateOptions()` throws for an invalid `edge`, which previously made later `updateOptions()` calls throw until a valid `edge` was passed. Thanks @RaphaelFakhri for your [contribution](https://github.com/twilio/twilio-voice.js/pull/481).
+
+- Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/459) where a call that ended while its microphone was being switched, by `device.audio.setInputDevice()` or by the SDK's own recovery after the active microphone was lost, produced `InvalidStateError: Failed to execute 'replaceTrack' on 'RTCRtpSender': The peer connection is closed.` The SDK's recovery surfaced it as an unhandled promise rejection. `setInputDevice()` rejected with it and left the new microphone open without selecting it. On Firefox, `setInputDevice()` could instead never settle, and every later `device.connect()` waited on it indefinitely. The switch now completes for future calls instead.
+
+- Fixed an issue where Voice Insights did not receive the `dtls-transport-state` `closed` event when a call ended on Chrome 154 and later or on Firefox. These browsers do not fire the DTLS transport's `statechange` event when the SDK closes the `RTCPeerConnection`, so the SDK now reports the `closed` state itself.
 
 2.18.5 (September 10, 2026)
 ===========================

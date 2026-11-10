@@ -96,7 +96,7 @@ class DockerProxyServer {
     }));
     return fetchRequest({
       socketPath: '/var/run/docker.sock',
-      path: `/v1.32/networks/prune?filters=${filters}`,
+      path: `/v1.44/networks/prune?filters=${filters}`,
       method: 'POST',
     });
   }
@@ -160,7 +160,7 @@ class DockerProxyServer {
   _getContainers() {
     return fetchRequest({
       socketPath: '/var/run/docker.sock',
-      path: '/v1.32/containers/json',
+      path: '/v1.44/containers/json',
       method: 'GET',
     });
   }
@@ -169,7 +169,7 @@ class DockerProxyServer {
     const { containerId } = await this._getCurrentContainerId();
     return fetchRequest({
       socketPath: '/var/run/docker.sock',
-      path: `/v1.32/containers/${containerId}/json`,
+      path: `/v1.44/containers/${containerId}/json`,
       method: 'GET',
     });
   }
@@ -182,7 +182,7 @@ class DockerProxyServer {
   _getAllNetworks() {
     return fetchRequest({
       socketPath: '/var/run/docker.sock',
-      path: '/v1.32/networks',
+      path: '/v1.44/networks',
       method: 'GET',
     });
   }
@@ -234,7 +234,7 @@ class DockerProxyServer {
     });
     return fetchRequest({
       socketPath: '/var/run/docker.sock',
-      path: '/v1.32/networks/create',
+      path: '/v1.44/networks/create',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -258,7 +258,7 @@ class DockerProxyServer {
 
     return fetchRequest({
       socketPath: '/var/run/docker.sock',
-      path: `/v1.32/networks/${networkId}/connect`,
+      path: `/v1.44/networks/${networkId}/connect`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -274,7 +274,7 @@ class DockerProxyServer {
     });
     return fetchRequest({
       socketPath: '/var/run/docker.sock',
-      path: `/v1.32/networks/${networkId}/disconnect`,
+      path: `/v1.44/networks/${networkId}/disconnect`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

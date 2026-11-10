@@ -16,9 +16,10 @@ import {
   TwilioError,
 } from './errors';
 import Publisher from './eventpublisher';
+import InsightsOutbox from './insightsoutbox';
 import Log from './log';
 import { PreflightTest } from './preflight/preflight';
-import PStream from './pstream';
+import PStream, { isTransportErrorPayload } from './pstream';
 import {
   createEventGatewayURI,
   createSignalingEndpointURL,
@@ -33,6 +34,7 @@ import getUserMedia from './rtc/getusermedia';
 import { generateVoiceEventSid } from './sid';
 import Sound from './sound';
 import {
+  getTokenPrincipal,
   isLegacyEdge,
   promisifyEvents,
   queryToJson,
@@ -273,9 +275,29 @@ class Device extends EventEmitter {
   }
 
   /**
+   * Whether two tokens are for the same account SID and identity. A token that
+   * cannot be decoded counts as a different principal.
+   * @param a
+   * @param b
+   */
+  private static _isSameTokenPrincipal(a: string, b: string): boolean {
+    const first = getTokenPrincipal(a);
+    const second = getTokenPrincipal(b);
+    return !!first && !!second
+      && first.accountSid === second.accountSid
+      && first.identity === second.identity;
+  }
+
+  /**
    * The currently active {@link Call}, if there is one.
    */
   private _activeCall: Call | null = null;
+
+  /**
+   * The outgoing {@link Call} that connect() is accepting. When an accepted incoming call holds the slot,
+   * it is neither the active call nor in _calls until beforeAccept claims it, so disconnectAll() reaches it here.
+   */
+  private _acceptingCall: Call | null = null;
 
   /**
    * The AudioHelper instance associated with this {@link Device}.
@@ -358,6 +380,14 @@ class Device extends EventEmitter {
   private _identity: string | null = null;
 
   /**
+   * The Insights event buffer and retry loop. Created once and shared by every
+   * publisher this Device creates, so buffered events survive
+   * {@link Device.updateOptions} replacing the publisher, and Calls holding a
+   * replaced publisher post into the same buffer.
+   */
+  private _insightsOutbox: InsightsOutbox | null = null;
+
+  /**
    * Whether SDK is run as a browser extension
    */
   private _isBrowserExtension: boolean;
@@ -430,6 +460,14 @@ class Device extends EventEmitter {
     [Device.State.Registering]: Device.EventName.Registering,
     [Device.State.Registered]: Device.EventName.Registered,
   };
+
+  /**
+   * Whether a transport error has been published to Insights since the
+   * signaling connection was last established. Transport errors repeat on
+   * every reconnect attempt, so only the first one per lost connection is
+   * published. Device `error` is still emitted for each one.
+   */
+  private _isTransportErrorPublished: boolean = false;
 
   /**
    * The Signaling stream.
@@ -588,9 +626,14 @@ class Device extends EventEmitter {
     let activeCall;
     this._makeCallPromise = this._makeCall(twimlParams, callOptions, isReconnect);
     try {
-      activeCall = this._activeCall = await this._makeCallPromise;
+      activeCall = await this._makeCallPromise;
     } finally {
       this._makeCallPromise = null;
+    }
+
+    // An incoming call accepted meanwhile keeps the slot until accept() below replaces it.
+    if (!this._activeCall) {
+      this._activeCall = activeCall;
     }
 
     // Make sure any incoming calls are ignored
@@ -599,7 +642,12 @@ class Device extends EventEmitter {
     // Stop the incoming sound if it's playing
     this._soundcache.get(Device.SoundName.Incoming).stop();
 
-    activeCall.accept({ rtcConstraints: options.rtcConstraints });
+    this._acceptingCall = activeCall;
+    try {
+      activeCall.accept({ rtcConstraints: options.rtcConstraints });
+    } finally {
+      this._acceptingCall = null;
+    }
     this._publishNetworkChange();
     return activeCall;
   }
@@ -628,6 +676,7 @@ class Device extends EventEmitter {
     this._destroyAudioHelper();
     this._audioProcessorEventObserver?.destroy();
     this._destroyPublisher();
+    this._destroyInsightsOutbox();
 
     if (this._networkInformation && typeof this._networkInformation.removeEventListener === 'function') {
       this._networkInformation.removeEventListener('change', this._publishNetworkChange);
@@ -653,6 +702,9 @@ class Device extends EventEmitter {
 
     if (this._activeCall) {
       this._activeCall.disconnect();
+    }
+    if (this._acceptingCall) {
+      this._acceptingCall.disconnect();
     }
   }
 
@@ -681,7 +733,11 @@ class Device extends EventEmitter {
   }
 
   /**
-   * Whether the Device is currently on an active Call.
+   * Whether the Device is currently on an active Call. A Call counts as active from `call.accept()`,
+   * which `device.connect()` calls before it resolves, until it ends, even before its media has
+   * connected. When accepting a Call replaces the active one, the replaced Call's disconnect handlers
+   * see the Device idle, and a Call they accept or connect, or a `disconnectAll()` they call, ends
+   * the accepting Call instead.
    */
   get isBusy(): boolean {
     return !!this._activeCall;
@@ -764,12 +820,12 @@ class Device extends EventEmitter {
       );
     }
 
-    this._options = { ...this._defaultOptions, ...this._options, ...options };
+    const newOptions = { ...this._defaultOptions, ...this._options, ...options };
 
     const originalChunderURIs: Set<string> = new Set(this._chunderURIs);
 
-    const newChunderURIs = this._chunderURIs = (
-      this._getChunderws() || getChunderURIs(this._options.edge)
+    const newChunderURIs = (
+      this._getChunderws(newOptions) || getChunderURIs(newOptions.edge)
     ).map(createSignalingEndpointURL);
 
     let hasChunderURIsChanged = originalChunderURIs.size !== newChunderURIs.length;
@@ -786,6 +842,10 @@ class Device extends EventEmitter {
     if (this.isBusy && hasChunderURIsChanged) {
       throw new InvalidStateError('Cannot change Edge while on an active Call');
     }
+
+    // Store only once validated, so a rejected call leaves the Device unchanged.
+    this._options = newOptions;
+    this._chunderURIs = newChunderURIs;
 
     this._setupLoglevel(this._options.logLevel);
 
@@ -839,6 +899,14 @@ class Device extends EventEmitter {
 
     if (typeof token !== 'string') {
       throw new InvalidArgumentError(INVALID_TOKEN_MESSAGE);
+    }
+
+    // Buffered Insights events are sent with the token current at send time.
+    // Drop them when the new token is for another account or identity, so
+    // they are not reported under it. A refresh for the same identity keeps them.
+    if (this._insightsOutbox && this._token && token !== this._token
+      && !Device._isSameTokenPrincipal(this._token, token)) {
+      this._insightsOutbox.clear('the new access token is for a different account or identity');
     }
 
     this._token = token;
@@ -897,6 +965,8 @@ class Device extends EventEmitter {
 
     setIfDefined('gateway', this._stream && this._stream.gateway);
     setIfDefined('region', this._stream && this._stream.region);
+    // Signaling connection scope: set with or without a Call.
+    setIfDefined('signaling_connection_id', this._stream && this._stream.signalingConnectionId);
 
     return payload;
   }
@@ -908,6 +978,15 @@ class Device extends EventEmitter {
     if (!this._audio) { return; }
     this._audio._destroy();
     this._audio = null;
+  }
+
+  /**
+   * Send buffered Insights events once (no retries) and stop the retry timer.
+   */
+  private _destroyInsightsOutbox() {
+    if (!this._insightsOutbox) { return; }
+    this._insightsOutbox.destroy();
+    this._insightsOutbox = null;
   }
 
   /**
@@ -953,9 +1032,9 @@ class Device extends EventEmitter {
   /**
    * Get chunderws array from the chunderw param
    */
-  private _getChunderws(): string[] | null {
-    return typeof this._options.chunderw === 'string' ? [this._options.chunderw]
-      : Array.isArray(this._options.chunderw) ? this._options.chunderw : null;
+  private _getChunderws(options: IExtendedDeviceOptions = this._options): string[] | null {
+    return typeof options.chunderw === 'string' ? [options.chunderw]
+      : Array.isArray(options.chunderw) ? options.chunderw : null;
   }
 
   /**
@@ -1031,12 +1110,26 @@ class Device extends EventEmitter {
       MediaStream: this._options.MediaStream,
       RTCPeerConnection: this._options.RTCPeerConnection,
       beforeAccept: (currentCall: Call) => {
-        if (!this._activeCall || this._activeCall === currentCall) {
+        const previousCall = this._activeCall;
+        if (previousCall && previousCall !== currentCall) {
+          // Disconnect before claiming the slot; the Device's own disconnect listener frees it,
+          // so the previous call's handlers see the Device idle.
+          previousCall.disconnect();
+          this._removeCall(previousCall);
+        }
+
+        // A disconnect handler above ended this call, or accepted another one, which wins.
+        if (currentCall.status() !== Call.State.Connecting) {
+          return;
+        }
+        if (this._activeCall && this._activeCall !== currentCall) {
+          this._log.info('Another call was accepted while replacing the active call; disconnecting this one');
+          currentCall.disconnect();
           return;
         }
 
-        this._activeCall.disconnect();
-        this._removeCall(this._activeCall);
+        // Claim the slot now; 'accept' only fires once media is open.
+        this._activeCall = currentCall;
       },
       codecPreferences: this._options.codecPreferences,
       customSounds: this._options.sounds,
@@ -1226,6 +1319,7 @@ class Device extends EventEmitter {
    * Called when a 'connected' event is received from the signaling stream.
    */
   private _onSignalingConnected = (payload: Record<string, any>) => {
+    this._isTransportErrorPublished = false;
     const region = getRegionShortcode(payload.region);
     this._edge = payload.edge || regionToEdge[region as Region] || payload.region;
     this._region = region || payload.region;
@@ -1319,6 +1413,12 @@ class Device extends EventEmitter {
 
     this._log.error('Received error: ', twilioError);
     this._log.debug('#error', originalError);
+    if (!isTransportErrorPayload(payload)) {
+      this._publishError(twilioError, call);
+    } else if (!this._isTransportErrorPublished) {
+      this._isTransportErrorPublished = true;
+      this._publishError(twilioError, call, this._getDroppedSignalingConnectionId());
+    }
     this.emit(Device.EventName.Error, twilioError, call);
   }
 
@@ -1334,7 +1434,9 @@ class Device extends EventEmitter {
 
     if (!payload.callsid || !payload.sdp) {
       this._log.debug('#error', payload);
-      this.emit(Device.EventName.Error, new ClientErrors.BadRequest('Malformed invite from gateway'));
+      const error = new ClientErrors.BadRequest('Malformed invite from gateway');
+      this._publishError(error);
+      this.emit(Device.EventName.Error, error);
       return;
     }
 
@@ -1403,6 +1505,38 @@ class Device extends EventEmitter {
   }
 
   /**
+   * The id of the signaling connection that dropped, when the current
+   * connection has none: the transport closed and has not reconnected yet.
+   * @returns The id, or `undefined` while connected or if none is known.
+   */
+  private _getDroppedSignalingConnectionId(): string | undefined {
+    const stream = this._stream;
+    if (!stream || stream.signalingConnectionId) {
+      return;
+    }
+    const droppedId = stream.lastClosedSignalingConnectionId;
+    return typeof droppedId === 'string' && droppedId ? droppedId : undefined;
+  }
+
+  /**
+   * Publish an error to Insights. Without a Call, the event has no call ids.
+   * @param twilioError - The error to publish.
+   * @param call - The Call the error belongs to, if any.
+   * @param droppedSignalingConnectionId - The id of the signaling connection
+   *   that dropped, set on this event only when the current one has none.
+   */
+  private _publishError(twilioError: TwilioError, call?: Call, droppedSignalingConnectionId?: string): void {
+    const payload: Record<string, any> = {
+      code: twilioError.code,
+      message: twilioError.message,
+    };
+    if (droppedSignalingConnectionId) {
+      payload.signaling_connection_id = droppedSignalingConnectionId;
+    }
+    this._publisher?.error('connection', 'error', payload, call);
+  }
+
+  /**
    * Publish a NetworkInformation#change event to Insights if there's an active {@link Call}.
    */
   private _publishNetworkChange = () => {
@@ -1428,7 +1562,6 @@ class Device extends EventEmitter {
   private _removeCall(call: Call): void {
     if (this._activeCall === call) {
       this._activeCall = null;
-      this._makeCallPromise = null;
     }
 
     for (let i = this._calls.length - 1; i >= 0; i--) {
@@ -1543,12 +1676,17 @@ class Device extends EventEmitter {
       this._destroyPublisher();
     }
 
+    if (!this._insightsOutbox) {
+      this._insightsOutbox = new InsightsOutbox();
+    }
+
     const publisherOptions = {
       defaultPayload: this._createDefaultPayload,
       metadata: {
         app_name: this._options.appName,
         app_version: this._options.appVersion,
       },
+      outbox: this._insightsOutbox,
     } as any;
 
     if (this._options.eventgw) {
@@ -1569,6 +1707,11 @@ class Device extends EventEmitter {
       });
     }
 
+    // Send events buffered before this publisher replaced the previous one.
+    // No-op when the host is unknown, and the buffer is already empty when
+    // publishing is disabled.
+    this._insightsOutbox.flush();
+
     return this._publisher;
   }
 
@@ -1583,6 +1726,7 @@ class Device extends EventEmitter {
     }
 
     this._log.info('Setting up VSP');
+    this._isTransportErrorPublished = false;
     this._stream = new (this._options.PStream || PStream)(
       this.token,
       this._chunderURIs,

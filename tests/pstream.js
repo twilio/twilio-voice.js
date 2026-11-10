@@ -2,6 +2,7 @@ const assert = require('assert');
 const sinon = require('sinon');
 
 const PStream = require('../lib/twilio/pstream').default;
+const { isTransportErrorPayload } = require('../lib/twilio/pstream');
 const { RELEASE_VERSION } = require('../lib/twilio/constants');
 const TransportFactory = require('./mock/WSTransport');
 
@@ -196,6 +197,45 @@ describe('PStream', () => {
         assert.equal(pstream.status, status);
       });
     });
+
+    [
+      ['only an error', { code: 31005, message: 'foo' }],
+      ['an error payload', { error: { code: 31000, message: 'foo' }, callSid: 'CA000' }],
+      ['no error', undefined],
+    ].forEach(([scenario, err]) => {
+      it(`should mark the payload as a transport error when the transport fires ${scenario}`, () => {
+        const payloads = [];
+        pstream.on('error', payload => payloads.push(payload));
+        pstream.transport.emit('error', err);
+        assert.equal(payloads.length, 1);
+        assert.equal(isTransportErrorPayload(payloads[0]), true);
+      });
+    });
+
+    it('should not add an enumerable property to the payload', () => {
+      const payloads = [];
+      pstream.on('error', payload => payloads.push(payload));
+      pstream.transport.emit('error', { code: 31005, message: 'foo' });
+      assert.deepEqual(Object.keys(payloads[0]), ['error']);
+    });
+  });
+
+  describe('isTransportErrorPayload', () => {
+    it('should be false for an error message from the server', () => {
+      const payloads = [];
+      pstream.on('error', payload => payloads.push(payload));
+      pstream.transport.emit('message', { data: JSON.stringify({
+        type: 'error', payload: { error: { code: 31100, message: 'foo' } },
+      }) });
+      assert.equal(payloads.length, 1);
+      assert.equal(isTransportErrorPayload(payloads[0]), false);
+    });
+
+    [undefined, null, 'foo', {}, { error: {} }].forEach(payload => {
+      it(`should be false for ${JSON.stringify(payload)}`, () => {
+        assert.equal(isTransportErrorPayload(payload), false);
+      });
+    });
   });
 
   describe('when transport fires onmessage', () => {
@@ -224,6 +264,297 @@ describe('PStream', () => {
       pstream.transport.emit('message', { data: JSON.stringify({ type: 'close' })});
       pstream.transport.emit('message', { data: JSON.stringify({ type: 'close' })});
       assert.equal(count, 1);
+    });
+  });
+
+  // VBLOCKS-7513: the VSP `connected` message carries `payload.connectionId`
+  // (the backend WebSocket sessionId). PStream keeps it at signaling
+  // connection scope so Device can add it to every Insights event.
+  describe('signalingConnectionId (VBLOCKS-7513)', () => {
+    const receive = (type, payload) => {
+      pstream.transport.emit('message', {
+        data: JSON.stringify({ payload, type, version: EXPECTED_PSTREAM_VERSION }),
+      });
+    };
+
+    const connectedPayload = (connectionId) => {
+      const payload = {
+        edge: 'ashburn',
+        home: 'stage-us1',
+        region: 'US_EAST_VIRGINIA',
+        token: { identity: 'alice', ttl: 3600 },
+      };
+      if (connectionId !== undefined) {
+        payload.connectionId = connectionId;
+      }
+      return payload;
+    };
+
+    const openAndConnect = (connectionId) => {
+      pstream.transport.emit('open');
+      receive('connected', connectedPayload(connectionId));
+    };
+
+    it('should not have a signalingConnectionId before any connected message', () => {
+      assert.equal(pstream.signalingConnectionId, null);
+    });
+
+    it('should not have a signalingConnectionId after transport open but before connected', () => {
+      pstream.transport.emit('open');
+      assert.equal(pstream.signalingConnectionId, null);
+    });
+
+    it('should store the exact signalingConnectionId from a connected message', () => {
+      openAndConnect('6ee01b38-0000-4000-8000-00000000000a');
+      assert.strictEqual(pstream.signalingConnectionId, '6ee01b38-0000-4000-8000-00000000000a');
+    });
+
+    it('should treat the signalingConnectionId as an opaque string (no format validation)', () => {
+      openAndConnect('not-a-uuid:42');
+      assert.strictEqual(pstream.signalingConnectionId, 'not-a-uuid:42');
+    });
+
+    it('should still emit connected with the unmodified payload', () => {
+      const listener = sinon.spy();
+      pstream.on('connected', listener);
+      openAndConnect('CONN-A');
+      sinon.assert.calledOnce(listener);
+      assert.deepStrictEqual(listener.args[0][0], connectedPayload('CONN-A'));
+    });
+
+    it('should be readable by connected listeners when connected is emitted', () => {
+      let seen;
+      pstream.on('connected', () => { seen = pstream.signalingConnectionId; });
+      openAndConnect('CONN-A');
+      assert.strictEqual(seen, 'CONN-A');
+    });
+
+    it('should leave signalingConnectionId absent when connected has no connectionId (older backend)', () => {
+      const listener = sinon.spy();
+      pstream.on('connected', listener);
+      openAndConnect(undefined);
+      assert.equal(pstream.signalingConnectionId, null);
+      sinon.assert.calledOnce(listener);
+    });
+
+    it('should not read the signalingConnectionId key in the connected payload (VSP sends connectionId)', () => {
+      pstream.transport.emit('open');
+      receive('connected', { ...connectedPayload(undefined), signalingConnectionId: 'LEGACY-NAME' });
+      assert.equal(pstream.signalingConnectionId, null);
+    });
+
+    [
+      ['a number', 12345],
+      ['a boolean', true],
+      ['an object', { id: 'CONN-A' }],
+      ['an array', ['CONN-A']],
+      ['null', null],
+    ].forEach(([label, value]) => {
+      it(`should ignore a connectionId that is ${label}`, () => {
+        openAndConnect(value);
+        assert.equal(pstream.signalingConnectionId, null);
+      });
+    });
+
+    ['ready', 'offline', 'invite', 'answer', 'hangup', 'cancel', 'error', 'message', 'ringing', 'foo'].forEach(type => {
+      it(`should not set signalingConnectionId from a "${type}" message`, () => {
+        pstream.transport.emit('open');
+        const payload = { callsid: 'CA123', connectionId: `FROM-${type}` };
+        if (type === 'error') {
+          payload.error = { code: 31000, message: 'foo' };
+        }
+        receive(type, payload);
+        assert.equal(pstream.signalingConnectionId, null);
+      });
+
+      // A server `offline` message (unregister response) leaves the socket open;
+      // whether it clears the id is not fixed by the contract, so it is not asserted.
+      if (type === 'offline') {
+        return;
+      }
+
+      it(`should not overwrite an existing signalingConnectionId from a "${type}" message`, () => {
+        openAndConnect('CONN-A');
+        const payload = { callsid: 'CA123', connectionId: `FROM-${type}` };
+        if (type === 'error') {
+          payload.error = { code: 31000, message: 'foo' };
+        }
+        receive(type, payload);
+        assert.strictEqual(pstream.signalingConnectionId, 'CONN-A');
+      });
+    });
+
+    it('should keep the same signalingConnectionId when connected repeats the same id (e.g. after setToken)', () => {
+      openAndConnect('CONN-A');
+      pstream.setToken('new-token');
+      receive('connected', connectedPayload('CONN-A'));
+      assert.strictEqual(pstream.signalingConnectionId, 'CONN-A');
+    });
+
+    it('should replace the signalingConnectionId when connected carries a different id', () => {
+      openAndConnect('CONN-A');
+      receive('connected', connectedPayload('CONN-B'));
+      assert.strictEqual(pstream.signalingConnectionId, 'CONN-B');
+    });
+
+    context('when the transport closes', () => {
+      it('should clear the signalingConnectionId', () => {
+        openAndConnect('CONN-A');
+        pstream.transport.emit('close');
+        assert.equal(pstream.signalingConnectionId, null);
+      });
+
+      // 'transportClose' listeners describe the connection that just dropped
+      // (e.g. Call publishes `connection/reconnecting` and signaling errors
+      // there), so they still see its id. It is cleared before 'offline'.
+      it('should expose the old id to transportClose listeners and clear it before offline', () => {
+        openAndConnect('CONN-A');
+        const seen = [];
+        pstream.on('transportClose', () => { seen.push(['transportClose', pstream.signalingConnectionId]); });
+        pstream.on('offline', () => { seen.push(['offline', pstream.signalingConnectionId]); });
+        pstream.transport.emit('close');
+        assert.deepStrictEqual(seen, [
+          ['transportClose', 'CONN-A'],
+          ['offline', null],
+        ]);
+      });
+
+      it('should clear the signalingConnectionId even if a transportClose listener throws', () => {
+        openAndConnect('CONN-A');
+        pstream.on('transportClose', () => { throw new Error('listener failure'); });
+        assert.throws(() => pstream.transport.emit('close'), /listener failure/);
+        assert.equal(pstream.signalingConnectionId, null);
+      });
+
+      it('should not let the next connection see the old id after a throwing transportClose listener', () => {
+        openAndConnect('CONN-A');
+        const failing = () => { throw new Error('listener failure'); };
+        pstream.on('transportClose', failing);
+        assert.throws(() => pstream.transport.emit('close'));
+        pstream.removeListener('transportClose', failing);
+        pstream.transport.emit('open');
+        assert.equal(pstream.signalingConnectionId, null);
+        receive('connected', connectedPayload('CONN-B'));
+        assert.strictEqual(pstream.signalingConnectionId, 'CONN-B');
+      });
+
+      it('should not restore the old signalingConnectionId when the transport reopens', () => {
+        openAndConnect('CONN-A');
+        pstream.transport.emit('close');
+        pstream.transport.emit('open');
+        assert.equal(pstream.signalingConnectionId, null);
+      });
+
+      it('should use the new signalingConnectionId after reopen and a new connected', () => {
+        openAndConnect('CONN-A');
+        pstream.transport.emit('close');
+        openAndConnect('CONN-B');
+        assert.strictEqual(pstream.signalingConnectionId, 'CONN-B');
+      });
+
+      it('should never bring back the old signalingConnectionId when the new connected has none', () => {
+        openAndConnect('CONN-A');
+        pstream.transport.emit('close');
+        openAndConnect(undefined);
+        assert.equal(pstream.signalingConnectionId, null);
+      });
+
+      it('should track each connection across several reconnects', () => {
+        ['CONN-1', 'CONN-2', 'CONN-3'].forEach(id => {
+          openAndConnect(id);
+          assert.strictEqual(pstream.signalingConnectionId, id);
+          pstream.transport.emit('close');
+          assert.equal(pstream.signalingConnectionId, null);
+        });
+      });
+    });
+
+    context('when the PStream is destroyed', () => {
+      it('should clear the signalingConnectionId on destroy()', () => {
+        openAndConnect('CONN-A');
+        pstream.destroy();
+        assert.equal(pstream.signalingConnectionId, null);
+      });
+
+      it('should clear the signalingConnectionId when the server sends close', () => {
+        openAndConnect('CONN-A');
+        receive('close', {});
+        assert.equal(pstream.signalingConnectionId, null);
+      });
+
+      it('should ignore a connected message delivered after destroy()', () => {
+        openAndConnect('CONN-A');
+        pstream.destroy();
+        receive('connected', connectedPayload('CONN-LATE'));
+        assert.equal(pstream.signalingConnectionId, null);
+      });
+    });
+
+    it('should not share the signalingConnectionId between PStream instances', () => {
+      openAndConnect('CONN-A');
+      const other = new PStream(token, uris, options);
+      assert.equal(other.signalingConnectionId, null);
+      assert.strictEqual(pstream.signalingConnectionId, 'CONN-A');
+    });
+
+    describe('lastClosedSignalingConnectionId', () => {
+      it('should be null before any connection closes', () => {
+        assert.equal(pstream.lastClosedSignalingConnectionId, null);
+        openAndConnect('CONN-A');
+        assert.equal(pstream.lastClosedSignalingConnectionId, null);
+      });
+
+      it('should hold the id of the connection that closed', () => {
+        openAndConnect('CONN-A');
+        pstream.transport.emit('close');
+        assert.equal(pstream.signalingConnectionId, null);
+        assert.strictEqual(pstream.lastClosedSignalingConnectionId, 'CONN-A');
+      });
+
+      it('should not be set yet while transportClose listeners run', () => {
+        let seen;
+        openAndConnect('CONN-A');
+        pstream.on('transportClose', () => { seen = pstream.lastClosedSignalingConnectionId; });
+        pstream.transport.emit('close');
+        assert.equal(seen, null);
+      });
+
+      it('should be kept across reconnect attempts that never reach connected', () => {
+        openAndConnect('CONN-A');
+        pstream.transport.emit('close');
+        pstream.transport.emit('open');
+        pstream.transport.emit('close');
+        pstream.transport.emit('close');
+        assert.strictEqual(pstream.lastClosedSignalingConnectionId, 'CONN-A');
+      });
+
+      it('should be cleared by the next connected message', () => {
+        openAndConnect('CONN-A');
+        pstream.transport.emit('close');
+        openAndConnect('CONN-B');
+        assert.equal(pstream.lastClosedSignalingConnectionId, null);
+        assert.strictEqual(pstream.signalingConnectionId, 'CONN-B');
+      });
+
+      it('should be cleared by a connected message without a connectionId', () => {
+        openAndConnect('CONN-A');
+        pstream.transport.emit('close');
+        openAndConnect(undefined);
+        assert.equal(pstream.lastClosedSignalingConnectionId, null);
+      });
+
+      it('should not be set by a close on a connection that never had an id', () => {
+        openAndConnect(undefined);
+        pstream.transport.emit('close');
+        assert.equal(pstream.lastClosedSignalingConnectionId, null);
+      });
+
+      it('should be cleared on destroy', () => {
+        openAndConnect('CONN-A');
+        pstream.transport.emit('close');
+        pstream.destroy();
+        assert.equal(pstream.lastClosedSignalingConnectionId, null);
+      });
     });
   });
 
@@ -361,6 +692,15 @@ describe('PStream', () => {
       it('should not queue the message to send on reconnect if shouldRetry is false', () => {
         pstream._publish('foo', { }, false);
         assert.equal(pstream._messageQueue.length, 0);
+      });
+
+      it('should emit 31009 marked as a transport error', () => {
+        const payloads = [];
+        pstream.on('error', payload => payloads.push(payload));
+        pstream._publish('foo', { }, false);
+        assert.equal(payloads.length, 1);
+        assert.equal(payloads[0].error.code, 31009);
+        assert.equal(isTransportErrorPayload(payloads[0]), true);
       });
     });
 
