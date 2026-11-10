@@ -1,6 +1,7 @@
 import * as loglevel from 'loglevel';
 import CallType from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
+import { markTransportErrorPayload } from '../../lib/twilio/pstream';
 import { GeneralErrors, InvalidArgumentError } from '../../lib/twilio/errors';
 import {
   Edge,
@@ -252,6 +253,134 @@ describe('Device', function() {
             root.chrome = origChrome;
           });
         });
+
+        // VBLOCKS-7513: signaling_connection_id comes from the stream, not the Call.
+        describe('signaling_connection_id', () => {
+          const basePayload = () => ({
+            aggressive_nomination: false,
+            browser_extension: false,
+            dscp: true,
+            ice_restart_enabled: true,
+            platform: 'WebRTC',
+            sdk_version: Device.version,
+          });
+
+          const createFakeCall = (callSid: string, tempCallSid: string): any => ({
+            codec: 'opus',
+            direction: 'OUTGOING',
+            outboundConnectionId: tempCallSid,
+            parameters: { CallSid: callSid },
+          });
+
+          const defaultPayload = (call?: any) => Publisher.lastCall.args[2].defaultPayload(call);
+
+          it('should include signaling_connection_id without a call', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            assert.deepStrictEqual(defaultPayload(), {
+              ...basePayload(),
+              signaling_connection_id: 'CONN-A',
+            });
+          });
+
+          it('should include signaling_connection_id when called with no arguments', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            assert.strictEqual(device['_createDefaultPayload']().signaling_connection_id, 'CONN-A');
+          });
+
+          it('should include signaling_connection_id alongside the call fields', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            assert.deepStrictEqual(defaultPayload(createFakeCall('CA1111', 'TJ1111')), {
+              ...basePayload(),
+              audio_codec: 'opus',
+              call_sid: 'CA1111',
+              direction: 'OUTGOING',
+              signaling_connection_id: 'CONN-A',
+              temp_call_sid: 'TJ1111',
+            });
+          });
+
+          it('should include signaling_connection_id for a call without a CallSid yet', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            const payload = defaultPayload(createFakeCall(undefined as any, 'TJ1111'));
+            assert.strictEqual(payload.signaling_connection_id, 'CONN-A');
+            assert.strictEqual(payload.temp_call_sid, 'TJ1111');
+            assert(!('call_sid' in payload));
+          });
+
+          [null, undefined].forEach(value => {
+            it(`should omit signaling_connection_id when the stream signalingConnectionId is ${value}`, () => {
+              pstream.signalingConnectionId = value;
+              assert.deepStrictEqual(defaultPayload(), basePayload());
+              assert(!('signaling_connection_id' in defaultPayload(createFakeCall('CA1111', 'TJ1111'))));
+            });
+          });
+
+          it('should omit signaling_connection_id when the stream never received one', () => {
+            assert(!('signaling_connection_id' in defaultPayload()));
+          });
+
+          it('should use the same id for two calls on the same stream', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            const payload1 = defaultPayload(createFakeCall('CA1111', 'TJ1111'));
+            const payload2 = defaultPayload(createFakeCall('CA2222', 'TJ2222'));
+            assert.strictEqual(payload1.signaling_connection_id, 'CONN-A');
+            assert.strictEqual(payload2.signaling_connection_id, 'CONN-A');
+            assert.notStrictEqual(payload1.call_sid, payload2.call_sid);
+          });
+
+          it('should read the current stream id after a reconnect', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            assert.strictEqual(defaultPayload().signaling_connection_id, 'CONN-A');
+            pstream.signalingConnectionId = null;
+            pstream.emit('offline');
+            assert(!('signaling_connection_id' in defaultPayload()));
+            pstream.signalingConnectionId = 'CONN-B';
+            pstream.emit('connected', { region: 'US_EAST_VIRGINIA' });
+            assert.strictEqual(defaultPayload().signaling_connection_id, 'CONN-B');
+          });
+
+          it('should read the id at payload creation, not when the publisher was created', () => {
+            const payloadFn = Publisher.lastCall.args[2].defaultPayload;
+            pstream.signalingConnectionId = 'CONN-A';
+            const first = payloadFn();
+            pstream.signalingConnectionId = 'CONN-B';
+            const second = payloadFn();
+            assert.strictEqual(first.signaling_connection_id, 'CONN-A');
+            assert.strictEqual(second.signaling_connection_id, 'CONN-B');
+          });
+
+          it('should omit signaling_connection_id after the server closes the stream', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            pstream.emit('close');
+            assert.equal(device['_stream'], null);
+            assert(!('signaling_connection_id' in defaultPayload()));
+          });
+
+          it('should read the replacement stream id, not the old stream id', async () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            const oldStream = pstream;
+            const setupPromise = device['_setupStream']();
+            assert.notStrictEqual(pstream, oldStream);
+            assert(!('signaling_connection_id' in defaultPayload()));
+            pstream.signalingConnectionId = 'CONN-B';
+            pstream.emit('connected', { region: 'US_EAST_VIRGINIA' });
+            await setupPromise;
+            assert.strictEqual(defaultPayload().signaling_connection_id, 'CONN-B');
+          });
+
+          it('should keep signaling_connection_id after updateOptions recreates the publisher', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            device.updateOptions({ appName: 'foobar' });
+            assert.strictEqual(Publisher.lastCall.args[2].defaultPayload().signaling_connection_id, 'CONN-A');
+          });
+
+          it('should omit signaling_connection_id after the Device is destroyed', () => {
+            pstream.signalingConnectionId = 'CONN-A';
+            const payloadFn = Publisher.lastCall.args[2].defaultPayload;
+            device.destroy();
+            assert(!('signaling_connection_id' in payloadFn()));
+          });
+        });
       });
 
       describe('.connect()', () => {
@@ -281,6 +410,48 @@ describe('Device', function() {
           await assert.rejects(() => device.connect());
           assert(!device['_activeCall']);
           assert(!device['_makeCallPromise']);
+        });
+
+        it('should leave an incoming call accepted meanwhile in the slot for accept() to replace', async () => {
+          let resolveInputDevice!: () => void;
+          device.audio!._getInputDevicePromise = () => new Promise<void>(res => { resolveInputDevice = res; });
+          const connectPromise = device.connect();
+          const incomingCall = { status: () => CallType.State.Connecting } as any;
+          device['_activeCall'] = incomingCall;
+          resolveInputDevice();
+          const call = await connectPromise;
+          assert.strictEqual(device['_activeCall'], incomingCall);
+          sinon.assert.calledOnce(call.accept as sinon.SinonStub);
+        });
+
+        it('should let disconnectAll() reach the outgoing call while it replaces a claimed call', async () => {
+          let resolveInputDevice!: () => void;
+          device.audio!._getInputDevicePromise = () => new Promise<void>(res => { resolveInputDevice = res; });
+          const connectPromise = device.connect();
+          device['_activeCall'] = { disconnect: sinon.stub(), status: () => CallType.State.Connecting } as any;
+          const makeCall: any = device['_options'].Call;
+          device['_options'].Call = ((...args: any[]) => {
+            const call = makeCall(...args);
+            // As the replaced call's disconnect handler does from inside accept().
+            call.accept.callsFake(() => device.disconnectAll());
+            return call;
+          }) as any;
+          resolveInputDevice();
+          const call = await connectPromise;
+          sinon.assert.calledOnce(call.disconnect as sinon.SinonStub);
+          assert.strictEqual(device['_acceptingCall'], null);
+        });
+
+        it('should keep rejecting connect() when a call claimed meanwhile ends', async () => {
+          let resolveInputDevice!: () => void;
+          device.audio!._getInputDevicePromise = () => new Promise<void>(res => { resolveInputDevice = res; });
+          const connectPromise = device.connect();
+          const incomingCall = { status: () => CallType.State.Connecting } as any;
+          device['_activeCall'] = incomingCall;
+          device['_removeCall'](incomingCall);
+          await assert.rejects(() => device.connect(), /A Call is already active/);
+          resolveInputDevice();
+          await connectPromise;
         });
 
         it('should reject if there is already an active call', async () => {
@@ -734,6 +905,48 @@ describe('Device', function() {
           sinon.assert.calledOnce(setupStreamSpy);
         });
 
+        describe('when changing the edge during an active Call', () => {
+          beforeEach(async () => {
+            await registerDevice();
+            await device.connect();
+          });
+
+          it('should throw', () => {
+            assert.throws(() => device.updateOptions({ edge: 'sydney' }), /Cannot change Edge/);
+          });
+
+          it('should not change the options or signaling URIs', () => {
+            const options = device['_options'];
+            const chunderURIs = device['_chunderURIs'];
+            assert.throws(() => device.updateOptions({ edge: 'sydney' }));
+            assert.strictEqual(device['_options'], options);
+            assert.strictEqual(device['_options'].edge, undefined);
+            assert.deepStrictEqual(device['_chunderURIs'], chunderURIs);
+          });
+
+          it('should reconstruct the stream when the same edge is applied after the Call ends', () => {
+            assert.throws(() => device.updateOptions({ edge: 'sydney' }));
+            device['_activeCall'] = null;
+            const setupStreamSpy = device['_setupStream'] = sinon.spy(device['_setupStream']);
+            device.updateOptions({ edge: 'sydney' });
+            sinon.assert.calledOnce(setupStreamSpy);
+          });
+        });
+
+        describe('when the edge is invalid', () => {
+          it('should throw without changing the options', () => {
+            const options = device['_options'];
+            assert.throws(() => device.updateOptions({ edge: 123 as any }), /must be of type `string`/);
+            assert.strictEqual(device['_options'], options);
+          });
+
+          it('should not throw on a later call without an edge', () => {
+            assert.throws(() => device.updateOptions({ edge: 123 as any }));
+            device.updateOptions({ appName: 'foo' });
+            assert.equal(device['_options'].appName, 'foo');
+          });
+        });
+
         it('should not throw during re-registration', async () => {
           await registerDevice();
 
@@ -1094,6 +1307,146 @@ describe('Device', function() {
           assert.equal(31005, errorObject.code);
           assert.equal('ConnectionError (31005): A connection error occurred during the call', errorObject.message);
         });
+
+        describe('Insights', () => {
+          it('should publish the error without a call if payload.callsid is missing', () => {
+            pstream.emit('error', { error: { code: 31005 } });
+            sinon.assert.calledOnce(publisher.error);
+            const [group, name, payload, call] = publisher.error.getCall(0).args;
+            assert.deepEqual([group, name], ['connection', 'error']);
+            assert.deepEqual(payload, {
+              code: 31005,
+              message: 'ConnectionError (31005): A connection error occurred during the call',
+            });
+            assert.equal(call, undefined);
+          });
+
+          it('should publish the error with the call if payload.callsid matches a call', async () => {
+            pstream.emit('invite', { callsid: 'foo', sdp: 'bar' });
+            await clock.tickAsync(0);
+            const call = device.calls[0];
+            call.parameters = { CallSid: 'foo' };
+            pstream.emit('error', { error: { twilioError }, callsid: 'foo' });
+            sinon.assert.calledOnce(publisher.error);
+            sinon.assert.calledWith(publisher.error, 'connection', 'error',
+              { code: twilioError.code, message: twilioError.message }, call);
+          });
+
+          it('should publish the error without a call if payload.callsid matches no call', () => {
+            pstream.emit('error', { error: { twilioError }, callsid: 'unknown' });
+            sinon.assert.calledOnce(publisher.error);
+            assert.equal(publisher.error.getCall(0).args[3], undefined);
+          });
+
+          it('should publish the mapped token error', () => {
+            pstream.emit('error', { error: { code: 31205, message: 'expired' } });
+            sinon.assert.calledOnce(publisher.error);
+            const payload = publisher.error.getCall(0).args[2];
+            assert.equal(payload.code, 20104);
+          });
+
+          it('should publish before emitting Device.error', () => {
+            const spy = device.emit = sinon.spy();
+            pstream.emit('error', { error: { twilioError } });
+            sinon.assert.callOrder(publisher.error, spy);
+          });
+
+          it('should not publish if a voiceeventsid is passed', () => {
+            pstream.emit('error', { error: { code: 31005 }, voiceeventsid: 'foo' });
+            sinon.assert.notCalled(publisher.error);
+          });
+
+          it('should not publish if payload.error is missing', () => {
+            pstream.emit('error', { });
+            sinon.assert.notCalled(publisher.error);
+          });
+
+          describe('transport errors', () => {
+            const transportError = (code: number) =>
+              markTransportErrorPayload({ error: { code, message: 'foo' } });
+
+            it('should publish only the first transport error until connected', () => {
+              const spy = device.emit = sinon.spy();
+              pstream.emit('error', transportError(31000));
+              pstream.emit('error', transportError(31005));
+              pstream.emit('error', transportError(31009));
+              sinon.assert.calledOnce(publisher.error);
+              assert.equal(publisher.error.getCall(0).args[2].code, 31000);
+              assert.equal(spy.withArgs('error').callCount, 3);
+            });
+
+            it('should publish the next transport error after connected', () => {
+              pstream.emit('error', transportError(31005));
+              pstream.emit('connected', { region: 'EU_IRELAND' });
+              pstream.emit('error', transportError(31005));
+              pstream.emit('error', transportError(31005));
+              sinon.assert.calledTwice(publisher.error);
+            });
+
+            it('should publish the first transport error of a new stream after the stream is replaced', () => {
+              const firstStream = pstream;
+              const firstPublisher = publisher;
+              pstream.emit('error', transportError(31005));
+
+              device.updateOptions({ edge: 'ashburn' });
+              assert.notStrictEqual(pstream, firstStream);
+
+              pstream.emit('error', transportError(31005));
+              const publishedErrors: sinon.SinonSpyCall[] = firstPublisher.error.getCalls().concat(
+                publisher === firstPublisher ? [] : publisher.error.getCalls(),
+              );
+              assert.equal(publishedErrors.length, 2);
+              publishedErrors.forEach((publishedError: sinon.SinonSpyCall) =>
+                assert.deepEqual(publishedError.args.slice(0, 2), ['connection', 'error']));
+            });
+
+            it('should still publish every server error while transport errors are suppressed', () => {
+              pstream.emit('error', transportError(31005));
+              pstream.emit('error', transportError(31005));
+              pstream.emit('error', { error: { code: 31100, message: 'server' } });
+              pstream.emit('error', { error: { code: 31100, message: 'server' } });
+              sinon.assert.calledThrice(publisher.error);
+            });
+
+            describe('signaling connection id of the dropped connection', () => {
+              it('should be set on the published transport error while disconnected', () => {
+                pstream.signalingConnectionId = null;
+                pstream.lastClosedSignalingConnectionId = 'CONN-A';
+                pstream.emit('error', transportError(31000));
+                sinon.assert.calledOnce(publisher.error);
+                assert.strictEqual(publisher.error.getCall(0).args[2].signaling_connection_id, 'CONN-A');
+              });
+
+              it('should not be set while the current connection has an id', () => {
+                pstream.signalingConnectionId = 'CONN-B';
+                pstream.lastClosedSignalingConnectionId = 'CONN-A';
+                pstream.emit('error', transportError(31005));
+                assert.equal('signaling_connection_id' in publisher.error.getCall(0).args[2], false);
+              });
+
+              it('should not be set when no connection has closed', () => {
+                pstream.signalingConnectionId = null;
+                pstream.lastClosedSignalingConnectionId = null;
+                pstream.emit('error', transportError(31005));
+                assert.deepEqual(Object.keys(publisher.error.getCall(0).args[2]), ['code', 'message']);
+              });
+
+              it('should not be set on a server error', () => {
+                pstream.signalingConnectionId = null;
+                pstream.lastClosedSignalingConnectionId = 'CONN-A';
+                pstream.emit('error', { error: { code: 31100, message: 'server' } });
+                assert.equal('signaling_connection_id' in publisher.error.getCall(0).args[2], false);
+              });
+            });
+
+            it('should not mark a server error as a transport error', () => {
+              pstream.emit('error', { error: { code: 31100, message: 'server' } });
+              pstream.emit('error', transportError(31005));
+              sinon.assert.calledTwice(publisher.error);
+              assert.equal(publisher.error.getCall(1).args[2].code, 31005);
+            });
+          });
+        });
       });
 
       describe('on signaling.invite', () => {
@@ -1110,6 +1463,15 @@ describe('Device', function() {
           assert.equal(device.calls.length, 0);
           sinon.assert.calledOnce(device.emit as any);
           sinon.assert.calledWith(device.emit as any, 'error');
+        });
+
+        it('should publish the malformed invite error without a call', () => {
+          pstream.emit('invite', { sdp: 'bar' });
+          sinon.assert.calledOnce(publisher.error);
+          const [group, name, payload, call] = publisher.error.getCall(0).args;
+          assert.deepEqual([group, name], ['connection', 'error']);
+          assert.equal(payload.code, 31400);
+          assert.equal(call, undefined);
         });
 
         it('should emit an error and not create a new call if payload is missing sdp', () => {
@@ -1225,6 +1587,143 @@ describe('Device', function() {
           });
 
           await incomingPromise;
+        });
+
+        describe('on call.beforeAccept', () => {
+          let callA: any;
+          let callB: any;
+
+          // accept() sets the call connecting before calling beforeAccept.
+          const beforeAccept = (call: any) => {
+            call.status = () => CallType.State.Connecting;
+            connectOptions!.beforeAccept(call);
+          };
+
+          beforeEach(async () => {
+            callA = device.calls[0];
+            beforeAccept(callA);
+
+            pstream.emit('invite', { callsid: 'CA5678', sdp: 'foobar' });
+            await clock.tickAsync(0);
+          });
+
+          it('should set the active call before media opens', () => {
+            assert.equal(device['_activeCall'], callA);
+            assert.equal(device.isBusy, true);
+          });
+
+          it('should ignore a second invite while connecting', () => {
+            sinon.assert.neverCalledWith(device.emit as any, Device.EventName.Incoming);
+            assert.equal(device.calls.length, 1);
+          });
+
+          it('should clear the active call if the call fails while connecting', () => {
+            assert.equal(device['_activeCall'], callA);
+            callA.emit('disconnect');
+            assert.equal(device['_activeCall'], null);
+          });
+
+          it('should clear the active call if the call is canceled while connecting', () => {
+            assert.equal(device['_activeCall'], callA);
+            callA.emit('cancel');
+            assert.equal(device['_activeCall'], null);
+          });
+
+          it('should clear the active call on an error that closed the call', () => {
+            assert.equal(device['_activeCall'], callA);
+            callA.status = () => 'closed';
+            callA.emit('error', new Error('closed'));
+            assert.equal(device['_activeCall'], null);
+          });
+
+          it('should keep the active call on an error that left the call connecting', () => {
+            callA.status = () => 'connecting';
+            callA.emit('error', new Error('warning'));
+            assert.equal(device['_activeCall'], callA);
+            assert.equal(device.isBusy, true);
+          });
+
+          context('when allowIncomingWhileBusy is true', () => {
+            beforeEach(async () => {
+              device['_options'].allowIncomingWhileBusy = true;
+              pstream.emit('invite', { callsid: 'CA9012', sdp: 'foobar' });
+              await clock.tickAsync(0);
+              callB = device.calls[device.calls.length - 1];
+              beforeAccept(callB);
+            });
+
+            it('should disconnect the connecting call when another is accepted', () => {
+              sinon.assert.calledOnce(callA.disconnect);
+              assert.equal(device.calls.indexOf(callA), -1);
+              assert.equal(device['_activeCall'], callB);
+            });
+
+            it('should not play the incoming sound for an invite while connecting', () => {
+              sinon.assert.calledOnce(spyIncomingSound.play);
+            });
+          });
+
+          context('when the replaced call has a disconnect handler', () => {
+            let busyInHandler: boolean | undefined;
+
+            beforeEach(async () => {
+              device['_options'].allowIncomingWhileBusy = true;
+              pstream.emit('invite', { callsid: 'CA9012', sdp: 'foobar' });
+              await clock.tickAsync(0);
+              callB = device.calls[device.calls.length - 1];
+
+              callA.disconnect = sinon.spy(() => callA.emit('disconnect'));
+              callA.once('disconnect', () => { busyInHandler = device.isBusy; });
+              beforeAccept(callB);
+            });
+
+            it('should show the Device idle to the handler, then claim the slot', () => {
+              assert.equal(busyInHandler, false);
+              assert.equal(device['_activeCall'], callB);
+            });
+          });
+
+          context('when the replaced call disconnect handler ends the accepted call', () => {
+            beforeEach(async () => {
+              device['_options'].allowIncomingWhileBusy = true;
+              pstream.emit('invite', { callsid: 'CA9012', sdp: 'foobar' });
+              await clock.tickAsync(0);
+              callB = device.calls[device.calls.length - 1];
+
+              callA.disconnect = sinon.spy(() => callA.emit('disconnect'));
+              callA.once('disconnect', () => { callB.status = () => CallType.State.Closed; });
+              callB.status = () => CallType.State.Connecting;
+              connectOptions!.beforeAccept(callB);
+            });
+
+            it('should not claim the slot for the ended call', () => {
+              assert.equal(device['_activeCall'], null);
+              assert.equal(device.isBusy, false);
+            });
+          });
+
+          context('when a disconnect handler accepts another call', () => {
+            let callC: any;
+
+            beforeEach(async () => {
+              device['_options'].allowIncomingWhileBusy = true;
+              pstream.emit('invite', { callsid: 'CA9012', sdp: 'foobar' });
+              await clock.tickAsync(0);
+              callB = device.calls[device.calls.length - 1];
+              pstream.emit('invite', { callsid: 'CA3456', sdp: 'foobar' });
+              await clock.tickAsync(0);
+              callC = device.calls[device.calls.length - 1];
+
+              callA.disconnect = sinon.spy(() => callA.emit('disconnect'));
+              callA.once('disconnect', () => beforeAccept(callC));
+              beforeAccept(callB);
+            });
+
+            it('should track only the last accepted call', () => {
+              sinon.assert.calledOnce(callB.disconnect);
+              assert.equal(device['_activeCall'], callC);
+            });
+          });
         });
 
         describe('on call.accept', () => {
@@ -1574,6 +2073,23 @@ describe('Device', function() {
                   { audio_device_ids: sinkIds });
               });
             });
+
+            context('if unsuccessful while no call is active', () => {
+              let sinkIds: string[];
+              beforeEach(() => {
+                sinkIds = ['default'];
+                sounds[Device.SoundName.Incoming].setSinkIds = sinon.spy(() => Promise.reject(new Error('foo')));
+                return updateSinkIds('ringtone', sinkIds).then(
+                  () => { throw Error('Expected a rejection'); },
+                  () => Promise.resolve());
+              });
+
+              it('should publish a ringtone-devices-set-failed event without a call', () => {
+                sinon.assert.calledOnce(publisher.error);
+                sinon.assert.calledWith(publisher.error, 'audio', 'ringtone-devices-set-failed',
+                  { audio_device_ids: sinkIds, message: 'foo' }, null);
+              });
+            });
           });
         });
       });
@@ -1591,6 +2107,12 @@ describe('Device', function() {
 
         it('should not set host address before signaling is connected', () => {
           sinon.assert.notCalled(publisher.setHost);
+        });
+
+        it('should omit signaling_connection_id before a stream exists', () => {
+          assert.equal(device['_stream'], null);
+          const payload = Publisher.lastCall.args[2].defaultPayload();
+          assert(!('signaling_connection_id' in payload));
         });
       });
 

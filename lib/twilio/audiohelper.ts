@@ -9,6 +9,25 @@ import MediaDeviceInfoShim from './shims/mediadeviceinfo';
 import { average, difference, isFirefox } from './util';
 
 /**
+ * A default device stream from _openDefaultDeviceWithConstraints, and what made it.
+ * @internal
+ */
+export interface DefaultInputStream {
+  /**
+   * The processed stream until it is destroyed, or null without a processor.
+   */
+  processed: MediaStream | null;
+  /**
+   * The processor that created the processed stream.
+   */
+  processor: AudioProcessor | null;
+  /**
+   * The getUserMedia stream.
+   */
+  raw: MediaStream;
+}
+
+/**
  * Aliases for audio kinds, used for labelling.
  */
 const kindAliases: Record<string, string> = {
@@ -115,12 +134,12 @@ class AudioHelper extends EventEmitter {
   private _beforeSetInputDevice: () => Promise<any>;
 
   /**
-   * The audio stream of the default device.
-   * This is populated when _openDefaultDeviceWithConstraints is called,
+   * The default device stream, populated when a call adopts a stream from
+   * _openDefaultDeviceWithConstraints (see _adoptDefaultInputDeviceStream).
    * See _selectedInputDeviceStream for differences.
    * TODO: Combine these two workflows (3.x?)
    */
-  private _defaultInputDeviceStream: MediaStream | null = null;
+  private _defaultInput: DefaultInputStream | null = null;
 
   /**
    * Whether each sound is enabled.
@@ -199,7 +218,7 @@ class AudioHelper extends EventEmitter {
   /**
    * Internal reference to the added local AudioProcessor.
    */
-  private _localProcessor: AudioProcessor | null;
+  private _localProcessor: AudioProcessor | null = null;
 
   /**
    * Internal reference to the remote processed stream.
@@ -215,7 +234,7 @@ class AudioHelper extends EventEmitter {
    * The selected input stream coming from the microphone device.
    * This is populated when the setInputDevice is called, meaning,
    * the end user manually selected it, which is different than
-   * the defaultInputDeviceStream.
+   * _defaultInput.
    * TODO: Combine these two workflows (3.x?)
    */
   private _selectedInputDeviceStream: MediaStream | null = null;
@@ -444,12 +463,14 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Call getUserMedia with specified constraints
+   * Call getUserMedia with specified constraints. The result becomes the default device stream
+   * only once a call adopts it, so a result for a call that has since ended leaves it alone.
    * @internal
    */
-  _openDefaultDeviceWithConstraints(constraints: MediaStreamConstraints): Promise<MediaStream> {
+  _openDefaultDeviceWithConstraints(constraints: MediaStreamConstraints): Promise<DefaultInputStream> {
     this._log.info('Opening default device with constraints', constraints);
-    return this._getUserMedia(constraints).then((stream: MediaStream) => {
+    return this._getUserMedia(constraints).then((stream: MediaStream):
+      DefaultInputStream | Promise<DefaultInputStream> => {
 
       this._log.info('Opened default device. Updating available devices.');
       // Ensures deviceId's and labels are populated after the gUM call
@@ -458,22 +479,56 @@ class AudioHelper extends EventEmitter {
         // Ignore error, we don't want to break the call flow
         this._log.warn('Unable to updateAvailableDevices after gUM call', error);
       });
-      this._defaultInputDeviceStream = stream;
-      return this._maybeCreateLocalProcessedStream(stream);
+      const processor = this._localProcessor;
+      if (!processor) {
+        return { processed: null, processor: null, raw: stream };
+      }
+
+      this._log.info('Creating local processed stream');
+      // Through then(), so a processor that throws synchronously also releases the raw stream.
+      return Promise.resolve().then(() => processor.createProcessedStream(stream)).then(processedStream => {
+        if (!processedStream) {
+          throw new InvalidArgumentError('The local AudioProcessor did not return a MediaStream');
+        }
+        this._audioProcessorEventObserver.emit('create', false);
+        return { processed: processedStream, processor, raw: stream };
+      }).catch(error => {
+        // Nothing holds the raw stream yet, so release it here.
+        stream.getTracks().forEach(track => track.stop());
+        throw error;
+      });
     });
+  }
+
+  /**
+   * Make a stream from _openDefaultDeviceWithConstraints the default device stream
+   * @internal
+   * @param input - The stream, adopted by the live call that opened it.
+   */
+  _adoptDefaultInputDeviceStream(input: DefaultInputStream): void {
+    this._defaultInput = input;
+    if (input.processed) {
+      this._localProcessedStream = input.processed;
+    }
   }
 
   /**
    * Stop the default audio stream
    * @internal
+   * @param input - A stream from _openDefaultDeviceWithConstraints, released whether or not
+   *   it was adopted. Defaults to the adopted default device stream.
    */
-  _stopDefaultInputDeviceStream(): void {
-    if (this._defaultInputDeviceStream) {
-      this._log.info('stopping default device stream');
-      this._defaultInputDeviceStream.getTracks().forEach(track => track.stop());
-      this._defaultInputDeviceStream = null;
-      this._destroyLocalProcessedStream();
+  _stopDefaultInputDeviceStream(input: DefaultInputStream | null = this._defaultInput): void {
+    if (!input) {
+      return;
     }
+
+    this._log.info('stopping default device stream');
+    input.raw.getTracks().forEach(track => track.stop());
+    if (input === this._defaultInput) {
+      this._defaultInput = null;
+    }
+    this._destroyDefaultProcessedStream(input);
   }
 
   /**
@@ -741,8 +796,9 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
-   * Unset the input device, stopping the tracks. This should only be called when not in a connection, and
-   *   will not allow removal of the input device during a live call.
+   * Unset the input device, stopping the tracks. This should only be called when not in a connection. While the
+   *   Device is busy (see `Device.isBusy`), including with an accepted call that is still connecting, it rejects
+   *   with InvalidStateError if an input device is set.
    */
   unsetInputDevice(): Promise<void> {
     this._log.debug('.unsetInputDevice', this.inputDevice);
@@ -758,9 +814,33 @@ class AudioHelper extends EventEmitter {
   }
 
   /**
+   * Destroys a default device stream's processed stream, with the processor that created it.
+   */
+  private _destroyDefaultProcessedStream(input: DefaultInputStream): void {
+    const { processed, processor } = input;
+    if (!processed || !processor) {
+      return;
+    }
+
+    this._log.info('destroying local processed stream');
+    input.processed = null;
+    processed.getTracks().forEach(track => track.stop());
+    if (processed === this._localProcessedStream) {
+      this._localProcessedStream = null;
+    }
+    processor.destroyProcessedStream(processed);
+    this._audioProcessorEventObserver.emit('destroy', false);
+  }
+
+  /**
    * Destroys the local processed stream and updates references.
    */
   private _destroyLocalProcessedStream() {
+    if (this._defaultInput && this._defaultInput.processed === this._localProcessedStream) {
+      this._destroyDefaultProcessedStream(this._defaultInput);
+      return;
+    }
+
     if (this._localProcessor && this._localProcessedStream) {
       this._log.info('destroying local processed stream');
       const localProcessedStream = this._localProcessedStream;
@@ -900,7 +980,7 @@ class AudioHelper extends EventEmitter {
       return this._setInputDevice(this.inputDevice.deviceId, true);
     }
 
-    if (this._defaultInputDeviceStream) {
+    if (this._defaultInput) {
       const defaultDevice = this.availableInputDevices.get('default')
       || Array.from(this.availableInputDevices.values())[0];
 
@@ -1035,7 +1115,7 @@ class AudioHelper extends EventEmitter {
       const isInputDeviceSet = this.inputDevice && this.inputDevice.deviceId === defaultId;
       // If this.inputDevice is null, and default stream is not null, it means
       // the user is using the default stream and did not explicitly call audio.setInputDevice()
-      const isDefaultDeviceSet = this._defaultInputDeviceStream && this.availableInputDevices.get(defaultId);
+      const isDefaultDeviceSet = this._defaultInput && this.availableInputDevices.get(defaultId);
 
       if (isInputDeviceSet || isDefaultDeviceSet) {
         this._log.warn(`Calling getUserMedia after device change to ensure that the \
