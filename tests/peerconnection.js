@@ -216,6 +216,7 @@ describe('PeerConnection', () => {
       newStream = { getAudioTracks: sinon.stub().returns(['foo']), id: 2 };
       context = {
         stream: STREAM,
+        version: {},
         mute: sinon.stub(),
         _closed: new Deferred(),
         _sender: {},
@@ -237,6 +238,39 @@ describe('PeerConnection', () => {
         assert(newStream.getAudioTracks.calledWithExactly());
         assert.equal(aError.message, 'Supplied input stream has no audio tracks');
       }).then(done).catch(done);
+    });
+
+    [false, true].forEach(shouldClone => {
+      [false, true].forEach(shouldManageStream => {
+        it(`Should replace input before connection setup (clone=${shouldClone}, managed=${shouldManageStream})`, async () => {
+          const clonedStream = { addTrack: sinon.stub() };
+          context.version = null;
+          context._sender = null;
+          const openedInput = { raw: STREAM };
+          context._openedInput = shouldManageStream ? openedInput : null;
+          context._audioHelper = { _stopDefaultInputDeviceStream: sinon.stub() };
+          context._stopStream = PeerConnection.prototype._stopStream.bind(context);
+          context.options = { MediaStream: sinon.stub().returns(clonedStream) };
+          context.isMuted = true;
+
+          const result = await toTest(shouldClone, newStream);
+
+          assert.strictEqual(result, shouldClone ? clonedStream : newStream);
+          assert.strictEqual(context.stream, result);
+          assert.strictEqual(context.version, null);
+          assert.strictEqual(context._sender, null);
+          assert.strictEqual(context._audioHelper._stopDefaultInputDeviceStream.calledOnce, shouldManageStream);
+          if (shouldManageStream) {
+            assert(context._audioHelper._stopDefaultInputDeviceStream.calledOnceWithExactly(openedInput));
+          }
+          assert.strictEqual(context._openedInput, null);
+          assert(context.mute.calledOnceWithExactly(true));
+          assert.strictEqual(context.options.MediaStream.calledOnce, shouldClone);
+          if (shouldClone) {
+            assert(clonedStream.addTrack.calledOnceWithExactly('foo', 0, ['foo']));
+          }
+        });
+      });
     });
 
     it('Should replace tracks before returning the new stream', done => {
@@ -323,6 +357,7 @@ describe('PeerConnection', () => {
       });
       context = {
         stream: STREAM,
+        version: {},
         mute: sinon.stub(),
         _closed: new Deferred(),
         _sender: {},
