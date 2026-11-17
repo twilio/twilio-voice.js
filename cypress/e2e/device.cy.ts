@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import Call from '../../lib/twilio/call';
 import Device from '../../lib/twilio/device';
 import { generateAccessToken } from '../../tests/lib/token';
+import { expectEvent, waitFor } from '../../tests/lib/util';
 
 // (rrowland) The TwiML expected by these tests can be found in the README.md
 
@@ -40,8 +41,9 @@ describe('Device', function() {
   });
 
   describe('tokenWillExpire event', () => {
-    const setupDevice = async (tokenTtl: number, tokenRefreshMs: number) => {
-      const accessToken = await generateAccessToken(`device-tokenWillExpire-${Date.now()}`, tokenTtl);
+    const setupDevice = async (tokenTtl: number, tokenRefreshMs: number,
+                               identity: string = `device-tokenWillExpire-${Date.now()}`) => {
+      const accessToken = await generateAccessToken(identity, tokenTtl);
       const device = new Device(accessToken, { tokenRefreshMs });
       device.on(Device.EventName.Error, () => { /* no-op */ });
       return device;
@@ -94,6 +96,51 @@ describe('Device', function() {
       // ttl returned from signaling, which we use to calculate the timeout,
       // sometimes returns 1s less from the original ttl we provided. So let's account for that.
       assert(diff < 2000, `event time occurred too late; diff: ${diff}`);
+    });
+
+    it('should emit "tokenWillExpire" only for the updated token', async function() {
+      this.timeout(45000);
+      const identity = `device-tokenWillExpire-${Date.now()}`;
+      const device = await setupDevice(10, 1000, identity);
+      const updatedToken = await generateAccessToken(identity, 25);
+      const expiredAt = expectEvent(Device.EventName.TokenWillExpire, device).then(() => Date.now());
+
+      try {
+        await device.register();
+        const connectedAt = expectEvent('connected', (device as any)._stream).then(() => Date.now());
+        device.updateToken(updatedToken);
+        await waitFor(connectedAt, 5000);
+        await waitFor(expiredAt, 30000);
+
+        // The first token's timer fires about 8s after this connected, the updated token's about 22s.
+        const firedAfterMs = (await expiredAt) - (await connectedAt);
+        assert(firedAfterMs > 12000, `tokenWillExpire fired ${firedAfterMs}ms after the updated token connected`);
+      } finally {
+        device.destroy();
+      }
+    });
+
+    it('should emit "tokenWillExpire" once after signaling reconnects', async function() {
+      this.timeout(45000);
+      const device = await setupDevice(20, 1000);
+      let count = 0;
+      device.on(Device.EventName.TokenWillExpire, () => count++);
+
+      try {
+        await device.register();
+        for (let i = 0; i < 2; i++) {
+          const reconnected = expectEvent('connected', (device as any)._stream);
+          (device as any)._stream.transport._socket.close();
+          await waitFor(reconnected, 10000);
+        }
+        await waitFor(expectEvent(Device.EventName.TokenWillExpire, device), 25000);
+
+        // Timers left over from the earlier connections would fire within about a second.
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        assert.strictEqual(count, 1);
+      } finally {
+        device.destroy();
+      }
     });
   });
 

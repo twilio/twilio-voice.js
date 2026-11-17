@@ -671,6 +671,7 @@ class Device extends EventEmitter {
 
     this.disconnectAll();
     this._stopRegistrationTimer();
+    this._stopTokenWillExpireTimer();
 
     this._destroyStream();
     this._destroyAudioHelper();
@@ -1334,13 +1335,11 @@ class Device extends EventEmitter {
       ) {
         const ttlMs: number = payload.token.ttl * 1000;
         const timeoutMs: number = Math.max(0, ttlMs - this._options.tokenRefreshMs);
+        this._stopTokenWillExpireTimer();
         this._tokenWillExpireTimeout = setTimeout(() => {
+          this._tokenWillExpireTimeout = null;
           this._log.debug('#tokenWillExpire');
           this.emit('tokenWillExpire', this);
-          if (this._tokenWillExpireTimeout) {
-            clearTimeout(this._tokenWillExpireTimeout);
-            this._tokenWillExpireTimeout = null;
-          }
         }, timeoutMs);
       }
     }
@@ -1794,6 +1793,16 @@ class Device extends EventEmitter {
   }
 
   /**
+   * Stop the tokenWillExpire timer if it is running.
+   */
+  private _stopTokenWillExpireTimer(): void {
+    if (this._tokenWillExpireTimeout) {
+      clearTimeout(this._tokenWillExpireTimeout);
+      this._tokenWillExpireTimeout = null;
+    }
+  }
+
+  /**
    * Throw an error if the {@link Device} is destroyed.
    */
   private _throwIfDestroyed(): void {
@@ -1967,7 +1976,7 @@ namespace Device {
   export declare function registeredEvent(): void;
 
   /**
-   * Emitted when the {@link Device}'s token is about to expire. Use DeviceOptions.refreshTokenMs
+   * Emitted when the {@link Device}'s token is about to expire. Use DeviceOptions.tokenRefreshMs
    * to set a custom warning time. Default is 10000 (10 seconds) prior to the token expiring.
    * @event
    * @param device

@@ -1,5 +1,13 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.19.1 (In Progress)
+====================
+
+Bug Fixes
+---------
+
+- Fixed a cause of an [issue](https://github.com/twilio/twilio-voice.js/issues/494) where `tokenWillExpire` was sometimes not emitted for a token passed to `device.updateToken()`, so the token expired with error `20104`. A timer left over from an earlier token, after a signaling reconnect or an earlier `updateToken()` call, could emit a repeated `tokenWillExpire` and cancel the timer for the new token. A new timer now replaces any pending one, and `device.destroy()` clears it.
+
 2.19.0 (November 12, 2026)
 ==========================
 
