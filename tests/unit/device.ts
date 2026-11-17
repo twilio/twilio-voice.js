@@ -1205,6 +1205,41 @@ describe('Device', function() {
             clock.tick(ttlMilliseconds);
             assert(expiredEventDevice);
           });
+
+          it('should emit only for the latest token after a token update', () => {
+            const listener = sinon.stub();
+            device.on('tokenWillExpire', listener);
+
+            pstream.emit('connected', { token: { ttl: 20 } });
+            pstream.emit('connected', { token: { ttl: 60 } });
+
+            clock.tick(49999);
+            sinon.assert.notCalled(listener);
+            clock.tick(1);
+            sinon.assert.calledOnce(listener);
+          });
+
+          it('should emit once after a signaling reconnect with the same token', () => {
+            const listener = sinon.stub();
+            device.on('tokenWillExpire', listener);
+
+            pstream.emit('connected', { token: { ttl: 20 } });
+            clock.tick(5000);
+            // Signaling can report a ttl up to 1s short, so this timer fires first.
+            pstream.emit('connected', { token: { ttl: 14 } });
+
+            clock.tick(60000);
+            sinon.assert.calledOnce(listener);
+          });
+
+          it('should not emit after the device is destroyed', () => {
+            pstream.emit('connected', { token: { ttl: 20 } });
+            device.destroy();
+
+            const emit = sinon.spy(device, 'emit');
+            clock.tick(60000);
+            sinon.assert.neverCalledWith(emit, 'tokenWillExpire');
+          });
         });
       });
 
