@@ -8,6 +8,8 @@ Bug Fixes
 
 - Fixed an [issue](https://github.com/twilio/twilio-voice.js/issues/376) where setting the `maxAverageBitrate` option produced a malformed Opus `a=fmtp` line in the SDP, with `;maxaveragebitrate` added after the line's carriage return. Chrome re-serializes the SDP and hid the problem, but WebRTC redirection layers that pass the SDP through as-is, such as Citrix HDX, sent it unchanged, so outgoing calls failed with error `31000` and incoming calls with `31100`. The parameter is now added before the line ending.
 
+- Fixed an issue where no call could start under WebRTC redirection layers such as Citrix HDX, which return no transceivers right after the local track is added. Since 2.15.0, the SDK applied `codecPreferences` to the first transceiver and threw a `TypeError` before the call was placed. When no transceiver is available, the SDK now orders the codecs in the local SDP instead.
+
 2.19.0 (November 12, 2026)
 ==========================
 

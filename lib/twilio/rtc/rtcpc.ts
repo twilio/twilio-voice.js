@@ -74,7 +74,10 @@ RTCPC.prototype.createOffer = function(maxAverageBitrate, constraints, onSuccess
   return promisifyCreate(this.pc.createOffer, this.pc)(constraints).then(offer => {
     if (!this.pc) { return Promise.resolve(); }
 
-    const sdp = setMaxAverageBitrate(offer.sdp, maxAverageBitrate);
+    let sdp = setMaxAverageBitrate(offer.sdp, maxAverageBitrate);
+    if (this.localCodecPreferences) {
+      sdp = setCodecPreferences(sdp, this.localCodecPreferences);
+    }
 
     return promisifySet(this.pc.setLocalDescription, this.pc)(new RTCSessionDescription({
       sdp,
@@ -86,7 +89,10 @@ RTCPC.prototype.createAnswer = function(maxAverageBitrate, constraints, onSucces
   constraints = this.createModernConstraints(constraints);
   return promisifyCreate(this.pc.createAnswer, this.pc)(constraints).then(answer => {
     if (!this.pc) { return Promise.resolve(); }
-    const sdp = setMaxAverageBitrate(answer.sdp, maxAverageBitrate);
+    let sdp = setMaxAverageBitrate(answer.sdp, maxAverageBitrate);
+    if (this.localCodecPreferences) {
+      sdp = setCodecPreferences(sdp, this.localCodecPreferences);
+    }
 
     return promisifySet(this.pc.setLocalDescription, this.pc)(new RTCSessionDescription({
       sdp,

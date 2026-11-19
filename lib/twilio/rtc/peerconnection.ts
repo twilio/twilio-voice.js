@@ -654,12 +654,19 @@ PeerConnection.prototype._setupPeerConnection = function(rtcConfiguration) {
   try {
     addStream(version.pc, this.stream);
 
-    const supportedCodecs = RTCRtpReceiver.getCapabilities('audio').codecs;
-    this._log.debug('sorting codecs', supportedCodecs, this.codecPreferences);
-    const sortedCodecs = util.sortByMimeTypes(supportedCodecs, this.codecPreferences);
     const [transceiver] = version.pc.getTransceivers();
-    this._log.debug('setting sorted codecs', sortedCodecs);
-    transceiver.setCodecPreferences(sortedCodecs);
+    if (transceiver) {
+      const supportedCodecs = RTCRtpReceiver.getCapabilities('audio').codecs;
+      this._log.debug('sorting codecs', supportedCodecs, this.codecPreferences);
+      const sortedCodecs = util.sortByMimeTypes(supportedCodecs, this.codecPreferences);
+      this._log.debug('setting sorted codecs', sortedCodecs);
+      transceiver.setCodecPreferences(sortedCodecs);
+    } else {
+      // WebRTC redirection layers such as Citrix HDX add the transceiver asynchronously,
+      // so order the codecs in the local SDP instead.
+      this._log.info('No transceiver available, applying codec preferences to the local SDP');
+      version.localCodecPreferences = this.codecPreferences;
+    }
   } catch (error) {
     // The caller never receives this version, so close its RTCPeerConnection here.
     version.pc.close();

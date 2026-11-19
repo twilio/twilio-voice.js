@@ -99,10 +99,17 @@ describe('setMaxAverageBitrate', () => {
 
 describe('getPreferredCodecInfo', () => {
   it('should get the correct info for Opus', () => {
-    const sdp = 'foo=a\na=rtpmap:1337 opus/48000/2\na=rtpmap:0 PCMU/8000\na=fmtp:0\na=fmtp:1337 maxaveragebitrate=12000;usedtx=0\nbar=b';
+    const sdp = 'foo=a\nm=audio 9 UDP/TLS/RTP/SAVPF 1337 0\na=rtpmap:1337 opus/48000/2\na=rtpmap:0 PCMU/8000\na=fmtp:0\na=fmtp:1337 maxaveragebitrate=12000;usedtx=0\nbar=b';
     const { codecName, codecParams } = getPreferredCodecInfo(sdp);
     assert.equal(codecName, 'opus/48000/2');
     assert.equal(codecParams, 'maxaveragebitrate=12000;usedtx=0');
+  });
+
+  it('should use the first codec on the m= line, not the first rtpmap', () => {
+    const sdp = 'foo=a\nm=audio 9 UDP/TLS/RTP/SAVPF 0 1337\na=rtpmap:1337 opus/48000/2\na=rtpmap:0 PCMU/8000\na=fmtp:1337 maxaveragebitrate=12000;usedtx=0\nbar=b';
+    const { codecName, codecParams } = getPreferredCodecInfo(sdp);
+    assert.equal(codecName, 'PCMU/8000');
+    assert.equal(codecParams, '');
   });
 });
 

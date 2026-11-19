@@ -56,4 +56,49 @@ describe('rtcpc', function() {
       sinon.assert.notCalled(onSuccess);
     });
   });
+
+  describe('localCodecPreferences', () => {
+    const root = global as any;
+    const SDP = 'v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\n'
+      + 'm=audio 9 UDP/TLS/RTP/SAVPF 111 0\r\na=rtpmap:111 opus/48000/2\r\na=rtpmap:0 PCMU/8000\r\n';
+    let originalRTCSessionDescription: any;
+
+    beforeEach(() => {
+      originalRTCSessionDescription = root.RTCSessionDescription;
+      root.RTCSessionDescription = function(init: any) { Object.assign(this, init); };
+    });
+
+    afterEach(() => {
+      root.RTCSessionDescription = originalRTCSessionDescription;
+    });
+
+    [['createOffer', 'offer'], ['createAnswer', 'answer']].forEach(([method, type]) => {
+      describe(method, () => {
+        let rtcpc: any;
+        let setLocalDescription: sinon.SinonStub;
+
+        beforeEach(() => {
+          setLocalDescription = sinon.stub().resolves();
+          rtcpc = new (RTCPC as any)({});
+          rtcpc.pc = {
+            [method]: () => Promise.resolve({ sdp: SDP, type }),
+            setLocalDescription,
+          };
+        });
+
+        it('should reorder the codecs in the local SDP when set', async () => {
+          rtcpc.localCodecPreferences = ['pcmu', 'opus'];
+          await rtcpc[method](undefined, { audio: true });
+          const desc = setLocalDescription.firstCall.args[0];
+          assert.equal(desc.type, type);
+          assert(desc.sdp.includes('m=audio 9 UDP/TLS/RTP/SAVPF 0 111\r\n'));
+        });
+
+        it('should leave the local SDP unchanged when not set', async () => {
+          await rtcpc[method](undefined, { audio: true });
+          assert.equal(setLocalDescription.firstCall.args[0].sdp, SDP);
+        });
+      });
+    });
+  });
 });
