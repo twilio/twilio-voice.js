@@ -2621,6 +2621,14 @@ describe('PeerConnection', () => {
       ]));
     });
 
+    it('Should apply codec preferences to the local SDP when there is no transceiver', () => {
+      versionPc.getTransceivers = () => [];
+      const version = toTest();
+      assert.deepStrictEqual(version.localCodecPreferences, ['pcmu', 'opus']);
+      sinon.assert.notCalled(versionPc.close);
+      assert.equal(typeof versionPc.onaddstream, 'function');
+    });
+
     describe('after creating audio outputs', () => {
       beforeEach(() => {
         clock = sinon.useFakeTimers();

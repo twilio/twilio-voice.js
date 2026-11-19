@@ -11,7 +11,9 @@ const BITRATE_MAX = 510000;
 const BITRATE_MIN = 6000;
 
 function getPreferredCodecInfo(sdp) {
-  const [, codecId, codecName] = /a=rtpmap:(\d+) (\S+)/m.exec(sdp) || [null, '', ''];
+  // The m= line sets the order. Some layers keep munged SDP verbatim, so the rtpmap order can differ.
+  const [, codecId] = /^m=audio \S+ \S+ (\d+)/m.exec(sdp) || [null, ''];
+  const [, codecName] = new RegExp(`a=rtpmap:${codecId} (\\S+)`, 'm').exec(sdp) || [null, ''];
   const regex = new RegExp(`a=fmtp:${codecId} (\\S+)`, 'm');
   const [, codecParams] = regex.exec(sdp) || [null, ''];
   return { codecName, codecParams };
@@ -41,7 +43,7 @@ function setMaxAverageBitrate(sdp, maxAverageBitrate) {
   const opusId = matches && matches.length ? matches[1] : defaultOpusId;
   const regex = new RegExp(`a=fmtp:${opusId}`);
   const lines = sdp.split('\n').map(line => regex.test(line)
-    ? line + `;maxaveragebitrate=${maxAverageBitrate}`
+    ? line.replace(/(\r?)$/, `;maxaveragebitrate=${maxAverageBitrate}$1`)
     : line);
 
   return lines.join('\n');

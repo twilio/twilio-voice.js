@@ -42,7 +42,7 @@ describe('Call', function() {
     mediaHandler.isMuted = false;
     mediaHandler.mute = sinon.spy((shouldMute: boolean) => { mediaHandler.isMuted = shouldMute; });
     mediaHandler.version = {pc: {}, getSDP: () =>
-      'a=rtpmap:1337 opus/48000/2\na=rtpmap:0 PCMU/8000\na=fmtp:0\na=fmtp:1337 maxaveragebitrate=12000'};
+      'm=audio 9 UDP/TLS/RTP/SAVPF 1337 0\na=rtpmap:1337 opus/48000/2\na=rtpmap:0 PCMU/8000\na=fmtp:0\na=fmtp:1337 maxaveragebitrate=12000'};
     return mediaHandler;
   };
 
