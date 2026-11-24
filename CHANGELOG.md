@@ -1,5 +1,13 @@
 :warning: **Important**: If you are upgrading to version 2.3.0 or later and have firewall rules or network configuration that blocks any unknown traffic by default, you need to update your configuration to allow connections to the new DNS names and IP addresses. Please refer to this [changelog](#230-january-23-2023) for more details.
 
+2.19.1 (In Progress)
+====================
+
+Bug Fixes
+---------
+
+- Fixed an issue where calling `device.updateToken()` during a call sent a signaling reconnect for that call although the signaling connection never dropped. Each update briefly interrupted incoming audio, and several updates in quick succession could fail the call with error `31000` while the other party stayed connected with no audio. This has happened since 2.1.0. A call now sends a signaling reconnect only after its signaling connection was lost, and only once each time, including when the token is updated while the call is reconnecting.
+
 2.19.0 (November 12, 2026)
 ==========================
 

@@ -188,6 +188,11 @@ class Call extends EventEmitter {
   private _isCancelled: boolean = false;
 
   /**
+   * Whether a reconnect invite was sent since the signaling transport last closed.
+   */
+  private _isReconnectSent: boolean = false;
+
+  /**
    * Whether the call has been rejected
    */
   private _isRejected: boolean = false;
@@ -1223,7 +1228,13 @@ class Call extends EventEmitter {
    */
   private _onConnected = (): void => {
     this._log.info('Received connected from pstream');
-    if (this._signalingReconnectToken && this._mediaHandler.version) {
+    // A token update also yields `connected`. Send one reconnect per dropped transport;
+    // the gateway can fail the call on a duplicate.
+    if (this._signalingStatus === Call.State.Reconnecting
+      && !this._isReconnectSent
+      && this._signalingReconnectToken
+      && this._mediaHandler.version) {
+      this._isReconnectSent = true;
       this._pstream.reconnect(
         this._mediaHandler.version.getSDP(),
         this.parameters.CallSid,
@@ -1527,6 +1538,7 @@ class Call extends EventEmitter {
     this._log.debug('#transportClose');
     this.emit('transportClose');
     if (this._signalingReconnectToken) {
+      this._isReconnectSent = false;
       this._status = Call.State.Reconnecting;
       this._signalingStatus = Call.State.Reconnecting;
       this._publisher.info('connection', 'reconnecting', null, this);
