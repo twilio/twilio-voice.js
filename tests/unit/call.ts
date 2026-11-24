@@ -2095,36 +2095,61 @@ describe('Call', function() {
     describe('pstream.connected event', () => {
       [true, false].forEach(doesMediaHandlerVersionExist => {
         ['foo', undefined].forEach(signalingReconnectToken => {
-          describe(`when mediaHandler.version ${
-            doesMediaHandlerVersionExist ? 'exists' : 'does not exist'
-          } and signaling reconnect token ${
-            signalingReconnectToken ? 'exists' : 'does not exist'
-          }`, () => {
-            beforeEach(async () => {
-              conn = new Call(config, Object.assign(options, { callParameters: { CallSid: 'CA1234' } }));
-              conn.accept();
-              await clock.tickAsync(0);
-              if (!doesMediaHandlerVersionExist) {
-                mediaHandler.version = null;
-              }
-              if (signalingReconnectToken) {
-                // @ts-ignore
-                conn._signalingReconnectToken = signalingReconnectToken;
-              }
-              pstream.emit('connected');
-            });
+          [Call.State.Reconnecting, Call.State.Open, Call.State.Pending].forEach(signalingStatus => {
+            describe(`when mediaHandler.version ${
+              doesMediaHandlerVersionExist ? 'exists' : 'does not exist'
+            }, signaling reconnect token ${
+              signalingReconnectToken ? 'exists' : 'does not exist'
+            } and signaling status is ${signalingStatus}`, () => {
+              const shouldReconnect = doesMediaHandlerVersionExist && signalingReconnectToken
+                && signalingStatus === Call.State.Reconnecting;
 
-            it(`should ${
-              doesMediaHandlerVersionExist && signalingReconnectToken ? '' : 'not '
-            }call pstream.reconnect()`, async () => {
-              if (doesMediaHandlerVersionExist && signalingReconnectToken) {
-                sinon.assert.calledWith(pstream.reconnect, mediaHandler.version.getSDP(), 'CA1234', signalingReconnectToken);
-              } else {
-                sinon.assert.notCalled(pstream.reconnect);
-              }
+              beforeEach(async () => {
+                conn = new Call(config, Object.assign(options, { callParameters: { CallSid: 'CA1234' } }));
+                conn.accept();
+                await clock.tickAsync(0);
+                if (!doesMediaHandlerVersionExist) {
+                  mediaHandler.version = null;
+                }
+                if (signalingReconnectToken) {
+                  // @ts-ignore
+                  conn._signalingReconnectToken = signalingReconnectToken;
+                }
+                // @ts-ignore
+                conn._signalingStatus = signalingStatus;
+                pstream.emit('connected');
+              });
+
+              it(`should ${shouldReconnect ? '' : 'not '}call pstream.reconnect()`, async () => {
+                if (shouldReconnect) {
+                  sinon.assert.calledWith(pstream.reconnect, mediaHandler.version.getSDP(), 'CA1234', signalingReconnectToken);
+                } else {
+                  sinon.assert.notCalled(pstream.reconnect);
+                }
+              });
             });
           });
         });
+      });
+
+      it('should call pstream.reconnect() once per transportClose', async () => {
+        conn = new Call(config, Object.assign(options, { callParameters: { CallSid: 'CA1234' } }));
+        conn.accept();
+        await clock.tickAsync(0);
+        // @ts-ignore
+        conn._signalingReconnectToken = 'foo';
+
+        pstream.emit('connected');
+        sinon.assert.notCalled(pstream.reconnect);
+
+        pstream.emit('transportClose');
+        pstream.emit('connected');
+        pstream.emit('connected');
+        sinon.assert.calledOnceWithExactly(pstream.reconnect, mediaHandler.version.getSDP(), 'CA1234', 'foo');
+
+        pstream.emit('transportClose');
+        pstream.emit('connected');
+        sinon.assert.calledTwice(pstream.reconnect);
       });
     });
 
