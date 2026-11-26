@@ -17,6 +17,7 @@ import { InvalidArgumentError } from './errors';
  * @typedef {Object} Sound#ConstructorOptions
  * @property {number} [maxDuration=0] - The maximum length of time to play the sound
  *   before stopping it.
+ * @property {Boolean} [preload=true] - Whether the sound should be preloaded on initialization.
  * @property {Boolean} [shouldLoop=false] - Whether the sound should be looped.
  */
 function Sound(name, url, options) {
@@ -31,6 +32,7 @@ function Sound(name, url, options) {
   options = Object.assign({
     AudioFactory: typeof Audio !== 'undefined' ? Audio : null,
     maxDuration: 0,
+    preload: true,
     shouldLoop: false,
   }, options);
 
@@ -55,6 +57,7 @@ function Sound(name, url, options) {
       value: null,
       writable: true,
     },
+    _preload: { value: options.preload },
     _shouldLoop: { value: options.shouldLoop },
     _sinkIds: { value: ['default'] },
     isPlaying: {
@@ -73,7 +76,7 @@ function Sound(name, url, options) {
     },
   });
 
-  if (this._Audio) {
+  if (this._Audio && options.preload !== false) {
     // Play it (muted and should not loop) as soon as possible so that it does not get incorrectly caught by Chrome's
     // "gesture requirement for media playback" feature.
     // https://plus.google.com/+FrancoisBeaufort/posts/6PiJQqJzGqX
